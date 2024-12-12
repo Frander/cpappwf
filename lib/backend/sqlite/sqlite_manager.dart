@@ -1,0 +1,65 @@
+import 'package:flutter/foundation.dart';
+
+import '/backend/sqlite/init.dart';
+import 'queries/read.dart';
+import 'queries/update.dart';
+
+import 'package:sqflite/sqflite.dart';
+export 'queries/read.dart';
+export 'queries/update.dart';
+
+class SQLiteManager {
+  SQLiteManager._();
+
+  static SQLiteManager? _instance;
+  static SQLiteManager get instance => _instance ??= SQLiteManager._();
+
+  static late Database _database;
+  Database get database => _database;
+
+  static Future initialize() async {
+    if (kIsWeb) {
+      return;
+    }
+    _database = await initializeDatabaseFromDbFile(
+      'click_palm_local_b_d',
+      'ClickPalmLocalBD.db',
+    );
+  }
+
+  /// START READ QUERY CALLS
+
+  Future<List<GetAllUsersRow>> getAllUsers() => performGetAllUsers(
+        _database,
+      );
+
+  /// END READ QUERY CALLS
+
+  /// START UPDATE QUERY CALLS
+
+  Future deleteAllUsers() => performDeleteAllUsers(
+        _database,
+      );
+
+  Future insertUser({
+    int? idUser,
+    int? idCompany,
+    String? operId,
+    String? nameUser,
+    String? email,
+    String? createdAt,
+    String? modifiedAt,
+  }) =>
+      performInsertUser(
+        _database,
+        idUser: idUser,
+        idCompany: idCompany,
+        operId: operId,
+        nameUser: nameUser,
+        email: email,
+        createdAt: createdAt,
+        modifiedAt: modifiedAt,
+      );
+
+  /// END UPDATE QUERY CALLS
+}
