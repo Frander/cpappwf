@@ -1,0 +1,59 @@
+// Automatic FlutterFlow imports
+import '/backend/schema/structs/index.dart';
+import '/backend/sqlite/sqlite_manager.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import 'index.dart'; // Imports other custom actions
+import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+import 'package:flutter/material.dart';
+// Begin custom action code
+// DO NOT REMOVE OR MODIFY THE CODE ABOVE!
+
+import 'package:sqflite/sqflite.dart';
+
+Future<void> usersInserData(
+    String databasePath, String tableName, List<UsersStruct> data) async {
+  // Abre la base de datos usando la ruta proporcionada
+  final db = await openDatabase(databasePath);
+
+  // Verificar si la tabla existe
+  final tableExists = await db.rawQuery(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+    [tableName],
+  );
+
+  // Si la tabla no existe, crearla dinámicamente
+  if (tableExists.isEmpty) {
+    // Obtén los campos dinámicamente desde el método toMap del primer elemento
+    final firstUser = data.first.toMap();
+    final fields = firstUser.keys
+        .map((key) => "$key ${_getSqlType(firstUser[key])}")
+        .join(", ");
+    await db.execute("CREATE TABLE $tableName ($fields)");
+    print('Tabla $tableName creada con campos: $fields');
+  }
+
+  // Insertar los registros en la tabla
+  for (final user in data) {
+    await db.insert(
+      tableName,
+      user.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  print('Datos insertados en la tabla $tableName');
+  await db.close(); // Cerrar la base de datos después de la operación
+}
+
+// Función auxiliar para determinar el tipo de dato SQL basado en los valores de toMap
+String _getSqlType(dynamic value) {
+  if (value is int) return 'INTEGER';
+  if (value is double) return 'REAL';
+  if (value is String) return 'TEXT';
+  if (value is bool) return 'INTEGER'; // SQLite no tiene un tipo booleano
+  return 'TEXT'; // Tipo por defecto
+}
+
+// Set your action name, define your arguments and return parameter,
+// and then add the boilerplate code using the green button on the right!

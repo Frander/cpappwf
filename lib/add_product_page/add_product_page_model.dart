@@ -1,0 +1,20 @@
+import '/flutter_flow/flutter_flow_util.dart';
+import 'add_product_page_widget.dart' show AddProductPageWidget;
+import 'package:flutter/material.dart';
+
+class AddProductPageModel extends FlutterFlowModel<AddProductPageWidget> {
+  ///  State fields for stateful widgets in this page.
+
+  // State field(s) for CountController widget.
+  int? countControllerValue1;
+  // State field(s) for CountController widget.
+  int? countControllerValue2;
+  // State field(s) for Checkbox widget.
+  bool? checkboxValue;
+
+  @override
+  void initState(BuildContext context) {}
+
+  @override
+  void dispose() {}
+}

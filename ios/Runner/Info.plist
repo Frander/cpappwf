@@ -43,7 +43,14 @@
 	<true/>
 
 
-
+	<key>NSLocationWhenInUseUsageDescription</key>
+    <string>Clickpalm requiere acceso a tu ubicación en tiempo real para realizar las lecturas</string>
+	<key>NSCameraUsageDescription</key>
+    <string>Clickpalm requiere acceso a tu camara para subir fotos</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+    <string>Clickpalm requiere acceso a tu galería para cargar imágenes de las actividades</string>
+	<key>PermissionGroupNotification</key>
+    <string>Clickpalm requiere acceso para las notificaciones en tiempo real</string>
 
 
 	<key>UILaunchStoryboardName</key>

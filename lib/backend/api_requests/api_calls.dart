@@ -3988,13 +3988,18 @@ class TasksFiltersGETCall {
 }
 
 class UsersLoginPOSTCall {
-  Future<ApiCallResponse> call() async {
+  Future<ApiCallResponse> call({
+    String? typeLogin = '',
+    String? username = '',
+    String? password = '',
+  }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    const ffApiRequestBody = '''
+    final ffApiRequestBody = '''
 {
-  "username": "example string",
-  "password": "example string"
+  "type_login": "$typeLogin",
+  "username": "$username",
+  "password": "$password"
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users/Login POST',

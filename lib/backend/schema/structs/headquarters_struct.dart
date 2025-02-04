@@ -11,22 +11,22 @@ class HeadquartersStruct extends BaseStruct {
     int? idZone,
     String? createdAt,
     String? nameHeadquarter,
-    double? densityHeadquarter,
+    int? densityHeadquarter,
     String? seedTime,
-    int? areaHeadquarter,
-    String? polygon,
     String? stateHeadquarter,
+    double? areaHeadquarter,
+    String? polygon,
   })  : _idHeadquarter = idHeadquarter,
         _idZone = idZone,
         _createdAt = createdAt,
         _nameHeadquarter = nameHeadquarter,
         _densityHeadquarter = densityHeadquarter,
         _seedTime = seedTime,
+        _stateHeadquarter = stateHeadquarter,
         _areaHeadquarter = areaHeadquarter,
-        _polygon = polygon,
-        _stateHeadquarter = stateHeadquarter;
+        _polygon = polygon;
 
-  // "Id_headquarter" field.
+  // "id_headquarter" field.
   int? _idHeadquarter;
   int get idHeadquarter => _idHeadquarter ?? 0;
   set idHeadquarter(int? val) => _idHeadquarter = val;
@@ -36,7 +36,7 @@ class HeadquartersStruct extends BaseStruct {
 
   bool hasIdHeadquarter() => _idHeadquarter != null;
 
-  // "Id_zone" field.
+  // "id_zone" field.
   int? _idZone;
   int get idZone => _idZone ?? 0;
   set idZone(int? val) => _idZone = val;
@@ -45,72 +45,72 @@ class HeadquartersStruct extends BaseStruct {
 
   bool hasIdZone() => _idZone != null;
 
-  // "Created_at" field.
+  // "created_at" field.
   String? _createdAt;
   String get createdAt => _createdAt ?? '';
   set createdAt(String? val) => _createdAt = val;
 
   bool hasCreatedAt() => _createdAt != null;
 
-  // "Name_headquarter" field.
+  // "name_headquarter" field.
   String? _nameHeadquarter;
   String get nameHeadquarter => _nameHeadquarter ?? '';
   set nameHeadquarter(String? val) => _nameHeadquarter = val;
 
   bool hasNameHeadquarter() => _nameHeadquarter != null;
 
-  // "Density_headquarter" field.
-  double? _densityHeadquarter;
-  double get densityHeadquarter => _densityHeadquarter ?? 0.0;
-  set densityHeadquarter(double? val) => _densityHeadquarter = val;
+  // "density_headquarter" field.
+  int? _densityHeadquarter;
+  int get densityHeadquarter => _densityHeadquarter ?? 0;
+  set densityHeadquarter(int? val) => _densityHeadquarter = val;
 
-  void incrementDensityHeadquarter(double amount) =>
+  void incrementDensityHeadquarter(int amount) =>
       densityHeadquarter = densityHeadquarter + amount;
 
   bool hasDensityHeadquarter() => _densityHeadquarter != null;
 
-  // "Seed_time" field.
+  // "seed_time" field.
   String? _seedTime;
   String get seedTime => _seedTime ?? '';
   set seedTime(String? val) => _seedTime = val;
 
   bool hasSeedTime() => _seedTime != null;
 
-  // "Area_headquarter" field.
-  int? _areaHeadquarter;
-  int get areaHeadquarter => _areaHeadquarter ?? 0;
-  set areaHeadquarter(int? val) => _areaHeadquarter = val;
-
-  void incrementAreaHeadquarter(int amount) =>
-      areaHeadquarter = areaHeadquarter + amount;
-
-  bool hasAreaHeadquarter() => _areaHeadquarter != null;
-
-  // "Polygon" field.
-  String? _polygon;
-  String get polygon => _polygon ?? '';
-  set polygon(String? val) => _polygon = val;
-
-  bool hasPolygon() => _polygon != null;
-
-  // "State_headquarter" field.
+  // "state_headquarter" field.
   String? _stateHeadquarter;
   String get stateHeadquarter => _stateHeadquarter ?? '';
   set stateHeadquarter(String? val) => _stateHeadquarter = val;
 
   bool hasStateHeadquarter() => _stateHeadquarter != null;
 
+  // "area_headquarter" field.
+  double? _areaHeadquarter;
+  double get areaHeadquarter => _areaHeadquarter ?? 0.0;
+  set areaHeadquarter(double? val) => _areaHeadquarter = val;
+
+  void incrementAreaHeadquarter(double amount) =>
+      areaHeadquarter = areaHeadquarter + amount;
+
+  bool hasAreaHeadquarter() => _areaHeadquarter != null;
+
+  // "polygon" field.
+  String? _polygon;
+  String get polygon => _polygon ?? '';
+  set polygon(String? val) => _polygon = val;
+
+  bool hasPolygon() => _polygon != null;
+
   static HeadquartersStruct fromMap(Map<String, dynamic> data) =>
       HeadquartersStruct(
-        idHeadquarter: castToType<int>(data['Id_headquarter']),
-        idZone: castToType<int>(data['Id_zone']),
-        createdAt: data['Created_at'] as String?,
-        nameHeadquarter: data['Name_headquarter'] as String?,
-        densityHeadquarter: castToType<double>(data['Density_headquarter']),
-        seedTime: data['Seed_time'] as String?,
-        areaHeadquarter: castToType<int>(data['Area_headquarter']),
-        polygon: data['Polygon'] as String?,
-        stateHeadquarter: data['State_headquarter'] as String?,
+        idHeadquarter: castToType<int>(data['id_headquarter']),
+        idZone: castToType<int>(data['id_zone']),
+        createdAt: data['created_at'] as String?,
+        nameHeadquarter: data['name_headquarter'] as String?,
+        densityHeadquarter: castToType<int>(data['density_headquarter']),
+        seedTime: data['seed_time'] as String?,
+        stateHeadquarter: data['state_headquarter'] as String?,
+        areaHeadquarter: castToType<double>(data['area_headquarter']),
+        polygon: data['polygon'] as String?,
       );
 
   static HeadquartersStruct? maybeFromMap(dynamic data) => data is Map
@@ -118,53 +118,53 @@ class HeadquartersStruct extends BaseStruct {
       : null;
 
   Map<String, dynamic> toMap() => {
-        'Id_headquarter': _idHeadquarter,
-        'Id_zone': _idZone,
-        'Created_at': _createdAt,
-        'Name_headquarter': _nameHeadquarter,
-        'Density_headquarter': _densityHeadquarter,
-        'Seed_time': _seedTime,
-        'Area_headquarter': _areaHeadquarter,
-        'Polygon': _polygon,
-        'State_headquarter': _stateHeadquarter,
+        'id_headquarter': _idHeadquarter,
+        'id_zone': _idZone,
+        'created_at': _createdAt,
+        'name_headquarter': _nameHeadquarter,
+        'density_headquarter': _densityHeadquarter,
+        'seed_time': _seedTime,
+        'state_headquarter': _stateHeadquarter,
+        'area_headquarter': _areaHeadquarter,
+        'polygon': _polygon,
       }.withoutNulls;
 
   @override
   Map<String, dynamic> toSerializableMap() => {
-        'Id_headquarter': serializeParam(
+        'id_headquarter': serializeParam(
           _idHeadquarter,
           ParamType.int,
         ),
-        'Id_zone': serializeParam(
+        'id_zone': serializeParam(
           _idZone,
           ParamType.int,
         ),
-        'Created_at': serializeParam(
+        'created_at': serializeParam(
           _createdAt,
           ParamType.String,
         ),
-        'Name_headquarter': serializeParam(
+        'name_headquarter': serializeParam(
           _nameHeadquarter,
           ParamType.String,
         ),
-        'Density_headquarter': serializeParam(
+        'density_headquarter': serializeParam(
           _densityHeadquarter,
-          ParamType.double,
+          ParamType.int,
         ),
-        'Seed_time': serializeParam(
+        'seed_time': serializeParam(
           _seedTime,
           ParamType.String,
         ),
-        'Area_headquarter': serializeParam(
-          _areaHeadquarter,
-          ParamType.int,
-        ),
-        'Polygon': serializeParam(
-          _polygon,
+        'state_headquarter': serializeParam(
+          _stateHeadquarter,
           ParamType.String,
         ),
-        'State_headquarter': serializeParam(
-          _stateHeadquarter,
+        'area_headquarter': serializeParam(
+          _areaHeadquarter,
+          ParamType.double,
+        ),
+        'polygon': serializeParam(
+          _polygon,
           ParamType.String,
         ),
       }.withoutNulls;
@@ -172,47 +172,47 @@ class HeadquartersStruct extends BaseStruct {
   static HeadquartersStruct fromSerializableMap(Map<String, dynamic> data) =>
       HeadquartersStruct(
         idHeadquarter: deserializeParam(
-          data['Id_headquarter'],
+          data['id_headquarter'],
           ParamType.int,
           false,
         ),
         idZone: deserializeParam(
-          data['Id_zone'],
+          data['id_zone'],
           ParamType.int,
           false,
         ),
         createdAt: deserializeParam(
-          data['Created_at'],
+          data['created_at'],
           ParamType.String,
           false,
         ),
         nameHeadquarter: deserializeParam(
-          data['Name_headquarter'],
+          data['name_headquarter'],
           ParamType.String,
           false,
         ),
         densityHeadquarter: deserializeParam(
-          data['Density_headquarter'],
-          ParamType.double,
-          false,
-        ),
-        seedTime: deserializeParam(
-          data['Seed_time'],
-          ParamType.String,
-          false,
-        ),
-        areaHeadquarter: deserializeParam(
-          data['Area_headquarter'],
+          data['density_headquarter'],
           ParamType.int,
           false,
         ),
-        polygon: deserializeParam(
-          data['Polygon'],
+        seedTime: deserializeParam(
+          data['seed_time'],
           ParamType.String,
           false,
         ),
         stateHeadquarter: deserializeParam(
-          data['State_headquarter'],
+          data['state_headquarter'],
+          ParamType.String,
+          false,
+        ),
+        areaHeadquarter: deserializeParam(
+          data['area_headquarter'],
+          ParamType.double,
+          false,
+        ),
+        polygon: deserializeParam(
+          data['polygon'],
           ParamType.String,
           false,
         ),
@@ -230,9 +230,9 @@ class HeadquartersStruct extends BaseStruct {
         nameHeadquarter == other.nameHeadquarter &&
         densityHeadquarter == other.densityHeadquarter &&
         seedTime == other.seedTime &&
+        stateHeadquarter == other.stateHeadquarter &&
         areaHeadquarter == other.areaHeadquarter &&
-        polygon == other.polygon &&
-        stateHeadquarter == other.stateHeadquarter;
+        polygon == other.polygon;
   }
 
   @override
@@ -243,9 +243,9 @@ class HeadquartersStruct extends BaseStruct {
         nameHeadquarter,
         densityHeadquarter,
         seedTime,
+        stateHeadquarter,
         areaHeadquarter,
-        polygon,
-        stateHeadquarter
+        polygon
       ]);
 }
 
@@ -254,11 +254,11 @@ HeadquartersStruct createHeadquartersStruct({
   int? idZone,
   String? createdAt,
   String? nameHeadquarter,
-  double? densityHeadquarter,
+  int? densityHeadquarter,
   String? seedTime,
-  int? areaHeadquarter,
-  String? polygon,
   String? stateHeadquarter,
+  double? areaHeadquarter,
+  String? polygon,
 }) =>
     HeadquartersStruct(
       idHeadquarter: idHeadquarter,
@@ -267,7 +267,7 @@ HeadquartersStruct createHeadquartersStruct({
       nameHeadquarter: nameHeadquarter,
       densityHeadquarter: densityHeadquarter,
       seedTime: seedTime,
+      stateHeadquarter: stateHeadquarter,
       areaHeadquarter: areaHeadquarter,
       polygon: polygon,
-      stateHeadquarter: stateHeadquarter,
     );

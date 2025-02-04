@@ -9,7 +9,7 @@ class UsersStruct extends BaseStruct {
   UsersStruct({
     int? idUser,
     int? idCompany,
-    int? operID,
+    String? operID,
     String? nameUser,
     String? email,
     String? createdAt,
@@ -22,7 +22,7 @@ class UsersStruct extends BaseStruct {
         _createdAt = createdAt,
         _modifiedAt = modifiedAt;
 
-  // "Id_user" field.
+  // "id_user" field.
   int? _idUser;
   int get idUser => _idUser ?? 0;
   set idUser(int? val) => _idUser = val;
@@ -31,7 +31,7 @@ class UsersStruct extends BaseStruct {
 
   bool hasIdUser() => _idUser != null;
 
-  // "Id_company" field.
+  // "id_company" field.
   int? _idCompany;
   int get idCompany => _idCompany ?? 0;
   set idCompany(int? val) => _idCompany = val;
@@ -40,37 +40,35 @@ class UsersStruct extends BaseStruct {
 
   bool hasIdCompany() => _idCompany != null;
 
-  // "OperID" field.
-  int? _operID;
-  int get operID => _operID ?? 0;
-  set operID(int? val) => _operID = val;
-
-  void incrementOperID(int amount) => operID = operID + amount;
+  // "operID" field.
+  String? _operID;
+  String get operID => _operID ?? '';
+  set operID(String? val) => _operID = val;
 
   bool hasOperID() => _operID != null;
 
-  // "Name_user" field.
+  // "name_user" field.
   String? _nameUser;
   String get nameUser => _nameUser ?? '';
   set nameUser(String? val) => _nameUser = val;
 
   bool hasNameUser() => _nameUser != null;
 
-  // "Email" field.
+  // "email" field.
   String? _email;
   String get email => _email ?? '';
   set email(String? val) => _email = val;
 
   bool hasEmail() => _email != null;
 
-  // "Created_at" field.
+  // "created_at" field.
   String? _createdAt;
   String get createdAt => _createdAt ?? '';
   set createdAt(String? val) => _createdAt = val;
 
   bool hasCreatedAt() => _createdAt != null;
 
-  // "ModifiedAt" field.
+  // "modifiedAt" field.
   String? _modifiedAt;
   String get modifiedAt => _modifiedAt ?? '';
   set modifiedAt(String? val) => _modifiedAt = val;
@@ -78,55 +76,55 @@ class UsersStruct extends BaseStruct {
   bool hasModifiedAt() => _modifiedAt != null;
 
   static UsersStruct fromMap(Map<String, dynamic> data) => UsersStruct(
-        idUser: castToType<int>(data['Id_user']),
-        idCompany: castToType<int>(data['Id_company']),
-        operID: castToType<int>(data['OperID']),
-        nameUser: data['Name_user'] as String?,
-        email: data['Email'] as String?,
-        createdAt: data['Created_at'] as String?,
-        modifiedAt: data['ModifiedAt'] as String?,
+        idUser: castToType<int>(data['id_user']),
+        idCompany: castToType<int>(data['id_company']),
+        operID: data['operID'] as String?,
+        nameUser: data['name_user'] as String?,
+        email: data['email'] as String?,
+        createdAt: data['created_at'] as String?,
+        modifiedAt: data['modifiedAt'] as String?,
       );
 
   static UsersStruct? maybeFromMap(dynamic data) =>
       data is Map ? UsersStruct.fromMap(data.cast<String, dynamic>()) : null;
 
   Map<String, dynamic> toMap() => {
-        'Id_user': _idUser,
-        'Id_company': _idCompany,
-        'OperID': _operID,
-        'Name_user': _nameUser,
-        'Email': _email,
-        'Created_at': _createdAt,
-        'ModifiedAt': _modifiedAt,
+        'id_user': _idUser,
+        'id_company': _idCompany,
+        'operID': _operID,
+        'name_user': _nameUser,
+        'email': _email,
+        'created_at': _createdAt,
+        'modifiedAt': _modifiedAt,
       }.withoutNulls;
 
   @override
   Map<String, dynamic> toSerializableMap() => {
-        'Id_user': serializeParam(
+        'id_user': serializeParam(
           _idUser,
           ParamType.int,
         ),
-        'Id_company': serializeParam(
+        'id_company': serializeParam(
           _idCompany,
           ParamType.int,
         ),
-        'OperID': serializeParam(
+        'operID': serializeParam(
           _operID,
-          ParamType.int,
+          ParamType.String,
         ),
-        'Name_user': serializeParam(
+        'name_user': serializeParam(
           _nameUser,
           ParamType.String,
         ),
-        'Email': serializeParam(
+        'email': serializeParam(
           _email,
           ParamType.String,
         ),
-        'Created_at': serializeParam(
+        'created_at': serializeParam(
           _createdAt,
           ParamType.String,
         ),
-        'ModifiedAt': serializeParam(
+        'modifiedAt': serializeParam(
           _modifiedAt,
           ParamType.String,
         ),
@@ -135,37 +133,37 @@ class UsersStruct extends BaseStruct {
   static UsersStruct fromSerializableMap(Map<String, dynamic> data) =>
       UsersStruct(
         idUser: deserializeParam(
-          data['Id_user'],
+          data['id_user'],
           ParamType.int,
           false,
         ),
         idCompany: deserializeParam(
-          data['Id_company'],
+          data['id_company'],
           ParamType.int,
           false,
         ),
         operID: deserializeParam(
-          data['OperID'],
-          ParamType.int,
+          data['operID'],
+          ParamType.String,
           false,
         ),
         nameUser: deserializeParam(
-          data['Name_user'],
+          data['name_user'],
           ParamType.String,
           false,
         ),
         email: deserializeParam(
-          data['Email'],
+          data['email'],
           ParamType.String,
           false,
         ),
         createdAt: deserializeParam(
-          data['Created_at'],
+          data['created_at'],
           ParamType.String,
           false,
         ),
         modifiedAt: deserializeParam(
-          data['ModifiedAt'],
+          data['modifiedAt'],
           ParamType.String,
           false,
         ),
@@ -194,7 +192,7 @@ class UsersStruct extends BaseStruct {
 UsersStruct createUsersStruct({
   int? idUser,
   int? idCompany,
-  int? operID,
+  String? operID,
   String? nameUser,
   String? email,
   String? createdAt,

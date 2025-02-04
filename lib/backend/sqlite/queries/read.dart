@@ -21,11 +21,11 @@ select * from Users
 class GetAllUsersRow extends SqliteRow {
   GetAllUsersRow(super.data);
 
-  int get idUser => data['Id_user'] as int;
-  int get idCompany => data['Id_company'] as int;
-  String get operID => data['OperID'] as String;
-  String get nameUser => data['Name_user'] as String;
-  String? get email => data['Email'] as String?;
+  int get idUser => data['idUser'] as int;
+  int get idCompany => data['idCompany'] as int;
+  String get operID => data['operID'] as String;
+  String get nameUser => data['nameUser'] as String;
+  String get email => data['email'] as String;
 }
 
 /// END GETALLUSERS

@@ -1,4 +1,4 @@
-package com.mycompany.clickpalmapp
+package com.clickpalm.clickpalmapp
 
 import io.flutter.embedding.android.FlutterActivity
 

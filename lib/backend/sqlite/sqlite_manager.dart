@@ -41,25 +41,5 @@ class SQLiteManager {
         _database,
       );
 
-  Future insertUser({
-    int? idUser,
-    int? idCompany,
-    String? operId,
-    String? nameUser,
-    String? email,
-    String? createdAt,
-    String? modifiedAt,
-  }) =>
-      performInsertUser(
-        _database,
-        idUser: idUser,
-        idCompany: idCompany,
-        operId: operId,
-        nameUser: nameUser,
-        email: email,
-        createdAt: createdAt,
-        modifiedAt: modifiedAt,
-      );
-
   /// END UPDATE QUERY CALLS
 }

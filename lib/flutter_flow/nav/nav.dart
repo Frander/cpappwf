@@ -14,6 +14,8 @@ export 'serialization_util.dart';
 
 const kTransitionInfoKey = '__transition_info__';
 
+GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
 class AppStateNotifier extends ChangeNotifier {
   AppStateNotifier._();
 
@@ -32,17 +34,60 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       initialLocation: '/',
       debugLogDiagnostics: true,
       refreshListenable: appStateNotifier,
-      errorBuilder: (context, state) => const MainPageWidget(),
+      navigatorKey: appNavigatorKey,
+      errorBuilder: (context, state) => appStateNotifier.showSplashImage
+          ? Builder(
+              builder: (context) => Container(
+                color: Colors.transparent,
+                child: Image.asset(
+                  'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
+                  fit: BoxFit.cover,
+                ),
+              ),
+            )
+          : const StartPageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
-          builder: (context, _) => const MainPageWidget(),
+          builder: (context, _) => appStateNotifier.showSplashImage
+              ? Builder(
+                  builder: (context) => Container(
+                    color: Colors.transparent,
+                    child: Image.asset(
+                      'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+              : const StartPageWidget(),
         ),
         FFRoute(
-          name: 'HomePage',
-          path: '/homePage',
-          builder: (context, params) => const HomePageWidget(),
+          name: 'UsersPage',
+          path: '/usersPage',
+          builder: (context, params) => const UsersPageWidget(),
+        ),
+        FFRoute(
+          name: 'StartPage',
+          path: '/startPage',
+          builder: (context, params) => StartPageWidget(
+            visitsAdd: params.getParam<VisitsStruct>(
+              'visitsAdd',
+              ParamType.DataStruct,
+              isList: true,
+              structBuilder: VisitsStruct.fromSerializableMap,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: 'HeadquartersPage',
+          path: '/headquartersPage',
+          builder: (context, params) => const HeadquartersPageWidget(),
+        ),
+        FFRoute(
+          name: 'ActivitiesPage',
+          path: '/activitiesPage',
+          builder: (context, params) => const ActivitiesPageWidget(),
         ),
         FFRoute(
           name: 'MainPage',
@@ -50,9 +95,44 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => const MainPageWidget(),
         ),
         FFRoute(
-          name: 'UsersPage',
-          path: '/usersPage',
-          builder: (context, params) => const UsersPageWidget(),
+          name: 'CalculateLocationPage',
+          path: '/calculateLocationPage',
+          builder: (context, params) => const CalculateLocationPageWidget(),
+        ),
+        FFRoute(
+          name: 'DoActivitiesPage',
+          path: '/doActivitiesPage',
+          builder: (context, params) => DoActivitiesPageWidget(
+            tittle: params.getParam(
+              'tittle',
+              ParamType.String,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: 'AddProductPage',
+          path: '/addProductPage',
+          builder: (context, params) => const AddProductPageWidget(),
+        ),
+        FFRoute(
+          name: 'ZonesPage',
+          path: '/zonesPage',
+          builder: (context, params) => const ZonesPageWidget(),
+        ),
+        FFRoute(
+          name: 'InfoPage',
+          path: '/infoPage',
+          builder: (context, params) => const InfoPageWidget(),
+        ),
+        FFRoute(
+          name: 'DoVisitsPage',
+          path: '/doVisitsPage',
+          builder: (context, params) => DoVisitsPageWidget(
+            tittle: params.getParam(
+              'tittle',
+              ParamType.String,
+            ),
+          ),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );
