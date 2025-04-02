@@ -37,6 +37,17 @@ class FFAppState extends ChangeNotifier {
       }
     });
     _safeInit(() {
+      if (prefs.containsKey('ff_userSelected')) {
+        try {
+          final serializedData = prefs.getString('ff_userSelected') ?? '{}';
+          _userSelected =
+              UsersStruct.fromSerializableMap(jsonDecode(serializedData));
+        } catch (e) {
+          print("Can't decode persisted data type. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
       if (prefs.containsKey('ff_companyDefault')) {
         try {
           final serializedData = prefs.getString('ff_companyDefault') ?? '{}';
@@ -146,6 +157,17 @@ class FFAppState extends ChangeNotifier {
       }
     });
     _safeInit(() {
+      if (prefs.containsKey('ff_activitySelected')) {
+        try {
+          final serializedData = prefs.getString('ff_activitySelected') ?? '{}';
+          _activitySelected =
+              ActivitiesStruct.fromSerializableMap(jsonDecode(serializedData));
+        } catch (e) {
+          print("Can't decode persisted data type. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
       _visitsAdd = prefs
               .getStringList('ff_visitsAdd')
               ?.map((x) {
@@ -162,6 +184,23 @@ class FFAppState extends ChangeNotifier {
     });
     _safeInit(() {
       _pathDatabase = prefs.getString('ff_pathDatabase') ?? _pathDatabase;
+    });
+    _safeInit(() {
+      _lastLineInstall = prefs.getInt('ff_lastLineInstall') ?? _lastLineInstall;
+    });
+    _safeInit(() {
+      _lastPalmInstall = prefs.getInt('ff_lastPalmInstall') ?? _lastPalmInstall;
+    });
+    _safeInit(() {
+      _androidID = prefs.getString('ff_androidID') ?? _androidID;
+    });
+    _safeInit(() {
+      _isCalibrateVoice =
+          prefs.getBool('ff_isCalibrateVoice') ?? _isCalibrateVoice;
+    });
+    _safeInit(() {
+      _listVoiceCalibration = prefs.getStringList('ff_listVoiceCalibration') ??
+          _listVoiceCalibration;
     });
   }
 
@@ -205,10 +244,12 @@ class FFAppState extends ChangeNotifier {
   UsersStruct get userSelected => _userSelected;
   set userSelected(UsersStruct value) {
     _userSelected = value;
+    prefs.setString('ff_userSelected', value.serialize());
   }
 
   void updateUserSelectedStruct(Function(UsersStruct) updateFn) {
     updateFn(_userSelected);
+    prefs.setString('ff_userSelected', _userSelected.serialize());
   }
 
   CompaniesStruct _companyDefault = CompaniesStruct();
@@ -478,10 +519,12 @@ class FFAppState extends ChangeNotifier {
   ActivitiesStruct get activitySelected => _activitySelected;
   set activitySelected(ActivitiesStruct value) {
     _activitySelected = value;
+    prefs.setString('ff_activitySelected', value.serialize());
   }
 
   void updateActivitySelectedStruct(Function(ActivitiesStruct) updateFn) {
     updateFn(_activitySelected);
+    prefs.setString('ff_activitySelected', _activitySelected.serialize());
   }
 
   List<ProductsStruct> _productsAdd = [];
@@ -576,6 +619,81 @@ class FFAppState extends ChangeNotifier {
   set pathDatabase(String value) {
     _pathDatabase = value;
     prefs.setString('ff_pathDatabase', value);
+  }
+
+  int _lastLineInstall = 0;
+  int get lastLineInstall => _lastLineInstall;
+  set lastLineInstall(int value) {
+    _lastLineInstall = value;
+    prefs.setInt('ff_lastLineInstall', value);
+  }
+
+  int _lastPalmInstall = 0;
+  int get lastPalmInstall => _lastPalmInstall;
+  set lastPalmInstall(int value) {
+    _lastPalmInstall = value;
+    prefs.setInt('ff_lastPalmInstall', value);
+  }
+
+  String _androidID = '';
+  String get androidID => _androidID;
+  set androidID(String value) {
+    _androidID = value;
+    prefs.setString('ff_androidID', value);
+  }
+
+  bool _stopVoice = false;
+  bool get stopVoice => _stopVoice;
+  set stopVoice(bool value) {
+    _stopVoice = value;
+  }
+
+  bool _isCalibrateVoice = false;
+  bool get isCalibrateVoice => _isCalibrateVoice;
+  set isCalibrateVoice(bool value) {
+    _isCalibrateVoice = value;
+    prefs.setBool('ff_isCalibrateVoice', value);
+  }
+
+  List<String> _listVoiceCalibration = [];
+  List<String> get listVoiceCalibration => _listVoiceCalibration;
+  set listVoiceCalibration(List<String> value) {
+    _listVoiceCalibration = value;
+    prefs.setStringList('ff_listVoiceCalibration', value);
+  }
+
+  void addToListVoiceCalibration(String value) {
+    listVoiceCalibration.add(value);
+    prefs.setStringList('ff_listVoiceCalibration', _listVoiceCalibration);
+  }
+
+  void removeFromListVoiceCalibration(String value) {
+    listVoiceCalibration.remove(value);
+    prefs.setStringList('ff_listVoiceCalibration', _listVoiceCalibration);
+  }
+
+  void removeAtIndexFromListVoiceCalibration(int index) {
+    listVoiceCalibration.removeAt(index);
+    prefs.setStringList('ff_listVoiceCalibration', _listVoiceCalibration);
+  }
+
+  void updateListVoiceCalibrationAtIndex(
+    int index,
+    String Function(String) updateFn,
+  ) {
+    listVoiceCalibration[index] = updateFn(_listVoiceCalibration[index]);
+    prefs.setStringList('ff_listVoiceCalibration', _listVoiceCalibration);
+  }
+
+  void insertAtIndexInListVoiceCalibration(int index, String value) {
+    listVoiceCalibration.insert(index, value);
+    prefs.setStringList('ff_listVoiceCalibration', _listVoiceCalibration);
+  }
+
+  int _idActivityStatus = 0;
+  int get idActivityStatus => _idActivityStatus;
+  set idActivityStatus(int value) {
+    _idActivityStatus = value;
   }
 }
 

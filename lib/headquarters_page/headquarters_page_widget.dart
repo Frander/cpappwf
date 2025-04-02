@@ -10,6 +10,9 @@ export 'headquarters_page_model.dart';
 class HeadquartersPageWidget extends StatefulWidget {
   const HeadquartersPageWidget({super.key});
 
+  static String routeName = 'HeadquartersPage';
+  static String routePath = '/headquartersPage';
+
   @override
   State<HeadquartersPageWidget> createState() => _HeadquartersPageWidgetState();
 }
@@ -63,14 +66,14 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
             children: [
               Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(),
+                decoration: BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.start,
                   children: [
                     Container(
                       width: double.infinity,
-                      decoration: const BoxDecoration(),
+                      decoration: BoxDecoration(),
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.start,
@@ -97,7 +100,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               Container(
                                 width: 124.09,
                                 height: 53.2,
-                                decoration: const BoxDecoration(),
+                                decoration: BoxDecoration(),
                                 child: ClipRRect(
                                   borderRadius: BorderRadius.circular(8.0),
                                   child: Image.asset(
@@ -121,12 +124,12 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                 ),
                           ),
                           Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                                 10.0, 0.0, 10.0, 0.0),
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
                                     blurRadius: 4.0,
                                     color: Color(0x33000000),
@@ -139,8 +142,8 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.all(6.0),
-                                child: SizedBox(
+                                padding: EdgeInsets.all(6.0),
+                                child: Container(
                                   width: 200.0,
                                   child: TextFormField(
                                     controller: _model.textController,
@@ -164,7 +167,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                             letterSpacing: 0.0,
                                           ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -172,7 +175,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                             BorderRadius.circular(8.0),
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -217,7 +220,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               ),
                             ),
                           ),
-                        ].divide(const SizedBox(height: 10.0)),
+                        ].divide(SizedBox(height: 10.0)),
                       ),
                     ),
                   ],
@@ -227,9 +230,9 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  decoration: const BoxDecoration(),
+                  decoration: BoxDecoration(),
                   child: Padding(
-                    padding: const EdgeInsets.all(10.0),
+                    padding: EdgeInsets.all(10.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       children: [
@@ -242,7 +245,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               return GridView.builder(
                                 padding: EdgeInsets.zero,
                                 gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
+                                    SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   crossAxisSpacing: 10.0,
                                   mainAxisSpacing: 10.0,
@@ -254,7 +257,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                   final headquarterItemItem =
                                       headquarterItem[headquarterItemIndex];
                                   return Padding(
-                                    padding: const EdgeInsetsDirectional.fromSTEB(
+                                    padding: EdgeInsetsDirectional.fromSTEB(
                                         0.0, 5.0, 0.0, 0.0),
                                     child: InkWell(
                                       splashColor: Colors.transparent,
@@ -281,7 +284,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .primaryBackground,
-                                          boxShadow: const [
+                                          boxShadow: [
                                             BoxShadow(
                                               blurRadius: 10.0,
                                               color: Color(0x33000000),
@@ -295,12 +298,12 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                               BorderRadius.circular(12.0),
                                         ),
                                         child: Padding(
-                                          padding: const EdgeInsets.all(10.0),
+                                          padding: EdgeInsets.all(10.0),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.max,
                                             children: [
                                               Container(
-                                                decoration: const BoxDecoration(),
+                                                decoration: BoxDecoration(),
                                                 child: ClipRRect(
                                                   borderRadius:
                                                       BorderRadius.circular(
@@ -314,7 +317,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                               ),
                                               Expanded(
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           0.0, 5.0, 5.0, 5.0),
                                                   child: Column(
@@ -323,7 +326,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                                     children: [
                                                       Expanded(
                                                         child: Text(
-                                                          headquarterItemItem.nameHeadquarter,
+                                                          '${headquarterItemItem.nameHeadquarter}',
                                                           textAlign:
                                                               TextAlign.start,
                                                           style: FlutterFlowTheme
@@ -366,7 +369,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                                                             .bold,
                                                                   ),
                                                             ),
-                                                          ].divide(const SizedBox(
+                                                          ].divide(SizedBox(
                                                               width: 10.0)),
                                                         ),
                                                       ),
@@ -385,7 +388,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             },
                           ),
                         ),
-                      ].divide(const SizedBox(height: 10.0)),
+                      ].divide(SizedBox(height: 10.0)),
                     ),
                   ),
                 ),

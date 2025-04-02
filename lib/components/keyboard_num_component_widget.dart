@@ -11,8 +11,8 @@ class KeyboardNumComponentWidget extends StatefulWidget {
     super.key,
     String? tittle,
     bool? isBackButton,
-  })  : tittle = tittle ?? 'Ingrese el código',
-        isBackButton = isBackButton ?? false;
+  })  : this.tittle = tittle ?? 'Ingrese el código',
+        this.isBackButton = isBackButton ?? false;
 
   final String tittle;
   final bool isBackButton;
@@ -63,7 +63,7 @@ class _KeyboardNumComponentWidgetState
         ),
       ),
       child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(24.0, 10.0, 24.0, 24.0),
+        padding: EdgeInsetsDirectional.fromSTEB(24.0, 10.0, 24.0, 24.0),
         child: Column(
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.start,
@@ -92,7 +92,7 @@ class _KeyboardNumComponentWidgetState
                   ),
                 Container(
                   height: 48.39,
-                  decoration: const BoxDecoration(),
+                  decoration: BoxDecoration(),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8.0),
                     child: Image.asset(
@@ -126,7 +126,7 @@ class _KeyboardNumComponentWidgetState
                 ),
                 child: Padding(
                   padding:
-                      const EdgeInsetsDirectional.fromSTEB(10.0, 10.0, 10.0, 10.0),
+                      EdgeInsetsDirectional.fromSTEB(10.0, 10.0, 10.0, 10.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.max,
                     children: [
@@ -139,9 +139,9 @@ class _KeyboardNumComponentWidgetState
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                         child: Align(
-                          alignment: const AlignmentDirectional(0.0, 0.0),
+                          alignment: AlignmentDirectional(0.0, 0.0),
                           child: Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                                 16.0, 0.0, 16.0, 0.0),
                             child: Text(
                               FFAppState().codeKeyboard,
@@ -192,9 +192,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '1',
                                           textAlign: TextAlign.center,
@@ -236,9 +236,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '2',
                                           textAlign: TextAlign.center,
@@ -280,9 +280,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '3',
                                           textAlign: TextAlign.center,
@@ -330,9 +330,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '4',
                                           textAlign: TextAlign.center,
@@ -374,9 +374,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '5',
                                           textAlign: TextAlign.center,
@@ -418,9 +418,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '6',
                                           textAlign: TextAlign.center,
@@ -468,9 +468,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '7',
                                           textAlign: TextAlign.center,
@@ -512,9 +512,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '8',
                                           textAlign: TextAlign.center,
@@ -556,9 +556,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '9',
                                           textAlign: TextAlign.center,
@@ -606,7 +606,7 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Icon(
                                         Icons.backspace,
                                         color:
@@ -643,9 +643,9 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Text(
                                           '0',
                                           textAlign: TextAlign.center,
@@ -688,7 +688,7 @@ class _KeyboardNumComponentWidgetState
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: const AlignmentDirectional(0.0, 0.0),
+                                      alignment: AlignmentDirectional(0.0, 0.0),
                                       child: Icon(
                                         Icons.check_circle,
                                         color: FlutterFlowTheme.of(context)
@@ -701,14 +701,14 @@ class _KeyboardNumComponentWidgetState
                               ),
                             ],
                           ),
-                        ].divide(const SizedBox(height: 10.0)),
+                        ].divide(SizedBox(height: 10.0)),
                       ),
-                    ].divide(const SizedBox(height: 10.0)),
+                    ].divide(SizedBox(height: 10.0)),
                   ),
                 ),
               ),
             ),
-          ].divide(const SizedBox(height: 15.0)),
+          ].divide(SizedBox(height: 15.0)),
         ),
       ),
     );

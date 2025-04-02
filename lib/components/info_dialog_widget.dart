@@ -10,7 +10,7 @@ class InfoDialogWidget extends StatefulWidget {
     super.key,
     String? title,
     required this.info,
-  }) : title = title ?? 'Información';
+  }) : this.title = title ?? 'Información';
 
   final String title;
   final String? info;
@@ -46,17 +46,17 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: const AlignmentDirectional(0.0, 0.0),
+      alignment: AlignmentDirectional(0.0, 0.0),
       child: Padding(
-        padding: const EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
+        padding: EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
         child: Container(
           width: double.infinity,
-          constraints: const BoxConstraints(
+          constraints: BoxConstraints(
             maxWidth: 530.0,
           ),
           decoration: BoxDecoration(
             color: FlutterFlowTheme.of(context).secondaryBackground,
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
                 blurRadius: 3.0,
                 color: Color(0x33000000),
@@ -73,7 +73,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
             ),
           ),
           child: Padding(
-            padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
+            padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
             child: Column(
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -81,15 +81,15 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                 Expanded(
                   child: Padding(
                     padding:
-                        const EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
+                        EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Align(
-                          alignment: const AlignmentDirectional(0.0, 0.0),
+                          alignment: AlignmentDirectional(0.0, 0.0),
                           child: Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 16.0),
                             child: Icon(
                               Icons.phone_iphone_outlined,
@@ -99,7 +99,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                           ),
                         ),
                         Align(
-                          alignment: const AlignmentDirectional(0.0, 0.0),
+                          alignment: AlignmentDirectional(0.0, 0.0),
                           child: Text(
                             widget.title,
                             textAlign: TextAlign.center,
@@ -113,9 +113,9 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                         ),
                         Expanded(
                           child: Align(
-                            alignment: const AlignmentDirectional(-1.0, -1.0),
+                            alignment: AlignmentDirectional(-1.0, -1.0),
                             child: Padding(
-                              padding: const EdgeInsetsDirectional.fromSTEB(
+                              padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 12.0, 0.0, 0.0),
                               child: Text(
                                 valueOrDefault<String>(
@@ -140,7 +140,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                 ),
                 Padding(
                   padding:
-                      const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 12.0),
+                      EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 12.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -153,9 +153,9 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                         text: 'Continuar',
                         options: FFButtonOptions(
                           height: 40.0,
-                          padding: const EdgeInsetsDirectional.fromSTEB(
+                          padding: EdgeInsetsDirectional.fromSTEB(
                               20.0, 0.0, 20.0, 0.0),
-                          iconPadding: const EdgeInsetsDirectional.fromSTEB(
+                          iconPadding: EdgeInsetsDirectional.fromSTEB(
                               0.0, 0.0, 0.0, 0.0),
                           color: FlutterFlowTheme.of(context).primary,
                           textStyle:
@@ -164,7 +164,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                                     letterSpacing: 0.0,
                                   ),
                           elevation: 0.0,
-                          borderSide: const BorderSide(
+                          borderSide: BorderSide(
                             color: Colors.transparent,
                           ),
                           borderRadius: BorderRadius.circular(40.0),

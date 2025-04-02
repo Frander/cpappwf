@@ -1,3 +1,4 @@
+import '/components/calculate_coordenates_install_component_widget.dart';
 import '/flutter_flow/flutter_flow_count_controller.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -7,6 +8,9 @@ export 'add_product_page_model.dart';
 
 class AddProductPageWidget extends StatefulWidget {
   const AddProductPageWidget({super.key});
+
+  static String routeName = 'AddProductPage';
+  static String routePath = '/addProductPage';
 
   @override
   State<AddProductPageWidget> createState() => _AddProductPageWidgetState();
@@ -56,16 +60,16 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
             children: [
               Container(
                 width: double.infinity,
-                height: 154.2,
-                decoration: const BoxDecoration(),
+                height: 130.47,
+                decoration: BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Expanded(
                       child: Padding(
-                        padding:
-                            const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 10.0, 0.0),
+                        padding: EdgeInsetsDirectional.fromSTEB(
+                            0.0, 15.0, 10.0, 0.0),
                         child: Row(
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -84,23 +88,6 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                 size: 60.0,
                               ),
                             ),
-                            Container(
-                              width: 100.0,
-                              decoration: const BoxDecoration(),
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                    0.0, 5.0, 0.0, 0.0),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(8.0),
-                                  child: Image.asset(
-                                    'assets/images/Clickpalmlogo1-removebg-preview.png',
-                                    width: 80.0,
-                                    height: 50.0,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                              ),
-                            ),
                           ],
                         ),
                       ),
@@ -109,7 +96,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                       child: Container(
                         width: double.infinity,
                         height: double.infinity,
-                        decoration: const BoxDecoration(),
+                        decoration: BoxDecoration(),
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -126,13 +113,13 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
-                          ].divide(const SizedBox(height: 10.0)),
+                          ].divide(SizedBox(height: 10.0)),
                         ),
                       ),
                     ),
                     Padding(
                       padding:
-                          const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 10.0),
+                          EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 10.0),
                       child: Text(
                         'Registrar la palma implica que se activará el seguimiento GPS a la ubicación en la que se encuentra el dispositivo en estos momentos',
                         textAlign: TextAlign.center,
@@ -150,328 +137,109 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  height: double.infinity,
-                  decoration: const BoxDecoration(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              Text(
-                                'Linea',
-                                textAlign: TextAlign.center,
-                                style: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .override(
-                                      fontFamily: 'Inter',
-                                      fontSize: 22.0,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8.0),
-                                child: Image.asset(
-                                  'assets/images/HugeiconsGrid_(1).png',
-                                  width: 40.0,
-                                  height: 40.0,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ].divide(const SizedBox(width: 20.0)),
-                          ),
-                          Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
-                                30.0, 0.0, 30.0, 0.0),
-                            child: Container(
-                              width: MediaQuery.sizeOf(context).width * 1.0,
-                              height: 90.0,
-                              decoration: BoxDecoration(
-                                boxShadow: const [
-                                  BoxShadow(
-                                    blurRadius: 8.0,
-                                    color: Color(0x33000000),
-                                    offset: Offset(
-                                      0.0,
-                                      2.0,
-                                    ),
-                                  )
-                                ],
-                                borderRadius: BorderRadius.circular(22.0),
-                              ),
-                              child: Container(
-                                width: 120.0,
+                  decoration: BoxDecoration(),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.max,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Text(
+                              'Linea',
+                              textAlign: TextAlign.center,
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    fontFamily: 'Inter',
+                                    fontSize: 22.0,
+                                    letterSpacing: 0.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8.0),
+                              child: Image.asset(
+                                'assets/images/HugeiconsGrid_(1).png',
+                                width: 40.0,
                                 height: 40.0,
-                                decoration: BoxDecoration(
-                                  color: FlutterFlowTheme.of(context)
-                                      .secondaryBackground,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                  shape: BoxShape.rectangle,
-                                ),
-                                child: FlutterFlowCountController(
-                                  decrementIconBuilder: (enabled) => Icon(
-                                    Icons.remove_rounded,
-                                    color: enabled
-                                        ? FlutterFlowTheme.of(context)
-                                            .secondaryText
-                                        : FlutterFlowTheme.of(context)
-                                            .alternate,
-                                    size: 50.0,
-                                  ),
-                                  incrementIconBuilder: (enabled) => Icon(
-                                    Icons.add_rounded,
-                                    color: enabled
-                                        ? FlutterFlowTheme.of(context).primary
-                                        : FlutterFlowTheme.of(context)
-                                            .alternate,
-                                    size: 50.0,
-                                  ),
-                                  countBuilder: (count) => Text(
-                                    count.toString(),
-                                    style: FlutterFlowTheme.of(context)
-                                        .titleLarge
-                                        .override(
-                                          fontFamily: 'Inter Tight',
-                                          fontSize: 38.0,
-                                          letterSpacing: 0.0,
-                                        ),
-                                  ),
-                                  count: _model.countControllerValue1 ??= 1,
-                                  updateCount: (count) => safeSetState(() =>
-                                      _model.countControllerValue1 = count),
-                                  stepSize: 1,
-                                  minimum: 1,
-                                  contentPadding: const EdgeInsets.all(24.0),
-                                ),
+                                fit: BoxFit.cover,
                               ),
                             ),
-                          ),
-                        ].divide(const SizedBox(height: 15.0)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  decoration: const BoxDecoration(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.max,
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              Text(
-                                'Palma',
-                                textAlign: TextAlign.center,
-                                style: FlutterFlowTheme.of(context)
-                                    .bodyMedium
-                                    .override(
-                                      fontFamily: 'Inter',
-                                      fontSize: 22.0,
-                                      letterSpacing: 0.0,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                              ),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8.0),
-                                child: Image.asset(
-                                  'assets/images/GameIconsPalmTree.png',
-                                  width: 40.0,
-                                  height: 40.0,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ].divide(const SizedBox(width: 20.0)),
-                          ),
-                          Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
-                                30.0, 0.0, 30.0, 0.0),
-                            child: Container(
-                              width: MediaQuery.sizeOf(context).width * 1.0,
-                              height: 90.0,
-                              decoration: BoxDecoration(
-                                boxShadow: const [
-                                  BoxShadow(
-                                    blurRadius: 8.0,
-                                    color: Color(0x33000000),
-                                    offset: Offset(
-                                      0.0,
-                                      2.0,
-                                    ),
-                                  )
-                                ],
-                                borderRadius: BorderRadius.circular(22.0),
-                              ),
-                              child: Container(
-                                width: 120.0,
-                                height: 40.0,
-                                decoration: BoxDecoration(
-                                  color: FlutterFlowTheme.of(context)
-                                      .secondaryBackground,
-                                  borderRadius: BorderRadius.circular(8.0),
-                                  shape: BoxShape.rectangle,
-                                ),
-                                child: FlutterFlowCountController(
-                                  decrementIconBuilder: (enabled) => Icon(
-                                    Icons.remove_rounded,
-                                    color: enabled
-                                        ? FlutterFlowTheme.of(context)
-                                            .secondaryText
-                                        : FlutterFlowTheme.of(context)
-                                            .alternate,
-                                    size: 50.0,
+                          ].divide(SizedBox(width: 20.0)),
+                        ),
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                              30.0, 0.0, 30.0, 0.0),
+                          child: Container(
+                            width: MediaQuery.sizeOf(context).width * 1.0,
+                            height: 80.0,
+                            decoration: BoxDecoration(
+                              boxShadow: [
+                                BoxShadow(
+                                  blurRadius: 8.0,
+                                  color: Color(0x33000000),
+                                  offset: Offset(
+                                    0.0,
+                                    2.0,
                                   ),
-                                  incrementIconBuilder: (enabled) => Icon(
-                                    Icons.add_rounded,
-                                    color: enabled
-                                        ? FlutterFlowTheme.of(context).primary
-                                        : FlutterFlowTheme.of(context)
-                                            .alternate,
-                                    size: 50.0,
-                                  ),
-                                  countBuilder: (count) => Text(
-                                    count.toString(),
-                                    style: FlutterFlowTheme.of(context)
-                                        .titleLarge
-                                        .override(
-                                          fontFamily: 'Inter Tight',
-                                          fontSize: 38.0,
-                                          letterSpacing: 0.0,
-                                        ),
-                                  ),
-                                  count: _model.countControllerValue2 ??= 1,
-                                  updateCount: (count) => safeSetState(() =>
-                                      _model.countControllerValue2 = count),
-                                  stepSize: 1,
-                                  minimum: 1,
-                                  contentPadding: const EdgeInsets.all(24.0),
-                                ),
-                              ),
+                                )
+                              ],
+                              borderRadius: BorderRadius.circular(22.0),
                             ),
-                          ),
-                        ].divide(const SizedBox(height: 15.0)),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  decoration: const BoxDecoration(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        children: [
-                          Text(
-                            'Tipo',
-                            textAlign: TextAlign.center,
-                            style: FlutterFlowTheme.of(context)
-                                .bodyMedium
-                                .override(
-                                  fontFamily: 'Inter',
-                                  fontSize: 22.0,
-                                  letterSpacing: 0.0,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
-                                30.0, 0.0, 30.0, 0.0),
                             child: Container(
-                              width: MediaQuery.sizeOf(context).width * 1.0,
-                              height: 73.0,
+                              width: 120.0,
+                              height: 40.0,
                               decoration: BoxDecoration(
                                 color: FlutterFlowTheme.of(context)
                                     .secondaryBackground,
-                                boxShadow: const [
-                                  BoxShadow(
-                                    blurRadius: 8.0,
-                                    color: Color(0x33000000),
-                                    offset: Offset(
-                                      0.0,
-                                      2.0,
-                                    ),
-                                  )
-                                ],
-                                borderRadius: BorderRadius.circular(22.0),
+                                borderRadius: BorderRadius.circular(8.0),
+                                shape: BoxShape.rectangle,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 50.0,
-                                    height: 50.0,
-                                    decoration: const BoxDecoration(),
-                                    child: Theme(
-                                      data: ThemeData(
-                                        checkboxTheme: CheckboxThemeData(
-                                          visualDensity: VisualDensity.compact,
-                                          materialTapTargetSize:
-                                              MaterialTapTargetSize.shrinkWrap,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(4.0),
-                                          ),
-                                        ),
-                                        unselectedWidgetColor:
-                                            FlutterFlowTheme.of(context)
-                                                .alternate,
+                              child: FlutterFlowCountController(
+                                decrementIconBuilder: (enabled) => Icon(
+                                  Icons.remove_rounded,
+                                  color: enabled
+                                      ? FlutterFlowTheme.of(context)
+                                          .secondaryText
+                                      : FlutterFlowTheme.of(context).alternate,
+                                  size: 50.0,
+                                ),
+                                incrementIconBuilder: (enabled) => Icon(
+                                  Icons.add_rounded,
+                                  color: enabled
+                                      ? FlutterFlowTheme.of(context).primary
+                                      : FlutterFlowTheme.of(context).alternate,
+                                  size: 50.0,
+                                ),
+                                countBuilder: (count) => Text(
+                                  count.toString(),
+                                  style: FlutterFlowTheme.of(context)
+                                      .titleLarge
+                                      .override(
+                                        fontFamily: 'Inter Tight',
+                                        fontSize: 40.0,
+                                        letterSpacing: 0.0,
                                       ),
-                                      child: Checkbox(
-                                        value: _model.checkboxValue ??= true,
-                                        onChanged: (newValue) async {
-                                          safeSetState(() =>
-                                              _model.checkboxValue = newValue!);
-                                        },
-                                        side: BorderSide(
-                                          width: 2,
-                                          color: FlutterFlowTheme.of(context)
-                                              .alternate,
-                                        ),
-                                        activeColor:
-                                            FlutterFlowTheme.of(context)
-                                                .primary,
-                                        checkColor:
-                                            FlutterFlowTheme.of(context).info,
-                                      ),
-                                    ),
-                                  ),
-                                  Text(
-                                    'Hembra',
-                                    textAlign: TextAlign.center,
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          fontFamily: 'Inter',
-                                          fontSize: 22.0,
-                                          letterSpacing: 0.0,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ].divide(const SizedBox(width: 10.0)),
+                                ),
+                                count: _model.countControllerValue1 ??= 1,
+                                updateCount: (count) async {
+                                  safeSetState(() =>
+                                      _model.countControllerValue1 = count);
+                                  FFAppState().lastLineInstall =
+                                      _model.countControllerValue1!;
+                                  safeSetState(() {});
+                                },
+                                stepSize: 1,
+                                contentPadding: EdgeInsetsDirectional.fromSTEB(
+                                    12.0, 0.0, 12.0, 0.0),
                               ),
                             ),
                           ),
-                        ].divide(const SizedBox(height: 15.0)),
-                      ),
+                        ),
+                      ].divide(SizedBox(height: 5.0)),
                     ),
                   ),
                 ),
@@ -479,71 +247,324 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  height: double.infinity,
-                  decoration: const BoxDecoration(),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10.0),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.max,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
-                                30.0, 0.0, 30.0, 0.0),
-                            child: Container(
-                              width: MediaQuery.sizeOf(context).width * 1.0,
-                              height: 100.0,
-                              decoration: BoxDecoration(
-                                color: FlutterFlowTheme.of(context).primaryText,
-                                boxShadow: const [
-                                  BoxShadow(
-                                    blurRadius: 8.0,
-                                    color: Color(0x33000000),
-                                    offset: Offset(
-                                      0.0,
-                                      2.0,
-                                    ),
-                                  )
-                                ],
-                                borderRadius: BorderRadius.circular(22.0),
+                  decoration: BoxDecoration(),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Row(
+                          mainAxisSize: MainAxisSize.max,
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            Text(
+                              'Palma',
+                              textAlign: TextAlign.center,
+                              style: FlutterFlowTheme.of(context)
+                                  .bodyMedium
+                                  .override(
+                                    fontFamily: 'Inter',
+                                    fontSize: 22.0,
+                                    letterSpacing: 0.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8.0),
+                              child: Image.asset(
+                                'assets/images/GameIconsPalmTree.png',
+                                width: 40.0,
+                                height: 40.0,
+                                fit: BoxFit.cover,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  Container(
-                                    width: 50.0,
-                                    height: 50.0,
-                                    decoration: const BoxDecoration(),
-                                    child: Icon(
-                                      Icons.save,
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
-                                      size: 50.0,
-                                    ),
+                            ),
+                          ].divide(SizedBox(width: 20.0)),
+                        ),
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                              30.0, 0.0, 30.0, 0.0),
+                          child: Container(
+                            width: MediaQuery.sizeOf(context).width * 1.0,
+                            height: 80.0,
+                            decoration: BoxDecoration(
+                              boxShadow: [
+                                BoxShadow(
+                                  blurRadius: 8.0,
+                                  color: Color(0x33000000),
+                                  offset: Offset(
+                                    0.0,
+                                    2.0,
                                   ),
-                                  Text(
-                                    'Registrar',
-                                    textAlign: TextAlign.center,
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          fontFamily: 'Inter',
-                                          color: FlutterFlowTheme.of(context)
-                                              .secondaryBackground,
-                                          fontSize: 22.0,
-                                          letterSpacing: 0.0,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                  ),
-                                ].divide(const SizedBox(width: 10.0)),
+                                )
+                              ],
+                              borderRadius: BorderRadius.circular(22.0),
+                            ),
+                            child: Container(
+                              width: 120.0,
+                              height: 40.0,
+                              decoration: BoxDecoration(
+                                color: FlutterFlowTheme.of(context)
+                                    .secondaryBackground,
+                                borderRadius: BorderRadius.circular(8.0),
+                                shape: BoxShape.rectangle,
+                              ),
+                              child: FlutterFlowCountController(
+                                decrementIconBuilder: (enabled) => Icon(
+                                  Icons.remove_rounded,
+                                  color: enabled
+                                      ? FlutterFlowTheme.of(context)
+                                          .secondaryText
+                                      : FlutterFlowTheme.of(context).alternate,
+                                  size: 50.0,
+                                ),
+                                incrementIconBuilder: (enabled) => Icon(
+                                  Icons.add_rounded,
+                                  color: enabled
+                                      ? FlutterFlowTheme.of(context).primary
+                                      : FlutterFlowTheme.of(context).alternate,
+                                  size: 50.0,
+                                ),
+                                countBuilder: (count) => Text(
+                                  count.toString(),
+                                  style: FlutterFlowTheme.of(context)
+                                      .titleLarge
+                                      .override(
+                                        fontFamily: 'Inter Tight',
+                                        fontSize: 40.0,
+                                        letterSpacing: 0.0,
+                                      ),
+                                ),
+                                count: _model.countControllerValue2 ??= 1,
+                                updateCount: (count) async {
+                                  safeSetState(() =>
+                                      _model.countControllerValue2 = count);
+                                  FFAppState().lastPalmInstall =
+                                      _model.countControllerValue2!;
+                                  safeSetState(() {});
+                                },
+                                stepSize: 1,
+                                contentPadding: EdgeInsetsDirectional.fromSTEB(
+                                    12.0, 0.0, 12.0, 0.0),
                               ),
                             ),
                           ),
-                        ].divide(const SizedBox(height: 15.0)),
-                      ),
+                        ),
+                      ].divide(SizedBox(height: 5.0)),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      children: [
+                        Text(
+                          'Tipo',
+                          textAlign: TextAlign.center,
+                          style:
+                              FlutterFlowTheme.of(context).bodyMedium.override(
+                                    fontFamily: 'Inter',
+                                    fontSize: 22.0,
+                                    letterSpacing: 0.0,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                        ),
+                        Padding(
+                          padding: EdgeInsetsDirectional.fromSTEB(
+                              30.0, 0.0, 30.0, 0.0),
+                          child: Container(
+                            width: MediaQuery.sizeOf(context).width * 1.0,
+                            height: 73.0,
+                            decoration: BoxDecoration(
+                              color: FlutterFlowTheme.of(context)
+                                  .secondaryBackground,
+                              boxShadow: [
+                                BoxShadow(
+                                  blurRadius: 8.0,
+                                  color: Color(0x33000000),
+                                  offset: Offset(
+                                    0.0,
+                                    2.0,
+                                  ),
+                                )
+                              ],
+                              borderRadius: BorderRadius.circular(22.0),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.max,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 50.0,
+                                  height: 50.0,
+                                  decoration: BoxDecoration(),
+                                  child: Theme(
+                                    data: ThemeData(
+                                      checkboxTheme: CheckboxThemeData(
+                                        visualDensity: VisualDensity.compact,
+                                        materialTapTargetSize:
+                                            MaterialTapTargetSize.shrinkWrap,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(4.0),
+                                        ),
+                                      ),
+                                      unselectedWidgetColor:
+                                          FlutterFlowTheme.of(context)
+                                              .alternate,
+                                    ),
+                                    child: Checkbox(
+                                      value: _model.checkboxValue ??= true,
+                                      onChanged: (newValue) async {
+                                        safeSetState(() =>
+                                            _model.checkboxValue = newValue!);
+                                      },
+                                      side: BorderSide(
+                                        width: 2,
+                                        color: FlutterFlowTheme.of(context)
+                                            .alternate,
+                                      ),
+                                      activeColor:
+                                          FlutterFlowTheme.of(context).primary,
+                                      checkColor:
+                                          FlutterFlowTheme.of(context).info,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  'Hembra',
+                                  textAlign: TextAlign.center,
+                                  style: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .override(
+                                        fontFamily: 'Inter',
+                                        fontSize: 22.0,
+                                        letterSpacing: 0.0,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                ),
+                              ].divide(SizedBox(width: 10.0)),
+                            ),
+                          ),
+                        ),
+                      ].divide(SizedBox(height: 15.0)),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.max,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Builder(
+                          builder: (context) => Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                30.0, 0.0, 30.0, 0.0),
+                            child: InkWell(
+                              splashColor: Colors.transparent,
+                              focusColor: Colors.transparent,
+                              hoverColor: Colors.transparent,
+                              highlightColor: Colors.transparent,
+                              onTap: () async {
+                                showDialog(
+                                  barrierDismissible: false,
+                                  context: context,
+                                  builder: (dialogContext) {
+                                    return Dialog(
+                                      elevation: 0,
+                                      insetPadding: EdgeInsets.zero,
+                                      backgroundColor: Colors.transparent,
+                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                          .resolve(Directionality.of(context)),
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          FocusScope.of(dialogContext)
+                                              .unfocus();
+                                          FocusManager.instance.primaryFocus
+                                              ?.unfocus();
+                                        },
+                                        child: Container(
+                                          height: MediaQuery.sizeOf(context)
+                                                  .height *
+                                              0.9,
+                                          width:
+                                              MediaQuery.sizeOf(context).width *
+                                                  0.9,
+                                          child:
+                                              CalculateCoordenatesInstallComponentWidget(
+                                            line: _model.countControllerValue1,
+                                            palm: _model.countControllerValue2,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              child: Container(
+                                width: MediaQuery.sizeOf(context).width * 1.0,
+                                height: 100.0,
+                                decoration: BoxDecoration(
+                                  color:
+                                      FlutterFlowTheme.of(context).primaryText,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      blurRadius: 8.0,
+                                      color: Color(0x33000000),
+                                      offset: Offset(
+                                        0.0,
+                                        2.0,
+                                      ),
+                                    )
+                                  ],
+                                  borderRadius: BorderRadius.circular(22.0),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.max,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceEvenly,
+                                  children: [
+                                    Container(
+                                      width: 50.0,
+                                      height: 50.0,
+                                      decoration: BoxDecoration(),
+                                      child: Icon(
+                                        Icons.save,
+                                        color: FlutterFlowTheme.of(context)
+                                            .secondaryBackground,
+                                        size: 50.0,
+                                      ),
+                                    ),
+                                    Text(
+                                      'Registrar',
+                                      textAlign: TextAlign.center,
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            fontFamily: 'Inter',
+                                            color: FlutterFlowTheme.of(context)
+                                                .secondaryBackground,
+                                            fontSize: 22.0,
+                                            letterSpacing: 0.0,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                    ),
+                                  ].divide(SizedBox(width: 10.0)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ].divide(SizedBox(height: 15.0)),
                     ),
                   ),
                 ),

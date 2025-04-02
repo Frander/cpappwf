@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 class DoVisitsPageModel extends FlutterFlowModel<DoVisitsPageWidget> {
   ///  State fields for stateful widgets in this page.
 
+  // Stores action output result for [Custom Action - detectAndComparePhrase] action in DoVisitsPage widget.
+  String? optionVoiceSelected;
   // State field(s) for Timer widget.
   final timerInitialTimeMs = 0;
   int timerMilliseconds = 0;

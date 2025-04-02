@@ -1,5 +1,6 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/index.dart';
 import 'do_activities_page_widget.dart' show DoActivitiesPageWidget;
 import 'package:flutter/material.dart';
 

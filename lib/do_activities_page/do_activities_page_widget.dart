@@ -4,6 +4,7 @@ import '/components/keyboard_num_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/actions/index.dart' as actions;
+import '/index.dart';
 import 'package:styled_divider/styled_divider.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
@@ -15,9 +16,12 @@ class DoActivitiesPageWidget extends StatefulWidget {
   const DoActivitiesPageWidget({
     super.key,
     String? tittle,
-  }) : tittle = tittle ?? 'Módulo ClickPalm';
+  }) : this.tittle = tittle ?? 'Módulo ClickPalm';
 
   final String tittle;
+
+  static String routeName = 'DoActivitiesPage';
+  static String routePath = '/doActivitiesPage';
 
   @override
   State<DoActivitiesPageWidget> createState() => _DoActivitiesPageWidgetState();
@@ -70,7 +74,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
               Container(
                 width: double.infinity,
                 height: 102.21,
-                decoration: const BoxDecoration(),
+                decoration: BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -79,9 +83,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                       child: Container(
                         width: 210.0,
                         height: double.infinity,
-                        decoration: const BoxDecoration(),
+                        decoration: BoxDecoration(),
                         child: Padding(
-                          padding: const EdgeInsetsDirectional.fromSTEB(
+                          padding: EdgeInsetsDirectional.fromSTEB(
                               0.0, 5.0, 0.0, 0.0),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
@@ -99,7 +103,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                       child: Container(
                         width: double.infinity,
                         height: double.infinity,
-                        decoration: const BoxDecoration(),
+                        decoration: BoxDecoration(),
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -116,7 +120,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
-                          ].divide(const SizedBox(height: 10.0)),
+                          ].divide(SizedBox(height: 10.0)),
                         ),
                       ),
                     ),
@@ -127,10 +131,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  decoration: const BoxDecoration(),
+                  decoration: BoxDecoration(),
                   child: Padding(
                     padding:
-                        const EdgeInsetsDirectional.fromSTEB(10.0, 0.0, 10.0, 0.0),
+                        EdgeInsetsDirectional.fromSTEB(10.0, 0.0, 10.0, 0.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       children: [
@@ -156,9 +160,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                     .userSelected
                                                     .nameUser !=
                                                 '')
-                                    ? const Color(0xFFCCFFCB)
-                                    : const Color(0xFFFFC0C4),
-                                boxShadow: const [
+                                    ? Color(0xFFCCFFCB)
+                                    : Color(0xFFFFC0C4),
+                                boxShadow: [
                                   BoxShadow(
                                     blurRadius: 10.0,
                                     color: Color(0x33000000),
@@ -171,7 +175,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                               child: Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
+                                padding: EdgeInsetsDirectional.fromSTEB(
                                     10.0, 0.0, 5.0, 0.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.max,
@@ -189,9 +193,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           ),
                                     ),
                                     Container(
-                                      decoration: const BoxDecoration(),
+                                      decoration: BoxDecoration(),
                                       child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: ClipRRect(
                                           borderRadius:
                                               BorderRadius.circular(8.0),
@@ -206,7 +210,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                     ),
                                     Expanded(
                                       child: Padding(
-                                        padding: const EdgeInsetsDirectional.fromSTEB(
+                                        padding: EdgeInsetsDirectional.fromSTEB(
                                             0.0, 5.0, 0.0, 0.0),
                                         child: Column(
                                           mainAxisSize: MainAxisSize.max,
@@ -215,7 +219,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           children: [
                                             Expanded(
                                               child: Align(
-                                                alignment: const AlignmentDirectional(
+                                                alignment: AlignmentDirectional(
                                                     0.0, 0.0),
                                                 child: Text(
                                                   (FFAppState().userSelected !=
@@ -253,7 +257,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                       builder: (context) =>
                                                           Padding(
                                                         padding:
-                                                            const EdgeInsetsDirectional
+                                                            EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     0.0,
                                                                     0.0,
@@ -283,7 +287,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                                   backgroundColor:
                                                                       Colors
                                                                           .transparent,
-                                                                  alignment: const AlignmentDirectional(
+                                                                  alignment: AlignmentDirectional(
                                                                           0.0,
                                                                           0.0)
                                                                       .resolve(
@@ -301,7 +305,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                                           ?.unfocus();
                                                                     },
                                                                     child:
-                                                                        SizedBox(
+                                                                        Container(
                                                                       height: MediaQuery.sizeOf(context)
                                                                               .height *
                                                                           0.95,
@@ -309,7 +313,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                                               .width *
                                                                           0.95,
                                                                       child:
-                                                                          const KeyboardNumComponentWidget(
+                                                                          KeyboardNumComponentWidget(
                                                                         tittle:
                                                                             'Escriba el código del operador',
                                                                       ),
@@ -325,7 +329,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                               color: FlutterFlowTheme
                                                                       .of(context)
                                                                   .warning,
-                                                              boxShadow: const [
+                                                              boxShadow: [
                                                                 BoxShadow(
                                                                   blurRadius:
                                                                       4.0,
@@ -345,11 +349,11 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                             ),
                                                             child: Align(
                                                               alignment:
-                                                                  const AlignmentDirectional(
+                                                                  AlignmentDirectional(
                                                                       0.0, 0.0),
                                                               child: Padding(
                                                                 padding:
-                                                                    const EdgeInsetsDirectional
+                                                                    EdgeInsetsDirectional
                                                                         .fromSTEB(
                                                                             5.0,
                                                                             0.0,
@@ -370,7 +374,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                                         fontFamily:
                                                                             'Inter',
                                                                         fontSize:
-                                                                            14.0,
+                                                                            12.0,
                                                                         letterSpacing:
                                                                             0.0,
                                                                         fontWeight:
@@ -387,7 +391,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                   Expanded(
                                                     child: Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
                                                                   0.0,
@@ -421,11 +425,12 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                                       UsersStruct>();
 
                                                           context.pushNamed(
-                                                            'UsersPage',
+                                                            UsersPageWidget
+                                                                .routeName,
                                                             extra: <String,
                                                                 dynamic>{
                                                               kTransitionInfoKey:
-                                                                  const TransitionInfo(
+                                                                  TransitionInfo(
                                                                 hasTransition:
                                                                     true,
                                                                 transitionType:
@@ -446,7 +451,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                             color: FlutterFlowTheme
                                                                     .of(context)
                                                                 .warning,
-                                                            boxShadow: const [
+                                                            boxShadow: [
                                                               BoxShadow(
                                                                 blurRadius: 4.0,
                                                                 color: Color(
@@ -464,11 +469,11 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                           ),
                                                           child: Align(
                                                             alignment:
-                                                                const AlignmentDirectional(
+                                                                AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Padding(
                                                               padding:
-                                                                  const EdgeInsetsDirectional
+                                                                  EdgeInsetsDirectional
                                                                       .fromSTEB(
                                                                           5.0,
                                                                           0.0,
@@ -489,7 +494,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                                       fontFamily:
                                                                           'Inter',
                                                                       fontSize:
-                                                                          14.0,
+                                                                          12.0,
                                                                       letterSpacing:
                                                                           0.0,
                                                                       fontWeight:
@@ -503,14 +508,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                       ),
                                                     ),
                                                   ),
-                                                ].divide(const SizedBox(width: 5.0)),
+                                                ].divide(SizedBox(width: 5.0)),
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
                                     ),
-                                  ].divide(const SizedBox(width: 5.0)),
+                                  ].divide(SizedBox(width: 5.0)),
                                 ),
                               ),
                             ),
@@ -524,183 +529,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                             highlightColor: Colors.transparent,
                             onTap: () async {
                               context.pushNamed(
-                                'ZonesPage',
+                                ActivitiesPageWidget.routeName,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: const TransitionInfo(
-                                    hasTransition: true,
-                                    transitionType: PageTransitionType.fade,
-                                    duration: Duration(milliseconds: 1000),
-                                  ),
-                                },
-                              );
-                            },
-                            onLongPress: () async {
-                              FFAppState().zoneSelected = ZonesStruct();
-                              FFAppState().headquarterSelected =
-                                  HeadquartersStruct();
-                              safeSetState(() {});
-                            },
-                            child: Container(
-                              width: double.infinity,
-                              height: 100.0,
-                              decoration: BoxDecoration(
-                                color: (FFAppState().headquarterSelected !=
-                                            null) &&
-                                        (FFAppState()
-                                                    .headquarterSelected
-                                                    .nameHeadquarter !=
-                                                '')
-                                    ? const Color(0xFFCCFFCB)
-                                    : const Color(0xFFFFC0C4),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    blurRadius: 10.0,
-                                    color: Color(0x33000000),
-                                    offset: Offset(
-                                      0.0,
-                                      2.0,
-                                    ),
-                                  )
-                                ],
-                                borderRadius: BorderRadius.circular(12.0),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
-                                    10.0, 5.0, 10.0, 5.0),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.max,
-                                  children: [
-                                    Text(
-                                      '2',
-                                      textAlign: TextAlign.center,
-                                      style: FlutterFlowTheme.of(context)
-                                          .bodyMedium
-                                          .override(
-                                            fontFamily: 'Inter',
-                                            fontSize: 30.0,
-                                            letterSpacing: 0.0,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                    ),
-                                    Container(
-                                      decoration: const BoxDecoration(),
-                                      child: ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                        child: Image.asset(
-                                          'assets/images/cards.png',
-                                          width: 40.0,
-                                          height: 200.0,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      ),
-                                    ),
-                                    Expanded(
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.max,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Expanded(
-                                            child: Align(
-                                              alignment: const AlignmentDirectional(
-                                                  0.0, 0.0),
-                                              child: Padding(
-                                                padding: const EdgeInsetsDirectional
-                                                    .fromSTEB(
-                                                        0.0, 5.0, 0.0, 0.0),
-                                                child: Text(
-                                                  (FFAppState()
-                                                                  .headquarterSelected !=
-                                                              null) &&
-                                                          (FFAppState()
-                                                                      .headquarterSelected
-                                                                      .nameHeadquarter !=
-                                                                  '') &&
-                                                          (FFAppState()
-                                                                  .zoneSelected !=
-                                                              null) &&
-                                                          (FFAppState()
-                                                                      .zoneSelected
-                                                                      .nameZone !=
-                                                                  '')
-                                                      ? 'Zona: ${FFAppState().zoneSelected.nameZone} Lote: ${FFAppState().headquarterSelected.nameHeadquarter}'
-                                                      : 'Seleccione una ubicación',
-                                                  textAlign: TextAlign.center,
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        fontFamily: 'Inter',
-                                                        fontSize: 18.0,
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            child: Padding(
-                                              padding: const EdgeInsetsDirectional
-                                                  .fromSTEB(0.0, 0.0, 0.0, 5.0),
-                                              child: Container(
-                                                decoration: BoxDecoration(
-                                                  borderRadius:
-                                                      BorderRadius.circular(
-                                                          8.0),
-                                                ),
-                                                child: Align(
-                                                  alignment:
-                                                      const AlignmentDirectional(
-                                                          0.0, 0.0),
-                                                  child: Padding(
-                                                    padding:
-                                                        const EdgeInsetsDirectional
-                                                            .fromSTEB(5.0, 0.0,
-                                                                5.0, 0.0),
-                                                    child: AutoSizeText(
-                                                      'Seleccione la zona y el lote donde se realizarán las labores',
-                                                      textAlign:
-                                                          TextAlign.center,
-                                                      minFontSize: 8.0,
-                                                      style: FlutterFlowTheme
-                                                              .of(context)
-                                                          .bodyMedium
-                                                          .override(
-                                                            fontFamily: 'Inter',
-                                                            fontSize: 14.0,
-                                                            letterSpacing: 0.0,
-                                                            fontWeight:
-                                                                FontWeight.w800,
-                                                          ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ].divide(const SizedBox(height: 10.0)),
-                                      ),
-                                    ),
-                                  ].divide(const SizedBox(width: 5.0)),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: InkWell(
-                            splashColor: Colors.transparent,
-                            focusColor: Colors.transparent,
-                            hoverColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            onTap: () async {
-                              context.pushNamed(
-                                'ActivitiesPage',
-                                extra: <String, dynamic>{
-                                  kTransitionInfoKey: const TransitionInfo(
+                                  kTransitionInfoKey: TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.fade,
                                     duration: Duration(milliseconds: 1000),
@@ -723,9 +554,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                         .activitySelected
                                                         .nameActivity !=
                                                     '')
-                                        ? const Color(0xFFCCFFCB)
-                                        : const Color(0xFFFFC0C4),
-                                boxShadow: const [
+                                        ? Color(0xFFCCFFCB)
+                                        : Color(0xFFFFC0C4),
+                                boxShadow: [
                                   BoxShadow(
                                     blurRadius: 10.0,
                                     color: Color(0x33000000),
@@ -738,13 +569,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                               child: Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
+                                padding: EdgeInsetsDirectional.fromSTEB(
                                     10.0, 5.0, 5.0, 5.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.max,
                                   children: [
                                     Text(
-                                      '3',
+                                      '2',
                                       textAlign: TextAlign.center,
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -756,7 +587,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           ),
                                     ),
                                     Container(
-                                      decoration: const BoxDecoration(),
+                                      decoration: BoxDecoration(),
                                       child: ClipRRect(
                                         borderRadius:
                                             BorderRadius.circular(8.0),
@@ -776,10 +607,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                         children: [
                                           Expanded(
                                             child: Align(
-                                              alignment: const AlignmentDirectional(
+                                              alignment: AlignmentDirectional(
                                                   0.0, 0.0),
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 5.0, 0.0, 0.0),
                                                 child: Text(
@@ -810,7 +641,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           ),
                                           Expanded(
                                             child: Padding(
-                                              padding: const EdgeInsetsDirectional
+                                              padding: EdgeInsetsDirectional
                                                   .fromSTEB(0.0, 0.0, 0.0, 5.0),
                                               child: Container(
                                                 decoration: BoxDecoration(
@@ -820,11 +651,11 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                 ),
                                                 child: Align(
                                                   alignment:
-                                                      const AlignmentDirectional(
+                                                      AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        const EdgeInsetsDirectional
+                                                        EdgeInsetsDirectional
                                                             .fromSTEB(5.0, 0.0,
                                                                 5.0, 0.0),
                                                     child: AutoSizeText(
@@ -848,10 +679,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                               ),
                                             ),
                                           ),
-                                        ].divide(const SizedBox(height: 10.0)),
+                                        ].divide(SizedBox(height: 10.0)),
                                       ),
                                     ),
-                                  ].divide(const SizedBox(width: 5.0)),
+                                  ].divide(SizedBox(width: 5.0)),
                                 ),
                               ),
                             ),
@@ -868,22 +699,17 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                 if ((FFAppState().userSelected != null) &&
                                     (FFAppState().userSelected.nameUser !=
                                             '')) {
-                                  if ((FFAppState().headquarterSelected !=
-                                          null) &&
+                                  if ((FFAppState().activitySelected != null) &&
                                       (FFAppState()
-                                                  .headquarterSelected
-                                                  .nameHeadquarter !=
+                                                  .activitySelected
+                                                  .nameActivity !=
                                               '')) {
-                                    if ((FFAppState().activitySelected !=
-                                            null) &&
-                                        (FFAppState()
-                                                    .activitySelected
-                                                    .nameActivity !=
-                                                '')) {
+                                    FFAppState().stopVoice = false;
+                                    if (FFAppState().isCalibrateVoice == true) {
                                       context.pushNamed(
-                                        'DoVisitsPage',
+                                        DoVisitsPageWidget.routeName,
                                         extra: <String, dynamic>{
-                                          kTransitionInfoKey: const TransitionInfo(
+                                          kTransitionInfoKey: TransitionInfo(
                                             hasTransition: true,
                                             transitionType:
                                                 PageTransitionType.topToBottom,
@@ -895,46 +721,21 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
 
                                       return;
                                     } else {
-                                      await showDialog(
-                                        context: context,
-                                        builder: (dialogContext) {
-                                          return Dialog(
-                                            elevation: 0,
-                                            insetPadding: EdgeInsets.zero,
-                                            backgroundColor: Colors.transparent,
-                                            alignment: const AlignmentDirectional(
-                                                    0.0, 0.0)
-                                                .resolve(
-                                                    Directionality.of(context)),
-                                            child: GestureDetector(
-                                              onTap: () {
-                                                FocusScope.of(dialogContext)
-                                                    .unfocus();
-                                                FocusManager
-                                                    .instance.primaryFocus
-                                                    ?.unfocus();
-                                              },
-                                              child: SizedBox(
-                                                height:
-                                                    MediaQuery.sizeOf(context)
-                                                            .height *
-                                                        0.4,
-                                                width:
-                                                    MediaQuery.sizeOf(context)
-                                                            .width *
-                                                        0.9,
-                                                child: const InfoDialogWidget(
-                                                  info:
-                                                      'Debe seleccionar una actividad a realizar',
-                                                ),
-                                              ),
-                                            ),
-                                          );
+                                      context.pushNamed(
+                                        DoVisitsPageWidget.routeName,
+                                        extra: <String, dynamic>{
+                                          kTransitionInfoKey: TransitionInfo(
+                                            hasTransition: true,
+                                            transitionType:
+                                                PageTransitionType.topToBottom,
+                                            duration:
+                                                Duration(milliseconds: 1000),
+                                          ),
                                         },
                                       );
-
-                                      return;
                                     }
+
+                                    return;
                                   } else {
                                     await showDialog(
                                       context: context,
@@ -943,7 +744,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           elevation: 0,
                                           insetPadding: EdgeInsets.zero,
                                           backgroundColor: Colors.transparent,
-                                          alignment: const AlignmentDirectional(
+                                          alignment: AlignmentDirectional(
                                                   0.0, 0.0)
                                               .resolve(
                                                   Directionality.of(context)),
@@ -954,16 +755,16 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                               FocusManager.instance.primaryFocus
                                                   ?.unfocus();
                                             },
-                                            child: SizedBox(
+                                            child: Container(
                                               height: MediaQuery.sizeOf(context)
                                                       .height *
                                                   0.4,
                                               width: MediaQuery.sizeOf(context)
                                                       .width *
                                                   0.9,
-                                              child: const InfoDialogWidget(
+                                              child: InfoDialogWidget(
                                                 info:
-                                                    'Debe seleccionar una ubicación de trabajo',
+                                                    'Debe seleccionar una actividad a realizar',
                                               ),
                                             ),
                                           ),
@@ -982,7 +783,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                         insetPadding: EdgeInsets.zero,
                                         backgroundColor: Colors.transparent,
                                         alignment:
-                                            const AlignmentDirectional(0.0, 0.0)
+                                            AlignmentDirectional(0.0, 0.0)
                                                 .resolve(
                                                     Directionality.of(context)),
                                         child: GestureDetector(
@@ -992,14 +793,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                             FocusManager.instance.primaryFocus
                                                 ?.unfocus();
                                           },
-                                          child: SizedBox(
+                                          child: Container(
                                             height: MediaQuery.sizeOf(context)
                                                     .height *
                                                 0.4,
                                             width: MediaQuery.sizeOf(context)
                                                     .width *
                                                 0.9,
-                                            child: const InfoDialogWidget(
+                                            child: InfoDialogWidget(
                                               info:
                                                   'Debe seleccionar un operador',
                                             ),
@@ -1017,7 +818,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                 height: 86.0,
                                 decoration: BoxDecoration(
                                   color: FlutterFlowTheme.of(context).primary,
-                                  boxShadow: const [
+                                  boxShadow: [
                                     BoxShadow(
                                       blurRadius: 10.0,
                                       color: Color(0x33000000),
@@ -1030,16 +831,16 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                   borderRadius: BorderRadius.circular(12.0),
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
                                       10.0, 5.0, 10.0, 5.0),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.max,
                                     children: [
                                       Padding(
-                                        padding: const EdgeInsetsDirectional.fromSTEB(
+                                        padding: EdgeInsetsDirectional.fromSTEB(
                                             20.0, 0.0, 0.0, 0.0),
                                         child: Container(
-                                          decoration: const BoxDecoration(),
+                                          decoration: BoxDecoration(),
                                           child: ClipRRect(
                                             borderRadius:
                                                 BorderRadius.circular(8.0),
@@ -1053,7 +854,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                       Expanded(
                                         child: Padding(
                                           padding:
-                                              const EdgeInsetsDirectional.fromSTEB(
+                                              EdgeInsetsDirectional.fromSTEB(
                                                   0.0, 0.0, 15.0, 0.0),
                                           child: Text(
                                             'Realizar visitas',
@@ -1094,7 +895,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: const AlignmentDirectional(0.0, 0.0)
+                                      alignment: AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -1103,14 +904,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: SizedBox(
+                                        child: Container(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.5,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: const InfoDialogWidget(
+                                          child: InfoDialogWidget(
                                             info:
                                                 'Informacion en mantenimiento',
                                           ),
@@ -1125,7 +926,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                 decoration: BoxDecoration(
                                   color: FlutterFlowTheme.of(context)
                                       .primaryBackground,
-                                  boxShadow: const [
+                                  boxShadow: [
                                     BoxShadow(
                                       blurRadius: 10.0,
                                       color: Color(0x33000000),
@@ -1138,13 +939,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                   borderRadius: BorderRadius.circular(12.0),
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
                                       10.0, 5.0, 10.0, 5.0),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.max,
                                     children: [
                                       Container(
-                                        decoration: const BoxDecoration(),
+                                        decoration: BoxDecoration(),
                                         child: Icon(
                                           Icons.new_releases_rounded,
                                           color: FlutterFlowTheme.of(context)
@@ -1158,82 +959,69 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           mainAxisAlignment:
                                               MainAxisAlignment.center,
                                           children: [
-                                            Expanded(
-                                              child: Align(
-                                                alignment: const AlignmentDirectional(
-                                                    0.0, 0.0),
-                                                child: Padding(
-                                                  padding: const EdgeInsetsDirectional
-                                                      .fromSTEB(
-                                                          0.0, 5.0, 0.0, 0.0),
-                                                  child: Text(
-                                                    'Novedades',
-                                                    textAlign: TextAlign.center,
-                                                    style: FlutterFlowTheme.of(
-                                                            context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          fontFamily: 'Inter',
-                                                          fontSize: 20.0,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                                  ),
+                                            Align(
+                                              alignment: AlignmentDirectional(
+                                                  0.0, 0.0),
+                                              child: Padding(
+                                                padding: EdgeInsetsDirectional
+                                                    .fromSTEB(
+                                                        0.0, 5.0, 0.0, 0.0),
+                                                child: Text(
+                                                  'Novedades',
+                                                  textAlign: TextAlign.center,
+                                                  style: FlutterFlowTheme.of(
+                                                          context)
+                                                      .bodyMedium
+                                                      .override(
+                                                        fontFamily: 'Inter',
+                                                        fontSize: 20.0,
+                                                        letterSpacing: 0.0,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                      ),
                                                 ),
                                               ),
                                             ),
                                             Expanded(
-                                              child: Padding(
-                                                padding: const EdgeInsetsDirectional
-                                                    .fromSTEB(
-                                                        0.0, 0.0, 0.0, 5.0),
-                                                child: Container(
-                                                  decoration: BoxDecoration(
-                                                    borderRadius:
-                                                        BorderRadius.circular(
-                                                            8.0),
-                                                  ),
-                                                  child: Align(
-                                                    alignment:
-                                                        const AlignmentDirectional(
-                                                            0.0, 0.0),
-                                                    child: Padding(
-                                                      padding:
-                                                          const EdgeInsetsDirectional
-                                                              .fromSTEB(
-                                                                  5.0,
-                                                                  0.0,
-                                                                  5.0,
-                                                                  0.0),
-                                                      child: AutoSizeText(
-                                                        'Si algo interrumpe el trabajo, reportelo aquí.',
-                                                        textAlign:
-                                                            TextAlign.center,
-                                                        minFontSize: 8.0,
-                                                        style: FlutterFlowTheme
-                                                                .of(context)
-                                                            .bodyMedium
-                                                            .override(
-                                                              fontFamily:
-                                                                  'Inter',
-                                                              fontSize: 14.0,
-                                                              letterSpacing:
-                                                                  0.0,
-                                                              fontWeight:
-                                                                  FontWeight
-                                                                      .w800,
-                                                            ),
-                                                      ),
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  borderRadius:
+                                                      BorderRadius.circular(
+                                                          8.0),
+                                                ),
+                                                child: Align(
+                                                  alignment:
+                                                      AlignmentDirectional(
+                                                          0.0, 0.0),
+                                                  child: Padding(
+                                                    padding:
+                                                        EdgeInsetsDirectional
+                                                            .fromSTEB(5.0, 0.0,
+                                                                5.0, 0.0),
+                                                    child: AutoSizeText(
+                                                      'Si algo interrumpe el trabajo, reportelo aquí.',
+                                                      textAlign:
+                                                          TextAlign.center,
+                                                      minFontSize: 8.0,
+                                                      style: FlutterFlowTheme
+                                                              .of(context)
+                                                          .bodyMedium
+                                                          .override(
+                                                            fontFamily: 'Inter',
+                                                            fontSize: 14.0,
+                                                            letterSpacing: 0.0,
+                                                            fontWeight:
+                                                                FontWeight.w800,
+                                                          ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ].divide(const SizedBox(height: 10.0)),
+                                          ].divide(SizedBox(height: 10.0)),
                                         ),
                                       ),
-                                    ].divide(const SizedBox(width: 5.0)),
+                                    ].divide(SizedBox(width: 5.0)),
                                   ),
                                 ),
                               ),
@@ -1247,7 +1035,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                         ),
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 10.0),
                             child: InkWell(
                               splashColor: Colors.transparent,
@@ -1256,9 +1044,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                               highlightColor: Colors.transparent,
                               onTap: () async {
                                 context.pushNamed(
-                                  'InfoPage',
+                                  InfoPageWidget.routeName,
                                   extra: <String, dynamic>{
-                                    kTransitionInfoKey: const TransitionInfo(
+                                    kTransitionInfoKey: TransitionInfo(
                                       hasTransition: true,
                                       transitionType:
                                           PageTransitionType.bottomToTop,
@@ -1272,7 +1060,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                 decoration: BoxDecoration(
                                   color: FlutterFlowTheme.of(context)
                                       .primaryBackground,
-                                  boxShadow: const [
+                                  boxShadow: [
                                     BoxShadow(
                                       blurRadius: 10.0,
                                       color: Color(0x33000000),
@@ -1285,13 +1073,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                   borderRadius: BorderRadius.circular(12.0),
                                 ),
                                 child: Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
                                       10.0, 5.0, 10.0, 5.0),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.max,
                                     children: [
                                       Container(
-                                        decoration: const BoxDecoration(),
+                                        decoration: BoxDecoration(),
                                         child: Icon(
                                           Icons.sync_problem,
                                           color: FlutterFlowTheme.of(context)
@@ -1305,10 +1093,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                           children: [
                                             Expanded(
                                               child: Align(
-                                                alignment: const AlignmentDirectional(
+                                                alignment: AlignmentDirectional(
                                                     0.0, 0.0),
                                                 child: Padding(
-                                                  padding: const EdgeInsetsDirectional
+                                                  padding: EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           0.0, 5.0, 0.0, 0.0),
                                                   child: Text(
@@ -1330,10 +1118,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                             ),
                                             Expanded(
                                               child: Container(
-                                                decoration: const BoxDecoration(),
+                                                decoration: BoxDecoration(),
                                                 child: Align(
                                                   alignment:
-                                                      const AlignmentDirectional(
+                                                      AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: AutoSizeText(
                                                     'Sin información pendiente por sincronizar',
@@ -1363,7 +1151,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                             ),
                           ),
                         ),
-                      ].divide(const SizedBox(height: 10.0)),
+                      ].divide(SizedBox(height: 10.0)),
                     ),
                   ),
                 ),

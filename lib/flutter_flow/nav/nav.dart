@@ -6,8 +6,9 @@ import 'package:provider/provider.dart';
 import '/backend/schema/structs/index.dart';
 
 
-import '/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+
+import '/index.dart';
 
 export 'package:go_router/go_router.dart';
 export 'serialization_util.dart';
@@ -45,7 +46,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                 ),
               ),
             )
-          : const StartPageWidget(),
+          : StartPageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
@@ -60,16 +61,16 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
                     ),
                   ),
                 )
-              : const StartPageWidget(),
+              : StartPageWidget(),
         ),
         FFRoute(
-          name: 'UsersPage',
-          path: '/usersPage',
-          builder: (context, params) => const UsersPageWidget(),
+          name: UsersPageWidget.routeName,
+          path: UsersPageWidget.routePath,
+          builder: (context, params) => UsersPageWidget(),
         ),
         FFRoute(
-          name: 'StartPage',
-          path: '/startPage',
+          name: StartPageWidget.routeName,
+          path: StartPageWidget.routePath,
           builder: (context, params) => StartPageWidget(
             visitsAdd: params.getParam<VisitsStruct>(
               'visitsAdd',
@@ -80,28 +81,18 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
-          name: 'HeadquartersPage',
-          path: '/headquartersPage',
-          builder: (context, params) => const HeadquartersPageWidget(),
+          name: HeadquartersPageWidget.routeName,
+          path: HeadquartersPageWidget.routePath,
+          builder: (context, params) => HeadquartersPageWidget(),
         ),
         FFRoute(
-          name: 'ActivitiesPage',
-          path: '/activitiesPage',
-          builder: (context, params) => const ActivitiesPageWidget(),
+          name: ActivitiesPageWidget.routeName,
+          path: ActivitiesPageWidget.routePath,
+          builder: (context, params) => ActivitiesPageWidget(),
         ),
         FFRoute(
-          name: 'MainPage',
-          path: '/mainPage',
-          builder: (context, params) => const MainPageWidget(),
-        ),
-        FFRoute(
-          name: 'CalculateLocationPage',
-          path: '/calculateLocationPage',
-          builder: (context, params) => const CalculateLocationPageWidget(),
-        ),
-        FFRoute(
-          name: 'DoActivitiesPage',
-          path: '/doActivitiesPage',
+          name: DoActivitiesPageWidget.routeName,
+          path: DoActivitiesPageWidget.routePath,
           builder: (context, params) => DoActivitiesPageWidget(
             tittle: params.getParam(
               'tittle',
@@ -110,27 +101,54 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
-          name: 'AddProductPage',
-          path: '/addProductPage',
-          builder: (context, params) => const AddProductPageWidget(),
+          name: AddProductPageWidget.routeName,
+          path: AddProductPageWidget.routePath,
+          builder: (context, params) => AddProductPageWidget(),
         ),
         FFRoute(
-          name: 'ZonesPage',
-          path: '/zonesPage',
-          builder: (context, params) => const ZonesPageWidget(),
+          name: ZonesPageWidget.routeName,
+          path: ZonesPageWidget.routePath,
+          builder: (context, params) => ZonesPageWidget(),
         ),
         FFRoute(
-          name: 'InfoPage',
-          path: '/infoPage',
-          builder: (context, params) => const InfoPageWidget(),
+          name: InfoPageWidget.routeName,
+          path: InfoPageWidget.routePath,
+          builder: (context, params) => InfoPageWidget(),
         ),
         FFRoute(
-          name: 'DoVisitsPage',
-          path: '/doVisitsPage',
+          name: DoVisitsPageWidget.routeName,
+          path: DoVisitsPageWidget.routePath,
           builder: (context, params) => DoVisitsPageWidget(
             tittle: params.getParam(
               'tittle',
               ParamType.String,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: DetailsInfoPageWidget.routeName,
+          path: DetailsInfoPageWidget.routePath,
+          builder: (context, params) => DetailsInfoPageWidget(),
+        ),
+        FFRoute(
+          name: NewsPageWidget.routeName,
+          path: NewsPageWidget.routePath,
+          builder: (context, params) => NewsPageWidget(),
+        ),
+        FFRoute(
+          name: ModulesPageWidget.routeName,
+          path: ModulesPageWidget.routePath,
+          builder: (context, params) => ModulesPageWidget(),
+        ),
+        FFRoute(
+          name: DetailsCoordenatesVisitsPageWidget.routeName,
+          path: DetailsCoordenatesVisitsPageWidget.routePath,
+          builder: (context, params) => DetailsCoordenatesVisitsPageWidget(
+            visitSelected: params.getParam(
+              'visitSelected',
+              ParamType.DataStruct,
+              isList: false,
+              structBuilder: VisitsStruct.fromSerializableMap,
             ),
           ),
         )
@@ -298,7 +316,7 @@ class TransitionInfo {
   final Duration duration;
   final Alignment? alignment;
 
-  static TransitionInfo appDefault() => const TransitionInfo(hasTransition: false);
+  static TransitionInfo appDefault() => TransitionInfo(hasTransition: false);
 }
 
 class RootPageContext {

@@ -1,14 +1,17 @@
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'calculate_location_page_widget.dart' show CalculateLocationPageWidget;
+import 'calculate_coordenates_install_component_widget.dart'
+    show CalculateCoordenatesInstallComponentWidget;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 
-class CalculateLocationPageModel
-    extends FlutterFlowModel<CalculateLocationPageWidget> {
-  ///  State fields for stateful widgets in this page.
+class CalculateCoordenatesInstallComponentModel
+    extends FlutterFlowModel<CalculateCoordenatesInstallComponentWidget> {
+  ///  State fields for stateful widgets in this component.
 
-  // Stores action output result for [Custom Action - getLocationList] action in CalculateLocationPage widget.
+  // Stores action output result for [Custom Action - downloadGNSSData] action in CalculateCoordenatesInstallComponent widget.
+  String? pathGNSS;
+  // Stores action output result for [Custom Action - getLocationList] action in CalculateCoordenatesInstallComponent widget.
   List<String>? locationsList;
   // State field(s) for Timer widget.
   final timerInitialTimeMs = 10000;

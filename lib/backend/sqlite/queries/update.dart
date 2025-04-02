@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 Future performDeleteAllUsers(
   Database database,
 ) {
-  const query = '''
+  final query = '''
 DELETE FROM Users
 ''';
   return database.rawQuery(query);

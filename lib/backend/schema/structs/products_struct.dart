@@ -15,6 +15,7 @@ class ProductsStruct extends BaseStruct {
     String? locationRaw,
     int? line,
     int? palm,
+    List<String>? locationsAdd,
   })  : _idProduct = idProduct,
         _idHeadquarter = idHeadquarter,
         _rfid = rfid,
@@ -22,7 +23,8 @@ class ProductsStruct extends BaseStruct {
         _descriptionProduct = descriptionProduct,
         _locationRaw = locationRaw,
         _line = line,
-        _palm = palm;
+        _palm = palm,
+        _locationsAdd = locationsAdd;
 
   // "id_product" field.
   int? _idProduct;
@@ -89,6 +91,17 @@ class ProductsStruct extends BaseStruct {
 
   bool hasPalm() => _palm != null;
 
+  // "locations_add" field.
+  List<String>? _locationsAdd;
+  List<String> get locationsAdd => _locationsAdd ?? const [];
+  set locationsAdd(List<String>? val) => _locationsAdd = val;
+
+  void updateLocationsAdd(Function(List<String>) updateFn) {
+    updateFn(_locationsAdd ??= []);
+  }
+
+  bool hasLocationsAdd() => _locationsAdd != null;
+
   static ProductsStruct fromMap(Map<String, dynamic> data) => ProductsStruct(
         idProduct: castToType<int>(data['id_product']),
         idHeadquarter: castToType<int>(data['id_headquarter']),
@@ -98,6 +111,7 @@ class ProductsStruct extends BaseStruct {
         locationRaw: data['location_raw'] as String?,
         line: castToType<int>(data['line']),
         palm: castToType<int>(data['palm']),
+        locationsAdd: getDataList(data['locations_add']),
       );
 
   static ProductsStruct? maybeFromMap(dynamic data) =>
@@ -112,6 +126,7 @@ class ProductsStruct extends BaseStruct {
         'location_raw': _locationRaw,
         'line': _line,
         'palm': _palm,
+        'locations_add': _locationsAdd,
       }.withoutNulls;
 
   @override
@@ -147,6 +162,11 @@ class ProductsStruct extends BaseStruct {
         'palm': serializeParam(
           _palm,
           ParamType.int,
+        ),
+        'locations_add': serializeParam(
+          _locationsAdd,
+          ParamType.String,
+          isList: true,
         ),
       }.withoutNulls;
 
@@ -192,6 +212,11 @@ class ProductsStruct extends BaseStruct {
           ParamType.int,
           false,
         ),
+        locationsAdd: deserializeParam<String>(
+          data['locations_add'],
+          ParamType.String,
+          true,
+        ),
       );
 
   @override
@@ -199,6 +224,7 @@ class ProductsStruct extends BaseStruct {
 
   @override
   bool operator ==(Object other) {
+    const listEquality = ListEquality();
     return other is ProductsStruct &&
         idProduct == other.idProduct &&
         idHeadquarter == other.idHeadquarter &&
@@ -207,7 +233,8 @@ class ProductsStruct extends BaseStruct {
         descriptionProduct == other.descriptionProduct &&
         locationRaw == other.locationRaw &&
         line == other.line &&
-        palm == other.palm;
+        palm == other.palm &&
+        listEquality.equals(locationsAdd, other.locationsAdd);
   }
 
   @override
@@ -219,7 +246,8 @@ class ProductsStruct extends BaseStruct {
         descriptionProduct,
         locationRaw,
         line,
-        palm
+        palm,
+        locationsAdd
       ]);
 }
 

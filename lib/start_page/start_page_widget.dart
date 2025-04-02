@@ -6,6 +6,7 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
+import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
@@ -19,6 +20,9 @@ class StartPageWidget extends StatefulWidget {
   });
 
   final List<VisitsStruct>? visitsAdd;
+
+  static String routeName = 'StartPage';
+  static String routePath = '/startPage';
 
   @override
   State<StartPageWidget> createState() => _StartPageWidgetState();
@@ -51,14 +55,14 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 elevation: 0,
                 insetPadding: EdgeInsets.zero,
                 backgroundColor: Colors.transparent,
-                alignment: const AlignmentDirectional(0.0, 0.0)
+                alignment: AlignmentDirectional(0.0, 0.0)
                     .resolve(Directionality.of(context)),
                 child: GestureDetector(
                   onTap: () {
                     FocusScope.of(dialogContext).unfocus();
                     FocusManager.instance.primaryFocus?.unfocus();
                   },
-                  child: SizedBox(
+                  child: Container(
                     height: MediaQuery.sizeOf(context).height * 0.5,
                     width: MediaQuery.sizeOf(context).width * 0.9,
                     child: InfoDialogWidget(
@@ -88,6 +92,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             if ((_model.apiResultLoginDirect?.succeeded ?? true)) {
               _model.pathDatabase = await actions.getDatabase();
               FFAppState().pathDatabase = _model.pathDatabase!;
+              FFAppState().androidID = _model.androidID!;
               await actions.usersInserData(
                 _model.pathDatabase!,
                 'Users',
@@ -169,9 +174,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 context.pop();
               }
               context.pushNamed(
-                'MainPage',
+                ModulesPageWidget.routeName,
                 extra: <String, dynamic>{
-                  kTransitionInfoKey: const TransitionInfo(
+                  kTransitionInfoKey: TransitionInfo(
                     hasTransition: true,
                     transitionType: PageTransitionType.fade,
                     duration: Duration(milliseconds: 1000),
@@ -188,17 +193,17 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    alignment: const AlignmentDirectional(0.0, 0.0)
+                    alignment: AlignmentDirectional(0.0, 0.0)
                         .resolve(Directionality.of(context)),
                     child: GestureDetector(
                       onTap: () {
                         FocusScope.of(dialogContext).unfocus();
                         FocusManager.instance.primaryFocus?.unfocus();
                       },
-                      child: SizedBox(
+                      child: Container(
                         height: MediaQuery.sizeOf(context).height * 0.6,
                         width: MediaQuery.sizeOf(context).width * 0.6,
-                        child: const InfoDialogWidget(
+                        child: InfoDialogWidget(
                           info:
                               'Error encontrando los datos intentalo de nuevo cuando tengas internet!',
                         ),
@@ -218,14 +223,14 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   elevation: 0,
                   insetPadding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
-                  alignment: const AlignmentDirectional(0.0, 0.0)
+                  alignment: AlignmentDirectional(0.0, 0.0)
                       .resolve(Directionality.of(context)),
                   child: GestureDetector(
                     onTap: () {
                       FocusScope.of(dialogContext).unfocus();
                       FocusManager.instance.primaryFocus?.unfocus();
                     },
-                    child: SizedBox(
+                    child: Container(
                       height: MediaQuery.sizeOf(context).height * 0.6,
                       width: MediaQuery.sizeOf(context).width * 0.8,
                       child: InfoDialogWidget(
@@ -245,17 +250,17 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   elevation: 0,
                   insetPadding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
-                  alignment: const AlignmentDirectional(0.0, 0.0)
+                  alignment: AlignmentDirectional(0.0, 0.0)
                       .resolve(Directionality.of(context)),
                   child: GestureDetector(
                     onTap: () {
                       FocusScope.of(dialogContext).unfocus();
                       FocusManager.instance.primaryFocus?.unfocus();
                     },
-                    child: SizedBox(
+                    child: Container(
                       height: MediaQuery.sizeOf(context).height * 0.95,
                       width: MediaQuery.sizeOf(context).width * 0.95,
-                      child: const KeyboardNumComponentWidget(
+                      child: KeyboardNumComponentWidget(
                         tittle: 'Ingrese el código del supervisor',
                       ),
                     ),
@@ -327,9 +332,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 context.pop();
               }
               context.pushNamed(
-                'MainPage',
+                ModulesPageWidget.routeName,
                 extra: <String, dynamic>{
-                  kTransitionInfoKey: const TransitionInfo(
+                  kTransitionInfoKey: TransitionInfo(
                     hasTransition: true,
                     transitionType: PageTransitionType.fade,
                     duration: Duration(milliseconds: 1000),
@@ -347,7 +352,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       color: FlutterFlowTheme.of(context).secondaryBackground,
                     ),
                   ),
-                  duration: const Duration(milliseconds: 3750),
+                  duration: Duration(milliseconds: 3750),
                   backgroundColor: FlutterFlowTheme.of(context).error,
                 ),
               );
@@ -359,9 +364,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             context.pop();
           }
           context.pushNamed(
-            'MainPage',
+            ModulesPageWidget.routeName,
             extra: <String, dynamic>{
-              kTransitionInfoKey: const TransitionInfo(
+              kTransitionInfoKey: TransitionInfo(
                 hasTransition: true,
                 transitionType: PageTransitionType.fade,
                 duration: Duration(milliseconds: 1000),
@@ -377,9 +382,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             context.pop();
           }
           context.pushNamed(
-            'MainPage',
+            ModulesPageWidget.routeName,
             extra: <String, dynamic>{
-              kTransitionInfoKey: const TransitionInfo(
+              kTransitionInfoKey: TransitionInfo(
                 hasTransition: true,
                 transitionType: PageTransitionType.fade,
                 duration: Duration(milliseconds: 1000),
@@ -394,17 +399,17 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 elevation: 0,
                 insetPadding: EdgeInsets.zero,
                 backgroundColor: Colors.transparent,
-                alignment: const AlignmentDirectional(0.0, 0.0)
+                alignment: AlignmentDirectional(0.0, 0.0)
                     .resolve(Directionality.of(context)),
                 child: GestureDetector(
                   onTap: () {
                     FocusScope.of(dialogContext).unfocus();
                     FocusManager.instance.primaryFocus?.unfocus();
                   },
-                  child: SizedBox(
+                  child: Container(
                     height: MediaQuery.sizeOf(context).height * 0.6,
                     width: MediaQuery.sizeOf(context).width * 0.9,
-                    child: const InfoDialogWidget(
+                    child: InfoDialogWidget(
                       info:
                           'No tiene conexión a internet y es la primera vez que se inicia el dispositivo, debe conectar el teléfono y proceder a iniciar de nuevo la aplicación',
                     ),
@@ -460,7 +465,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   child: Container(
                     width: double.infinity,
                     height: 122.0,
-                    decoration: const BoxDecoration(),
+                    decoration: BoxDecoration(),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -469,9 +474,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                           child: Container(
                             width: 210.0,
                             height: double.infinity,
-                            decoration: const BoxDecoration(),
+                            decoration: BoxDecoration(),
                             child: Padding(
-                              padding: const EdgeInsetsDirectional.fromSTEB(
+                              padding: EdgeInsetsDirectional.fromSTEB(
                                   0.0, 5.0, 0.0, 0.0),
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8.0),
@@ -489,13 +494,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                           child: Container(
                             width: double.infinity,
                             height: double.infinity,
-                            decoration: const BoxDecoration(),
+                            decoration: BoxDecoration(),
                             child: Column(
                               mainAxisSize: MainAxisSize.max,
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Padding(
-                                  padding: const EdgeInsetsDirectional.fromSTEB(
+                                  padding: EdgeInsetsDirectional.fromSTEB(
                                       20.0, 0.0, 20.0, 0.0),
                                   child: Text(
                                     'Estamos cargando todos los recursos necesarios',
@@ -522,7 +527,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                 ),
-                              ].divide(const SizedBox(height: 20.0)),
+                              ].divide(SizedBox(height: 20.0)),
                             ),
                           ),
                         ),
@@ -534,9 +539,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   child: Container(
                     width: double.infinity,
                     height: double.infinity,
-                    decoration: const BoxDecoration(),
+                    decoration: BoxDecoration(),
                     child: Padding(
-                      padding: const EdgeInsets.all(10.0),
+                      padding: EdgeInsets.all(10.0),
                       child: SingleChildScrollView(
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
@@ -547,14 +552,14 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 borderRadius: BorderRadius.circular(8.0),
                               ),
                               child: Padding(
-                                padding: const EdgeInsetsDirectional.fromSTEB(
+                                padding: EdgeInsetsDirectional.fromSTEB(
                                     10.0, 5.0, 5.0, 5.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.max,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Container(
-                                      decoration: const BoxDecoration(),
+                                      decoration: BoxDecoration(),
                                       child: ClipRRect(
                                         borderRadius:
                                             BorderRadius.circular(8.0),
@@ -570,7 +575,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 ),
                               ),
                             ),
-                          ].divide(const SizedBox(height: 15.0)),
+                          ].divide(SizedBox(height: 15.0)),
                         ),
                       ),
                     ),

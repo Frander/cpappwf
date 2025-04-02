@@ -1,6 +1,8 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/custom_code/actions/index.dart' as actions;
+import 'package:easy_debounce/easy_debounce.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'users_page_model.dart';
@@ -8,6 +10,9 @@ export 'users_page_model.dart';
 
 class UsersPageWidget extends StatefulWidget {
   const UsersPageWidget({super.key});
+
+  static String routeName = 'UsersPage';
+  static String routePath = '/usersPage';
 
   @override
   State<UsersPageWidget> createState() => _UsersPageWidgetState();
@@ -62,7 +67,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
             children: [
               Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(),
+                decoration: BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -88,7 +93,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                         Container(
                           width: 124.09,
                           height: 53.2,
-                          decoration: const BoxDecoration(),
+                          decoration: BoxDecoration(),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
                             child: Image.asset(
@@ -101,7 +106,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                     ),
                     Container(
                       width: double.infinity,
-                      decoration: const BoxDecoration(),
+                      decoration: BoxDecoration(),
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -119,12 +124,12 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                 ),
                           ),
                           Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                                 10.0, 0.0, 10.0, 0.0),
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
                                     blurRadius: 4.0,
                                     color: Color(0x33000000),
@@ -137,12 +142,57 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.all(6.0),
-                                child: SizedBox(
+                                padding: EdgeInsets.all(6.0),
+                                child: Container(
                                   width: 200.0,
                                   child: TextFormField(
                                     controller: _model.textController,
                                     focusNode: _model.textFieldFocusNode,
+                                    onChanged: (_) => EasyDebounce.debounce(
+                                      '_model.textController',
+                                      Duration(milliseconds: 2000),
+                                      () async {
+                                        var _shouldSetState = false;
+                                        if (_model.textController.text == '') {
+                                          _model.usersFilterList =
+                                              await actions.usersSelect(
+                                            FFAppState().pathDatabase,
+                                            'ALL',
+                                            ' ',
+                                            ' ',
+                                          );
+                                          _shouldSetState = true;
+                                          FFAppState().usersList = _model
+                                              .usersFilterList!
+                                              .toList()
+                                              .cast<UsersStruct>();
+                                          safeSetState(() {});
+                                          if (_shouldSetState)
+                                            safeSetState(() {});
+                                          return;
+                                        } else {
+                                          _model.usersFilterNameList =
+                                              await actions.usersSelect(
+                                            FFAppState().pathDatabase,
+                                            'NAME USER',
+                                            _model.textController.text,
+                                            ' ',
+                                          );
+                                          _shouldSetState = true;
+                                          FFAppState().usersList = _model
+                                              .usersFilterNameList!
+                                              .toList()
+                                              .cast<UsersStruct>();
+                                          safeSetState(() {});
+                                          if (_shouldSetState)
+                                            safeSetState(() {});
+                                          return;
+                                        }
+
+                                        if (_shouldSetState)
+                                          safeSetState(() {});
+                                      },
+                                    ),
                                     autofocus: false,
                                     obscureText: false,
                                     decoration: InputDecoration(
@@ -162,7 +212,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                             letterSpacing: 0.0,
                                           ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -170,7 +220,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                             BorderRadius.circular(8.0),
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -215,7 +265,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                               ),
                             ),
                           ),
-                        ].divide(const SizedBox(height: 10.0)),
+                        ].divide(SizedBox(height: 10.0)),
                       ),
                     ),
                   ],
@@ -225,9 +275,9 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  decoration: const BoxDecoration(),
+                  decoration: BoxDecoration(),
                   child: Padding(
-                    padding: const EdgeInsets.all(10.0),
+                    padding: EdgeInsets.all(10.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       children: [
@@ -242,11 +292,11 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                 scrollDirection: Axis.vertical,
                                 itemCount: userItem.length,
                                 separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 5.0),
+                                    SizedBox(height: 5.0),
                                 itemBuilder: (context, userItemIndex) {
                                   final userItemItem = userItem[userItemIndex];
                                   return Padding(
-                                    padding: const EdgeInsetsDirectional.fromSTEB(
+                                    padding: EdgeInsetsDirectional.fromSTEB(
                                         0.0, 5.0, 0.0, 0.0),
                                     child: InkWell(
                                       splashColor: Colors.transparent,
@@ -269,7 +319,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .primaryBackground,
-                                          boxShadow: const [
+                                          boxShadow: [
                                             BoxShadow(
                                               blurRadius: 10.0,
                                               color: Color(0x33000000),
@@ -286,9 +336,9 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                           mainAxisSize: MainAxisSize.max,
                                           children: [
                                             Container(
-                                              decoration: const BoxDecoration(),
+                                              decoration: BoxDecoration(),
                                               child: Padding(
-                                                padding: const EdgeInsets.all(16.0),
+                                                padding: EdgeInsets.all(16.0),
                                                 child: ClipRRect(
                                                   borderRadius:
                                                       BorderRadius.circular(
@@ -304,7 +354,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                             ),
                                             Expanded(
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 5.0, 5.0, 5.0),
                                                 child: Column(
@@ -335,7 +385,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                                                     ),
                                                     Padding(
                                                       padding:
-                                                          const EdgeInsetsDirectional
+                                                          EdgeInsetsDirectional
                                                               .fromSTEB(
                                                                   0.0,
                                                                   0.0,
@@ -381,7 +431,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> {
                             },
                           ),
                         ),
-                      ].divide(const SizedBox(height: 10.0)),
+                      ].divide(SizedBox(height: 10.0)),
                     ),
                   ),
                 ),

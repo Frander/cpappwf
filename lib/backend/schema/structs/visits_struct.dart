@@ -1,5 +1,6 @@
 // ignore_for_file: unnecessary_getters_setters
 
+import '/backend/schema/util/schema_util.dart';
 
 import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -13,9 +14,10 @@ class VisitsStruct extends BaseStruct {
     int? idProduct,
     int? idUser,
     int? idDevice,
-    List<ActivitiesStatusStruct>? statusAdd,
     List<String>? locationsAdd,
     String? locationDefault,
+    int? idStatus,
+    DateTime? createdAt,
   })  : _idVisit = idVisit,
         _idCompany = idCompany,
         _idActivity = idActivity,
@@ -23,9 +25,10 @@ class VisitsStruct extends BaseStruct {
         _idProduct = idProduct,
         _idUser = idUser,
         _idDevice = idDevice,
-        _statusAdd = statusAdd,
         _locationsAdd = locationsAdd,
-        _locationDefault = locationDefault;
+        _locationDefault = locationDefault,
+        _idStatus = idStatus,
+        _createdAt = createdAt;
 
   // "id_visit" field.
   int? _idVisit;
@@ -91,17 +94,6 @@ class VisitsStruct extends BaseStruct {
 
   bool hasIdDevice() => _idDevice != null;
 
-  // "status_add" field.
-  List<ActivitiesStatusStruct>? _statusAdd;
-  List<ActivitiesStatusStruct> get statusAdd => _statusAdd ?? const [];
-  set statusAdd(List<ActivitiesStatusStruct>? val) => _statusAdd = val;
-
-  void updateStatusAdd(Function(List<ActivitiesStatusStruct>) updateFn) {
-    updateFn(_statusAdd ??= []);
-  }
-
-  bool hasStatusAdd() => _statusAdd != null;
-
   // "locations_add" field.
   List<String>? _locationsAdd;
   List<String> get locationsAdd => _locationsAdd ?? const [];
@@ -120,6 +112,22 @@ class VisitsStruct extends BaseStruct {
 
   bool hasLocationDefault() => _locationDefault != null;
 
+  // "id_status" field.
+  int? _idStatus;
+  int get idStatus => _idStatus ?? 0;
+  set idStatus(int? val) => _idStatus = val;
+
+  void incrementIdStatus(int amount) => idStatus = idStatus + amount;
+
+  bool hasIdStatus() => _idStatus != null;
+
+  // "created_at" field.
+  DateTime? _createdAt;
+  DateTime? get createdAt => _createdAt;
+  set createdAt(DateTime? val) => _createdAt = val;
+
+  bool hasCreatedAt() => _createdAt != null;
+
   static VisitsStruct fromMap(Map<String, dynamic> data) => VisitsStruct(
         idVisit: castToType<int>(data['id_visit']),
         idCompany: castToType<int>(data['id_company']),
@@ -128,12 +136,10 @@ class VisitsStruct extends BaseStruct {
         idProduct: castToType<int>(data['id_product']),
         idUser: castToType<int>(data['id_user']),
         idDevice: castToType<int>(data['id_device']),
-        statusAdd: getStructList(
-          data['status_add'],
-          ActivitiesStatusStruct.fromMap,
-        ),
         locationsAdd: getDataList(data['locations_add']),
         locationDefault: data['location_default'] as String?,
+        idStatus: castToType<int>(data['id_status']),
+        createdAt: data['created_at'] as DateTime?,
       );
 
   static VisitsStruct? maybeFromMap(dynamic data) =>
@@ -147,9 +153,10 @@ class VisitsStruct extends BaseStruct {
         'id_product': _idProduct,
         'id_user': _idUser,
         'id_device': _idDevice,
-        'status_add': _statusAdd?.map((e) => e.toMap()).toList(),
         'locations_add': _locationsAdd,
         'location_default': _locationDefault,
+        'id_status': _idStatus,
+        'created_at': _createdAt,
       }.withoutNulls;
 
   @override
@@ -182,11 +189,6 @@ class VisitsStruct extends BaseStruct {
           _idDevice,
           ParamType.int,
         ),
-        'status_add': serializeParam(
-          _statusAdd,
-          ParamType.DataStruct,
-          isList: true,
-        ),
         'locations_add': serializeParam(
           _locationsAdd,
           ParamType.String,
@@ -195,6 +197,14 @@ class VisitsStruct extends BaseStruct {
         'location_default': serializeParam(
           _locationDefault,
           ParamType.String,
+        ),
+        'id_status': serializeParam(
+          _idStatus,
+          ParamType.int,
+        ),
+        'created_at': serializeParam(
+          _createdAt,
+          ParamType.DateTime,
         ),
       }.withoutNulls;
 
@@ -235,12 +245,6 @@ class VisitsStruct extends BaseStruct {
           ParamType.int,
           false,
         ),
-        statusAdd: deserializeStructParam<ActivitiesStatusStruct>(
-          data['status_add'],
-          ParamType.DataStruct,
-          true,
-          structBuilder: ActivitiesStatusStruct.fromSerializableMap,
-        ),
         locationsAdd: deserializeParam<String>(
           data['locations_add'],
           ParamType.String,
@@ -249,6 +253,16 @@ class VisitsStruct extends BaseStruct {
         locationDefault: deserializeParam(
           data['location_default'],
           ParamType.String,
+          false,
+        ),
+        idStatus: deserializeParam(
+          data['id_status'],
+          ParamType.int,
+          false,
+        ),
+        createdAt: deserializeParam(
+          data['created_at'],
+          ParamType.DateTime,
           false,
         ),
       );
@@ -267,9 +281,10 @@ class VisitsStruct extends BaseStruct {
         idProduct == other.idProduct &&
         idUser == other.idUser &&
         idDevice == other.idDevice &&
-        listEquality.equals(statusAdd, other.statusAdd) &&
         listEquality.equals(locationsAdd, other.locationsAdd) &&
-        locationDefault == other.locationDefault;
+        locationDefault == other.locationDefault &&
+        idStatus == other.idStatus &&
+        createdAt == other.createdAt;
   }
 
   @override
@@ -281,9 +296,10 @@ class VisitsStruct extends BaseStruct {
         idProduct,
         idUser,
         idDevice,
-        statusAdd,
         locationsAdd,
-        locationDefault
+        locationDefault,
+        idStatus,
+        createdAt
       ]);
 }
 
@@ -296,6 +312,8 @@ VisitsStruct createVisitsStruct({
   int? idUser,
   int? idDevice,
   String? locationDefault,
+  int? idStatus,
+  DateTime? createdAt,
 }) =>
     VisitsStruct(
       idVisit: idVisit,
@@ -306,4 +324,6 @@ VisitsStruct createVisitsStruct({
       idUser: idUser,
       idDevice: idDevice,
       locationDefault: locationDefault,
+      idStatus: idStatus,
+      createdAt: createdAt,
     );

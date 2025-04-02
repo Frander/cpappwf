@@ -8,6 +8,9 @@ export 'activities_page_model.dart';
 class ActivitiesPageWidget extends StatefulWidget {
   const ActivitiesPageWidget({super.key});
 
+  static String routeName = 'ActivitiesPage';
+  static String routePath = '/activitiesPage';
+
   @override
   State<ActivitiesPageWidget> createState() => _ActivitiesPageWidgetState();
 }
@@ -61,7 +64,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
             children: [
               Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(),
+                decoration: BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.start,
@@ -87,7 +90,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                         Container(
                           width: 124.09,
                           height: 53.2,
-                          decoration: const BoxDecoration(),
+                          decoration: BoxDecoration(),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
                             child: Image.asset(
@@ -100,7 +103,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                     ),
                     Container(
                       width: double.infinity,
-                      decoration: const BoxDecoration(),
+                      decoration: BoxDecoration(),
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -118,12 +121,12 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                 ),
                           ),
                           Padding(
-                            padding: const EdgeInsetsDirectional.fromSTEB(
+                            padding: EdgeInsetsDirectional.fromSTEB(
                                 10.0, 0.0, 10.0, 0.0),
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                boxShadow: const [
+                                boxShadow: [
                                   BoxShadow(
                                     blurRadius: 4.0,
                                     color: Color(0x33000000),
@@ -136,8 +139,8 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
                               child: Padding(
-                                padding: const EdgeInsets.all(6.0),
-                                child: SizedBox(
+                                padding: EdgeInsets.all(6.0),
+                                child: Container(
                                   width: 200.0,
                                   child: TextFormField(
                                     controller: _model.textController,
@@ -161,7 +164,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                             letterSpacing: 0.0,
                                           ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -169,7 +172,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                             BorderRadius.circular(8.0),
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -214,19 +217,19 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                               ),
                             ),
                           ),
-                        ].divide(const SizedBox(height: 10.0)),
+                        ].divide(SizedBox(height: 10.0)),
                       ),
                     ),
-                  ].divide(const SizedBox(height: 10.0)),
+                  ].divide(SizedBox(height: 10.0)),
                 ),
               ),
               Expanded(
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  decoration: const BoxDecoration(),
+                  decoration: BoxDecoration(),
                   child: Padding(
-                    padding: const EdgeInsets.all(10.0),
+                    padding: EdgeInsets.all(10.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       children: [
@@ -242,12 +245,12 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                 scrollDirection: Axis.vertical,
                                 itemCount: activityItem.length,
                                 separatorBuilder: (_, __) =>
-                                    const SizedBox(height: 5.0),
+                                    SizedBox(height: 5.0),
                                 itemBuilder: (context, activityItemIndex) {
                                   final activityItemItem =
                                       activityItem[activityItemIndex];
                                   return Padding(
-                                    padding: const EdgeInsetsDirectional.fromSTEB(
+                                    padding: EdgeInsetsDirectional.fromSTEB(
                                         0.0, 5.0, 0.0, 0.0),
                                     child: InkWell(
                                       splashColor: Colors.transparent,
@@ -266,7 +269,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .primaryBackground,
-                                          boxShadow: const [
+                                          boxShadow: [
                                             BoxShadow(
                                               blurRadius: 10.0,
                                               color: Color(0x33000000),
@@ -283,9 +286,9 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                           mainAxisSize: MainAxisSize.max,
                                           children: [
                                             Container(
-                                              decoration: const BoxDecoration(),
+                                              decoration: BoxDecoration(),
                                               child: Padding(
-                                                padding: const EdgeInsets.all(16.0),
+                                                padding: EdgeInsets.all(16.0),
                                                 child: ClipRRect(
                                                   borderRadius:
                                                       BorderRadius.circular(
@@ -301,7 +304,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                             ),
                                             Expanded(
                                               child: Padding(
-                                                padding: const EdgeInsetsDirectional
+                                                padding: EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 5.0, 5.0, 5.0),
                                                 child: Column(
@@ -310,7 +313,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                                   children: [
                                                     Expanded(
                                                       child: Text(
-                                                        activityItemItem.nameActivity,
+                                                        '${activityItemItem.nameActivity}',
                                                         textAlign:
                                                             TextAlign.start,
                                                         style: FlutterFlowTheme
@@ -319,7 +322,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                                             .override(
                                                               fontFamily:
                                                                   'Inter',
-                                                              fontSize: 18.0,
+                                                              fontSize: 16.0,
                                                               letterSpacing:
                                                                   0.0,
                                                               fontWeight:
@@ -371,7 +374,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                                                           .bold,
                                                                 ),
                                                           ),
-                                                        ].divide(const SizedBox(
+                                                        ].divide(SizedBox(
                                                             width: 10.0)),
                                                       ),
                                                     ),
@@ -399,7 +402,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                                                           .bold,
                                                                 ),
                                                           ),
-                                                        ].divide(const SizedBox(
+                                                        ].divide(SizedBox(
                                                             width: 10.0)),
                                                       ),
                                                     ),
@@ -417,7 +420,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             },
                           ),
                         ),
-                      ].divide(const SizedBox(height: 10.0)),
+                      ].divide(SizedBox(height: 10.0)),
                     ),
                   ),
                 ),

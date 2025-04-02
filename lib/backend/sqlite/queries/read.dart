@@ -12,14 +12,14 @@ Future<List<T>> _readQuery<T>(
 Future<List<GetAllUsersRow>> performGetAllUsers(
   Database database,
 ) {
-  const query = '''
+  final query = '''
 select * from Users
 ''';
   return _readQuery(database, query, (d) => GetAllUsersRow(d));
 }
 
 class GetAllUsersRow extends SqliteRow {
-  GetAllUsersRow(super.data);
+  GetAllUsersRow(Map<String, dynamic> data) : super(data);
 
   int get idUser => data['idUser'] as int;
   int get idCompany => data['idCompany'] as int;
