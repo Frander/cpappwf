@@ -12,10 +12,10 @@ class CalculateCoordenatesComponentModel
   // Stores action output result for [Custom Action - getLocationList] action in CalculateCoordenatesComponent widget.
   List<String>? locationsList;
   // State field(s) for Timer widget.
-  final timerInitialTimeMs = 10000;
-  int timerMilliseconds = 10000;
+  final timerInitialTimeMs = 5000;
+  int timerMilliseconds = 5000;
   String timerValue = StopWatchTimer.getDisplayTime(
-    10000,
+    5000,
     hours: false,
     minute: false,
     milliSecond: false,

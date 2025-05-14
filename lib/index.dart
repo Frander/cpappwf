@@ -13,7 +13,7 @@ export '/info_page/info_page_widget.dart' show InfoPageWidget;
 export '/do_visits_page/do_visits_page_widget.dart' show DoVisitsPageWidget;
 export '/details_info_page/details_info_page_widget.dart'
     show DetailsInfoPageWidget;
-export '/news_page/news_page_widget.dart' show NewsPageWidget;
 export '/modules_page/modules_page_widget.dart' show ModulesPageWidget;
 export '/details_coordenates_visits_page/details_coordenates_visits_page_widget.dart'
     show DetailsCoordenatesVisitsPageWidget;
+export '/news_page/news_page_widget.dart' show NewsPageWidget;

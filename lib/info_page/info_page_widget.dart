@@ -3,8 +3,10 @@ import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/actions/index.dart' as actions;
+import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'info_page_model.dart';
 export 'info_page_model.dart';
@@ -28,8 +30,6 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => InfoPageModel());
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
   @override
@@ -117,10 +117,20 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            fontFamily: 'Inter',
+                                            font: GoogleFonts.inter(
+                                              fontWeight: FontWeight.bold,
+                                              fontStyle:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodyMedium
+                                                      .fontStyle,
+                                            ),
                                             fontSize: 10.0,
                                             letterSpacing: 0.0,
                                             fontWeight: FontWeight.bold,
+                                            fontStyle:
+                                                FlutterFlowTheme.of(context)
+                                                    .bodyMedium
+                                                    .fontStyle,
                                           ),
                                     ),
                                   ),
@@ -328,10 +338,18 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                             style: FlutterFlowTheme.of(context)
                                 .bodyMedium
                                 .override(
-                                  fontFamily: 'Inter',
+                                  font: GoogleFonts.inter(
+                                    fontWeight: FontWeight.bold,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontStyle,
+                                  ),
                                   fontSize: 22.0,
                                   letterSpacing: 0.0,
                                   fontWeight: FontWeight.bold,
+                                  fontStyle: FlutterFlowTheme.of(context)
+                                      .bodyMedium
+                                      .fontStyle,
                                 ),
                           ),
                           Padding(
@@ -343,10 +361,18 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    fontFamily: 'Inter',
+                                    font: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontStyle,
+                                    ),
                                     fontSize: 12.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontStyle,
                                   ),
                             ),
                           ),
@@ -354,15 +380,23 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                             padding: EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 5.0),
                             child: Text(
-                              FFAppState().androidID,
+                              'Identificación del CTR: ${FFAppState().androidID}',
                               textAlign: TextAlign.center,
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    fontFamily: 'Inter',
+                                    font: GoogleFonts.inter(
+                                      fontWeight: FontWeight.bold,
+                                      fontStyle: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .fontStyle,
+                                    ),
                                     fontSize: 12.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .bodyMedium
+                                        .fontStyle,
                                   ),
                             ),
                           ),
@@ -383,6 +417,181 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         children: [
+                          Padding(
+                            padding: EdgeInsetsDirectional.fromSTEB(
+                                10.0, 0.0, 5.0, 0.0),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.max,
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    splashColor: Colors.transparent,
+                                    focusColor: Colors.transparent,
+                                    hoverColor: Colors.transparent,
+                                    highlightColor: Colors.transparent,
+                                    onTap: () async {
+                                      context.pushNamed(
+                                        DetailsInfoPageWidget.routeName,
+                                        extra: <String, dynamic>{
+                                          kTransitionInfoKey: TransitionInfo(
+                                            hasTransition: true,
+                                            transitionType:
+                                                PageTransitionType.fade,
+                                            duration:
+                                                Duration(milliseconds: 800),
+                                          ),
+                                        },
+                                      );
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFFE3D4D4),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            blurRadius: 6.0,
+                                            color: Color(0x33000000),
+                                            offset: Offset(
+                                              0.0,
+                                              2.0,
+                                            ),
+                                          )
+                                        ],
+                                        borderRadius:
+                                            BorderRadius.circular(16.0),
+                                      ),
+                                      child: Padding(
+                                        padding: EdgeInsetsDirectional.fromSTEB(
+                                            15.0, 5.0, 15.0, 15.0),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.max,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Padding(
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(
+                                                      0.0, 10.0, 0.0, 0.0),
+                                              child: Text(
+                                                'Información pendiente por sincronizar:',
+                                                textAlign: TextAlign.center,
+                                                style:
+                                                    FlutterFlowTheme.of(context)
+                                                        .bodyMedium
+                                                        .override(
+                                                          font:
+                                                              GoogleFonts.inter(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontStyle:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .bodyMedium
+                                                                    .fontStyle,
+                                                          ),
+                                                          fontSize: 16.0,
+                                                          letterSpacing: 0.0,
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                              ),
+                                            ),
+                                            Text(
+                                              '▲ ${FFAppState().visitsAdd.length.toString()} visitas',
+                                              textAlign: TextAlign.start,
+                                              style:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodyMedium
+                                                      .override(
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 16.0,
+                                                        letterSpacing: 0.0,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
+                                                      ),
+                                            ),
+                                            Text(
+                                              '▲ ${FFAppState().newsAdd.length.toString()} novedades',
+                                              textAlign: TextAlign.start,
+                                              style:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodyMedium
+                                                      .override(
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 16.0,
+                                                        letterSpacing: 0.0,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
+                                                      ),
+                                            ),
+                                            Text(
+                                              '▲ ${FFAppState().productsAdd.length.toString()} palmas instaladas',
+                                              textAlign: TextAlign.start,
+                                              style:
+                                                  FlutterFlowTheme.of(context)
+                                                      .bodyMedium
+                                                      .override(
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 16.0,
+                                                        letterSpacing: 0.0,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
+                                                      ),
+                                            ),
+                                          ].divide(SizedBox(height: 10.0)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           InkWell(
                             splashColor: Colors.transparent,
                             focusColor: Colors.transparent,
@@ -392,22 +601,22 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                               FFAppState().loginResponse = null;
                               FFAppState().userSelected = UsersStruct();
                               FFAppState().companyDefault = CompaniesStruct();
-                              FFAppState().activitiesList = [];
                               FFAppState().headquartersList = [];
                               FFAppState().zonesList = [];
                               FFAppState().productsList = [];
-                              FFAppState().lastSync = null;
+                              FFAppState().lastSync =
+                                  DateTime.fromMillisecondsSinceEpoch(
+                                      1743526800000);
                               FFAppState().isSync = false;
                               FFAppState().usersList = [];
                               FFAppState().headquarterSelected =
                                   HeadquartersStruct();
                               FFAppState().zoneSelected = ZonesStruct();
-                              FFAppState().activitySelected =
-                                  ActivitiesStruct();
-                              FFAppState().activityStatusSelected =
-                                  ActivitiesStatusStruct();
                               FFAppState().visitsAdd = [];
                               FFAppState().productsAdd = [];
+                              FFAppState().activitySelectedJSON = null;
+                              FFAppState().activityStatusSelectedJSON = null;
+                              FFAppState().userSelectedJSON = null;
                               FFAppState().update(() {});
                             },
                             child: Container(
@@ -469,11 +678,25 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                             context)
                                                         .bodyMedium
                                                         .override(
-                                                          fontFamily: 'Inter',
+                                                          font:
+                                                              GoogleFonts.inter(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontStyle:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .bodyMedium
+                                                                    .fontStyle,
+                                                          ),
                                                           fontSize: 16.0,
                                                           letterSpacing: 0.0,
                                                           fontWeight:
                                                               FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
                                                         ),
                                                   ),
                                                 ),
@@ -484,11 +707,24 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        fontFamily: 'Inter',
-                                                        fontSize: 16.0,
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 14.0,
                                                         letterSpacing: 0.0,
                                                         fontWeight:
                                                             FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                       ),
                                                 ),
                                                 Text(
@@ -498,11 +734,24 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        fontFamily: 'Inter',
-                                                        fontSize: 16.0,
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 14.0,
                                                         letterSpacing: 0.0,
                                                         fontWeight:
                                                             FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                       ),
                                                 ),
                                                 Text(
@@ -512,25 +761,78 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        fontFamily: 'Inter',
-                                                        fontSize: 16.0,
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 14.0,
                                                         letterSpacing: 0.0,
                                                         fontWeight:
                                                             FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                       ),
                                                 ),
                                                 Text(
-                                                  '▲ ${FFAppState().activitiesList.length.toString()} actividades',
+                                                  '▲ ${functions.countJsonItems(FFAppState().activitiesJSON).toString()} actividades',
                                                   textAlign: TextAlign.start,
                                                   style: FlutterFlowTheme.of(
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        fontFamily: 'Inter',
-                                                        fontSize: 16.0,
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 14.0,
                                                         letterSpacing: 0.0,
                                                         fontWeight:
                                                             FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
+                                                      ),
+                                                ),
+                                                Text(
+                                                  '▲ ${FFAppState().newsList.length.toString()} novedades',
+                                                  textAlign: TextAlign.start,
+                                                  style: FlutterFlowTheme.of(
+                                                          context)
+                                                      .bodyMedium
+                                                      .override(
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
+                                                        fontSize: 14.0,
+                                                        letterSpacing: 0.0,
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                       ),
                                                 ),
                                               ].divide(SizedBox(height: 10.0)),
@@ -541,133 +843,6 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
-                          ),
-                          Container(
-                            width: double.infinity,
-                            decoration: BoxDecoration(),
-                            child: Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
-                                  10.0, 0.0, 5.0, 0.0),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.max,
-                                children: [
-                                  Expanded(
-                                    child: InkWell(
-                                      splashColor: Colors.transparent,
-                                      focusColor: Colors.transparent,
-                                      hoverColor: Colors.transparent,
-                                      highlightColor: Colors.transparent,
-                                      onTap: () async {
-                                        context.pushNamed(
-                                          DetailsInfoPageWidget.routeName,
-                                          extra: <String, dynamic>{
-                                            kTransitionInfoKey: TransitionInfo(
-                                              hasTransition: true,
-                                              transitionType:
-                                                  PageTransitionType.fade,
-                                              duration:
-                                                  Duration(milliseconds: 800),
-                                            ),
-                                          },
-                                        );
-                                      },
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: Color(0xFFE3D4D4),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              blurRadius: 6.0,
-                                              color: Color(0x33000000),
-                                              offset: Offset(
-                                                0.0,
-                                                2.0,
-                                              ),
-                                            )
-                                          ],
-                                          borderRadius:
-                                              BorderRadius.circular(16.0),
-                                        ),
-                                        child: Padding(
-                                          padding:
-                                              EdgeInsetsDirectional.fromSTEB(
-                                                  15.0, 5.0, 15.0, 15.0),
-                                          child: Column(
-                                            mainAxisSize: MainAxisSize.max,
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.start,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Padding(
-                                                padding: EdgeInsetsDirectional
-                                                    .fromSTEB(
-                                                        0.0, 10.0, 0.0, 0.0),
-                                                child: Text(
-                                                  'Información pendiente por sincronizar:',
-                                                  textAlign: TextAlign.center,
-                                                  style: FlutterFlowTheme.of(
-                                                          context)
-                                                      .bodyMedium
-                                                      .override(
-                                                        fontFamily: 'Inter',
-                                                        fontSize: 16.0,
-                                                        letterSpacing: 0.0,
-                                                        fontWeight:
-                                                            FontWeight.bold,
-                                                      ),
-                                                ),
-                                              ),
-                                              Text(
-                                                '▲ ${FFAppState().visitsAdd.length.toString()} visitas',
-                                                textAlign: TextAlign.start,
-                                                style:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          fontFamily: 'Inter',
-                                                          fontSize: 16.0,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                              ),
-                                              Text(
-                                                '▲ 0 novedades',
-                                                textAlign: TextAlign.start,
-                                                style:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          fontFamily: 'Inter',
-                                                          fontSize: 16.0,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                              ),
-                                              Text(
-                                                '▲ ${FFAppState().productsAdd.length.toString()} palmas instaladas',
-                                                textAlign: TextAlign.start,
-                                                style:
-                                                    FlutterFlowTheme.of(context)
-                                                        .bodyMedium
-                                                        .override(
-                                                          fontFamily: 'Inter',
-                                                          fontSize: 16.0,
-                                                          letterSpacing: 0.0,
-                                                          fontWeight:
-                                                              FontWeight.bold,
-                                                        ),
-                                              ),
-                                            ].divide(SizedBox(height: 10.0)),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
                               ),
                             ),
                           ),
@@ -740,11 +915,24 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        fontFamily: 'Inter',
+                                                        font: GoogleFonts.inter(
+                                                          fontWeight:
+                                                              FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
+                                                        ),
                                                         fontSize: 18.0,
                                                         letterSpacing: 0.0,
                                                         fontWeight:
                                                             FontWeight.bold,
+                                                        fontStyle:
+                                                            FlutterFlowTheme.of(
+                                                                    context)
+                                                                .bodyMedium
+                                                                .fontStyle,
                                                       ),
                                                 ),
                                               ),
@@ -769,17 +957,20 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                       highlightColor: Colors.transparent,
                                       onTap: () async {
                                         var _shouldSetState = false;
-                                        await actions.deleteAllRecords(
-                                          FFAppState().pathDatabase,
-                                          'Users',
-                                        );
-                                        if (FFAppState().visitsAdd.length > 0) {
+                                        if ((FFAppState().visitsAdd.length >
+                                                0) ||
+                                            (FFAppState().newsAdd.length > 0)) {
                                           _model.syncAddResult =
                                               await actions.syncVisits(
                                             FFAppState().visitsAdd.toList(),
+                                            FFAppState().newsAdd.toList(),
                                             FFAppState()
                                                 .companyDefault
                                                 .idCompany,
+                                            functions.concatenateHeadquarterIds(
+                                                FFAppState()
+                                                    .headquartersSelectedList
+                                                    .toList()),
                                           );
                                           _shouldSetState = true;
                                           if (_model.syncAddResult!) {
@@ -788,24 +979,33 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                 UsersStruct();
                                             FFAppState().companyDefault =
                                                 CompaniesStruct();
-                                            FFAppState().activitiesList = [];
                                             FFAppState().headquartersList = [];
                                             FFAppState().zonesList = [];
                                             FFAppState().productsList = [];
-                                            FFAppState().lastSync = null;
+                                            FFAppState().lastSync = DateTime
+                                                .fromMillisecondsSinceEpoch(
+                                                    1743526800000);
                                             FFAppState().isSync = false;
                                             FFAppState().usersList = [];
                                             FFAppState().headquarterSelected =
                                                 HeadquartersStruct();
                                             FFAppState().zoneSelected =
                                                 ZonesStruct();
-                                            FFAppState().activitySelected =
-                                                ActivitiesStruct();
-                                            FFAppState()
-                                                    .activityStatusSelected =
-                                                ActivitiesStatusStruct();
                                             FFAppState().visitsAdd = [];
                                             FFAppState().productsAdd = [];
+                                            FFAppState().activitySelectedJSON =
+                                                null;
+                                            FFAppState()
+                                                    .activityStatusSelectedJSON =
+                                                null;
+                                            FFAppState().activitiesJSON = null;
+                                            FFAppState().newsAdd = [];
+                                            FFAppState().newsList = [];
+                                            FFAppState().newsSelected = [];
+                                            await actions.deleteAllRecords(
+                                              FFAppState().pathDatabase,
+                                              'Users',
+                                            );
 
                                             context.pushNamed(
                                               StartPageWidget.routeName,
@@ -830,7 +1030,8 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                               builder: (alertDialogContext) {
                                                 return AlertDialog(
                                                   title: Text('Error'),
-                                                  content: Text('Error'),
+                                                  content: Text(
+                                                      'Revise que esté conectado a internet'),
                                                   actions: [
                                                     TextButton(
                                                       onPressed: () =>
@@ -852,23 +1053,29 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                               UsersStruct();
                                           FFAppState().companyDefault =
                                               CompaniesStruct();
-                                          FFAppState().activitiesList = [];
                                           FFAppState().headquartersList = [];
                                           FFAppState().zonesList = [];
                                           FFAppState().productsList = [];
-                                          FFAppState().lastSync = null;
+                                          FFAppState().lastSync = DateTime
+                                              .fromMillisecondsSinceEpoch(
+                                                  1743526800000);
                                           FFAppState().isSync = false;
                                           FFAppState().usersList = [];
                                           FFAppState().headquarterSelected =
                                               HeadquartersStruct();
                                           FFAppState().zoneSelected =
                                               ZonesStruct();
-                                          FFAppState().activitySelected =
-                                              ActivitiesStruct();
-                                          FFAppState().activityStatusSelected =
-                                              ActivitiesStatusStruct();
                                           FFAppState().visitsAdd = [];
                                           FFAppState().productsAdd = [];
+                                          FFAppState().activitySelectedJSON =
+                                              null;
+                                          FFAppState()
+                                                  .activityStatusSelectedJSON =
+                                              null;
+                                          FFAppState().activitiesJSON = null;
+                                          FFAppState().newsAdd = [];
+                                          FFAppState().newsList = [];
+                                          FFAppState().newsSelected = [];
 
                                           context.pushNamed(
                                             StartPageWidget.routeName,
@@ -924,11 +1131,25 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                     FlutterFlowTheme.of(context)
                                                         .bodyMedium
                                                         .override(
-                                                          fontFamily: 'Inter',
+                                                          font:
+                                                              GoogleFonts.inter(
+                                                            fontWeight:
+                                                                FontWeight.bold,
+                                                            fontStyle:
+                                                                FlutterFlowTheme.of(
+                                                                        context)
+                                                                    .bodyMedium
+                                                                    .fontStyle,
+                                                          ),
                                                           fontSize: 18.0,
                                                           letterSpacing: 0.0,
                                                           fontWeight:
                                                               FontWeight.bold,
+                                                          fontStyle:
+                                                              FlutterFlowTheme.of(
+                                                                      context)
+                                                                  .bodyMedium
+                                                                  .fontStyle,
                                                         ),
                                               ),
                                             ),

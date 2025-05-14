@@ -3729,12 +3729,19 @@ class SyncTimesPOSTCall {
 class SyncVisitsAddCall {
   Future<ApiCallResponse> call({
     dynamic visitsAddListJson,
+    dynamic newsAddListJson,
+    String? createdAt = '',
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
     final visitsAddList = _serializeJson(visitsAddListJson, true);
+    final newsAddList = _serializeJson(newsAddListJson, true);
     final ffApiRequestBody = '''
-${visitsAddList}''';
+{
+  "createdAt": "${createdAt}",
+  "visitsAdd": ${visitsAddList},
+  "newsAdd": ${newsAddList}
+}''';
     return ApiManager.instance.makeApiCall(
       callName: 'SyncVisitsAdd',
       apiUrl: '${baseUrl}/Sync_times/SyncVisitsAdd',

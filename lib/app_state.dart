@@ -22,11 +22,6 @@ class FFAppState extends ChangeNotifier {
       _isSync = prefs.getBool('ff_isSync') ?? _isSync;
     });
     _safeInit(() {
-      _lastSync = prefs.containsKey('ff_lastSync')
-          ? DateTime.fromMillisecondsSinceEpoch(prefs.getInt('ff_lastSync')!)
-          : _lastSync;
-    });
-    _safeInit(() {
       if (prefs.containsKey('ff_loginResponse')) {
         try {
           _loginResponse =
@@ -68,21 +63,6 @@ class FFAppState extends ChangeNotifier {
           print("Can't decode persisted data type. Error: $e.");
         }
       }
-    });
-    _safeInit(() {
-      _activitiesList = prefs
-              .getStringList('ff_activitiesList')
-              ?.map((x) {
-                try {
-                  return ActivitiesStruct.fromSerializableMap(jsonDecode(x));
-                } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
-                  return null;
-                }
-              })
-              .withoutNulls
-              .toList() ??
-          _activitiesList;
     });
     _safeInit(() {
       _headquartersList = prefs
@@ -157,17 +137,6 @@ class FFAppState extends ChangeNotifier {
       }
     });
     _safeInit(() {
-      if (prefs.containsKey('ff_activitySelected')) {
-        try {
-          final serializedData = prefs.getString('ff_activitySelected') ?? '{}';
-          _activitySelected =
-              ActivitiesStruct.fromSerializableMap(jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
-      }
-    });
-    _safeInit(() {
       _visitsAdd = prefs
               .getStringList('ff_visitsAdd')
               ?.map((x) {
@@ -202,6 +171,125 @@ class FFAppState extends ChangeNotifier {
       _listVoiceCalibration = prefs.getStringList('ff_listVoiceCalibration') ??
           _listVoiceCalibration;
     });
+    _safeInit(() {
+      _calibrateCompass =
+          prefs.getBool('ff_calibrateCompass') ?? _calibrateCompass;
+    });
+    _safeInit(() {
+      if (prefs.containsKey('ff_activitiesJSON')) {
+        try {
+          _activitiesJSON =
+              jsonDecode(prefs.getString('ff_activitiesJSON') ?? '');
+        } catch (e) {
+          print("Can't decode persisted json. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
+      _headquartersSelectedList = prefs
+              .getStringList('ff_headquartersSelectedList')
+              ?.map((x) {
+                try {
+                  return HeadquartersStruct.fromSerializableMap(jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _headquartersSelectedList;
+    });
+    _safeInit(() {
+      _newsList = prefs
+              .getStringList('ff_newsList')
+              ?.map((x) {
+                try {
+                  return NewsStruct.fromSerializableMap(jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _newsList;
+    });
+    _safeInit(() {
+      _newsSelected = prefs
+              .getStringList('ff_newsSelected')
+              ?.map((x) {
+                try {
+                  return NewsStruct.fromSerializableMap(jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _newsSelected;
+    });
+    _safeInit(() {
+      if (prefs.containsKey('ff_userSelectedJSON')) {
+        try {
+          _userSelectedJSON =
+              jsonDecode(prefs.getString('ff_userSelectedJSON') ?? '');
+        } catch (e) {
+          print("Can't decode persisted json. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
+      _activitiesStatusSelected = prefs
+              .getStringList('ff_activitiesStatusSelected')
+              ?.map((x) {
+                try {
+                  return ActivitiesStatusStruct.fromSerializableMap(
+                      jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _activitiesStatusSelected;
+    });
+    _safeInit(() {
+      _newsAdd = prefs
+              .getStringList('ff_newsAdd')
+              ?.map((x) {
+                try {
+                  return VisitsNewsStruct.fromSerializableMap(jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _newsAdd;
+    });
+    _safeInit(() {
+      _StatusAdd = prefs
+              .getStringList('ff_StatusAdd')
+              ?.map((x) {
+                try {
+                  return ActivitiesStatusStruct.fromSerializableMap(
+                      jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _StatusAdd;
+    });
+    _safeInit(() {
+      _rinexNavFile = prefs.getString('ff_rinexNavFile') ?? _rinexNavFile;
+    });
   }
 
   void update(VoidCallback callback) {
@@ -224,13 +312,10 @@ class FFAppState extends ChangeNotifier {
     prefs.setBool('ff_isSync', value);
   }
 
-  DateTime? _lastSync;
+  DateTime? _lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
   DateTime? get lastSync => _lastSync;
   set lastSync(DateTime? value) {
     _lastSync = value;
-    value != null
-        ? prefs.setInt('ff_lastSync', value.millisecondsSinceEpoch)
-        : prefs.remove('ff_lastSync');
   }
 
   dynamic _loginResponse;
@@ -274,47 +359,6 @@ class FFAppState extends ChangeNotifier {
   void updateDeviceDefaultStruct(Function(DevicesStruct) updateFn) {
     updateFn(_deviceDefault);
     prefs.setString('ff_deviceDefault', _deviceDefault.serialize());
-  }
-
-  List<ActivitiesStruct> _activitiesList = [];
-  List<ActivitiesStruct> get activitiesList => _activitiesList;
-  set activitiesList(List<ActivitiesStruct> value) {
-    _activitiesList = value;
-    prefs.setStringList(
-        'ff_activitiesList', value.map((x) => x.serialize()).toList());
-  }
-
-  void addToActivitiesList(ActivitiesStruct value) {
-    activitiesList.add(value);
-    prefs.setStringList('ff_activitiesList',
-        _activitiesList.map((x) => x.serialize()).toList());
-  }
-
-  void removeFromActivitiesList(ActivitiesStruct value) {
-    activitiesList.remove(value);
-    prefs.setStringList('ff_activitiesList',
-        _activitiesList.map((x) => x.serialize()).toList());
-  }
-
-  void removeAtIndexFromActivitiesList(int index) {
-    activitiesList.removeAt(index);
-    prefs.setStringList('ff_activitiesList',
-        _activitiesList.map((x) => x.serialize()).toList());
-  }
-
-  void updateActivitiesListAtIndex(
-    int index,
-    ActivitiesStruct Function(ActivitiesStruct) updateFn,
-  ) {
-    activitiesList[index] = updateFn(_activitiesList[index]);
-    prefs.setStringList('ff_activitiesList',
-        _activitiesList.map((x) => x.serialize()).toList());
-  }
-
-  void insertAtIndexInActivitiesList(int index, ActivitiesStruct value) {
-    activitiesList.insert(index, value);
-    prefs.setStringList('ff_activitiesList',
-        _activitiesList.map((x) => x.serialize()).toList());
   }
 
   List<HeadquartersStruct> _headquartersList = [];
@@ -515,18 +559,6 @@ class FFAppState extends ChangeNotifier {
     prefs.setString('ff_headquarterSelected', _headquarterSelected.serialize());
   }
 
-  ActivitiesStruct _activitySelected = ActivitiesStruct();
-  ActivitiesStruct get activitySelected => _activitySelected;
-  set activitySelected(ActivitiesStruct value) {
-    _activitySelected = value;
-    prefs.setString('ff_activitySelected', value.serialize());
-  }
-
-  void updateActivitySelectedStruct(Function(ActivitiesStruct) updateFn) {
-    updateFn(_activitySelected);
-    prefs.setString('ff_activitySelected', _activitySelected.serialize());
-  }
-
   List<ProductsStruct> _productsAdd = [];
   List<ProductsStruct> get productsAdd => _productsAdd;
   set productsAdd(List<ProductsStruct> value) {
@@ -554,17 +586,6 @@ class FFAppState extends ChangeNotifier {
 
   void insertAtIndexInProductsAdd(int index, ProductsStruct value) {
     productsAdd.insert(index, value);
-  }
-
-  ActivitiesStatusStruct _activityStatusSelected = ActivitiesStatusStruct();
-  ActivitiesStatusStruct get activityStatusSelected => _activityStatusSelected;
-  set activityStatusSelected(ActivitiesStatusStruct value) {
-    _activityStatusSelected = value;
-  }
-
-  void updateActivityStatusSelectedStruct(
-      Function(ActivitiesStatusStruct) updateFn) {
-    updateFn(_activityStatusSelected);
   }
 
   List<VisitsStruct> _visitsAdd = [];
@@ -608,10 +629,10 @@ class FFAppState extends ChangeNotifier {
         'ff_visitsAdd', _visitsAdd.map((x) => x.serialize()).toList());
   }
 
-  dynamic _activitySelectedCopy;
-  dynamic get activitySelectedCopy => _activitySelectedCopy;
-  set activitySelectedCopy(dynamic value) {
-    _activitySelectedCopy = value;
+  dynamic _activitySelectedJSON;
+  dynamic get activitySelectedJSON => _activitySelectedJSON;
+  set activitySelectedJSON(dynamic value) {
+    _activitySelectedJSON = value;
   }
 
   String _pathDatabase = '';
@@ -694,6 +715,309 @@ class FFAppState extends ChangeNotifier {
   int get idActivityStatus => _idActivityStatus;
   set idActivityStatus(int value) {
     _idActivityStatus = value;
+  }
+
+  bool _calibrateCompass = false;
+  bool get calibrateCompass => _calibrateCompass;
+  set calibrateCompass(bool value) {
+    _calibrateCompass = value;
+    prefs.setBool('ff_calibrateCompass', value);
+  }
+
+  String _nfcRead = '';
+  String get nfcRead => _nfcRead;
+  set nfcRead(String value) {
+    _nfcRead = value;
+  }
+
+  dynamic _activitiesJSON;
+  dynamic get activitiesJSON => _activitiesJSON;
+  set activitiesJSON(dynamic value) {
+    _activitiesJSON = value;
+    prefs.setString('ff_activitiesJSON', jsonEncode(value));
+  }
+
+  dynamic _activityStatusSelectedJSON;
+  dynamic get activityStatusSelectedJSON => _activityStatusSelectedJSON;
+  set activityStatusSelectedJSON(dynamic value) {
+    _activityStatusSelectedJSON = value;
+  }
+
+  String _qrRead = '';
+  String get qrRead => _qrRead;
+  set qrRead(String value) {
+    _qrRead = value;
+  }
+
+  List<HeadquartersStruct> _headquartersSelectedList = [];
+  List<HeadquartersStruct> get headquartersSelectedList =>
+      _headquartersSelectedList;
+  set headquartersSelectedList(List<HeadquartersStruct> value) {
+    _headquartersSelectedList = value;
+    prefs.setStringList('ff_headquartersSelectedList',
+        value.map((x) => x.serialize()).toList());
+  }
+
+  void addToHeadquartersSelectedList(HeadquartersStruct value) {
+    headquartersSelectedList.add(value);
+    prefs.setStringList('ff_headquartersSelectedList',
+        _headquartersSelectedList.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromHeadquartersSelectedList(HeadquartersStruct value) {
+    headquartersSelectedList.remove(value);
+    prefs.setStringList('ff_headquartersSelectedList',
+        _headquartersSelectedList.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromHeadquartersSelectedList(int index) {
+    headquartersSelectedList.removeAt(index);
+    prefs.setStringList('ff_headquartersSelectedList',
+        _headquartersSelectedList.map((x) => x.serialize()).toList());
+  }
+
+  void updateHeadquartersSelectedListAtIndex(
+    int index,
+    HeadquartersStruct Function(HeadquartersStruct) updateFn,
+  ) {
+    headquartersSelectedList[index] =
+        updateFn(_headquartersSelectedList[index]);
+    prefs.setStringList('ff_headquartersSelectedList',
+        _headquartersSelectedList.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInHeadquartersSelectedList(
+      int index, HeadquartersStruct value) {
+    headquartersSelectedList.insert(index, value);
+    prefs.setStringList('ff_headquartersSelectedList',
+        _headquartersSelectedList.map((x) => x.serialize()).toList());
+  }
+
+  List<NewsStruct> _newsList = [];
+  List<NewsStruct> get newsList => _newsList;
+  set newsList(List<NewsStruct> value) {
+    _newsList = value;
+    prefs.setStringList(
+        'ff_newsList', value.map((x) => x.serialize()).toList());
+  }
+
+  void addToNewsList(NewsStruct value) {
+    newsList.add(value);
+    prefs.setStringList(
+        'ff_newsList', _newsList.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromNewsList(NewsStruct value) {
+    newsList.remove(value);
+    prefs.setStringList(
+        'ff_newsList', _newsList.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromNewsList(int index) {
+    newsList.removeAt(index);
+    prefs.setStringList(
+        'ff_newsList', _newsList.map((x) => x.serialize()).toList());
+  }
+
+  void updateNewsListAtIndex(
+    int index,
+    NewsStruct Function(NewsStruct) updateFn,
+  ) {
+    newsList[index] = updateFn(_newsList[index]);
+    prefs.setStringList(
+        'ff_newsList', _newsList.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInNewsList(int index, NewsStruct value) {
+    newsList.insert(index, value);
+    prefs.setStringList(
+        'ff_newsList', _newsList.map((x) => x.serialize()).toList());
+  }
+
+  List<NewsStruct> _newsSelected = [];
+  List<NewsStruct> get newsSelected => _newsSelected;
+  set newsSelected(List<NewsStruct> value) {
+    _newsSelected = value;
+    prefs.setStringList(
+        'ff_newsSelected', value.map((x) => x.serialize()).toList());
+  }
+
+  void addToNewsSelected(NewsStruct value) {
+    newsSelected.add(value);
+    prefs.setStringList(
+        'ff_newsSelected', _newsSelected.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromNewsSelected(NewsStruct value) {
+    newsSelected.remove(value);
+    prefs.setStringList(
+        'ff_newsSelected', _newsSelected.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromNewsSelected(int index) {
+    newsSelected.removeAt(index);
+    prefs.setStringList(
+        'ff_newsSelected', _newsSelected.map((x) => x.serialize()).toList());
+  }
+
+  void updateNewsSelectedAtIndex(
+    int index,
+    NewsStruct Function(NewsStruct) updateFn,
+  ) {
+    newsSelected[index] = updateFn(_newsSelected[index]);
+    prefs.setStringList(
+        'ff_newsSelected', _newsSelected.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInNewsSelected(int index, NewsStruct value) {
+    newsSelected.insert(index, value);
+    prefs.setStringList(
+        'ff_newsSelected', _newsSelected.map((x) => x.serialize()).toList());
+  }
+
+  String _moduleSelected = '';
+  String get moduleSelected => _moduleSelected;
+  set moduleSelected(String value) {
+    _moduleSelected = value;
+  }
+
+  dynamic _userSelectedJSON;
+  dynamic get userSelectedJSON => _userSelectedJSON;
+  set userSelectedJSON(dynamic value) {
+    _userSelectedJSON = value;
+    prefs.setString('ff_userSelectedJSON', jsonEncode(value));
+  }
+
+  List<ActivitiesStatusStruct> _activitiesStatusSelected = [];
+  List<ActivitiesStatusStruct> get activitiesStatusSelected =>
+      _activitiesStatusSelected;
+  set activitiesStatusSelected(List<ActivitiesStatusStruct> value) {
+    _activitiesStatusSelected = value;
+    prefs.setStringList('ff_activitiesStatusSelected',
+        value.map((x) => x.serialize()).toList());
+  }
+
+  void addToActivitiesStatusSelected(ActivitiesStatusStruct value) {
+    activitiesStatusSelected.add(value);
+    prefs.setStringList('ff_activitiesStatusSelected',
+        _activitiesStatusSelected.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromActivitiesStatusSelected(ActivitiesStatusStruct value) {
+    activitiesStatusSelected.remove(value);
+    prefs.setStringList('ff_activitiesStatusSelected',
+        _activitiesStatusSelected.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromActivitiesStatusSelected(int index) {
+    activitiesStatusSelected.removeAt(index);
+    prefs.setStringList('ff_activitiesStatusSelected',
+        _activitiesStatusSelected.map((x) => x.serialize()).toList());
+  }
+
+  void updateActivitiesStatusSelectedAtIndex(
+    int index,
+    ActivitiesStatusStruct Function(ActivitiesStatusStruct) updateFn,
+  ) {
+    activitiesStatusSelected[index] =
+        updateFn(_activitiesStatusSelected[index]);
+    prefs.setStringList('ff_activitiesStatusSelected',
+        _activitiesStatusSelected.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInActivitiesStatusSelected(
+      int index, ActivitiesStatusStruct value) {
+    activitiesStatusSelected.insert(index, value);
+    prefs.setStringList('ff_activitiesStatusSelected',
+        _activitiesStatusSelected.map((x) => x.serialize()).toList());
+  }
+
+  List<VisitsNewsStruct> _newsAdd = [];
+  List<VisitsNewsStruct> get newsAdd => _newsAdd;
+  set newsAdd(List<VisitsNewsStruct> value) {
+    _newsAdd = value;
+    prefs.setStringList('ff_newsAdd', value.map((x) => x.serialize()).toList());
+  }
+
+  void addToNewsAdd(VisitsNewsStruct value) {
+    newsAdd.add(value);
+    prefs.setStringList(
+        'ff_newsAdd', _newsAdd.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromNewsAdd(VisitsNewsStruct value) {
+    newsAdd.remove(value);
+    prefs.setStringList(
+        'ff_newsAdd', _newsAdd.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromNewsAdd(int index) {
+    newsAdd.removeAt(index);
+    prefs.setStringList(
+        'ff_newsAdd', _newsAdd.map((x) => x.serialize()).toList());
+  }
+
+  void updateNewsAddAtIndex(
+    int index,
+    VisitsNewsStruct Function(VisitsNewsStruct) updateFn,
+  ) {
+    newsAdd[index] = updateFn(_newsAdd[index]);
+    prefs.setStringList(
+        'ff_newsAdd', _newsAdd.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInNewsAdd(int index, VisitsNewsStruct value) {
+    newsAdd.insert(index, value);
+    prefs.setStringList(
+        'ff_newsAdd', _newsAdd.map((x) => x.serialize()).toList());
+  }
+
+  List<ActivitiesStatusStruct> _StatusAdd = [];
+  List<ActivitiesStatusStruct> get StatusAdd => _StatusAdd;
+  set StatusAdd(List<ActivitiesStatusStruct> value) {
+    _StatusAdd = value;
+    prefs.setStringList(
+        'ff_StatusAdd', value.map((x) => x.serialize()).toList());
+  }
+
+  void addToStatusAdd(ActivitiesStatusStruct value) {
+    StatusAdd.add(value);
+    prefs.setStringList(
+        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromStatusAdd(ActivitiesStatusStruct value) {
+    StatusAdd.remove(value);
+    prefs.setStringList(
+        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromStatusAdd(int index) {
+    StatusAdd.removeAt(index);
+    prefs.setStringList(
+        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+  }
+
+  void updateStatusAddAtIndex(
+    int index,
+    ActivitiesStatusStruct Function(ActivitiesStatusStruct) updateFn,
+  ) {
+    StatusAdd[index] = updateFn(_StatusAdd[index]);
+    prefs.setStringList(
+        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInStatusAdd(int index, ActivitiesStatusStruct value) {
+    StatusAdd.insert(index, value);
+    prefs.setStringList(
+        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+  }
+
+  String _rinexNavFile = '';
+  String get rinexNavFile => _rinexNavFile;
+  set rinexNavFile(String value) {
+    _rinexNavFile = value;
+    prefs.setString('ff_rinexNavFile', value);
   }
 }
 

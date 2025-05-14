@@ -35,8 +35,6 @@ class _DetailsCoordenatesVisitsPageWidgetState
   void initState() {
     super.initState();
     _model = createModel(context, () => DetailsCoordenatesVisitsPageModel());
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
   @override

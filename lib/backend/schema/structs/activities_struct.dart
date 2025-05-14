@@ -1,5 +1,6 @@
 // ignore_for_file: unnecessary_getters_setters
 
+import '/backend/schema/util/schema_util.dart';
 
 import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -15,7 +16,6 @@ class ActivitiesStruct extends BaseStruct {
     int? effectivityVisits,
     String? typeEffectivity,
     String? moduleActivity,
-    List<ActivitiesStatusStruct>? activitiesStatus,
   })  : _idActivity = idActivity,
         _nameActivity = nameActivity,
         _groupActivity = groupActivity,
@@ -24,8 +24,7 @@ class ActivitiesStruct extends BaseStruct {
         _effectivityUnitys = effectivityUnitys,
         _effectivityVisits = effectivityVisits,
         _typeEffectivity = typeEffectivity,
-        _moduleActivity = moduleActivity,
-        _activitiesStatus = activitiesStatus;
+        _moduleActivity = moduleActivity;
 
   // "id_activity" field.
   int? _idActivity;
@@ -66,7 +65,7 @@ class ActivitiesStruct extends BaseStruct {
 
   bool hasCycle() => _cycle != null;
 
-  // "effectivityUnitys" field.
+  // "effectivity_unitys" field.
   int? _effectivityUnitys;
   int get effectivityUnitys => _effectivityUnitys ?? 0;
   set effectivityUnitys(int? val) => _effectivityUnitys = val;
@@ -76,7 +75,7 @@ class ActivitiesStruct extends BaseStruct {
 
   bool hasEffectivityUnitys() => _effectivityUnitys != null;
 
-  // "effectivityVisits" field.
+  // "effectivity_visits" field.
   int? _effectivityVisits;
   int get effectivityVisits => _effectivityVisits ?? 0;
   set effectivityVisits(int? val) => _effectivityVisits = val;
@@ -100,19 +99,6 @@ class ActivitiesStruct extends BaseStruct {
 
   bool hasModuleActivity() => _moduleActivity != null;
 
-  // "activities_status" field.
-  List<ActivitiesStatusStruct>? _activitiesStatus;
-  List<ActivitiesStatusStruct> get activitiesStatus =>
-      _activitiesStatus ?? const [];
-  set activitiesStatus(List<ActivitiesStatusStruct>? val) =>
-      _activitiesStatus = val;
-
-  void updateActivitiesStatus(Function(List<ActivitiesStatusStruct>) updateFn) {
-    updateFn(_activitiesStatus ??= []);
-  }
-
-  bool hasActivitiesStatus() => _activitiesStatus != null;
-
   static ActivitiesStruct fromMap(Map<String, dynamic> data) =>
       ActivitiesStruct(
         idActivity: castToType<int>(data['id_activity']),
@@ -120,14 +106,10 @@ class ActivitiesStruct extends BaseStruct {
         groupActivity: data['group_activity'] as String?,
         unity: data['unity'] as String?,
         cycle: castToType<int>(data['cycle']),
-        effectivityUnitys: castToType<int>(data['effectivityUnitys']),
-        effectivityVisits: castToType<int>(data['effectivityVisits']),
+        effectivityUnitys: castToType<int>(data['effectivity_unitys']),
+        effectivityVisits: castToType<int>(data['effectivity_visits']),
         typeEffectivity: data['type_effectivity'] as String?,
         moduleActivity: data['module_activity'] as String?,
-        activitiesStatus: getStructList(
-          data['activities_status'],
-          ActivitiesStatusStruct.fromMap,
-        ),
       );
 
   static ActivitiesStruct? maybeFromMap(dynamic data) => data is Map
@@ -140,11 +122,10 @@ class ActivitiesStruct extends BaseStruct {
         'group_activity': _groupActivity,
         'unity': _unity,
         'cycle': _cycle,
-        'effectivityUnitys': _effectivityUnitys,
-        'effectivityVisits': _effectivityVisits,
+        'effectivity_unitys': _effectivityUnitys,
+        'effectivity_visits': _effectivityVisits,
         'type_effectivity': _typeEffectivity,
         'module_activity': _moduleActivity,
-        'activities_status': _activitiesStatus?.map((e) => e.toMap()).toList(),
       }.withoutNulls;
 
   @override
@@ -169,11 +150,11 @@ class ActivitiesStruct extends BaseStruct {
           _cycle,
           ParamType.int,
         ),
-        'effectivityUnitys': serializeParam(
+        'effectivity_unitys': serializeParam(
           _effectivityUnitys,
           ParamType.int,
         ),
-        'effectivityVisits': serializeParam(
+        'effectivity_visits': serializeParam(
           _effectivityVisits,
           ParamType.int,
         ),
@@ -184,11 +165,6 @@ class ActivitiesStruct extends BaseStruct {
         'module_activity': serializeParam(
           _moduleActivity,
           ParamType.String,
-        ),
-        'activities_status': serializeParam(
-          _activitiesStatus,
-          ParamType.DataStruct,
-          isList: true,
         ),
       }.withoutNulls;
 
@@ -220,12 +196,12 @@ class ActivitiesStruct extends BaseStruct {
           false,
         ),
         effectivityUnitys: deserializeParam(
-          data['effectivityUnitys'],
+          data['effectivity_unitys'],
           ParamType.int,
           false,
         ),
         effectivityVisits: deserializeParam(
-          data['effectivityVisits'],
+          data['effectivity_visits'],
           ParamType.int,
           false,
         ),
@@ -239,12 +215,6 @@ class ActivitiesStruct extends BaseStruct {
           ParamType.String,
           false,
         ),
-        activitiesStatus: deserializeStructParam<ActivitiesStatusStruct>(
-          data['activities_status'],
-          ParamType.DataStruct,
-          true,
-          structBuilder: ActivitiesStatusStruct.fromSerializableMap,
-        ),
       );
 
   @override
@@ -252,7 +222,6 @@ class ActivitiesStruct extends BaseStruct {
 
   @override
   bool operator ==(Object other) {
-    const listEquality = ListEquality();
     return other is ActivitiesStruct &&
         idActivity == other.idActivity &&
         nameActivity == other.nameActivity &&
@@ -262,8 +231,7 @@ class ActivitiesStruct extends BaseStruct {
         effectivityUnitys == other.effectivityUnitys &&
         effectivityVisits == other.effectivityVisits &&
         typeEffectivity == other.typeEffectivity &&
-        moduleActivity == other.moduleActivity &&
-        listEquality.equals(activitiesStatus, other.activitiesStatus);
+        moduleActivity == other.moduleActivity;
   }
 
   @override
@@ -276,8 +244,7 @@ class ActivitiesStruct extends BaseStruct {
         effectivityUnitys,
         effectivityVisits,
         typeEffectivity,
-        moduleActivity,
-        activitiesStatus
+        moduleActivity
       ]);
 }
 

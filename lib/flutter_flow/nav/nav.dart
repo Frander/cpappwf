@@ -131,11 +131,6 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => DetailsInfoPageWidget(),
         ),
         FFRoute(
-          name: NewsPageWidget.routeName,
-          path: NewsPageWidget.routePath,
-          builder: (context, params) => NewsPageWidget(),
-        ),
-        FFRoute(
           name: ModulesPageWidget.routeName,
           path: ModulesPageWidget.routePath,
           builder: (context, params) => ModulesPageWidget(),
@@ -151,6 +146,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               structBuilder: VisitsStruct.fromSerializableMap,
             ),
           ),
+        ),
+        FFRoute(
+          name: NewsPageWidget.routeName,
+          path: NewsPageWidget.routePath,
+          builder: (context, params) => NewsPageWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

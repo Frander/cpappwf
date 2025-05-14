@@ -78,21 +78,6 @@ List<String> extractFieldFromJson(
   }
 }
 
-List<String> extractFieldFromActivities(
-  ActivitiesStruct activities,
-  String fieldName,
-) {
-  try {
-    return activities.activitiesStatus.map<String>((item) {
-      var value = item.statusName;
-      return value.toString();
-    }).toList();
-  } catch (e) {
-    print("Error extracting field: $e");
-    return [];
-  }
-}
-
 String listToCommaSeparatedString(List<String> items) {
   return items.join(',');
 }
@@ -146,21 +131,6 @@ String getActivityName(
   return activity.nameActivity;
 }
 
-String? getStatusName(
-  List<ActivitiesStatusStruct> activitiesStatusList,
-  int idActivityStatus,
-) {
-  // Buscar el primer objeto en la lista que tenga el idActivityStatus proporcionado
-  final activityStatus = activitiesStatusList.firstWhere(
-    (activityStatus) => activityStatus.idActivityStatus == idActivityStatus,
-    orElse: () =>
-        ActivitiesStatusStruct(statusName: ''), // Devolver un objeto vacío
-  );
-
-  // Si se encuentra el objeto, devolver su statusName; de lo contrario, devolver una cadena vacía
-  return activityStatus.statusName;
-}
-
 String convertToMarkdown(
   String title,
   List<String> items,
@@ -175,25 +145,192 @@ String convertToMarkdown(
   return '$markdownTitle$markdownItems';
 }
 
-ActivitiesStatusStruct? findActivityStatusById(
-  List<ActivitiesStruct> activities,
-  int idStatus,
-) {
-  // Recorrer todas las actividades en busca de un status específico
-  for (var activity in activities) {
-    // Buscar dentro de la lista de statuses de cada actividad
-    final status = activity.activitiesStatus.firstWhere(
-      (status) => status.idActivityStatus == idStatus,
-      orElse: () =>
-          ActivitiesStatusStruct(), // Si no se encuentra, devuelve un objeto vacío
-    );
-
-    // Si el objeto encontrado no es vacío, retornarlo
-    if (status.idActivityStatus != 0) {
-      return status;
+int countJsonItems(dynamic jsonData) {
+  try {
+    if (jsonData is List) {
+      return jsonData.length;
     }
+    return 0;
+  } catch (e) {
+    // En caso de error, retornar 0
+    return 0;
+  }
+}
+
+dynamic filterByModuleActivity(
+  dynamic jsonData,
+  String moduleToFilter,
+) {
+  try {
+    if (jsonData is List) {
+      // Filtrar los elementos donde module_activity coincide con el parámetro
+      final filteredList = jsonData.where((item) {
+        // Verificar si el item es un Map y contiene module_activity
+        if (item is Map<String, dynamic>) {
+          final module = item['module_activity'] as String?;
+          return module != null && module == moduleToFilter;
+        }
+        return false;
+      }).toList();
+
+      return filteredList; // Esto es un List<dynamic>, pero se devuelve como dynamic
+    }
+    return []; // Devuelve una lista vacía como dynamic
+  } catch (e) {
+    // En caso de error, retornar lista vacía como dynamic
+    return [];
+  }
+}
+
+String concatHeadquartersNames(List<HeadquartersStruct> headquartersList) {
+  // Si la lista es null o está vacía, devolvemos cadena vacía
+  if (headquartersList == null || headquartersList.isEmpty) {
+    return '';
+  }
+  // Extraemos los name_headquarter, filtramos nulls y strings vacíos,
+  // y luego unimos con ' - '
+  final validNames = headquartersList
+      .map((hq) => hq.nameHeadquarter) // String?
+      .where((name) => name != null && name.isNotEmpty) // filtra null y ''
+      .map((name) => name!) // cast a String no-null
+      .toList();
+
+  return validNames.join(' - ');
+}
+
+dynamic sortJsonByOrder(dynamic jsonData) {
+  try {
+    if (jsonData is List) {
+      // Crear una copia de la lista para no modificar la original
+      final sortedList = List.from(jsonData);
+
+      // Ordenar por el campo "orden"
+      sortedList.sort((a, b) {
+        final orderA = a['orden'] as int? ?? 0;
+        final orderB = b['orden'] as int? ?? 0;
+        return orderA.compareTo(orderB);
+      });
+
+      return sortedList;
+    }
+    return jsonData; // Si no es una lista, devolver el dato original
+  } catch (e) {
+    // En caso de error, devolver el dato original
+    return jsonData;
+  }
+}
+
+List<UsersStruct> filterUsersByName(
+  List<UsersStruct> usersList,
+  String filterName,
+) {
+// Si filterName está vacío, devolver toda la lista sin filtrar
+  if (filterName.isEmpty) {
+    return usersList.toList(); // Retorna una nueva lista (inmutable)
   }
 
-  // Si no se encontró, devolver null
-  return null;
+  // Filtrar la lista por name_user (case insensitive)
+  return usersList
+      .where((user) =>
+          user.nameUser?.toLowerCase().contains(filterName.toLowerCase()) ??
+          false)
+      .toList();
+}
+
+List<HeadquartersStruct> filterHeadquartersByName(
+  List<HeadquartersStruct> headquartersList,
+  String filterName,
+) {
+// Si filterName está vacío, devolver toda la lista sin filtrar
+  if (filterName.isEmpty) {
+    return headquartersList.toList(); // Retorna una nueva lista (inmutable)
+  }
+
+  // Filtrar la lista por name_headquarter (case insensitive)
+  return headquartersList
+      .where((hq) =>
+          hq.nameHeadquarter
+              ?.toLowerCase()
+              .contains(filterName.toLowerCase()) ??
+          false)
+      .toList();
+}
+
+String concatenateHeadquarterIds(List<HeadquartersStruct> headquartersList) {
+// Extrae todos los id_headquarter de la lista y los convierte a String
+  List<String> ids = headquartersList
+      .map((headquarter) => headquarter.idHeadquarter.toString())
+      .toList();
+
+  // Une los IDs con comas
+  String result = ids.join(',');
+
+  return result;
+}
+
+dynamic groupVisitsByActivityAndStatus(
+  List<VisitsStruct> visits,
+  dynamic activitiesJson,
+) {
+  try {
+    // Convertir el JSON de actividades a una lista de mapas si es necesario
+    final List<dynamic> activitiesList = activitiesJson is String
+        ? jsonDecode(activitiesJson)
+        : activitiesJson as List<dynamic>;
+
+    // Mapa para buscar actividades por ID
+    final Map<int, dynamic> activitiesMap = {};
+    for (final activity in activitiesList) {
+      activitiesMap[activity['id_activity'] as int] = activity;
+    }
+
+    // Agrupar y contar visitas
+    final Map<int, Map<int, int>> counts = {};
+
+    for (final visit in visits) {
+      counts
+          .putIfAbsent(visit.idActivity, () => {})
+          .update(visit.idStatus, (count) => count + 1, ifAbsent: () => 1);
+    }
+
+    // Construir el resultado
+    final List<dynamic> result = [];
+
+    counts.forEach((activityId, statusCounts) {
+      final activity = activitiesMap[activityId];
+      if (activity == null) return;
+
+      final List<dynamic> statuses = [];
+
+      statusCounts.forEach((statusId, count) {
+        final status = (activity['activity_status'] as List?)?.firstWhere(
+          (s) => s['id_activity_status'] == statusId,
+          orElse: () => {'status_name': 'Estado $statusId'},
+        );
+
+        statuses.add({
+          'status_name': status['status_name'],
+          'conteo': count.toString(),
+        });
+      });
+
+      // Ordenar estados por conteo descendente
+      statuses.sort(
+          (a, b) => int.parse(b['conteo']).compareTo(int.parse(a['conteo'])));
+
+      result.add({
+        'name_activity': activity['name_activity'],
+        'activity_status': statuses,
+      });
+    });
+
+    // Ordenar por nombre de actividad
+    result.sort((a, b) =>
+        (a['name_activity'] as String).compareTo(b['name_activity'] as String));
+
+    return result;
+  } catch (e) {
+    print('Error processing visits: $e');
+    return [];
+  }
 }

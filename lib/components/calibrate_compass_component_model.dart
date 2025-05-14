@@ -1,21 +1,23 @@
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'calculate_coordenates_install_component_widget.dart'
-    show CalculateCoordenatesInstallComponentWidget;
+import 'calibrate_compass_component_widget.dart'
+    show CalibrateCompassComponentWidget;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 
-class CalculateCoordenatesInstallComponentModel
-    extends FlutterFlowModel<CalculateCoordenatesInstallComponentWidget> {
+class CalibrateCompassComponentModel
+    extends FlutterFlowModel<CalibrateCompassComponentWidget> {
   ///  State fields for stateful widgets in this component.
 
-  // Stores action output result for [Custom Action - getLocationList] action in CalculateCoordenatesInstallComponent widget.
-  List<String>? locationsList;
+  // Stores action output result for [Custom Action - calibrateCompass] action in Container widget.
+  bool? calibrateCompass;
+  // Stores action output result for [Custom Action - calibrateGPS] action in Container widget.
+  bool? calibrateGPS;
   // State field(s) for Timer widget.
-  final timerInitialTimeMs = 5000;
-  int timerMilliseconds = 5000;
+  final timerInitialTimeMs = 40000;
+  int timerMilliseconds = 40000;
   String timerValue = StopWatchTimer.getDisplayTime(
-    5000,
+    40000,
     hours: false,
     minute: false,
     milliSecond: false,

@@ -4,10 +4,10 @@ import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:async';
 import '/custom_code/actions/index.dart' as actions;
-import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'calculate_coordenates_component_model.dart';
 export 'calculate_coordenates_component_model.dart';
@@ -42,8 +42,8 @@ class _CalculateCoordenatesComponentWidgetState
           unawaited(
             () async {
               _model.locationsList = await actions.getLocationList(
-                context,
-                10,
+                4,
+                FFAppState().rinexNavFile,
               );
             }(),
           );
@@ -100,10 +100,16 @@ class _CalculateCoordenatesComponentWidgetState
                 'Quedese cerca a la palma',
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      fontFamily: 'Inter',
+                      font: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontStyle:
+                            FlutterFlowTheme.of(context).bodyMedium.fontStyle,
+                      ),
                       fontSize: 20.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,
+                      fontStyle:
+                          FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                     ),
               ),
             ),
@@ -113,21 +119,33 @@ class _CalculateCoordenatesComponentWidgetState
                 'Estamos calculando la ubicación exacta del dispositivo',
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      fontFamily: 'Inter',
+                      font: GoogleFonts.inter(
+                        fontWeight: FontWeight.bold,
+                        fontStyle:
+                            FlutterFlowTheme.of(context).bodyMedium.fontStyle,
+                      ),
                       fontSize: 20.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,
+                      fontStyle:
+                          FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                     ),
               ),
             ),
             Text(
-              'Espere 10 segundos',
+              'Espere 5 segundos',
               textAlign: TextAlign.center,
               style: FlutterFlowTheme.of(context).bodyMedium.override(
-                    fontFamily: 'Inter',
+                    font: GoogleFonts.inter(
+                      fontWeight: FontWeight.bold,
+                      fontStyle:
+                          FlutterFlowTheme.of(context).bodyMedium.fontStyle,
+                    ),
                     fontSize: 16.0,
                     letterSpacing: 0.0,
                     fontWeight: FontWeight.bold,
+                    fontStyle:
+                        FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                   ),
             ),
             FlutterFlowTimer(
@@ -149,18 +167,20 @@ class _CalculateCoordenatesComponentWidgetState
                 if (_model.locationsList!.length > 0) {
                   FFAppState().addToVisitsAdd(VisitsStruct(
                     idVisit: 0,
-                    idCompany: FFAppState().userSelected.idCompany,
-                    idActivity: FFAppState().activitySelected.idActivity,
+                    idCompany: FFAppState().companyDefault.idCompany,
+                    idActivity: getJsonField(
+                      FFAppState().activitySelectedJSON,
+                      r'''$.id_activity''',
+                    ),
                     idHeadquarter: 0,
                     idProduct: 0,
                     idUser: FFAppState().userSelected.idUser,
                     idDevice: FFAppState().deviceDefault.idDevice,
                     locationsAdd: _model.locationsList,
                     locationDefault: ' ',
-                    idStatus:
-                        FFAppState().activityStatusSelected.idActivityStatus,
-                    createdAt:
-                        functions.convertToDotNetDateTime(getCurrentTimestamp),
+                    idStatus: 0,
+                    createdAt: getCurrentTimestamp,
+                    statusAdd: FFAppState().activitiesStatusSelected,
                   ));
                   _model.updatePage(() {});
                   ScaffoldMessenger.of(context).clearSnackBars();
@@ -170,11 +190,24 @@ class _CalculateCoordenatesComponentWidgetState
                         'Visita registrada con éxito. Total visitas: ${FFAppState().visitsAdd.length.toString()}',
                         style:
                             FlutterFlowTheme.of(context).titleMedium.override(
-                                  fontFamily: 'Inter Tight',
+                                  font: GoogleFonts.interTight(
+                                    fontWeight: FlutterFlowTheme.of(context)
+                                        .titleMedium
+                                        .fontWeight,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .titleMedium
+                                        .fontStyle,
+                                  ),
                                   color: FlutterFlowTheme.of(context)
                                       .secondaryBackground,
                                   fontSize: 20.0,
                                   letterSpacing: 0.0,
+                                  fontWeight: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .fontWeight,
+                                  fontStyle: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .fontStyle,
                                 ),
                       ),
                       duration: Duration(milliseconds: 2000),
@@ -191,11 +224,24 @@ class _CalculateCoordenatesComponentWidgetState
                         'Se está tardando más de lo normal...',
                         style:
                             FlutterFlowTheme.of(context).titleMedium.override(
-                                  fontFamily: 'Inter Tight',
+                                  font: GoogleFonts.interTight(
+                                    fontWeight: FlutterFlowTheme.of(context)
+                                        .titleMedium
+                                        .fontWeight,
+                                    fontStyle: FlutterFlowTheme.of(context)
+                                        .titleMedium
+                                        .fontStyle,
+                                  ),
                                   color: FlutterFlowTheme.of(context)
                                       .secondaryBackground,
                                   fontSize: 20.0,
                                   letterSpacing: 0.0,
+                                  fontWeight: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .fontWeight,
+                                  fontStyle: FlutterFlowTheme.of(context)
+                                      .titleMedium
+                                      .fontStyle,
                                 ),
                       ),
                       duration: Duration(milliseconds: 2000),
@@ -210,9 +256,18 @@ class _CalculateCoordenatesComponentWidgetState
               },
               textAlign: TextAlign.start,
               style: FlutterFlowTheme.of(context).headlineSmall.override(
-                    fontFamily: 'Inter Tight',
+                    font: GoogleFonts.interTight(
+                      fontWeight:
+                          FlutterFlowTheme.of(context).headlineSmall.fontWeight,
+                      fontStyle:
+                          FlutterFlowTheme.of(context).headlineSmall.fontStyle,
+                    ),
                     fontSize: 100.0,
                     letterSpacing: 0.0,
+                    fontWeight:
+                        FlutterFlowTheme.of(context).headlineSmall.fontWeight,
+                    fontStyle:
+                        FlutterFlowTheme.of(context).headlineSmall.fontStyle,
                   ),
             ),
           ].divide(SizedBox(height: 15.0)),

@@ -9,6 +9,7 @@ import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'start_page_model.dart';
 export 'start_page_model.dart';
@@ -40,59 +41,38 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
     // On page load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
-      await Future.delayed(const Duration(milliseconds: 2000));
+      _model.identifierCTR = await actions.getPersistentId(
+        context,
+      );
       _model.isConnection = await actions.checkConnection();
       if (_model.isConnection == true) {
         if ((FFAppState().lastSync == null) ||
             (functions.hasMoreThanAnHourPassed(
                     FFAppState().lastSync!, getCurrentTimestamp) ==
                 true)) {
-          _model.androidID = await actions.getAndroidID();
-          await showDialog(
-            context: context,
-            builder: (dialogContext) {
-              return Dialog(
-                elevation: 0,
-                insetPadding: EdgeInsets.zero,
-                backgroundColor: Colors.transparent,
-                alignment: AlignmentDirectional(0.0, 0.0)
-                    .resolve(Directionality.of(context)),
-                child: GestureDetector(
-                  onTap: () {
-                    FocusScope.of(dialogContext).unfocus();
-                    FocusManager.instance.primaryFocus?.unfocus();
-                  },
-                  child: Container(
-                    height: MediaQuery.sizeOf(context).height * 0.5,
-                    width: MediaQuery.sizeOf(context).width * 0.9,
-                    child: InfoDialogWidget(
-                      info: 'IMEI: ${_model.androidID}',
-                    ),
-                  ),
-                ),
-              );
-            },
-          );
-
           _model.apiResultDevices =
               await APIClickPalmGroup.devicesFiltersGETCall.call(
             typeSearch: 'IMEI GENERAL',
-            textSearch1: _model.androidID,
+            textSearch1: _model.identifierCTR,
             idCompany: 0,
-            textSearch2: _model.androidID,
+            textSearch2: _model.identifierCTR,
           );
 
           if ((_model.apiResultDevices?.statusCode ?? 200) == 200) {
             _model.apiResultLoginDirect =
                 await APIClickPalmGroup.usersLoginPOSTCall.call(
               typeLogin: 'IMEI',
-              username: _model.androidID,
+              username: _model.identifierCTR,
             );
 
             if ((_model.apiResultLoginDirect?.succeeded ?? true)) {
+              _model.urlRinexNavFile = await actions.getRinexNavFile(
+                context,
+              );
               _model.pathDatabase = await actions.getDatabase();
               FFAppState().pathDatabase = _model.pathDatabase!;
-              FFAppState().androidID = _model.androidID!;
+              FFAppState().androidID = _model.identifierCTR!;
+              FFAppState().rinexNavFile = _model.urlRinexNavFile!;
               await actions.usersInserData(
                 _model.pathDatabase!,
                 'Users',
@@ -131,17 +111,6 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                 r'''$.device_default''',
               ))!;
-              FFAppState().activitiesList = (getJsonField(
-                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                r'''$.activities''',
-                true,
-              )!
-                      .toList()
-                      .map<ActivitiesStruct?>(ActivitiesStruct.maybeFromMap)
-                      .toList() as Iterable<ActivitiesStruct?>)
-                  .withoutNulls
-                  .toList()
-                  .cast<ActivitiesStruct>();
               FFAppState().headquartersList = (getJsonField(
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                 r'''$.headquarters''',
@@ -170,6 +139,22 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   _model.usersSelectList!.toList().cast<UsersStruct>();
               FFAppState().headquarterSelected = HeadquartersStruct();
               FFAppState().zoneSelected = ZonesStruct();
+              FFAppState().activitiesJSON = getJsonField(
+                (_model.apiResultLoginDirect?.jsonBody ?? ''),
+                r'''$.activities''',
+              );
+              FFAppState().headquartersSelectedList = [];
+              FFAppState().newsList = (getJsonField(
+                (_model.apiResultLoginDirect?.jsonBody ?? ''),
+                r'''$.news''',
+                true,
+              )!
+                      .toList()
+                      .map<NewsStruct?>(NewsStruct.maybeFromMap)
+                      .toList() as Iterable<NewsStruct?>)
+                  .withoutNulls
+                  .toList()
+                  .cast<NewsStruct>();
               if (Navigator.of(context).canPop()) {
                 context.pop();
               }
@@ -235,7 +220,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       width: MediaQuery.sizeOf(context).width * 0.8,
                       child: InfoDialogWidget(
                         info:
-                            'El dispositivo CTR con IMEI ${_model.androidID} no se encuentra en nuestro sistema a continuación, deberá registrar el CTR utilizando el código de un supervisor',
+                            'El dispositivo CTR con IMEI ${_model.identifierCTR} no se encuentra en nuestro sistema a continuación, deberá registrar el CTR utilizando el código de un supervisor',
                       ),
                     ),
                   ),
@@ -272,7 +257,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             _model.apiResultLoginRegister =
                 await APIClickPalmGroup.usersLoginPOSTCall.call(
               typeLogin: 'IMEI',
-              username: _model.androidID,
+              username: _model.identifierCTR,
               password: FFAppState().codeKeyboard,
             );
 
@@ -295,17 +280,6 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 (_model.apiResultLoginRegister?.jsonBody ?? ''),
                 r'''$.device_default''',
               ))!;
-              FFAppState().activitiesList = (getJsonField(
-                (_model.apiResultLoginRegister?.jsonBody ?? ''),
-                r'''$.activities''',
-                true,
-              )!
-                      .toList()
-                      .map<ActivitiesStruct?>(ActivitiesStruct.maybeFromMap)
-                      .toList() as Iterable<ActivitiesStruct?>)
-                  .withoutNulls
-                  .toList()
-                  .cast<ActivitiesStruct>();
               FFAppState().headquartersList = (getJsonField(
                 (_model.apiResultLoginRegister?.jsonBody ?? ''),
                 r'''$.headquarters''',
@@ -328,6 +302,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   .withoutNulls
                   .toList()
                   .cast<UsersStruct>();
+              FFAppState().activitiesJSON = getJsonField(
+                (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                r'''$.activities''',
+              );
               if (Navigator.of(context).canPop()) {
                 context.pop();
               }
@@ -425,8 +403,6 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         return;
       }
     });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
 
   @override
@@ -508,10 +484,20 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          fontFamily: 'Inter',
+                                          font: GoogleFonts.inter(
+                                            fontWeight: FontWeight.bold,
+                                            fontStyle:
+                                                FlutterFlowTheme.of(context)
+                                                    .bodyMedium
+                                                    .fontStyle,
+                                          ),
                                           fontSize: 22.0,
                                           letterSpacing: 0.0,
                                           fontWeight: FontWeight.bold,
+                                          fontStyle:
+                                              FlutterFlowTheme.of(context)
+                                                  .bodyMedium
+                                                  .fontStyle,
                                         ),
                                   ),
                                 ),
@@ -521,10 +507,19 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   style: FlutterFlowTheme.of(context)
                                       .bodyMedium
                                       .override(
-                                        fontFamily: 'Inter',
+                                        font: GoogleFonts.inter(
+                                          fontWeight: FontWeight.bold,
+                                          fontStyle:
+                                              FlutterFlowTheme.of(context)
+                                                  .bodyMedium
+                                                  .fontStyle,
+                                        ),
                                         fontSize: 18.0,
                                         letterSpacing: 0.0,
                                         fontWeight: FontWeight.bold,
+                                        fontStyle: FlutterFlowTheme.of(context)
+                                            .bodyMedium
+                                            .fontStyle,
                                       ),
                                 ),
                               ].divide(SizedBox(height: 20.0)),

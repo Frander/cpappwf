@@ -31,6 +31,10 @@ Future<void> usersInserData(
         .join(", ");
     await db.execute("CREATE TABLE $tableName ($fields)");
     print('Tabla $tableName creada con campos: $fields');
+  } else {
+    // Si la tabla existe, eliminar todos los registros primero
+    await db.delete(tableName);
+    print('Todos los registros existentes en $tableName fueron eliminados');
   }
 
   // Insertar los registros en la tabla
