@@ -1,6 +1,7 @@
 // ignore_for_file: unnecessary_getters_setters
 
 import '/backend/schema/util/schema_util.dart';
+import '/backend/schema/enums/enums.dart';
 
 import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -16,6 +17,8 @@ class ActivitiesStruct extends BaseStruct {
     int? effectivityVisits,
     String? typeEffectivity,
     String? moduleActivity,
+    bool? isSyncFull,
+    bool? trackingHeadquarter,
   })  : _idActivity = idActivity,
         _nameActivity = nameActivity,
         _groupActivity = groupActivity,
@@ -24,7 +27,9 @@ class ActivitiesStruct extends BaseStruct {
         _effectivityUnitys = effectivityUnitys,
         _effectivityVisits = effectivityVisits,
         _typeEffectivity = typeEffectivity,
-        _moduleActivity = moduleActivity;
+        _moduleActivity = moduleActivity,
+        _isSyncFull = isSyncFull,
+        _trackingHeadquarter = trackingHeadquarter;
 
   // "id_activity" field.
   int? _idActivity;
@@ -99,6 +104,20 @@ class ActivitiesStruct extends BaseStruct {
 
   bool hasModuleActivity() => _moduleActivity != null;
 
+  // "is_sync_full" field.
+  bool? _isSyncFull;
+  bool get isSyncFull => _isSyncFull ?? false;
+  set isSyncFull(bool? val) => _isSyncFull = val;
+
+  bool hasIsSyncFull() => _isSyncFull != null;
+
+  // "tracking_headquarter" field.
+  bool? _trackingHeadquarter;
+  bool get trackingHeadquarter => _trackingHeadquarter ?? true;
+  set trackingHeadquarter(bool? val) => _trackingHeadquarter = val;
+
+  bool hasTrackingHeadquarter() => _trackingHeadquarter != null;
+
   static ActivitiesStruct fromMap(Map<String, dynamic> data) =>
       ActivitiesStruct(
         idActivity: castToType<int>(data['id_activity']),
@@ -110,6 +129,8 @@ class ActivitiesStruct extends BaseStruct {
         effectivityVisits: castToType<int>(data['effectivity_visits']),
         typeEffectivity: data['type_effectivity'] as String?,
         moduleActivity: data['module_activity'] as String?,
+        isSyncFull: data['is_sync_full'] == 1 || data['is_sync_full'] == true,
+        trackingHeadquarter: data['tracking_headquarter'] == null || data['tracking_headquarter'] == 1 || data['tracking_headquarter'] == true,
       );
 
   static ActivitiesStruct? maybeFromMap(dynamic data) => data is Map
@@ -126,6 +147,8 @@ class ActivitiesStruct extends BaseStruct {
         'effectivity_visits': _effectivityVisits,
         'type_effectivity': _typeEffectivity,
         'module_activity': _moduleActivity,
+        'is_sync_full': _isSyncFull,
+        'tracking_headquarter': _trackingHeadquarter,
       }.withoutNulls;
 
   @override
@@ -165,6 +188,14 @@ class ActivitiesStruct extends BaseStruct {
         'module_activity': serializeParam(
           _moduleActivity,
           ParamType.String,
+        ),
+        'is_sync_full': serializeParam(
+          _isSyncFull,
+          ParamType.bool,
+        ),
+        'tracking_headquarter': serializeParam(
+          _trackingHeadquarter,
+          ParamType.bool,
         ),
       }.withoutNulls;
 
@@ -215,6 +246,16 @@ class ActivitiesStruct extends BaseStruct {
           ParamType.String,
           false,
         ),
+        isSyncFull: deserializeParam(
+          data['is_sync_full'],
+          ParamType.bool,
+          false,
+        ),
+        trackingHeadquarter: deserializeParam(
+          data['tracking_headquarter'],
+          ParamType.bool,
+          false,
+        ),
       );
 
   @override
@@ -231,7 +272,9 @@ class ActivitiesStruct extends BaseStruct {
         effectivityUnitys == other.effectivityUnitys &&
         effectivityVisits == other.effectivityVisits &&
         typeEffectivity == other.typeEffectivity &&
-        moduleActivity == other.moduleActivity;
+        moduleActivity == other.moduleActivity &&
+        isSyncFull == other.isSyncFull &&
+        trackingHeadquarter == other.trackingHeadquarter;
   }
 
   @override
@@ -244,7 +287,9 @@ class ActivitiesStruct extends BaseStruct {
         effectivityUnitys,
         effectivityVisits,
         typeEffectivity,
-        moduleActivity
+        moduleActivity,
+        isSyncFull,
+        trackingHeadquarter
       ]);
 }
 
@@ -258,6 +303,8 @@ ActivitiesStruct createActivitiesStruct({
   int? effectivityVisits,
   String? typeEffectivity,
   String? moduleActivity,
+  bool? isSyncFull,
+  bool? trackingHeadquarter,
 }) =>
     ActivitiesStruct(
       idActivity: idActivity,
@@ -269,4 +316,6 @@ ActivitiesStruct createActivitiesStruct({
       effectivityVisits: effectivityVisits,
       typeEffectivity: typeEffectivity,
       moduleActivity: moduleActivity,
+      isSyncFull: isSyncFull,
+      trackingHeadquarter: trackingHeadquarter,
     );

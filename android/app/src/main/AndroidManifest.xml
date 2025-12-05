@@ -1,12 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.clickpalm.clickpalmapp" xmlns:tools="http://schemas.android.com/tools">
   <uses-permission android:name="android.permission.INTERNET"/>
+
+  <!-- Permisos de red de alto rendimiento -->
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+  <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
   <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION"/>
   <!-- Si es necesario -->
   <uses-permission android:name="android.permission.CAMERA"/>
   <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
-  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
   <uses-permission android:name="android.permission.RECORD_AUDIO"/>
   <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
   <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
@@ -19,13 +25,21 @@
   <!-- Android 14+ -->
   <uses-permission android:name="android.permission.NFC"/>
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
   <!-- Para geolocalización en segundo plano -->
   <uses-feature android:name="android.hardware.nfc" android:required="true"/>
   <uses-feature android:name="android.hardware.location.gnss" android:required="true"/>
+  <uses-permission android:name="android.permission.BLUETOOTH"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
+  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <application
     android:label="ClickPalm APP"
     tools:replace="android:label"
-    android:icon="@mipmap/ic_launcher"
+    android:icon="@mipmap/launcher_icon"
     android:requestLegacyExternalStorage="true"
     android:preserveLegacyExternalStorage="true"
     android:usesCleartextTraffic="true"
@@ -60,5 +74,12 @@
     <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
     <meta-data android:name="flutterEmbedding" android:value="2"/>
+
+    <!-- Servicio de geolocalización en segundo plano -->
+    <service
+      android:name="id.flutter.flutter_background_service.BackgroundService"
+      android:foregroundServiceType="location"
+      android:exported="true"
+      tools:replace="android:exported" />
   </application>
 </manifest>

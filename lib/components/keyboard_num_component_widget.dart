@@ -1,6 +1,11 @@
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
+import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
+import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -12,11 +17,23 @@ class KeyboardNumComponentWidget extends StatefulWidget {
     super.key,
     String? tittle,
     bool? isBackButton,
+    this.idStatus,
+    this.statusName,
+    this.statusJSON,
+    int? idStepParent,
   })  : this.tittle = tittle ?? 'Ingrese el código',
-        this.isBackButton = isBackButton ?? false;
+        this.isBackButton = isBackButton ?? false,
+        this.idStepParent = idStepParent ?? 0;
 
   final String tittle;
   final bool isBackButton;
+
+  /// Para guardar el estado en formularios
+  final int? idStatus;
+
+  final String? statusName;
+  final dynamic statusJSON;
+  final int idStepParent;
 
   @override
   State<KeyboardNumComponentWidget> createState() =>
@@ -54,12 +71,7 @@ class _KeyboardNumComponentWidgetState
       width: MediaQuery.sizeOf(context).width * 1.0,
       height: MediaQuery.sizeOf(context).height * 1.0,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          fit: BoxFit.cover,
-          image: Image.asset(
-            'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-          ).image,
-        ),
+        color: Color(0xFF101827),
       ),
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(24.0, 10.0, 24.0, 24.0),
@@ -72,7 +84,7 @@ class _KeyboardNumComponentWidgetState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (valueOrDefault<bool>(
-                  widget.isBackButton,
+                  widget!.isBackButton,
                   false,
                 ))
                   InkWell(
@@ -85,7 +97,7 @@ class _KeyboardNumComponentWidgetState
                     },
                     child: Icon(
                       Icons.chevron_left,
-                      color: FlutterFlowTheme.of(context).primaryText,
+                      color: FlutterFlowTheme.of(context).info,
                       size: 50.0,
                     ),
                   ),
@@ -95,7 +107,7 @@ class _KeyboardNumComponentWidgetState
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8.0),
                     child: Image.asset(
-                      'assets/images/Clickpalmlogo1-removebg-preview.png',
+                      'assets/images/logo2_(1).png',
                       fit: BoxFit.contain,
                     ),
                   ),
@@ -103,14 +115,14 @@ class _KeyboardNumComponentWidgetState
               ],
             ),
             Text(
-              'Ingrese el código del operador',
+              widget!.tittle,
               style: FlutterFlowTheme.of(context).headlineMedium.override(
                     font: GoogleFonts.interTight(
                       fontWeight: FontWeight.w600,
                       fontStyle:
                           FlutterFlowTheme.of(context).headlineMedium.fontStyle,
                     ),
-                    color: FlutterFlowTheme.of(context).primaryText,
+                    color: FlutterFlowTheme.of(context).info,
                     fontSize: 20.0,
                     letterSpacing: 0.0,
                     fontWeight: FontWeight.w600,
@@ -126,7 +138,7 @@ class _KeyboardNumComponentWidgetState
               ),
               child: Container(
                 decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).primaryBackground,
+                  color: Color(0xFF004628),
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 child: Padding(
@@ -139,8 +151,7 @@ class _KeyboardNumComponentWidgetState
                         width: MediaQuery.sizeOf(context).width * 1.0,
                         height: 60.0,
                         decoration: BoxDecoration(
-                          color:
-                              FlutterFlowTheme.of(context).secondaryBackground,
+                          color: Color(0xFFE6FFE6),
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                         child: Align(
@@ -205,8 +216,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -268,8 +278,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -331,8 +340,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -400,8 +408,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -463,8 +470,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -526,8 +532,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -595,8 +600,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -658,8 +662,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -721,8 +724,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -790,8 +792,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -827,8 +828,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
@@ -875,11 +875,58 @@ class _KeyboardNumComponentWidgetState
                                 hoverColor: Colors.transparent,
                                 highlightColor: Colors.transparent,
                                 onTap: () async {
-                                  FFAppState().codeKeyboard =
-                                      functions.concatenateStrings(
-                                          FFAppState().codeKeyboard, '');
-                                  _model.updatePage(() {});
-                                  context.safePop();
+                                  var _shouldSetState = false;
+                                  if ((widget!.idStatus.toString() != null &&
+                                          widget!.idStatus.toString() != '') &&
+                                      (widget!.idStatus! > 0)) {
+                                    _model.visitDetails =
+                                        await actions.updateOrAddVisitDetail(
+                                      FFAppState().visitDetails.toList(),
+                                      widget!.idStatus!,
+                                      widget!.idStepParent,
+                                      widget!.statusName!,
+                                      FFAppState().codeKeyboard,
+                                      getJsonField(
+                                        widget!.statusJSON,
+                                        r'''$.remember_status''',
+                                      ),
+                                      getJsonField(
+                                        widget!.statusJSON,
+                                        r'''$.default_status''',
+                                      ).toString(),
+                                      0,
+                                    );
+                                    _shouldSetState = true;
+                                    FFAppState().visitDetails = _model
+                                        .visitDetails!
+                                        .toList()
+                                        .cast<VisitsDetailsStruct>();
+
+                                    context.pushNamed(
+                                      DoVisitsFormPageWidget.routeName,
+                                      extra: <String, dynamic>{
+                                        kTransitionInfoKey: TransitionInfo(
+                                          hasTransition: true,
+                                          transitionType:
+                                              PageTransitionType.fade,
+                                          duration: Duration(milliseconds: 500),
+                                        ),
+                                      },
+                                    );
+
+                                    if (_shouldSetState) safeSetState(() {});
+                                    return;
+                                  } else {
+                                    FFAppState().codeKeyboard =
+                                        functions.concatenateStrings(
+                                            FFAppState().codeKeyboard, '');
+                                    FFAppState().update(() {});
+                                    context.safePop();
+                                    if (_shouldSetState) safeSetState(() {});
+                                    return;
+                                  }
+
+                                  if (_shouldSetState) safeSetState(() {});
                                 },
                                 child: Material(
                                   color: Colors.transparent,
@@ -891,8 +938,7 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
+                                      color: Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(

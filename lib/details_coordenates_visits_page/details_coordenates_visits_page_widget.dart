@@ -1,10 +1,13 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'details_coordenates_visits_page_model.dart';
 export 'details_coordenates_visits_page_model.dart';
@@ -55,15 +58,10 @@ class _DetailsCoordenatesVisitsPageWidgetState
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
+        backgroundColor: Color(0xFF101827),
         body: Container(
           decoration: BoxDecoration(
-            image: DecorationImage(
-              fit: BoxFit.cover,
-              image: Image.asset(
-                'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-              ).image,
-            ),
+            color: Color(0xFF101827),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.max,
@@ -89,7 +87,7 @@ class _DetailsCoordenatesVisitsPageWidgetState
                         },
                         child: Icon(
                           Icons.chevron_left,
-                          color: FlutterFlowTheme.of(context).primaryText,
+                          color: FlutterFlowTheme.of(context).info,
                           size: 50.0,
                         ),
                       ),
@@ -110,7 +108,7 @@ class _DetailsCoordenatesVisitsPageWidgetState
                       },
                       child: Icon(
                         Icons.download_sharp,
-                        color: FlutterFlowTheme.of(context).primaryText,
+                        color: FlutterFlowTheme.of(context).info,
                         size: 50.0,
                       ),
                     ),
@@ -146,7 +144,7 @@ class _DetailsCoordenatesVisitsPageWidgetState
                             padding: EdgeInsets.all(14.0),
                             child: MarkdownBody(
                               data: functions.convertToMarkdown('Coordenadas',
-                                  widget.visitSelected!.locationsAdd.toList()),
+                                  widget!.visitSelected!.locationsAdd.toList()),
                               selectable: true,
                               onTapLink: (_, url, __) => launchURL(url!),
                             ),

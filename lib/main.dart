@@ -1,15 +1,34 @@
 import 'package:provider/provider.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import '/backend/sqlite/sqlite_manager.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
+import 'flutter_flow/nav/nav.dart';
+import 'index.dart';
 
+import 'package:provider/provider.dart';
+import 'package:flutter/gestures.dart';
 
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
+import 'flutter_flow/flutter_flow_util.dart';
+import 'flutter_flow/internationalization.dart';
+import 'flutter_flow/nav/nav.dart';
+import 'index.dart';
 
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
+
+import '/components/animated_splash_screen_widget.dart';
+import '/custom_code/actions/background_location_service.dart';
+
+StreamSubscription<Position>? locationSubscription;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +36,9 @@ void main() async {
   usePathUrlStrategy();
 
   await SQLiteManager.initialize();
+
+  // Inicializar el servicio de geolocalización en segundo plano
+  await initializeBackgroundLocationService();
 
   final appState = FFAppState(); // Initialize FFAppState
   await appState.initializePersistedState();
@@ -56,8 +78,8 @@ class _MyAppState extends State<MyApp> {
       _router.routerDelegate.currentConfiguration.matches
           .map((e) => getRoute(e))
           .toList();
-
   bool displaySplashImage = true;
+  bool _showAnimatedSplash = true;
 
   @override
   void initState() {
@@ -66,7 +88,16 @@ class _MyAppState extends State<MyApp> {
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
 
-    Future.delayed(Duration(milliseconds: 1000),
+    // Keep the FlutterFlow splash active until animated splash completes
+    // The animated splash will call _onSplashComplete when done
+  }
+
+  void _onSplashComplete() {
+    safeSetState(() {
+      _showAnimatedSplash = false;
+    });
+    // Stop showing FlutterFlow splash image after animated splash completes
+    Future.delayed(Duration(milliseconds: 100),
         () => safeSetState(() => _appStateNotifier.stopShowingSplashImage()));
   }
 
@@ -101,6 +132,17 @@ class _MyAppState extends State<MyApp> {
       ),
       themeMode: _themeMode,
       routerConfig: _router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child ?? SizedBox.shrink(),
+            if (_showAnimatedSplash)
+              AnimatedSplashScreenWidget(
+                onAnimationComplete: _onSplashComplete,
+              ),
+          ],
+        );
+      },
     );
   }
 }

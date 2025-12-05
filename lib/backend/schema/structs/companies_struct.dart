@@ -1,6 +1,7 @@
 // ignore_for_file: unnecessary_getters_setters
 
 import '/backend/schema/util/schema_util.dart';
+import '/backend/schema/enums/enums.dart';
 
 import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -13,12 +14,16 @@ class CompaniesStruct extends BaseStruct {
     String? nit,
     String? address,
     String? telePhone,
+    double? latitudeExtractor,
+    double? longitudeExtractor,
   })  : _idCompany = idCompany,
         _nameCompany = nameCompany,
         _businessName = businessName,
         _nit = nit,
         _address = address,
-        _telePhone = telePhone;
+        _telePhone = telePhone,
+        _latitudeExtractor = latitudeExtractor,
+        _longitudeExtractor = longitudeExtractor;
 
   // "id_company" field.
   int? _idCompany;
@@ -64,6 +69,20 @@ class CompaniesStruct extends BaseStruct {
 
   bool hasTelePhone() => _telePhone != null;
 
+  // "latitude_extractor" field.
+  double? _latitudeExtractor;
+  double get latitudeExtractor => _latitudeExtractor ?? 0.0;
+  set latitudeExtractor(double? val) => _latitudeExtractor = val;
+
+  bool hasLatitudeExtractor() => _latitudeExtractor != null;
+
+  // "longitude_extractor" field.
+  double? _longitudeExtractor;
+  double get longitudeExtractor => _longitudeExtractor ?? 0.0;
+  set longitudeExtractor(double? val) => _longitudeExtractor = val;
+
+  bool hasLongitudeExtractor() => _longitudeExtractor != null;
+
   static CompaniesStruct fromMap(Map<String, dynamic> data) => CompaniesStruct(
         idCompany: castToType<int>(data['id_company']),
         nameCompany: data['name_company'] as String?,
@@ -71,6 +90,8 @@ class CompaniesStruct extends BaseStruct {
         nit: data['nit'] as String?,
         address: data['address'] as String?,
         telePhone: data['telePhone'] as String?,
+        latitudeExtractor: castToType<double>(data['latitude_extractor']),
+        longitudeExtractor: castToType<double>(data['longitude_extractor']),
       );
 
   static CompaniesStruct? maybeFromMap(dynamic data) => data is Map
@@ -84,6 +105,8 @@ class CompaniesStruct extends BaseStruct {
         'nit': _nit,
         'address': _address,
         'telePhone': _telePhone,
+        'latitude_extractor': _latitudeExtractor,
+        'longitude_extractor': _longitudeExtractor,
       }.withoutNulls;
 
   @override
@@ -111,6 +134,14 @@ class CompaniesStruct extends BaseStruct {
         'telePhone': serializeParam(
           _telePhone,
           ParamType.String,
+        ),
+        'latitude_extractor': serializeParam(
+          _latitudeExtractor,
+          ParamType.double,
+        ),
+        'longitude_extractor': serializeParam(
+          _longitudeExtractor,
+          ParamType.double,
         ),
       }.withoutNulls;
 
@@ -146,6 +177,16 @@ class CompaniesStruct extends BaseStruct {
           ParamType.String,
           false,
         ),
+        latitudeExtractor: deserializeParam(
+          data['latitude_extractor'],
+          ParamType.double,
+          false,
+        ),
+        longitudeExtractor: deserializeParam(
+          data['longitude_extractor'],
+          ParamType.double,
+          false,
+        ),
       );
 
   @override
@@ -159,12 +200,14 @@ class CompaniesStruct extends BaseStruct {
         businessName == other.businessName &&
         nit == other.nit &&
         address == other.address &&
-        telePhone == other.telePhone;
+        telePhone == other.telePhone &&
+        latitudeExtractor == other.latitudeExtractor &&
+        longitudeExtractor == other.longitudeExtractor;
   }
 
   @override
   int get hashCode => const ListEquality()
-      .hash([idCompany, nameCompany, businessName, nit, address, telePhone]);
+      .hash([idCompany, nameCompany, businessName, nit, address, telePhone, latitudeExtractor, longitudeExtractor]);
 }
 
 CompaniesStruct createCompaniesStruct({
@@ -174,6 +217,8 @@ CompaniesStruct createCompaniesStruct({
   String? nit,
   String? address,
   String? telePhone,
+  double? latitudeExtractor,
+  double? longitudeExtractor,
 }) =>
     CompaniesStruct(
       idCompany: idCompany,
@@ -182,4 +227,6 @@ CompaniesStruct createCompaniesStruct({
       nit: nit,
       address: address,
       telePhone: telePhone,
+      latitudeExtractor: latitudeExtractor,
+      longitudeExtractor: longitudeExtractor,
     );

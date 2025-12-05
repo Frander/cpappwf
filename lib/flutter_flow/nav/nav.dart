@@ -1,12 +1,21 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
 
 import '/backend/schema/structs/index.dart';
+import '/backend/schema/enums/enums.dart';
 
+import '/backend/sqlite/sqlite_manager.dart';
 
+import '/main.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/lat_lng.dart';
+import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import 'serialization_util.dart';
 
 import '/index.dart';
 
@@ -64,9 +73,41 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
               : StartPageWidget(),
         ),
         FFRoute(
+          name: DoVisitsFormPageWidget.routeName,
+          path: DoVisitsFormPageWidget.routePath,
+          builder: (context, params) => DoVisitsFormPageWidget(
+            tittle: params.getParam(
+              'tittle',
+              ParamType.String,
+            ),
+          ),
+        ),
+        FFRoute(
           name: UsersPageWidget.routeName,
           path: UsersPageWidget.routePath,
           builder: (context, params) => UsersPageWidget(),
+        ),
+        FFRoute(
+          name: HeadquartersPageWidget.routeName,
+          path: HeadquartersPageWidget.routePath,
+          builder: (context, params) => HeadquartersPageWidget(),
+        ),
+        FFRoute(
+          name: InfoPageWidget.routeName,
+          path: InfoPageWidget.routePath,
+          builder: (context, params) => InfoPageWidget(),
+        ),
+        FFRoute(
+          name: DetailsCoordenatesVisitsPageWidget.routeName,
+          path: DetailsCoordenatesVisitsPageWidget.routePath,
+          builder: (context, params) => DetailsCoordenatesVisitsPageWidget(
+            visitSelected: params.getParam(
+              'visitSelected',
+              ParamType.DataStruct,
+              isList: false,
+              structBuilder: VisitsStruct.fromSerializableMap,
+            ),
+          ),
         ),
         FFRoute(
           name: StartPageWidget.routeName,
@@ -81,9 +122,14 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
-          name: HeadquartersPageWidget.routeName,
-          path: HeadquartersPageWidget.routePath,
-          builder: (context, params) => HeadquartersPageWidget(),
+          name: DoVisitsActivityPageWidget.routeName,
+          path: DoVisitsActivityPageWidget.routePath,
+          builder: (context, params) => DoVisitsActivityPageWidget(
+            tittle: params.getParam(
+              'tittle',
+              ParamType.String,
+            ),
+          ),
         ),
         FFRoute(
           name: ActivitiesPageWidget.routeName,
@@ -111,21 +157,6 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => ZonesPageWidget(),
         ),
         FFRoute(
-          name: InfoPageWidget.routeName,
-          path: InfoPageWidget.routePath,
-          builder: (context, params) => InfoPageWidget(),
-        ),
-        FFRoute(
-          name: DoVisitsPageWidget.routeName,
-          path: DoVisitsPageWidget.routePath,
-          builder: (context, params) => DoVisitsPageWidget(
-            tittle: params.getParam(
-              'tittle',
-              ParamType.String,
-            ),
-          ),
-        ),
-        FFRoute(
           name: DetailsInfoPageWidget.routeName,
           path: DetailsInfoPageWidget.routePath,
           builder: (context, params) => DetailsInfoPageWidget(),
@@ -136,21 +167,121 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => ModulesPageWidget(),
         ),
         FFRoute(
-          name: DetailsCoordenatesVisitsPageWidget.routeName,
-          path: DetailsCoordenatesVisitsPageWidget.routePath,
-          builder: (context, params) => DetailsCoordenatesVisitsPageWidget(
-            visitSelected: params.getParam(
-              'visitSelected',
-              ParamType.DataStruct,
-              isList: false,
-              structBuilder: VisitsStruct.fromSerializableMap,
-            ),
-          ),
+          name: HomePageWidget.routeName,
+          path: HomePageWidget.routePath,
+          builder: (context, params) => HomePageWidget(),
         ),
         FFRoute(
           name: NewsPageWidget.routeName,
           path: NewsPageWidget.routePath,
           builder: (context, params) => NewsPageWidget(),
+        ),
+        FFRoute(
+          name: DetailsVisitPageWidget.routeName,
+          path: DetailsVisitPageWidget.routePath,
+          builder: (context, params) => DetailsVisitPageWidget(
+            jsonSummary: params.getParam(
+              'jsonSummary',
+              ParamType.JSON,
+            ),
+            typeRead: params.getParam(
+              'typeRead',
+              ParamType.String,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: DetailsMultilpleVisitsPageWidget.routeName,
+          path: DetailsMultilpleVisitsPageWidget.routePath,
+          builder: (context, params) => DetailsMultilpleVisitsPageWidget(
+            jsonSummary: params.getParam(
+              'jsonSummary',
+              ParamType.JSON,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: MapInstallPageWidget.routeName,
+          path: MapInstallPageWidget.routePath,
+          builder: (context, params) => MapInstallPageWidget(
+            idHeadquarter: params.getParam(
+              'idHeadquarter',
+              ParamType.int,
+            ),
+            isTest: params.getParam(
+              'isTest',
+              ParamType.bool,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: HeadquartersInstallPageWidget.routeName,
+          path: HeadquartersInstallPageWidget.routePath,
+          builder: (context, params) => HeadquartersInstallPageWidget(),
+        ),
+        FFRoute(
+          name: HistoryGeoPageWidget.routeName,
+          path: HistoryGeoPageWidget.routePath,
+          builder: (context, params) => HistoryGeoPageWidget(),
+        ),
+        FFRoute(
+          name: SettingsPageWidget.routeName,
+          path: SettingsPageWidget.routePath,
+          builder: (context, params) => SettingsPageWidget(),
+        ),
+        FFRoute(
+          name: MapVisitsPageWidget.routeName,
+          path: MapVisitsPageWidget.routePath,
+          builder: (context, params) => MapVisitsPageWidget(),
+        ),
+        FFRoute(
+          name: DownloadRoutePageWidget.routeName,
+          path: DownloadRoutePageWidget.routePath,
+          builder: (context, params) => DownloadRoutePageWidget(
+            idHeadquarter: params.getParam(
+              'idHeadquarter',
+              ParamType.int,
+            ),
+            isTest: params.getParam(
+              'isTest',
+              ParamType.bool,
+            ),
+          ),
+        ),
+        FFRoute(
+          name: HistoryVisitsPageWidget.routeName,
+          path: HistoryVisitsPageWidget.routePath,
+          builder: (context, params) => HistoryVisitsPageWidget(),
+        ),
+        FFRoute(
+          name: ConfigMapsPageWidget.routeName,
+          path: ConfigMapsPageWidget.routePath,
+          builder: (context, params) => ConfigMapsPageWidget(),
+        ),
+        FFRoute(
+          name: SyncPageWidget.routeName,
+          path: SyncPageWidget.routePath,
+          builder: (context, params) => SyncPageWidget(),
+        ),
+        FFRoute(
+          name: ConfigBackupsPageWidget.routeName,
+          path: ConfigBackupsPageWidget.routePath,
+          builder: (context, params) => ConfigBackupsPageWidget(),
+        ),
+        FFRoute(
+          name: LoadCoordinatesPageWidget.routeName,
+          path: LoadCoordinatesPageWidget.routePath,
+          builder: (context, params) => LoadCoordinatesPageWidget(),
+        ),
+        FFRoute(
+          name: InformationPageWidget.routeName,
+          path: InformationPageWidget.routePath,
+          builder: (context, params) => InformationPageWidget(),
+        ),
+        FFRoute(
+          name: UpdatedAPPageWidget.routeName,
+          path: UpdatedAPPageWidget.routePath,
+          builder: (context, params) => UpdatedAPPageWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

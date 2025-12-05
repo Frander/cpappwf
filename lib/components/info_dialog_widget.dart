@@ -1,8 +1,10 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'info_dialog_model.dart';
 export 'info_dialog_model.dart';
 
@@ -100,7 +102,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                         Align(
                           alignment: AlignmentDirectional(0.0, 0.0),
                           child: Text(
-                            widget.title,
+                            widget!.title,
                             textAlign: TextAlign.center,
                             style: FlutterFlowTheme.of(context)
                                 .headlineMedium
@@ -113,6 +115,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                                         .headlineMedium
                                         .fontStyle,
                                   ),
+                                  fontSize: 20.0,
                                   letterSpacing: 0.0,
                                   fontWeight: FlutterFlowTheme.of(context)
                                       .headlineMedium
@@ -131,7 +134,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                                   0.0, 12.0, 0.0, 0.0),
                               child: Text(
                                 valueOrDefault<String>(
-                                  widget.info,
+                                  widget!.info,
                                   'Información',
                                 ),
                                 style: FlutterFlowTheme.of(context)
@@ -143,7 +146,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                                             .labelMedium
                                             .fontStyle,
                                       ),
-                                      fontSize: 18.0,
+                                      fontSize: 14.0,
                                       letterSpacing: 0.0,
                                       fontWeight: FontWeight.w600,
                                       fontStyle: FlutterFlowTheme.of(context)
@@ -188,6 +191,7 @@ class _InfoDialogWidgetState extends State<InfoDialogWidget> {
                                           .titleSmall
                                           .fontStyle,
                                     ),
+                                    fontSize: 14.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .titleSmall

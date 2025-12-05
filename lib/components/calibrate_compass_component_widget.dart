@@ -1,11 +1,14 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:async';
+import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'calibrate_compass_component_model.dart';
 export 'calibrate_compass_component_model.dart';
 
@@ -47,12 +50,7 @@ class _CalibrateCompassComponentWidgetState
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          fit: BoxFit.cover,
-          image: Image.asset(
-            'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-          ).image,
-        ),
+        color: Color(0xFF101827),
       ),
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
@@ -70,6 +68,7 @@ class _CalibrateCompassComponentWidgetState
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                       ),
+                      color: FlutterFlowTheme.of(context).info,
                       fontSize: 20.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,
@@ -89,6 +88,7 @@ class _CalibrateCompassComponentWidgetState
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                       ),
+                      color: FlutterFlowTheme.of(context).info,
                       fontSize: 14.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,
@@ -218,6 +218,7 @@ class _CalibrateCompassComponentWidgetState
                       fontStyle:
                           FlutterFlowTheme.of(context).headlineSmall.fontStyle,
                     ),
+                    color: FlutterFlowTheme.of(context).info,
                     fontSize: 50.0,
                     letterSpacing: 0.0,
                     fontWeight:

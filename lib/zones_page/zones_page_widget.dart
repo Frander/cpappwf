@@ -1,6 +1,8 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -53,12 +55,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: Container(
           decoration: BoxDecoration(
-            image: DecorationImage(
-              fit: BoxFit.cover,
-              image: Image.asset(
-                'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-              ).image,
-            ),
+            color: Color(0xFF101827),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.max,
@@ -84,7 +81,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                           },
                           child: Icon(
                             Icons.chevron_left,
-                            color: FlutterFlowTheme.of(context).primaryText,
+                            color: FlutterFlowTheme.of(context).info,
                             size: 50.0,
                           ),
                         ),
@@ -95,7 +92,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
                             child: Image.asset(
-                              'assets/images/Clickpalmlogo1-removebg-preview.png',
+                              'assets/images/logo2_(1).png',
                               fit: BoxFit.contain,
                             ),
                           ),
@@ -120,6 +117,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                         .bodyMedium
                                         .fontStyle,
                                   ),
+                                  color: FlutterFlowTheme.of(context).info,
                                   fontSize: 20.0,
                                   letterSpacing: 0.0,
                                   fontWeight: FontWeight.bold,

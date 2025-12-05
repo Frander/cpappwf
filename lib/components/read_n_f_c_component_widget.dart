@@ -1,9 +1,12 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'read_n_f_c_component_model.dart';
 export 'read_n_f_c_component_model.dart';
 
@@ -48,12 +51,7 @@ class _ReadNFCComponentWidgetState extends State<ReadNFCComponentWidget> {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          fit: BoxFit.cover,
-          image: Image.asset(
-            'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-          ).image,
-        ),
+        color: Color(0xFF101827),
       ),
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
@@ -65,7 +63,7 @@ class _ReadNFCComponentWidgetState extends State<ReadNFCComponentWidget> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
                 child: Image.asset(
-                  'assets/images/Clickpalmlogo1-removebg-preview.png',
+                  'assets/images/logo2_(1).png',
                   width: double.infinity,
                   fit: BoxFit.contain,
                 ),
@@ -82,6 +80,7 @@ class _ReadNFCComponentWidgetState extends State<ReadNFCComponentWidget> {
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                       ),
+                      color: FlutterFlowTheme.of(context).info,
                       fontSize: 20.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,

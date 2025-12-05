@@ -22,8 +22,8 @@ class SQLiteManager {
       return;
     }
     _database = await initializeDatabaseFromDbFile(
-      'click_palm_local_b_d',
-      'ClickPalmLocalBD.db',
+      'click_palm_local_b_d_n_e_w',
+      'ClickPalmLocalBDV2.db',
     );
   }
 
@@ -33,12 +33,48 @@ class SQLiteManager {
         _database,
       );
 
+  Future<List<SelectAllGeoRow>> selectAllGeo() => performSelectAllGeo(
+        _database,
+      );
+
+  Future<List<GetCountVisitRow>> getCountVisit() => performGetCountVisit(
+        _database,
+      );
+
+  Future<List<GetHeadquarterWeightsRow>> getHeadquarterWeights({
+    required int headquarterId,
+    required int year,
+    required int month,
+  }) =>
+      performGetHeadquarterWeights(
+        _database,
+        headquarterId: headquarterId,
+        year: year,
+        month: month,
+      );
+
   /// END READ QUERY CALLS
 
   /// START UPDATE QUERY CALLS
 
   Future deleteAllUsers() => performDeleteAllUsers(
         _database,
+      );
+
+  Future addReadGeo({
+    double? latitude,
+    double? longitude,
+    double? altitude,
+    double? errorHorizontal,
+    String? dateHourRead,
+  }) =>
+      performAddReadGeo(
+        _database,
+        latitude: latitude,
+        longitude: longitude,
+        altitude: altitude,
+        errorHorizontal: errorHorizontal,
+        dateHourRead: dateHourRead,
       );
 
   /// END UPDATE QUERY CALLS

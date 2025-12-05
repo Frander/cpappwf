@@ -1,7 +1,10 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import '../schema/structs/index.dart';
 
 import 'package:flutter/foundation.dart';
 
+import '/flutter_flow/flutter_flow_util.dart';
 import 'api_manager.dart';
 
 export 'api_manager.dart' show ApiCallResponse;
@@ -232,6 +235,7 @@ class APIClickPalmGroup {
   static UsersidPUTCall usersidPUTCall = UsersidPUTCall();
   static UsersidDELETECall usersidDELETECall = UsersidDELETECall();
   static UsersFiltersGETCall usersFiltersGETCall = UsersFiltersGETCall();
+  static UsersbyoperidGETCall usersbyoperidGETCall = UsersbyoperidGETCall();
   static UsersCredentialsGETCall usersCredentialsGETCall =
       UsersCredentialsGETCall();
   static UsersCredentialsPOSTCall usersCredentialsPOSTCall =
@@ -1313,20 +1317,30 @@ class DevicesGETCall {
 }
 
 class DevicesPOSTCall {
-  Future<ApiCallResponse> call() async {
+  Future<ApiCallResponse> call({
+    int? idDevice,
+    int? idCompany,
+    String? deviceName,
+    String? cellPhone,
+    String? serialId,
+    String? imeI1,
+    String? imeI2,
+    String? model,
+    String? state,
+  }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
     final ffApiRequestBody = '''
 {
-  "id_device": 123,
-  "id_company": 123,
-  "device_name": "example string",
-  "cellPhone": "example string",
-  "serial_id": "example string",
-  "imeI1": "example string",
-  "imeI2": "example string",
-  "model": "example string",
-  "state": "example string"
+  "id_device": ${idDevice ?? 0},
+  "id_company": ${idCompany ?? 0},
+  "device_name": "${deviceName ?? ''}",
+  "cellPhone": "${cellPhone ?? ''}",
+  "serial_id": "${serialId ?? ''}",
+  "imeI1": "${imeI1 ?? ''}",
+  "imeI2": "${imeI2 ?? ''}",
+  "model": "${model ?? ''}",
+  "state": "${state ?? 'A'}"
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Devices POST',
@@ -1432,6 +1446,7 @@ class DevicesFiltersGETCall {
     String? textSearch1 = '',
     String? textSearch2 = '',
     int? idCompany,
+    int? daysToProcess,
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
@@ -1445,6 +1460,7 @@ class DevicesFiltersGETCall {
         'Text_search1': textSearch1,
         'Text_search2': textSearch2,
         'Id_company': idCompany,
+        'DaysToProcess': daysToProcess,
       },
       returnBody: true,
       encodeBodyUtf8: false,
@@ -3728,8 +3744,8 @@ class SyncTimesPOSTCall {
 
 class SyncVisitsAddCall {
   Future<ApiCallResponse> call({
-    dynamic visitsAddListJson,
-    dynamic newsAddListJson,
+    dynamic? visitsAddListJson,
+    dynamic? newsAddListJson,
     String? createdAt = '',
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
@@ -4204,6 +4220,28 @@ class UsersFiltersGETCall {
         'Text_search2': textSearch2,
         'Id_company': idCompany,
       },
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+class UsersbyoperidGETCall {
+  Future<ApiCallResponse> call({
+    required String operID,
+  }) async {
+    final baseUrl = APIClickPalmGroup.getBaseUrl();
+
+    return ApiManager.instance.makeApiCall(
+      callName: '/Users/by-operid/{operID} GET',
+      apiUrl: '${baseUrl}/Users/by-operid/${operID}',
+      callType: ApiCallType.GET,
+      headers: {},
+      params: {},
       returnBody: true,
       encodeBodyUtf8: false,
       decodeUtf8: false,

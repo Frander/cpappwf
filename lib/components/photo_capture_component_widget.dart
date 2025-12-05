@@ -1,0 +1,526 @@
+import '/backend/schema/structs/index.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
+import 'dart:io';
+import '/custom_code/actions/index.dart' as actions;
+import '/flutter_flow/custom_functions.dart' as functions;
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import 'package:image_picker/image_picker.dart';
+import 'photo_capture_component_model.dart';
+export 'photo_capture_component_model.dart';
+
+class PhotoCaptureComponentWidget extends StatefulWidget {
+  const PhotoCaptureComponentWidget({
+    super.key,
+    String? tittle,
+    required this.idStatus,
+    required this.statusName,
+    required this.statusJSON,
+    int? idStepParent,
+  })  : this.tittle = tittle ?? 'Capturar Fotografía',
+        this.idStepParent = idStepParent ?? 0;
+
+  final String tittle;
+  final int idStatus;
+  final String statusName;
+  final dynamic statusJSON;
+  final int idStepParent;
+
+  @override
+  State<PhotoCaptureComponentWidget> createState() =>
+      _PhotoCaptureComponentWidgetState();
+}
+
+class _PhotoCaptureComponentWidgetState
+    extends State<PhotoCaptureComponentWidget>
+    with TickerProviderStateMixin {
+  late PhotoCaptureComponentModel _model;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
+  final ImagePicker _picker = ImagePicker();
+
+  @override
+  void setState(VoidCallback callback) {
+    super.setState(callback);
+    _model.onUpdate();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _model = createModel(context, () => PhotoCaptureComponentModel());
+
+    // Animación de pulso para el botón de captura
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Cargar foto existente si hay
+    _loadExistingPhoto();
+  }
+
+  @override
+  void dispose() {
+    _model.maybeDispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadExistingPhoto() async {
+    final existingPhoto = functions.statusResponseByActivityStatusAlternative(
+      widget.idStatus,
+      FFAppState().visitDetails.toList(),
+      widget.idStepParent,
+    );
+
+    if (existingPhoto.isNotEmpty) {
+      setState(() {
+        _model.photoPath = existingPhoto;
+        _model.isPhotoTaken = true;
+      });
+    }
+  }
+
+  Future<void> _capturePhoto(ImageSource source) async {
+    try {
+      HapticFeedback.mediumImpact();
+
+      final XFile? photo = await _picker.pickImage(
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (photo != null) {
+        setState(() {
+          _model.photoPath = photo.path;
+          _model.isPhotoTaken = true;
+        });
+
+        HapticFeedback.heavyImpact();
+
+        // Guardar en visitDetails
+        await _savePhoto(photo.path);
+      }
+    } catch (e) {
+      debugPrint('Error capturando foto: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al capturar foto: $e'),
+          backgroundColor: FlutterFlowTheme.of(context).error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _savePhoto(String photoPath) async {
+    final visitDetailsCopy = await actions.updateOrAddVisitDetail(
+      FFAppState().visitDetails.toList(),
+      widget.idStatus,
+      widget.idStepParent,
+      widget.statusName,
+      photoPath,
+      getJsonField(widget.statusJSON, r'''$.remember_status'''),
+      getJsonField(widget.statusJSON, r'''$.default_status''').toString(),
+      0,
+    );
+
+    FFAppState().visitDetails =
+        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+    FFAppState().update(() {});
+  }
+
+  Future<void> _deletePhoto() async {
+    HapticFeedback.lightImpact();
+
+    setState(() {
+      _model.photoPath = null;
+      _model.isPhotoTaken = false;
+    });
+
+    // Limpiar de visitDetails
+    await _savePhoto('');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: MediaQuery.sizeOf(context).width,
+      height: MediaQuery.sizeOf(context).height,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.max,
+          children: [
+            // Header
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+              child: Row(
+                mainAxisSize: MainAxisSize.max,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  InkWell(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      Navigator.pop(context);
+                    },
+                    child: Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Icon(
+                        Icons.chevron_left,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding:
+                          EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                      child: Text(
+                        widget.tittle,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_model.isPhotoTaken)
+                    InkWell(
+                      onTap: _deletePhoto,
+                      child: Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              FlutterFlowTheme.of(context).error,
+                              FlutterFlowTheme.of(context)
+                                  .error
+                                  .withOpacity(0.8),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: FlutterFlowTheme.of(context)
+                                  .error
+                                  .withOpacity(0.4),
+                              blurRadius: 8,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          Icons.delete_outline,
+                          color: Colors.white,
+                          size: 22,
+                        ),
+                      ),
+                    )
+                  else
+                    SizedBox(width: 44),
+                ],
+              ),
+            ),
+
+            // Preview Area
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: _model.isPhotoTaken && _model.photoPath != null
+                    ? _buildPhotoPreview()
+                    : _buildEmptyState(),
+              ),
+            ),
+
+            // Botones de captura
+            Padding(
+              padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
+              child: Column(
+                children: [
+                  // Botón cámara
+                  ScaleTransition(
+                    scale: _pulseAnimation,
+                    child: InkWell(
+                      onTap: () => _capturePhoto(ImageSource.camera),
+                      child: Container(
+                        width: double.infinity,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              FlutterFlowTheme.of(context).primary,
+                              FlutterFlowTheme.of(context).secondary,
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(20),
+                          boxShadow: [
+                            BoxShadow(
+                              color: FlutterFlowTheme.of(context)
+                                  .primary
+                                  .withOpacity(0.5),
+                              blurRadius: 20,
+                              offset: Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.camera_alt_rounded,
+                              color: Colors.white,
+                              size: 28,
+                            ),
+                            SizedBox(width: 12),
+                            Text(
+                              'Tomar Fotografía',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  SizedBox(height: 16),
+
+                  // Botón galería
+                  InkWell(
+                    onTap: () => _capturePhoto(ImageSource.gallery),
+                    child: Container(
+                      width: double.infinity,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withOpacity(0.2),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.photo_library_rounded,
+                            color: Colors.white.withOpacity(0.9),
+                            size: 24,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Seleccionar de Galería',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white.withOpacity(0.9),
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotoPreview() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 30,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: Stack(
+          children: [
+            // Foto
+            SizedBox(
+              width: double.infinity,
+              height: double.infinity,
+              child: Image.file(
+                File(_model.photoPath!),
+                fit: BoxFit.cover,
+              ),
+            ),
+
+            // Overlay gradient
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.black.withOpacity(0.0),
+                      Colors.black.withOpacity(0.2),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Badge de confirmación
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      FlutterFlowTheme.of(context).success,
+                      FlutterFlowTheme.of(context).success.withOpacity(0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: FlutterFlowTheme.of(context)
+                          .success
+                          .withOpacity(0.4),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      color: Colors.white,
+                      size: 18,
+                    ),
+                    SizedBox(width: 6),
+                    Text(
+                      'Capturada',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 2,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+                  FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.add_a_photo_rounded,
+              color: Colors.white.withOpacity(0.7),
+              size: 56,
+            ),
+          ),
+          SizedBox(height: 24),
+          Text(
+            'Sin fotografía',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+              color: Colors.white.withOpacity(0.9),
+            ),
+          ),
+          SizedBox(height: 8),
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+              'Toca el botón de abajo para capturar\nuna fotografía o seleccionar de la galería',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.6),
+                height: 1.5,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

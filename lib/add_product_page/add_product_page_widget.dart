@@ -2,8 +2,11 @@ import '/components/calculate_coordenates_install_component_widget.dart';
 import '/flutter_flow/flutter_flow_count_controller.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'add_product_page_model.dart';
 export 'add_product_page_model.dart';
 
@@ -47,12 +50,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: Container(
           decoration: BoxDecoration(
-            image: DecorationImage(
-              fit: BoxFit.cover,
-              image: Image.asset(
-                'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-              ).image,
-            ),
+            color: Color(0xFF101827),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.max,
@@ -112,6 +110,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                           .bodyMedium
                                           .fontStyle,
                                     ),
+                                    color: FlutterFlowTheme.of(context).info,
                                     fontSize: 22.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
@@ -137,6 +136,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                     .bodyMedium
                                     .fontStyle,
                               ),
+                              color: FlutterFlowTheme.of(context).info,
                               fontSize: 14.0,
                               letterSpacing: 0.0,
                               fontWeight: FontWeight.bold,
@@ -174,6 +174,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                           .bodyMedium
                                           .fontStyle,
                                     ),
+                                    color: FlutterFlowTheme.of(context).info,
                                     fontSize: 22.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
@@ -185,7 +186,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8.0),
                               child: Image.asset(
-                                'assets/images/HugeiconsGrid_(1).png',
+                                'assets/images/HugeiconsGrid_2.png',
                                 width: 40.0,
                                 height: 40.0,
                                 fit: BoxFit.cover,
@@ -307,6 +308,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                           .bodyMedium
                                           .fontStyle,
                                     ),
+                                    color: FlutterFlowTheme.of(context).info,
                                     fontSize: 22.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
@@ -318,7 +320,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                             ClipRRect(
                               borderRadius: BorderRadius.circular(8.0),
                               child: Image.asset(
-                                'assets/images/GameIconsPalmTree.png',
+                                'assets/images/GameIconsPalmTree2.png',
                                 width: 40.0,
                                 height: 40.0,
                                 fit: BoxFit.cover,
@@ -434,6 +436,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                           .bodyMedium
                                           .fontStyle,
                                     ),
+                                    color: FlutterFlowTheme.of(context).info,
                                     fontSize: 22.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
@@ -492,11 +495,16 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                         safeSetState(() =>
                                             _model.checkboxValue = newValue!);
                                       },
-                                      side: BorderSide(
-                                        width: 2,
-                                        color: FlutterFlowTheme.of(context)
-                                            .alternate,
-                                      ),
+                                      side: (FlutterFlowTheme.of(context)
+                                                  .alternate !=
+                                              null)
+                                          ? BorderSide(
+                                              width: 2,
+                                              color:
+                                                  FlutterFlowTheme.of(context)
+                                                      .alternate!,
+                                            )
+                                          : null,
                                       activeColor:
                                           FlutterFlowTheme.of(context).primary,
                                       checkColor:

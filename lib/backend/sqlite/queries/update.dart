@@ -11,3 +11,20 @@ DELETE FROM Users
 }
 
 /// END DELETEALLUSERS
+
+/// BEGIN ADDREADGEO
+Future performAddReadGeo(
+  Database database, {
+  double? latitude,
+  double? longitude,
+  double? altitude,
+  double? errorHorizontal,
+  String? dateHourRead,
+}) {
+  final query = '''
+Insert into ReadGeo (latitude,longitude,altitude,errorHorizontal,dateHourRead) values (${latitude}, ${longitude}, ${altitude}, ${errorHorizontal}, '${dateHourRead}')
+''';
+  return database.rawQuery(query);
+}
+
+/// END ADDREADGEO

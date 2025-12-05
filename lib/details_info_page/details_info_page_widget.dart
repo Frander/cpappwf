@@ -1,5 +1,8 @@
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
@@ -57,12 +60,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: Container(
           decoration: BoxDecoration(
-            image: DecorationImage(
-              fit: BoxFit.cover,
-              image: Image.asset(
-                'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-              ).image,
-            ),
+            color: Color(0xFF101827),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.max,
@@ -95,7 +93,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                               },
                               child: Icon(
                                 Icons.chevron_left,
-                                color: FlutterFlowTheme.of(context).primaryText,
+                                color: FlutterFlowTheme.of(context).info,
                                 size: 50.0,
                               ),
                             ),
@@ -125,6 +123,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                           .bodyMedium
                                           .fontStyle,
                                     ),
+                                    color: FlutterFlowTheme.of(context).info,
                                     fontSize: 16.0,
                                     letterSpacing: 0.0,
                                     fontWeight: FontWeight.bold,
@@ -146,7 +145,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                     Align(
                       alignment: Alignment(0.0, 0),
                       child: TabBar(
-                        labelColor: FlutterFlowTheme.of(context).primaryText,
+                        labelColor: FlutterFlowTheme.of(context).info,
                         unselectedLabelColor:
                             FlutterFlowTheme.of(context).secondaryText,
                         labelStyle:

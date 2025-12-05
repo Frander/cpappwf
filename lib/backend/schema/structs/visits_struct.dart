@@ -1,5 +1,7 @@
 // ignore_for_file: unnecessary_getters_setters
 
+import '/backend/schema/util/schema_util.dart';
+import '/backend/schema/enums/enums.dart';
 
 import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -17,7 +19,7 @@ class VisitsStruct extends BaseStruct {
     String? locationDefault,
     int? idStatus,
     DateTime? createdAt,
-    List<ActivitiesStatusStruct>? statusAdd,
+    List<VisitsDetailsStruct>? visitsDetails,
   })  : _idVisit = idVisit,
         _idCompany = idCompany,
         _idActivity = idActivity,
@@ -29,7 +31,7 @@ class VisitsStruct extends BaseStruct {
         _locationDefault = locationDefault,
         _idStatus = idStatus,
         _createdAt = createdAt,
-        _statusAdd = statusAdd;
+        _visitsDetails = visitsDetails;
 
   // "id_visit" field.
   int? _idVisit;
@@ -129,16 +131,16 @@ class VisitsStruct extends BaseStruct {
 
   bool hasCreatedAt() => _createdAt != null;
 
-  // "Status_add" field.
-  List<ActivitiesStatusStruct>? _statusAdd;
-  List<ActivitiesStatusStruct> get statusAdd => _statusAdd ?? const [];
-  set statusAdd(List<ActivitiesStatusStruct>? val) => _statusAdd = val;
+  // "visits_details" field.
+  List<VisitsDetailsStruct>? _visitsDetails;
+  List<VisitsDetailsStruct> get visitsDetails => _visitsDetails ?? const [];
+  set visitsDetails(List<VisitsDetailsStruct>? val) => _visitsDetails = val;
 
-  void updateStatusAdd(Function(List<ActivitiesStatusStruct>) updateFn) {
-    updateFn(_statusAdd ??= []);
+  void updateVisitsDetails(Function(List<VisitsDetailsStruct>) updateFn) {
+    updateFn(_visitsDetails ??= []);
   }
 
-  bool hasStatusAdd() => _statusAdd != null;
+  bool hasVisitsDetails() => _visitsDetails != null;
 
   static VisitsStruct fromMap(Map<String, dynamic> data) => VisitsStruct(
         idVisit: castToType<int>(data['id_visit']),
@@ -152,9 +154,9 @@ class VisitsStruct extends BaseStruct {
         locationDefault: data['location_default'] as String?,
         idStatus: castToType<int>(data['id_status']),
         createdAt: data['created_at'] as DateTime?,
-        statusAdd: getStructList(
-          data['Status_add'],
-          ActivitiesStatusStruct.fromMap,
+        visitsDetails: getStructList(
+          data['visits_details'],
+          VisitsDetailsStruct.fromMap,
         ),
       );
 
@@ -173,7 +175,7 @@ class VisitsStruct extends BaseStruct {
         'location_default': _locationDefault,
         'id_status': _idStatus,
         'created_at': _createdAt,
-        'Status_add': _statusAdd?.map((e) => e.toMap()).toList(),
+        'visits_details': _visitsDetails?.map((e) => e.toMap()).toList(),
       }.withoutNulls;
 
   @override
@@ -223,8 +225,8 @@ class VisitsStruct extends BaseStruct {
           _createdAt,
           ParamType.DateTime,
         ),
-        'Status_add': serializeParam(
-          _statusAdd,
+        'visits_details': serializeParam(
+          _visitsDetails,
           ParamType.DataStruct,
           isList: true,
         ),
@@ -287,11 +289,11 @@ class VisitsStruct extends BaseStruct {
           ParamType.DateTime,
           false,
         ),
-        statusAdd: deserializeStructParam<ActivitiesStatusStruct>(
-          data['Status_add'],
+        visitsDetails: deserializeStructParam<VisitsDetailsStruct>(
+          data['visits_details'],
           ParamType.DataStruct,
           true,
-          structBuilder: ActivitiesStatusStruct.fromSerializableMap,
+          structBuilder: VisitsDetailsStruct.fromSerializableMap,
         ),
       );
 
@@ -313,7 +315,7 @@ class VisitsStruct extends BaseStruct {
         locationDefault == other.locationDefault &&
         idStatus == other.idStatus &&
         createdAt == other.createdAt &&
-        listEquality.equals(statusAdd, other.statusAdd);
+        listEquality.equals(visitsDetails, other.visitsDetails);
   }
 
   @override
@@ -329,7 +331,7 @@ class VisitsStruct extends BaseStruct {
         locationDefault,
         idStatus,
         createdAt,
-        statusAdd
+        visitsDetails
       ]);
 }
 

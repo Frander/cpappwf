@@ -1,9 +1,14 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import '/backend/sqlite/global_db_singleton.dart';
+import '/backend/schema/structs/index.dart';
 import 'activities_page_model.dart';
 export 'activities_page_model.dart';
 
@@ -22,6 +27,10 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // Estado local para actividades cargadas desde SQLite
+  List<ActivitiesStruct> _allActivities = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -29,18 +38,74 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
 
     _model.textController ??= TextEditingController();
     _model.textFieldFocusNode ??= FocusNode();
+
+    // Cargar actividades desde SQLite después del primer frame
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      await _loadActivitiesFromSQLite();
+    });
+  }
+
+  /// Carga actividades desde SQLite filtrando por módulo seleccionado
+  Future<void> _loadActivitiesFromSQLite() async {
+    try {
+      final activities = await globalDb.executeOperation((db) async {
+        // Usar rawQuery con alias para mapear los nombres de columnas SQLite (mayúsculas)
+        // a los nombres esperados por ActivitiesStruct.fromMap() (minúsculas)
+        return await db.rawQuery('''
+          SELECT
+            Id_activity as id_activity,
+            Name_activity as name_activity,
+            Group_activity as group_activity,
+            Unity as unity,
+            Cycle as cycle,
+            Effectivity_unitys as effectivity_unitys,
+            Effectivity_visits as effectivity_visits,
+            Type_effectivity as type_effectivity,
+            Module_activity as module_activity,
+            Is_sync_full as is_sync_full,
+            Tracking_headquarter as tracking_headquarter
+          FROM Activities
+          WHERE Module_activity = ?
+          ORDER BY Name_activity ASC
+        ''', [FFAppState().moduleSelected]);
+      });
+
+      if (mounted) {
+        setState(() {
+          _allActivities = activities
+              .map((map) => ActivitiesStruct.fromMap(map))
+              .toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error cargando actividades desde SQLite: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   void dispose() {
     _model.dispose();
-
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
+
+    // Filtrar actividades por búsqueda
+    final searchQuery = _model.textController.text.toLowerCase();
+    final filteredActivities = searchQuery.isEmpty
+        ? _allActivities
+        : _allActivities.where((activity) {
+            final activityName = activity.nameActivity.toLowerCase();
+            return activityName.contains(searchQuery);
+          }).toList();
 
     return GestureDetector(
       onTap: () {
@@ -50,379 +115,518 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
       child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
-        body: Container(
-          decoration: BoxDecoration(
-            image: DecorationImage(
-              fit: BoxFit.cover,
-              image: Image.asset(
-                'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-              ).image,
+        body: SafeArea(
+          top: true,
+          child: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF003420),
+                  Color(0xFF002415),
+                  Color(0xFF00150A),
+                ],
+                stops: [0.0, 0.5, 1.0],
+              ),
             ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(),
-                child: Column(
-                  mainAxisSize: MainAxisSize.max,
-                  mainAxisAlignment: MainAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.max,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        InkWell(
-                          splashColor: Colors.transparent,
-                          focusColor: Colors.transparent,
-                          hoverColor: Colors.transparent,
-                          highlightColor: Colors.transparent,
-                          onTap: () async {
-                            context.safePop();
-                          },
-                          child: Icon(
-                            Icons.chevron_left,
-                            color: FlutterFlowTheme.of(context).primaryText,
-                            size: 50.0,
-                          ),
-                        ),
-                        Container(
-                          width: 124.1,
-                          height: 53.2,
-                          decoration: BoxDecoration(),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(8.0),
-                            child: Image.asset(
-                              'assets/images/Clickpalmlogo1-removebg-preview.png',
-                              fit: BoxFit.contain,
-                            ),
-                          ),
-                        ),
+            child: Column(
+              mainAxisSize: MainAxisSize.max,
+              children: [
+                // Header moderno
+                Container(
+                  padding: EdgeInsetsDirectional.fromSTEB(12.0, 12.0, 12.0, 16.0),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFF00a86b).withOpacity(0.15),
+                        Colors.transparent,
                       ],
                     ),
-                    Container(
-                      width: double.infinity,
-                      decoration: BoxDecoration(),
-                      child: Column(
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
                         mainAxisSize: MainAxisSize.max,
-                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            'Lista de actividades',
-                            textAlign: TextAlign.center,
-                            style: FlutterFlowTheme.of(context)
-                                .bodyMedium
-                                .override(
-                                  font: GoogleFonts.inter(
-                                    fontWeight: FontWeight.bold,
-                                    fontStyle: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .fontStyle,
-                                  ),
-                                  fontSize: 18.0,
-                                  letterSpacing: 0.0,
-                                  fontWeight: FontWeight.bold,
-                                  fontStyle: FlutterFlowTheme.of(context)
-                                      .bodyMedium
-                                      .fontStyle,
-                                ),
-                          ),
-                          Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
-                                10.0, 0.0, 10.0, 0.0),
+                          // Botón Back
+                          InkWell(
+                            splashColor: Colors.transparent,
+                            focusColor: Colors.transparent,
+                            hoverColor: Colors.transparent,
+                            highlightColor: Colors.transparent,
+                            onTap: () async {
+                              context.safePop();
+                            },
                             child: Container(
-                              width: double.infinity,
+                              width: 44,
+                              height: 44,
                               decoration: BoxDecoration(
-                                boxShadow: [
-                                  BoxShadow(
-                                    blurRadius: 4.0,
-                                    color: Color(0x33000000),
-                                    offset: Offset(
-                                      0.0,
-                                      2.0,
-                                    ),
-                                  )
-                                ],
-                                borderRadius: BorderRadius.circular(16.0),
-                              ),
-                              child: Padding(
-                                padding: EdgeInsets.all(6.0),
-                                child: Container(
-                                  width: 200.0,
-                                  child: TextFormField(
-                                    controller: _model.textController,
-                                    focusNode: _model.textFieldFocusNode,
-                                    autofocus: false,
-                                    obscureText: false,
-                                    decoration: InputDecoration(
-                                      isDense: true,
-                                      labelText: 'Búsqueda por nombre',
-                                      labelStyle: FlutterFlowTheme.of(context)
-                                          .labelMedium
-                                          .override(
-                                            font: GoogleFonts.inter(
-                                              fontWeight:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelMedium
-                                                      .fontWeight,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelMedium
-                                                      .fontStyle,
-                                            ),
-                                            letterSpacing: 0.0,
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .labelMedium
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .labelMedium
-                                                    .fontStyle,
-                                          ),
-                                      alignLabelWithHint: false,
-                                      hintStyle: FlutterFlowTheme.of(context)
-                                          .labelMedium
-                                          .override(
-                                            font: GoogleFonts.inter(
-                                              fontWeight:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelMedium
-                                                      .fontWeight,
-                                              fontStyle:
-                                                  FlutterFlowTheme.of(context)
-                                                      .labelMedium
-                                                      .fontStyle,
-                                            ),
-                                            letterSpacing: 0.0,
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .labelMedium
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .labelMedium
-                                                    .fontStyle,
-                                          ),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: Color(0x00000000),
-                                          width: 1.0,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: Color(0x00000000),
-                                          width: 1.0,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                      ),
-                                      errorBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: FlutterFlowTheme.of(context)
-                                              .error,
-                                          width: 1.0,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                      ),
-                                      focusedErrorBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
-                                          color: FlutterFlowTheme.of(context)
-                                              .error,
-                                          width: 1.0,
-                                        ),
-                                        borderRadius:
-                                            BorderRadius.circular(8.0),
-                                      ),
-                                      filled: true,
-                                      fillColor: FlutterFlowTheme.of(context)
-                                          .secondaryBackground,
-                                    ),
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          font: GoogleFonts.inter(
-                                            fontWeight:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontWeight,
-                                            fontStyle:
-                                                FlutterFlowTheme.of(context)
-                                                    .bodyMedium
-                                                    .fontStyle,
-                                          ),
-                                          letterSpacing: 0.0,
-                                          fontWeight:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontWeight,
-                                          fontStyle:
-                                              FlutterFlowTheme.of(context)
-                                                  .bodyMedium
-                                                  .fontStyle,
-                                        ),
-                                    textAlign: TextAlign.center,
-                                    cursorColor: FlutterFlowTheme.of(context)
-                                        .primaryText,
-                                    validator: _model.textControllerValidator
-                                        .asValidator(context),
-                                  ),
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.white.withOpacity(0.2),
+                                    Colors.white.withOpacity(0.1),
+                                  ],
                                 ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Color(0xFF00a86b).withOpacity(0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Icon(
+                                Icons.chevron_left_rounded,
+                                color: Color(0xFF00ff9f),
+                                size: 28,
                               ),
                             ),
                           ),
-                        ].divide(SizedBox(height: 10.0)),
+                          // Logo
+                          Container(
+                            width: 140,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8.0),
+                              child: Image.asset(
+                                'assets/images/logo2_(1).png',
+                                height: 44,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                          // Espaciador para balance
+                          SizedBox(width: 44),
+                        ],
                       ),
-                    ),
-                  ].divide(SizedBox(height: 10.0)),
-                ),
-              ),
-              Expanded(
-                child: Container(
-                  width: double.infinity,
-                  height: double.infinity,
-                  decoration: BoxDecoration(),
-                  child: Padding(
-                    padding: EdgeInsets.all(10.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.max,
-                      children: [
-                        Expanded(
-                          child: Builder(
-                            builder: (context) {
-                              final activityItem = functions
-                                  .filterByModuleActivity(
-                                      FFAppState().activitiesJSON,
-                                      FFAppState().moduleSelected)
-                                  .toList();
-
-                              return ListView.separated(
-                                padding: EdgeInsets.zero,
-                                shrinkWrap: true,
-                                scrollDirection: Axis.vertical,
-                                itemCount: activityItem.length,
-                                separatorBuilder: (_, __) =>
-                                    SizedBox(height: 5.0),
-                                itemBuilder: (context, activityItemIndex) {
-                                  final activityItemItem =
-                                      activityItem[activityItemIndex];
-                                  return Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
-                                        5.0, 5.0, 5.0, 0.0),
-                                    child: InkWell(
-                                      splashColor: Colors.transparent,
-                                      focusColor: Colors.transparent,
-                                      hoverColor: Colors.transparent,
-                                      highlightColor: Colors.transparent,
-                                      onTap: () async {
-                                        FFAppState().activitySelectedJSON =
-                                            getJsonField(
-                                          activityItemItem,
-                                          r'''$''',
-                                        );
-                                        FFAppState().update(() {});
-                                        context.safePop();
-                                      },
-                                      child: Container(
-                                        width: double.infinity,
-                                        height: 50.0,
-                                        decoration: BoxDecoration(
-                                          color: FlutterFlowTheme.of(context)
-                                              .primaryBackground,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              blurRadius: 10.0,
-                                              color: Color(0x33000000),
-                                              offset: Offset(
-                                                0.0,
-                                                2.0,
+                      SizedBox(height: 16),
+                      // Título con efecto brillante
+                      ShaderMask(
+                        shaderCallback: (bounds) {
+                          return LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Color(0xFF00ff9f),
+                              Color(0xFF00a86b),
+                            ],
+                          ).createShader(bounds);
+                        },
+                        child: Text(
+                          'Lista de actividades',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1.2,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                color: Color(0xFF00a86b).withOpacity(0.5),
+                                blurRadius: 12,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 16),
+                      // Campo de búsqueda mejorado
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.white.withOpacity(0.15),
+                              Colors.white.withOpacity(0.05),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Color(0xFF00a86b).withOpacity(0.3),
+                            width: 1.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              blurRadius: 15,
+                              color: Color(0xFF00a86b).withOpacity(0.2),
+                              offset: Offset(0, 6),
+                              spreadRadius: 0,
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.search_rounded,
+                                    color: Color(0xFF00ff9f),
+                                    size: 24,
+                                  ),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextFormField(
+                                      controller: _model.textController,
+                                      focusNode: _model.textFieldFocusNode,
+                                      autofocus: false,
+                                      obscureText: false,
+                                      onChanged: (_) => safeSetState(() {}),
+                                      decoration: InputDecoration(
+                                        isDense: true,
+                                        labelText: 'Búsqueda por nombre',
+                                        labelStyle: FlutterFlowTheme.of(context)
+                                            .labelMedium
+                                            .override(
+                                              font: GoogleFonts.inter(
+                                                fontWeight: FontWeight.w500,
                                               ),
-                                            )
-                                          ],
-                                          borderRadius:
-                                              BorderRadius.circular(12.0),
-                                        ),
-                                        child: Row(
-                                          mainAxisSize: MainAxisSize.max,
-                                          children: [
-                                            Container(
-                                              decoration: BoxDecoration(),
+                                              color: Color(0xFF00ff9f).withOpacity(0.7),
+                                              letterSpacing: 0.5,
                                             ),
-                                            Expanded(
-                                              child: Padding(
-                                                padding: EdgeInsetsDirectional
-                                                    .fromSTEB(
-                                                        0.0, 5.0, 5.0, 5.0),
-                                                child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.max,
-                                                  children: [
-                                                    Expanded(
-                                                      child: Align(
-                                                        alignment:
-                                                            AlignmentDirectional(
-                                                                0.0, 0.0),
-                                                        child: Text(
-                                                          '${getJsonField(
-                                                            activityItemItem,
-                                                            r'''$.name_activity''',
-                                                          ).toString()}',
-                                                          textAlign:
-                                                              TextAlign.start,
-                                                          style: FlutterFlowTheme
-                                                                  .of(context)
-                                                              .bodyMedium
-                                                              .override(
-                                                                font:
-                                                                    GoogleFonts
-                                                                        .inter(
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold,
-                                                                  fontStyle: FlutterFlowTheme.of(
-                                                                          context)
-                                                                      .bodyMedium
-                                                                      .fontStyle,
-                                                                ),
-                                                                fontSize: 16.0,
-                                                                letterSpacing:
-                                                                    0.0,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .bold,
-                                                                fontStyle: FlutterFlowTheme.of(
-                                                                        context)
-                                                                    .bodyMedium
-                                                                    .fontStyle,
-                                                              ),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
+                                        hintStyle: FlutterFlowTheme.of(context)
+                                            .labelMedium
+                                            .override(
+                                              font: GoogleFonts.inter(),
+                                              color: Colors.white.withOpacity(0.5),
+                                              letterSpacing: 0.0,
                                             ),
-                                          ],
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        errorBorder: InputBorder.none,
+                                        focusedErrorBorder: InputBorder.none,
+                                        filled: false,
+                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                      ),
+                                      style: FlutterFlowTheme.of(context)
+                                          .bodyMedium
+                                          .override(
+                                            font: GoogleFonts.inter(
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                            color: Colors.white,
+                                            fontSize: 15,
+                                            letterSpacing: 0.3,
+                                          ),
+                                      cursorColor: Color(0xFF00ff9f),
+                                      validator: _model.textControllerValidator
+                                          .asValidator(context),
+                                    ),
+                                  ),
+                                  if (_model.textController?.text.isNotEmpty ?? false)
+                                    Padding(
+                                      padding: EdgeInsets.only(left: 4),
+                                      child: InkWell(
+                                        onTap: () {
+                                          _model.textController?.clear();
+                                          safeSetState(() {});
+                                        },
+                                        child: Icon(
+                                          Icons.clear_rounded,
+                                          color: Color(0xFF00ff9f).withOpacity(0.7),
+                                          size: 20,
                                         ),
                                       ),
                                     ),
-                                  );
-                                },
-                              );
-                            },
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ].divide(SizedBox(height: 10.0)),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 8),
+
+                // Contador de actividades
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              Color(0xFF00a86b).withOpacity(0.3),
+                              Color(0xFF00a86b).withOpacity(0.1),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Color(0xFF00a86b).withOpacity(0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.list_alt_rounded,
+                              color: Color(0xFF00ff9f),
+                              size: 18,
+                            ),
+                            SizedBox(width: 8),
+                            Text(
+                              '${filteredActivities.length} actividad${filteredActivities.length != 1 ? 'es' : ''}',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF00ff9f),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 12),
+
+                // Lista de actividades
+                Expanded(
+                  child: _isLoading
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Color(0xFF00ff9f),
+                                ),
+                              ),
+                              SizedBox(height: 16),
+                              Text(
+                                'Cargando actividades...',
+                                style: GoogleFonts.inter(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withOpacity(0.7),
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : filteredActivities.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 80,
+                                    height: 80,
+                                    decoration: BoxDecoration(
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          Color(0xFF00a86b).withOpacity(0.3),
+                                          Colors.transparent,
+                                        ],
+                                      ),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.search_off_rounded,
+                                      color: Color(0xFF00ff9f).withOpacity(0.5),
+                                      size: 40,
+                                    ),
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'No se encontraron actividades',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white.withOpacity(0.7),
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Intenta con otra búsqueda',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withOpacity(0.5),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.separated(
+                              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              shrinkWrap: true,
+                              scrollDirection: Axis.vertical,
+                              itemCount: filteredActivities.length,
+                              separatorBuilder: (_, __) => SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final activityItem = filteredActivities[index];
+                                return _buildActivityCard(
+                                  context,
+                                  activityItem: activityItem,
+                                  index: index,
+                                );
+                              },
+                            ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActivityCard(
+    BuildContext context, {
+    required ActivitiesStruct activityItem,
+    required int index,
+  }) {
+    final activityName = activityItem.nameActivity;
+
+    return InkWell(
+      splashColor: Colors.transparent,
+      focusColor: Colors.transparent,
+      hoverColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      onTap: () async {
+        // Guardar actividad seleccionada como STRUCT
+        FFAppState().activitySelected = activityItem;
+        FFAppState().update(() {});
+        context.safePop();
+      },
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withOpacity(0.15),
+              Colors.white.withOpacity(0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Color(0xFF00a86b).withOpacity(0.3),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              blurRadius: 15,
+              color: Color(0xFF00a86b).withOpacity(0.2),
+              offset: Offset(0, 6),
+              spreadRadius: 0,
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Row(
+              children: [
+                // Número de índice
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF00a86b),
+                        Color(0xFF003420),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 8,
+                        color: Color(0xFF00a86b).withOpacity(0.4),
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: GoogleFonts.inter(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+                SizedBox(width: 16),
+                // Icono de actividad
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      colors: [
+                        Color(0xFF00a86b).withOpacity(0.3),
+                        Colors.transparent,
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.task_alt_rounded,
+                    color: Color(0xFF00ff9f),
+                    size: 24,
+                  ),
+                ),
+                SizedBox(width: 16),
+                // Nombre de la actividad
+                Expanded(
+                  child: Text(
+                    activityName,
+                    style: FlutterFlowTheme.of(context).bodyMedium.override(
+                          font: GoogleFonts.inter(
+                            fontWeight: FontWeight.bold,
+                          ),
+                          color: Colors.white,
+                          fontSize: 15,
+                          letterSpacing: 0.3,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(width: 12),
+                // Icono de flecha
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.chevron_right_rounded,
+                    color: Color(0xFF00ff9f),
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

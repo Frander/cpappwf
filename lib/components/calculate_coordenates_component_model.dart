@@ -1,16 +1,25 @@
+import '/backend/schema/structs/index.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
+import 'dart:async';
+import 'dart:ui';
+import '/custom_code/actions/index.dart' as actions;
+import '/flutter_flow/custom_functions.dart' as functions;
+import '/index.dart';
 import 'calculate_coordenates_component_widget.dart'
     show CalculateCoordenatesComponentWidget;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 
 class CalculateCoordenatesComponentModel
     extends FlutterFlowModel<CalculateCoordenatesComponentWidget> {
   ///  State fields for stateful widgets in this component.
 
-  // Stores action output result for [Custom Action - getLocationList] action in CalculateCoordenatesComponent widget.
-  List<String>? locationsList;
   // State field(s) for Timer widget.
   final timerInitialTimeMs = 5000;
   int timerMilliseconds = 5000;
@@ -22,6 +31,15 @@ class CalculateCoordenatesComponentModel
   );
   FlutterFlowTimerController timerController =
       FlutterFlowTimerController(StopWatchTimer(mode: StopWatchMode.countDown));
+
+  // Stores action output result for [Custom Action - createVisit] action in Timer widget.
+  VisitsStruct? visitCreated;
+  // Stores action output result for [Custom Action - getVisitsCount] action in Timer widget.
+  int? countVisits;
+  // Stores action output result for [Custom Action - createVisit] action in Timer widget.
+  VisitsStruct? visitCreated2;
+  // Stores action output result for [Custom Action - getVisitsCount] action in Timer widget.
+  int? countVisits1;
 
   @override
   void initState(BuildContext context) {}

@@ -3,9 +3,10 @@ import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:async';
+import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
-import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -51,9 +52,8 @@ class _CalculateCoordenatesInstallComponentWidgetState
         Future(() async {
           unawaited(
             () async {
-              _model.locationsList = await actions.getLocationList(
-                8,
-                FFAppState().rinexNavFile,
+              await actions.getLocationList(
+                context,
               );
             }(),
           );
@@ -81,12 +81,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        image: DecorationImage(
-          fit: BoxFit.cover,
-          image: Image.asset(
-            'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-          ).image,
-        ),
+        color: Color(0xFF101827),
       ),
       child: Padding(
         padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
@@ -98,7 +93,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
                 child: Image.asset(
-                  'assets/images/Clickpalmlogo1-removebg-preview.png',
+                  'assets/images/logo2_(1).png',
                   width: double.infinity,
                   fit: BoxFit.contain,
                 ),
@@ -115,6 +110,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                       ),
+                      color: FlutterFlowTheme.of(context).info,
                       fontSize: 20.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,
@@ -134,6 +130,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                       ),
+                      color: FlutterFlowTheme.of(context).info,
                       fontSize: 20.0,
                       letterSpacing: 0.0,
                       fontWeight: FontWeight.bold,
@@ -151,6 +148,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                       fontStyle:
                           FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                     ),
+                    color: FlutterFlowTheme.of(context).info,
                     fontSize: 16.0,
                     letterSpacing: 0.0,
                     fontWeight: FontWeight.bold,
@@ -184,22 +182,19 @@ class _CalculateCoordenatesInstallComponentWidgetState
                   if (shouldUpdate) safeSetState(() {});
                 },
                 onEnded: () async {
-                  if (((_model.locationsList != null &&
-                              (_model.locationsList)!.isNotEmpty) !=
-                          null) &&
-                      (_model.locationsList!.length > 0)) {
+                  if ((FFAppState().geoLocationsList.length != null) &&
+                      (FFAppState().geoLocationsList.length > 0)) {
                     FFAppState().addToProductsAdd(ProductsStruct(
                       idProduct: 0,
                       rfid: ' ',
                       stateProduct: 'ACTIVE',
                       descriptionProduct: ' ',
-                      locationsAdd: _model.locationsList,
-                      line: widget.line,
-                      palm: widget.palm,
+                      line: widget!.line,
+                      palm: widget!.palm,
                     ));
                     _model.updatePage(() {});
                     await actions.speakText(
-                      'Se registró Linea ${widget.line?.toString()}, Palma ${widget.palm?.toString()}',
+                      'Se registró Linea ${widget!.line?.toString()}, Palma ${widget!.palm?.toString()}',
                     );
                     await showDialog(
                       context: context,
@@ -214,8 +209,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                             height: MediaQuery.sizeOf(context).height * 0.9,
                             width: MediaQuery.sizeOf(context).width * 0.9,
                             child: InfoDialogWidget(
-                              info: functions.listToCommaSeparatedString(
-                                  _model.locationsList!.toList()),
+                              info: 'Prueba',
                             ),
                           ),
                         );
@@ -303,6 +297,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                             .headlineSmall
                             .fontStyle,
                       ),
+                      color: FlutterFlowTheme.of(context).info,
                       fontSize: 100.0,
                       letterSpacing: 0.0,
                       fontWeight:

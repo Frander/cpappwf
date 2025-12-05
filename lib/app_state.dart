@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import '/backend/schema/structs/index.dart';
+import '/backend/schema/enums/enums.dart';
+import '/backend/api_requests/api_manager.dart';
+import '/backend/sqlite/sqlite_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'flutter_flow/flutter_flow_util.dart';
+import 'dart:convert';
 
 class FFAppState extends ChangeNotifier {
   static FFAppState _instance = FFAppState._internal();
@@ -59,6 +63,28 @@ class FFAppState extends ChangeNotifier {
           final serializedData = prefs.getString('ff_deviceDefault') ?? '{}';
           _deviceDefault =
               DevicesStruct.fromSerializableMap(jsonDecode(serializedData));
+        } catch (e) {
+          print("Can't decode persisted data type. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
+      if (prefs.containsKey('ff_activityDefault')) {
+        try {
+          final serializedData = prefs.getString('ff_activityDefault') ?? '{}';
+          _activityDefault =
+              ActivitiesStruct.fromSerializableMap(jsonDecode(serializedData));
+        } catch (e) {
+          print("Can't decode persisted data type. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
+      if (prefs.containsKey('ff_activitySelected')) {
+        try {
+          final serializedData = prefs.getString('ff_activitySelected') ?? '{}';
+          _activitySelected =
+              ActivitiesStruct.fromSerializableMap(jsonDecode(serializedData));
         } catch (e) {
           print("Can't decode persisted data type. Error: $e.");
         }
@@ -241,6 +267,26 @@ class FFAppState extends ChangeNotifier {
       }
     });
     _safeInit(() {
+      if (prefs.containsKey('ff_activitySelectedJSON')) {
+        try {
+          _activitySelectedJSON =
+              jsonDecode(prefs.getString('ff_activitySelectedJSON') ?? '');
+        } catch (e) {
+          print("Can't decode persisted json. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
+      if (prefs.containsKey('ff_currentActivity')) {
+        try {
+          _currentActivity =
+              jsonDecode(prefs.getString('ff_currentActivity') ?? '');
+        } catch (e) {
+          print("Can't decode persisted json. Error: $e.");
+        }
+      }
+    });
+    _safeInit(() {
       _activitiesStatusSelected = prefs
               .getStringList('ff_activitiesStatusSelected')
               ?.map((x) {
@@ -288,7 +334,64 @@ class FFAppState extends ChangeNotifier {
           _StatusAdd;
     });
     _safeInit(() {
-      _rinexNavFile = prefs.getString('ff_rinexNavFile') ?? _rinexNavFile;
+      _sp3NavFile = prefs.getString('ff_sp3NavFile') ?? _sp3NavFile;
+    });
+    _safeInit(() {
+      _geoLocationsList = prefs
+              .getStringList('ff_geoLocationsList')
+              ?.map((x) {
+                try {
+                  return ReadGeoStruct.fromSerializableMap(jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _geoLocationsList;
+    });
+    _safeInit(() {
+      _visitDetails = prefs
+              .getStringList('ff_visitDetails')
+              ?.map((x) {
+                try {
+                  return VisitsDetailsStruct.fromSerializableMap(jsonDecode(x));
+                } catch (e) {
+                  print("Can't decode persisted data type. Error: $e.");
+                  return null;
+                }
+              })
+              .withoutNulls
+              .toList() ??
+          _visitDetails;
+    });
+    _safeInit(() {
+      _pathPmtiles = prefs.getString('ff_pathPmtiles') ?? _pathPmtiles;
+    });
+    _safeInit(() {
+      _routeConfigStartLine =
+          prefs.getInt('ff_routeConfigStartLine') ?? _routeConfigStartLine;
+    });
+    _safeInit(() {
+      _routeConfigStartPoint =
+          prefs.getInt('ff_routeConfigStartPoint') ?? _routeConfigStartPoint;
+    });
+    _safeInit(() {
+      _routeConfigMaxLines =
+          prefs.getInt('ff_routeConfigMaxLines') ?? _routeConfigMaxLines;
+    });
+    _safeInit(() {
+      _routeConfigMaxPoints =
+          prefs.getInt('ff_routeConfigMaxPoints') ?? _routeConfigMaxPoints;
+    });
+    _safeInit(() {
+      _routeConfigPattern =
+          prefs.getInt('ff_routeConfigPattern') ?? _routeConfigPattern;
+    });
+    _safeInit(() {
+      _routeConfigErrorMargin = prefs.getDouble('ff_routeConfigErrorMargin') ??
+          _routeConfigErrorMargin;
     });
   }
 
@@ -359,6 +462,36 @@ class FFAppState extends ChangeNotifier {
   void updateDeviceDefaultStruct(Function(DevicesStruct) updateFn) {
     updateFn(_deviceDefault);
     prefs.setString('ff_deviceDefault', _deviceDefault.serialize());
+  }
+
+  ActivitiesStruct _activityDefault = ActivitiesStruct();
+  ActivitiesStruct get activityDefault => _activityDefault;
+  set activityDefault(ActivitiesStruct value) {
+    _activityDefault = value;
+    prefs.setString('ff_activityDefault', value.serialize());
+  }
+
+  void updateActivityDefaultStruct(Function(ActivitiesStruct) updateFn) {
+    updateFn(_activityDefault);
+    prefs.setString('ff_activityDefault', _activityDefault.serialize());
+  }
+
+  // Actividad seleccionada (STRUCT - reemplaza activitySelectedJSON)
+  ActivitiesStruct _activitySelected = ActivitiesStruct();
+  ActivitiesStruct get activitySelected => _activitySelected;
+  set activitySelected(ActivitiesStruct value) {
+    _activitySelected = value;
+    prefs.setString('ff_activitySelected', value.serialize());
+  }
+
+  void updateActivitySelectedStruct(Function(ActivitiesStruct) updateFn) {
+    updateFn(_activitySelected);
+    prefs.setString('ff_activitySelected', _activitySelected.serialize());
+  }
+
+  void clearActivitySelected() {
+    _activitySelected = ActivitiesStruct();
+    prefs.remove('ff_activitySelected');
   }
 
   List<HeadquartersStruct> _headquartersList = [];
@@ -633,6 +766,7 @@ class FFAppState extends ChangeNotifier {
   dynamic get activitySelectedJSON => _activitySelectedJSON;
   set activitySelectedJSON(dynamic value) {
     _activitySelectedJSON = value;
+    prefs.setString('ff_activitySelectedJSON', jsonEncode(value));
   }
 
   String _pathDatabase = '';
@@ -667,6 +801,15 @@ class FFAppState extends ChangeNotifier {
   bool get stopVoice => _stopVoice;
   set stopVoice(bool value) {
     _stopVoice = value;
+  }
+
+  // Variable para guardar la preferencia de generar ruta óptima durante la sesión
+  // null = no se ha preguntado aún, true/false = preferencia guardada
+  // NO se persiste para que se resetee al reiniciar la app
+  bool? _shouldGenerateOptimalRoute;
+  bool? get shouldGenerateOptimalRoute => _shouldGenerateOptimalRoute;
+  set shouldGenerateOptimalRoute(bool? value) {
+    _shouldGenerateOptimalRoute = value;
   }
 
   bool _isCalibrateVoice = false;
@@ -1013,11 +1156,192 @@ class FFAppState extends ChangeNotifier {
         'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
   }
 
-  String _rinexNavFile = '';
-  String get rinexNavFile => _rinexNavFile;
-  set rinexNavFile(String value) {
-    _rinexNavFile = value;
-    prefs.setString('ff_rinexNavFile', value);
+  String _sp3NavFile = '';
+  String get sp3NavFile => _sp3NavFile;
+  set sp3NavFile(String value) {
+    _sp3NavFile = value;
+    prefs.setString('ff_sp3NavFile', value);
+  }
+
+  List<ReadGeoStruct> _geoLocationsList = [];
+  List<ReadGeoStruct> get geoLocationsList => _geoLocationsList;
+  set geoLocationsList(List<ReadGeoStruct> value) {
+    _geoLocationsList = value;
+    prefs.setStringList(
+        'ff_geoLocationsList', value.map((x) => x.serialize()).toList());
+  }
+
+  void addToGeoLocationsList(ReadGeoStruct value) {
+    geoLocationsList.add(value);
+    prefs.setStringList('ff_geoLocationsList',
+        _geoLocationsList.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromGeoLocationsList(ReadGeoStruct value) {
+    geoLocationsList.remove(value);
+    prefs.setStringList('ff_geoLocationsList',
+        _geoLocationsList.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromGeoLocationsList(int index) {
+    geoLocationsList.removeAt(index);
+    prefs.setStringList('ff_geoLocationsList',
+        _geoLocationsList.map((x) => x.serialize()).toList());
+  }
+
+  void updateGeoLocationsListAtIndex(
+    int index,
+    ReadGeoStruct Function(ReadGeoStruct) updateFn,
+  ) {
+    geoLocationsList[index] = updateFn(_geoLocationsList[index]);
+    prefs.setStringList('ff_geoLocationsList',
+        _geoLocationsList.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInGeoLocationsList(int index, ReadGeoStruct value) {
+    geoLocationsList.insert(index, value);
+    prefs.setStringList('ff_geoLocationsList',
+        _geoLocationsList.map((x) => x.serialize()).toList());
+  }
+
+  List<VisitsDetailsStruct> _visitDetails = [];
+  List<VisitsDetailsStruct> get visitDetails => _visitDetails;
+  set visitDetails(List<VisitsDetailsStruct> value) {
+    _visitDetails = value;
+    prefs.setStringList(
+        'ff_visitDetails', value.map((x) => x.serialize()).toList());
+  }
+
+  void addToVisitDetails(VisitsDetailsStruct value) {
+    visitDetails.add(value);
+    prefs.setStringList(
+        'ff_visitDetails', _visitDetails.map((x) => x.serialize()).toList());
+  }
+
+  void removeFromVisitDetails(VisitsDetailsStruct value) {
+    visitDetails.remove(value);
+    prefs.setStringList(
+        'ff_visitDetails', _visitDetails.map((x) => x.serialize()).toList());
+  }
+
+  void removeAtIndexFromVisitDetails(int index) {
+    visitDetails.removeAt(index);
+    prefs.setStringList(
+        'ff_visitDetails', _visitDetails.map((x) => x.serialize()).toList());
+  }
+
+  void updateVisitDetailsAtIndex(
+    int index,
+    VisitsDetailsStruct Function(VisitsDetailsStruct) updateFn,
+  ) {
+    visitDetails[index] = updateFn(_visitDetails[index]);
+    prefs.setStringList(
+        'ff_visitDetails', _visitDetails.map((x) => x.serialize()).toList());
+  }
+
+  void insertAtIndexInVisitDetails(int index, VisitsDetailsStruct value) {
+    visitDetails.insert(index, value);
+    prefs.setStringList(
+        'ff_visitDetails', _visitDetails.map((x) => x.serialize()).toList());
+  }
+
+  bool _isStabilized = false;
+  bool get isStabilized => _isStabilized;
+  set isStabilized(bool value) {
+    _isStabilized = value;
+  }
+
+  int _totalStepsActivity = 0;
+  int get totalStepsActivity => _totalStepsActivity;
+  set totalStepsActivity(int value) {
+    _totalStepsActivity = value;
+  }
+
+  int _countStepsActivity = 0;
+  int get countStepsActivity => _countStepsActivity;
+  set countStepsActivity(int value) {
+    _countStepsActivity = value;
+  }
+
+  dynamic _currentActivity;
+  dynamic get currentActivity => _currentActivity;
+  set currentActivity(dynamic value) {
+    _currentActivity = value;
+    prefs.setString('ff_currentActivity', jsonEncode(value));
+  }
+
+  int _visitCount = 0;
+  int get visitCount => _visitCount;
+  set visitCount(int value) {
+    _visitCount = value;
+  }
+
+  String _pathPmtiles = ' ';
+  String get pathPmtiles => _pathPmtiles;
+  set pathPmtiles(String value) {
+    _pathPmtiles = value;
+    prefs.setString('ff_pathPmtiles', value);
+  }
+
+  int _routeConfigStartLine = 0;
+  int get routeConfigStartLine => _routeConfigStartLine;
+  set routeConfigStartLine(int value) {
+    _routeConfigStartLine = value;
+    prefs.setInt('ff_routeConfigStartLine', value);
+  }
+
+  int _routeConfigStartPoint = 0;
+  int get routeConfigStartPoint => _routeConfigStartPoint;
+  set routeConfigStartPoint(int value) {
+    _routeConfigStartPoint = value;
+    prefs.setInt('ff_routeConfigStartPoint', value);
+  }
+
+  int _routeConfigMaxLines = 0;
+  int get routeConfigMaxLines => _routeConfigMaxLines;
+  set routeConfigMaxLines(int value) {
+    _routeConfigMaxLines = value;
+    prefs.setInt('ff_routeConfigMaxLines', value);
+  }
+
+  int _routeConfigMaxPoints = 0;
+  int get routeConfigMaxPoints => _routeConfigMaxPoints;
+  set routeConfigMaxPoints(int value) {
+    _routeConfigMaxPoints = value;
+    prefs.setInt('ff_routeConfigMaxPoints', value);
+  }
+
+  int _routeConfigPattern = 0;
+  int get routeConfigPattern => _routeConfigPattern;
+  set routeConfigPattern(int value) {
+    _routeConfigPattern = value;
+    prefs.setInt('ff_routeConfigPattern', value);
+  }
+
+  double _routeConfigErrorMargin = 0.0;
+  double get routeConfigErrorMargin => _routeConfigErrorMargin;
+  set routeConfigErrorMargin(double value) {
+    _routeConfigErrorMargin = value;
+    prefs.setDouble('ff_routeConfigErrorMargin', value);
+  }
+
+  String _printerMacAddress = '';
+  String get printerMacAddress => _printerMacAddress;
+  set printerMacAddress(String value) {
+    _printerMacAddress = value;
+  }
+
+  String _printerName = '';
+  String get printerName => _printerName;
+  set printerName(String value) {
+    _printerName = value;
+  }
+
+  // Caché temporal del formulario (no persistido)
+  Map<String, dynamic> _formCacheMap = {};
+  Map<String, dynamic> get formCacheMap => _formCacheMap;
+  set formCacheMap(Map<String, dynamic> value) {
+    _formCacheMap = value;
   }
 }
 
