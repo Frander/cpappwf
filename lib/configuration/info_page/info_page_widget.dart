@@ -1,4 +1,4 @@
-import '/components/info_dialog_widget.dart';
+﻿import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -6,7 +6,7 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'info_page_model.dart';
 export 'info_page_model.dart';
@@ -113,7 +113,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                         style: FlutterFlowTheme.of(context)
                                             .bodyMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.bold,
                                                 fontStyle:
                                                     FlutterFlowTheme.of(context)
@@ -312,7 +312,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -336,7 +336,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                 style: FlutterFlowTheme.of(context)
                                     .bodyMedium
                                     .override(
-                                      font: GoogleFonts.inter(
+                                      font: TextStyle(fontFamily: 'Roboto',
                                         fontWeight: FontWeight.bold,
                                         fontStyle: FlutterFlowTheme.of(context)
                                             .bodyMedium
@@ -361,7 +361,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                 style: FlutterFlowTheme.of(context)
                                     .bodyMedium
                                     .override(
-                                      font: GoogleFonts.inter(
+                                      font: TextStyle(fontFamily: 'Roboto',
                                         fontWeight: FontWeight.bold,
                                         fontStyle: FlutterFlowTheme.of(context)
                                             .bodyMedium
@@ -499,7 +499,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -528,7 +528,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -556,7 +556,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -584,7 +584,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -662,7 +662,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -691,7 +691,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -719,7 +719,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -747,7 +747,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -775,7 +775,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -803,7 +803,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -898,7 +898,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -984,7 +984,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:

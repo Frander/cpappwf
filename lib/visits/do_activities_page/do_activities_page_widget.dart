@@ -1,4 +1,4 @@
-import '/components/info_dialog_widget.dart';
+﻿import '/components/info_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/advanced_sync_dialog_widget.dart';
@@ -20,7 +20,7 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
@@ -978,7 +978,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                   SizedBox(width: 16),
                                   Text(
                                     'Realizar visitas',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 22,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 1.0,
@@ -1013,7 +1013,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                               SizedBox(width: 6),
                               Text(
                                 'Mantén presionado para opciones avanzadas',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
                                   color: Colors.white.withOpacity(0.5),
@@ -1142,7 +1142,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                         style: FlutterFlowTheme.of(context)
                                             .bodyMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.bold,
                                               ),
                                               color: Colors.white,
@@ -1162,7 +1162,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                         style: FlutterFlowTheme.of(context)
                                             .bodyMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               color:
@@ -1247,7 +1247,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
               child: Center(
                 child: Text(
                   stepNumber,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
@@ -1277,7 +1277,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
               child: Text(
                 title,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      font: GoogleFonts.inter(
+                      font: TextStyle(fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                       ),
                       color: Colors.white,
@@ -1366,7 +1366,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                       Text(
                         title,
                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                              font: GoogleFonts.inter(
+                              font: TextStyle(fontFamily: 'Roboto',
                                 fontWeight: FontWeight.bold,
                               ),
                               color: Color(0xFF00ff9f),
@@ -1378,7 +1378,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                       Text(
                         subtitle,
                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                              font: GoogleFonts.inter(
+                              font: TextStyle(fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w500,
                               ),
                               color: Colors.white.withOpacity(0.8),

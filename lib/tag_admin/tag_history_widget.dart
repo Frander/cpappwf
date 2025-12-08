@@ -1,8 +1,8 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -120,20 +120,20 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
             SizedBox(width: 12),
             Text(
               '¿Borrar historial?',
-              style: GoogleFonts.inter(color: Colors.white, fontSize: 18),
+              style: TextStyle(fontFamily: 'Roboto',color: Colors.white, fontSize: 18),
             ),
           ],
         ),
         content: Text(
           'Se eliminarán todos los registros de TAGs leídos. Esta acción no se puede deshacer.',
-          style: GoogleFonts.inter(color: Colors.white70, fontSize: 14),
+          style: TextStyle(fontFamily: 'Roboto',color: Colors.white70, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text(
               'Cancelar',
-              style: GoogleFonts.inter(color: Colors.white60),
+              style: TextStyle(fontFamily: 'Roboto',color: Colors.white60),
             ),
           ),
           ElevatedButton(
@@ -146,7 +146,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
             ),
             child: Text(
               'Borrar',
-              style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.bold),
+              style: TextStyle(fontFamily: 'Roboto',color: Colors.white, fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -232,7 +232,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
             SizedBox(width: 12),
             Text(
               'Historial de TAGs NFC',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -289,7 +289,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                               Expanded(
                                 child: Text(
                                   '${_filteredTags.length} de ${_tagHistory.length} TAG${_tagHistory.length == 1 ? '' : 's'}',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 12,
                                     color: Colors.white60,
                                   ),
@@ -319,7 +319,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                                       SizedBox(height: 16),
                                       Text(
                                         'No hay TAGs de este tipo',
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                           color: Colors.white70,
@@ -410,7 +410,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                     SizedBox(width: 8),
                     Text(
                       filter['label'] as String,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 13,
                         fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                         color: isSelected
@@ -448,7 +448,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
           SizedBox(height: 24),
           Text(
             'Sin TAGs leídos',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -460,7 +460,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
             child: Text(
               'Lee tu primer TAG NFC para ver el historial aquí',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white60,
               ),
@@ -498,7 +498,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               children: [
                 Text(
                   '${percentage.toStringAsFixed(1)}%',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -506,7 +506,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                 ),
                 Text(
                   '${usedSpace}B',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 9,
                     color: Colors.white70,
                   ),
@@ -586,7 +586,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                     ),
                     child: Text(
                       '×$readCount',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: Colors.white70,
@@ -600,7 +600,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
             // Tipo de TAG
             Text(
               tagType,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
                 color: color,
@@ -619,7 +619,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               ),
               child: Text(
                 tagId,
-                style: GoogleFonts.jetBrainsMono(
+                style: TextStyle(fontFamily: 'Roboto Mono',
                   fontSize: 10,
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
@@ -639,7 +639,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                     SizedBox(height: 4),
                     Text(
                       'Espacio: ${usedSpace}/${totalSpace} bytes',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 10,
                         color: Colors.white60,
                       ),
@@ -663,7 +663,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                     children: [
                       Text(
                         formattedDate,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 11,
                           color: Colors.white70,
                           fontWeight: FontWeight.w600,
@@ -671,7 +671,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                       ),
                       Text(
                         formattedTime,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 10,
                           color: Colors.white60,
                         ),

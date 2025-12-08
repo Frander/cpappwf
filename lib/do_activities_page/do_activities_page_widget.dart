@@ -1,4 +1,4 @@
-import '/components/info_dialog_widget.dart';
+﻿import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
@@ -6,7 +6,7 @@ import '/index.dart';
 import 'package:styled_divider/styled_divider.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'do_activities_page_model.dart';
 export 'do_activities_page_model.dart';
@@ -111,7 +111,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -199,7 +199,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.bold,
                                               fontStyle:
                                                   FlutterFlowTheme.of(context)
@@ -260,7 +260,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -341,7 +341,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.bold,
                                               fontStyle:
                                                   FlutterFlowTheme.of(context)
@@ -395,7 +395,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -477,7 +477,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.bold,
                                               fontStyle:
                                                   FlutterFlowTheme.of(context)
@@ -537,7 +537,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -740,7 +740,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(
@@ -840,7 +840,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -884,7 +884,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.w800,
                                                             fontStyle:
@@ -998,7 +998,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -1035,7 +1035,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:

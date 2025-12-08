@@ -1,4 +1,4 @@
-import '/components/calculate_coordenates_component_widget.dart';
+﻿import '/components/calculate_coordenates_component_widget.dart';
 import '/components/read_n_f_c_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -7,7 +7,7 @@ import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'details_visit_page_model.dart';
 export 'details_visit_page_model.dart';
@@ -89,7 +89,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.w600,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -112,7 +112,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.w600,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -187,8 +187,8 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                               .of(context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w600,
@@ -225,8 +225,8 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                               .of(context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w600,
@@ -314,7 +314,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -491,7 +491,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:

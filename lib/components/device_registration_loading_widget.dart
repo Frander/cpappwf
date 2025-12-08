@@ -1,7 +1,7 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'dart:math' as math;
 
 class DeviceRegistrationLoadingWidget extends StatefulWidget {
@@ -152,7 +152,7 @@ class _DeviceRegistrationLoadingWidgetState
                       padding: EdgeInsets.symmetric(horizontal: 40),
                       child: Text(
                         widget.message,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,

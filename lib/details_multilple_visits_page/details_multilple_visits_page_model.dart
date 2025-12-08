@@ -6,7 +6,6 @@ import '/custom_code/actions/index.dart' as actions;
 import 'details_multilple_visits_page_widget.dart'
     show DetailsMultilpleVisitsPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class DetailsMultilpleVisitsPageModel

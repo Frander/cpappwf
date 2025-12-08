@@ -1,4 +1,4 @@
-import '/activities/status_activity_main/status_activity_main_widget.dart';
+﻿import '/activities/status_activity_main/status_activity_main_widget.dart';
 import '/activities/steps_activity_main/steps_activity_main_widget.dart';
 import '/backend/schema/structs/index.dart';
 import '/components/calculate_coordenates_component_widget.dart';
@@ -17,7 +17,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'steps_main_model.dart';
 export 'steps_main_model.dart';
@@ -229,7 +229,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FlutterFlowTheme.of(
                                                                         context)
@@ -279,8 +279,8 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .headlineSmall
                                                       .override(
-                                                        font: GoogleFonts
-                                                            .interTight(
+                                                        font: TextStyle(
+                                                          fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -403,7 +403,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                   FlutterFlowTheme.of(context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.w600,
                                                           fontStyle:
@@ -486,7 +486,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                         .bodyLarge
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.w600,
                                                             fontStyle:
@@ -537,8 +537,8 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                               .of(context)
                                                           .bodyLarge
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .bold,
@@ -700,8 +700,8 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                               .bodyMedium
                                                               .override(
                                                                 font:
-                                                                    GoogleFonts
-                                                                        .inter(
+                                                                    TextStyle(
+                                                                  fontFamily: 'Roboto',
                                                                   fontWeight: FlutterFlowTheme.of(
                                                                           context)
                                                                       .bodyMedium
@@ -835,8 +835,8 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           .of(context)
                                                       .titleSmall
                                                       .override(
-                                                        font: GoogleFonts
-                                                            .interTight(
+                                                        font: TextStyle(
+                                                          fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.normal,
                                                           fontStyle:
@@ -1141,7 +1141,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -1275,7 +1275,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -1409,7 +1409,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -1543,7 +1543,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -1677,7 +1677,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)
@@ -1845,7 +1845,7 @@ class _StepsMainWidgetState extends State<StepsMainWidget> {
                                                           context)
                                                       .bodyLarge
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FlutterFlowTheme.of(
                                                                       context)

@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -6,7 +6,7 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'details_info_page_model.dart';
 export 'details_info_page_model.dart';
@@ -117,7 +117,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -150,7 +150,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                             FlutterFlowTheme.of(context).secondaryText,
                         labelStyle:
                             FlutterFlowTheme.of(context).titleMedium.override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .titleMedium
                                         .fontWeight,
@@ -168,7 +168,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                 ),
                         unselectedLabelStyle:
                             FlutterFlowTheme.of(context).titleMedium.override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .titleMedium
                                         .fontWeight,
@@ -364,7 +364,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                       ).toString()}',
                                                                                       textAlign: TextAlign.center,
                                                                                       style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                            font: GoogleFonts.inter(
+                                                                                            font: TextStyle(fontFamily: 'Roboto',
                                                                                               fontWeight: FontWeight.bold,
                                                                                               fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                                                                                             ),
@@ -408,7 +408,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                               ).toString()}',
                                                                                               textAlign: TextAlign.center,
                                                                                               style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                                    font: GoogleFonts.inter(
+                                                                                                    font: TextStyle(fontFamily: 'Roboto',
                                                                                                       fontWeight: FontWeight.bold,
                                                                                                       fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                                                                                                     ),
@@ -547,8 +547,8 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                               .bodyMedium
                                                               .override(
                                                                 font:
-                                                                    GoogleFonts
-                                                                        .inter(
+                                                                    TextStyle(
+                                                                  fontFamily: 'Roboto',
                                                                   fontWeight:
                                                                       FontWeight
                                                                           .bold,
@@ -682,7 +682,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                         'a',
                                                                                         textAlign: TextAlign.center,
                                                                                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                              font: GoogleFonts.inter(
+                                                                                              font: TextStyle(fontFamily: 'Roboto',
                                                                                                 fontWeight: FontWeight.bold,
                                                                                                 fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                                                                                               ),
@@ -703,7 +703,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                         ),
                                                                                         textAlign: TextAlign.center,
                                                                                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                              font: GoogleFonts.inter(
+                                                                                              font: TextStyle(fontFamily: 'Roboto',
                                                                                                 fontWeight: FontWeight.bold,
                                                                                                 fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                                                                                               ),
@@ -727,7 +727,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                         'a',
                                                                                         textAlign: TextAlign.center,
                                                                                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                              font: GoogleFonts.inter(
+                                                                                              font: TextStyle(fontFamily: 'Roboto',
                                                                                                 fontWeight: FontWeight.bold,
                                                                                                 fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                                                                                               ),
@@ -744,7 +744,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                         'Coordenadas ${visitAddItemItem.locationsAdd.length.toString()}',
                                                                                         textAlign: TextAlign.center,
                                                                                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                                                                                              font: GoogleFonts.inter(
+                                                                                              font: TextStyle(fontFamily: 'Roboto',
                                                                                                 fontWeight: FontWeight.bold,
                                                                                                 fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
                                                                                               ),

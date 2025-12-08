@@ -2,12 +2,14 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/components/gps_quality_indicator_widget.dart';
+import '/components/calibration_required_dialog_widget.dart';
+import '/components/modern_calibrate_compass_widget.dart';
+import '/custom_code/actions/index.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
@@ -119,6 +121,18 @@ class _HomePageWidgetState extends State<HomePageWidget>
       await _loadLastVisitDate();
       await _loadActivityMetrics();
       _userBadgeController.forward();
+
+      // Iniciar servicio de geolocalización en segundo plano
+      debugPrint('🚀 Iniciando servicio de geolocalización en segundo plano desde HomePage...');
+      try {
+        await startBackgroundLocationService();
+        debugPrint('✅ Servicio de geolocalización iniciado correctamente');
+      } catch (e) {
+        debugPrint('⚠️ Error al iniciar servicio de geolocalización: $e');
+      }
+
+      // Verificar si se necesita calibración
+      await _checkAndShowCalibrationDialog();
     });
 
     // Listener para búsqueda en tiempo real
@@ -271,6 +285,45 @@ class _HomePageWidgetState extends State<HomePageWidget>
       }).toList();
       _showSearchPreview = true;
     });
+  }
+
+  // Verificar y mostrar diálogo de calibración si es necesario
+  Future<void> _checkAndShowCalibrationDialog() async {
+    try {
+      // Verificar si se necesita calibración usando la custom action
+      final needsCalibration = await checkCalibrationNeeded();
+
+      if (needsCalibration && mounted) {
+        // Mostrar el diálogo de calibración
+        await showDialog(
+          context: context,
+          barrierDismissible: false, // No se puede cerrar tocando fuera
+          builder: (dialogContext) => CalibrationRequiredDialogWidget(
+            onCalibrateNow: () async {
+              // Cerrar el diálogo de aviso
+              Navigator.of(dialogContext).pop();
+
+              // Abrir el diálogo de calibración
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (calibrateContext) => Dialog(
+                  insetPadding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  child: Container(
+                    height: MediaQuery.sizeOf(context).height * 0.95,
+                    width: MediaQuery.sizeOf(context).width * 0.95,
+                    child: ModernCalibrateCompassWidget(),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error al verificar calibración: $e');
+    }
   }
 
   // Seleccionar actividad - actualiza inmediatamente el AppState
@@ -485,7 +538,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     child: Center(
                       child: Text(
                         _getUserInitials(),
-                        style: GoogleFonts.inter(
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
@@ -504,7 +558,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       children: [
                         Text(
                           'Bienvenido',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                             color: Colors.white.withOpacity(0.7),
@@ -514,7 +569,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                         SizedBox(height: 4),
                         Text(
                           userName.isNotEmpty ? userName : 'Usuario',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
@@ -532,7 +588,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                           ),
                           child: Text(
                             _lastVisitDate,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
                               color: Color(0xFF00ff9f),
@@ -630,7 +687,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                   children: [
                     Text(
                       'Información y sincronización',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         fontSize: 14,
@@ -643,7 +701,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                               (FFAppState().productsAdd.length > 0)
                           ? 'Hay información pendiente'
                           : 'Sin información pendiente',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
                         color: Colors.white.withOpacity(0.85),
                         fontSize: 11,
@@ -705,7 +764,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                           constraints: BoxConstraints(maxWidth: 100),
                           child: Text(
                             _selectedActivity!['Name_activity'] as String? ?? '',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
                               color: Colors.white,
@@ -802,14 +862,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                       child: TextField(
                                         controller: _model.searchController,
                                         focusNode: _model.searchFocusNode,
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(
+                                          fontFamily: 'Roboto',
                                           color: Colors.white,
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                         ),
                                         decoration: InputDecoration(
                                           hintText: 'Buscar actividad...',
-                                          hintStyle: GoogleFonts.inter(
+                                          hintStyle: TextStyle(
+                                            fontFamily: 'Roboto',
                                             color: Colors.white.withOpacity(0.5),
                                             fontSize: 16,
                                           ),
@@ -938,7 +1000,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                                           Expanded(
                                                             child: Text(
                                                               activity['Name_activity'] as String? ?? '',
-                                                              style: GoogleFonts.inter(
+                                                              style: TextStyle(
+                                                                fontFamily: 'Roboto',
                                                                 color: Colors.white,
                                                                 fontSize: 15,
                                                                 fontWeight: FontWeight.w600,
@@ -1069,7 +1132,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
             padding: EdgeInsets.only(left: 4, bottom: 12),
             child: Text(
               'Módulos rápidos',
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -1141,7 +1205,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                               SizedBox(height: 6),
                               Text(
                                 'VER MÁS',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
                                   fontSize: 13,
                                   fontWeight: FontWeight.w900,
                                   color: Color(0xFF00ff9f),
@@ -1235,7 +1300,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 Expanded(
                   child: Text(
                     module['title'] as String,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -1276,7 +1342,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
           child: Center(
             child: Text(
               'Sin actividades registradas',
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 color: Colors.white.withOpacity(0.6),
                 fontSize: 14,
               ),
@@ -1296,7 +1363,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
             padding: EdgeInsets.only(left: 4, bottom: 12),
             child: Text(
               'Resumen de Actividades',
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 20,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
@@ -1399,7 +1467,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 Expanded(
                   child: Text(
                     activity.activityName,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -1471,7 +1540,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                   SizedBox(width: 6),
                   Text(
                     _formatDateRange(activity.firstDate, activity.lastDate),
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 10,
                       color: Colors.white.withOpacity(0.8),
                       fontWeight: FontWeight.w500,
@@ -1506,7 +1576,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
             children: [
               Text(
                 value,
-                style: GoogleFonts.orbitron(
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: color,
@@ -1514,7 +1585,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
               ),
               Text(
                 label,
-                style: GoogleFonts.inter(
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 10,
                   color: Colors.white.withOpacity(0.7),
                   fontWeight: FontWeight.w500,
@@ -1533,7 +1605,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
       return Center(
         child: Text(
           'Sin datos',
-          style: GoogleFonts.inter(
+          style: TextStyle(
+            fontFamily: 'Roboto',
             color: Colors.white.withOpacity(0.5),
             fontSize: 12,
           ),
@@ -1558,7 +1631,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
               children: [
                 Text(
                   total.toString(),
-                  style: GoogleFonts.orbitron(
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -1566,7 +1640,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 ),
                 Text(
                   'Total',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 10,
                     color: Colors.white.withOpacity(0.7),
                   ),
@@ -1598,7 +1673,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
             SnackBar(
               content: Text(
                 'Debes tener un usuario registrado para realizar actividades',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
               ),
               backgroundColor: FlutterFlowTheme.of(context).error,
               duration: Duration(seconds: 3),
@@ -1639,7 +1714,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
           SizedBox(width: 8),
           Text(
             'REALIZAR VISITAS',
-            style: GoogleFonts.inter(
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 15,
               fontWeight: FontWeight.w900,
               color: Colors.white,

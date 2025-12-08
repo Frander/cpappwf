@@ -5,7 +5,6 @@ import 'dart:ui';
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import 'map_visits_page_widget.dart' show MapVisitsPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class MapVisitsPageModel extends FlutterFlowModel<MapVisitsPageWidget> {

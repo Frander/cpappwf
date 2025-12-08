@@ -12,8 +12,9 @@ import 'package:flutter/material.dart';
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -220,6 +221,9 @@ class _HTMLPreviewScreenState extends State<HTMLPreviewScreen> {
       _isPrinting = true;
     });
 
+    BluetoothDevice? connectedDevice;
+    BluetoothCharacteristic? writeCharacteristic;
+
     try {
       // Obtener la impresora guardada (primero desde AppState, luego SharedPreferences)
       String? printerMac = FFAppState().printerMacAddress;
@@ -248,13 +252,46 @@ class _HTMLPreviewScreenState extends State<HTMLPreviewScreen> {
         return;
       }
 
-      // Conectar a la impresora Bluetooth
+      // Verificar que Bluetooth esté encendido
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
+        _showErrorDialog('Bluetooth desactivado',
+            'Por favor, activa el Bluetooth para conectar con la impresora.');
+        return;
+      }
+
+      // Conectar a la impresora Bluetooth usando flutter_blue_plus
       debugPrint('🖨️ Conectando a impresora: $printerMac');
 
-      BluetoothConnection? connection;
       try {
-        connection = await BluetoothConnection.toAddress(printerMac);
+        // Crear dispositivo desde MAC address
+        connectedDevice = BluetoothDevice.fromId(printerMac);
+
+        // Conectar al dispositivo
+        await connectedDevice.connect(timeout: const Duration(seconds: 15));
         debugPrint('✅ Conectado a la impresora');
+
+        // Descubrir servicios
+        final services = await connectedDevice.discoverServices();
+        debugPrint('📋 Servicios descubiertos: ${services.length}');
+
+        // Buscar característica de escritura para impresión
+        // Las impresoras térmicas BLE generalmente usan estos UUIDs comunes
+        for (final service in services) {
+          for (final characteristic in service.characteristics) {
+            if (characteristic.properties.write ||
+                characteristic.properties.writeWithoutResponse) {
+              writeCharacteristic = characteristic;
+              debugPrint('✅ Característica de escritura encontrada: ${characteristic.uuid}');
+              break;
+            }
+          }
+          if (writeCharacteristic != null) break;
+        }
+
+        if (writeCharacteristic == null) {
+          throw Exception('No se encontró característica de escritura en la impresora');
+        }
 
         // Convertir HTML a texto plano para imprimir
         final printableText = await _htmlToPlainText(widget.htmlContent);
@@ -275,9 +312,16 @@ class _HTMLPreviewScreenState extends State<HTMLPreviewScreen> {
         bytes.addAll([0x0A, 0x0A, 0x0A]); // Line feeds
         bytes.addAll([0x1D, 0x56, 0x41, 0x00]); // GS V - Cut paper
 
-        // Enviar a la impresora
-        connection.output.add(Uint8List.fromList(bytes));
-        await connection.output.allSent;
+        // Enviar a la impresora en chunks (BLE tiene límite de MTU)
+        final data = Uint8List.fromList(bytes);
+        const chunkSize = 20; // Tamaño típico de MTU para BLE
+
+        for (int i = 0; i < data.length; i += chunkSize) {
+          final end = (i + chunkSize < data.length) ? i + chunkSize : data.length;
+          final chunk = data.sublist(i, end);
+          await writeCharacteristic.write(chunk, withoutResponse: true);
+          await Future.delayed(const Duration(milliseconds: 20)); // Pequeña pausa entre chunks
+        }
 
         debugPrint('✅ Impresión completada');
 
@@ -296,7 +340,12 @@ class _HTMLPreviewScreenState extends State<HTMLPreviewScreen> {
         _showErrorDialog('Error de conexión',
             'No se pudo conectar a la impresora. Verifica que esté encendida y cerca del dispositivo.\n\nError: $e');
       } finally {
-        connection?.dispose();
+        // Desconectar dispositivo
+        try {
+          await connectedDevice?.disconnect();
+        } catch (e) {
+          debugPrint('⚠️ Error al desconectar: $e');
+        }
       }
     } catch (e) {
       debugPrint('❌ Error general: $e');

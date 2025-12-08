@@ -1,11 +1,11 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'nfc_read_dialog_model.dart';
@@ -97,7 +97,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                   Expanded(
                     child: Text(
                       'Contenido inválido detectado. TAG limpiado automáticamente',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -248,7 +248,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                   Text(
                     '¿Eliminar contenido del tag?',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -260,7 +260,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                   Text(
                     'Se encontraron ${_model.parsedRecords.length} registro(s) en el tag. ¿Desea eliminar todo el contenido?',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       color: Colors.white.withOpacity(0.7),
                     ),
@@ -290,7 +290,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             child: Center(
                               child: Text(
                                 'Cancelar',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white,
@@ -327,7 +327,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             child: Center(
                               child: Text(
                                 'Eliminar',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -372,7 +372,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                 SizedBox(width: 12),
                 Text(
                   'Contenido del tag eliminado correctamente',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -406,7 +406,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               Expanded(
                 child: Text(
                   'Error al eliminar: ${e.toString()}',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -599,7 +599,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                       children: [
                         Text(
                           'LEER TAG NFC',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -673,7 +673,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                         SizedBox(width: 12),
                         Text(
                           'Leer Tag',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -716,7 +716,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
           SizedBox(height: 30),
           Text(
             'Listo para leer',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -728,7 +728,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             child: Text(
               'Toca el botón de abajo y acerca el tag NFC para leer los datos',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.6),
               ),
@@ -760,7 +760,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
           SizedBox(height: 30),
           Text(
             'Acerque el tag para leer',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -770,7 +770,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
           Text(
             'Mantenga el dispositivo cerca del tag NFC',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.6),
             ),
@@ -788,7 +788,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
         children: [
           Text(
             'REGISTROS ENCONTRADOS: ${_model.parsedRecords.length}',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color: Colors.white.withOpacity(0.6),
@@ -830,7 +830,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                         flex: 3,
                         child: Text(
                           'Fecha y hora',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -841,7 +841,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                         flex: 3,
                         child: Text(
                           'Operador',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -852,7 +852,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                         flex: 1,
                         child: Text(
                           'Visitas',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -864,7 +864,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                         flex: 1,
                         child: Text(
                           'Resul.',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -876,7 +876,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                         flex: 2,
                         child: Text(
                           'Lote',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -907,7 +907,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           flex: 3,
                           child: Text(
                             _formatDateHour(record.dateHour),
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
                               color: Colors.white.withOpacity(0.8),
                             ),
@@ -917,7 +917,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           flex: 3,
                           child: Text(
                             record.operatorName,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
                               color: Colors.white.withOpacity(0.8),
                             ),
@@ -927,7 +927,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           flex: 1,
                           child: Text(
                             '${record.visits}',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
                               color: Colors.white.withOpacity(0.8),
                             ),
@@ -938,7 +938,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           flex: 1,
                           child: Text(
                             '${record.results}',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
                               color: Colors.white.withOpacity(0.8),
                             ),
@@ -949,7 +949,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           flex: 2,
                           child: Text(
                             record.loteName,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
                               color: Colors.white.withOpacity(0.8),
                             ),
@@ -977,7 +977,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
           SizedBox(height: 20),
           Text(
             'Error',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -989,7 +989,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.7),
               ),

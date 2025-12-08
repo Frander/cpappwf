@@ -1,10 +1,10 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'nfc_transfer_dialog_model.dart';
 export 'nfc_transfer_dialog_model.dart';
 
@@ -140,7 +140,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                   SizedBox(height: 20),
                   Text(
                     'Tag Inválido',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -150,7 +150,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                   Text(
                     message,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       color: Colors.white.withOpacity(0.8),
                       height: 1.5,
@@ -171,7 +171,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                       child: Text(
                         'Entendido',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -474,7 +474,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                       children: [
                         Text(
                           'TRANSFERIR TAG NFC',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -548,7 +548,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
             SizedBox(height: 30),
             Text(
               'ACERQUE EL TAG DE ORIGEN',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -558,7 +558,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
             Text(
               'Mantenga el dispositivo cerca del tag\\npara leer su contenido',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.8),
                 height: 1.5,
@@ -596,7 +596,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           SizedBox(height: 30),
           Text(
             'ACERQUE EL TAG DE DESTINO',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -606,7 +606,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           Text(
             'El tag será limpiado y se escribirá\\nel contenido del tag de origen',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
               height: 1.5,
@@ -638,7 +638,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           SizedBox(height: 20),
           Text(
             'Contenido Leído',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -661,7 +661,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               children: [
                 Text(
                   'RESUMEN',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Colors.white.withOpacity(0.6),
@@ -679,7 +679,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           Text(
             'Preparando transferencia al tag de destino...',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.6),
             ),
@@ -697,14 +697,14 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
         children: [
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.7),
             ),
           ),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -734,7 +734,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           SizedBox(height: 30),
           Text(
             '¡Transferencia Exitosa!',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -744,7 +744,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           Text(
             'El contenido se ha transferido\\ncorrectamente al tag de destino',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.7),
             ),
@@ -763,7 +763,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           SizedBox(height: 20),
           Text(
             'Error',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -775,7 +775,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.7),
               ),
@@ -797,7 +797,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               ),
               child: Text(
                 'Reintentar',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,

@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -7,7 +7,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'text_input_component_model.dart';
 export 'text_input_component_model.dart';
@@ -193,7 +193,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                         child: Text(
                           widget.tittle,
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -314,7 +314,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                           children: [
                                             Text(
                                               widget.statusName,
-                                              style: GoogleFonts.inter(
+                                              style: TextStyle(fontFamily: 'Roboto',
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
                                                 color: Colors.white,
@@ -323,7 +323,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                             SizedBox(height: 2),
                                             Text(
                                               'Máximo ${widget.maxLength} caracteres',
-                                              style: GoogleFonts.inter(
+                                              style: TextStyle(fontFamily: 'Roboto',
                                                 fontSize: 12,
                                                 color: Colors.white
                                                     .withOpacity(0.6),
@@ -359,14 +359,14 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                       maxLength: widget.maxLength,
                                       maxLines: widget.multiline ? null : 1,
                                       minLines: widget.multiline ? 6 : 1,
-                                      style: GoogleFonts.inter(
+                                      style: TextStyle(fontFamily: 'Roboto',
                                         fontSize: 16,
                                         color: Colors.white,
                                         fontWeight: FontWeight.w500,
                                       ),
                                       decoration: InputDecoration(
                                         hintText: widget.placeholder,
-                                        hintStyle: GoogleFonts.inter(
+                                        hintStyle: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 16,
                                           color: Colors.white.withOpacity(0.4),
                                         ),
@@ -375,7 +375,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                           horizontal: 20,
                                           vertical: 16,
                                         ),
-                                        counterStyle: GoogleFonts.inter(
+                                        counterStyle: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 11,
                                           color: Colors.white.withOpacity(0.5),
                                         ),
@@ -400,7 +400,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                         SizedBox(width: 8),
                                         Text(
                                           'Texto ingresado: ${_textController.text.trim().length} caracteres',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'Roboto',
                                             fontSize: 13,
                                             color:
                                                 Colors.white.withOpacity(0.7),
@@ -462,7 +462,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                           SizedBox(width: 12),
                           Text(
                             'Guardar',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,

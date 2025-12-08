@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/components/calculate_coordenates_component_widget.dart';
 import '/components/read_n_f_c_component_widget.dart';
 import '/flutter_flow/flutter_flow_radio_button.dart';
@@ -13,7 +13,7 @@ import '/index.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'do_visits_page_model.dart';
 export 'do_visits_page_model.dart';
@@ -122,7 +122,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                                         style: FlutterFlowTheme.of(context)
                                             .bodyMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.bold,
                                                 fontStyle:
                                                     FlutterFlowTheme.of(context)
@@ -159,7 +159,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                             textStyle: FlutterFlowTheme.of(context)
                                 .labelMedium
                                 .override(
-                                  font: GoogleFonts.inter(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .labelMedium
                                         .fontWeight,
@@ -178,7 +178,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                             selectedTextStyle: FlutterFlowTheme.of(context)
                                 .bodyMedium
                                 .override(
-                                  font: GoogleFonts.inter(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FontWeight.bold,
                                     fontStyle: FlutterFlowTheme.of(context)
                                         .bodyMedium
@@ -212,7 +212,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -244,7 +244,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                         textAlign: TextAlign.start,
                         style:
                             FlutterFlowTheme.of(context).headlineSmall.override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .headlineSmall
                                         .fontWeight,
@@ -459,7 +459,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                                                         .bodyMedium
                                                         .override(
                                                           font:
-                                                              GoogleFonts.inter(
+                                                              TextStyle(fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FontWeight.bold,
                                                             fontStyle:
@@ -568,7 +568,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
-                                                font: GoogleFonts.inter(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight: FontWeight.bold,
                                                   fontStyle:
                                                       FlutterFlowTheme.of(
@@ -647,7 +647,7 @@ class _DoVisitsPageWidgetState extends State<DoVisitsPageWidget> {
                                           style: FlutterFlowTheme.of(context)
                                               .bodyMedium
                                               .override(
-                                                font: GoogleFonts.inter(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight: FontWeight.bold,
                                                   fontStyle:
                                                       FlutterFlowTheme.of(

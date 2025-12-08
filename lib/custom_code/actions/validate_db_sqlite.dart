@@ -333,21 +333,6 @@ Future<void> _createTables(Database db) async {
         Created_at DATETIME NOT NULL DEFAULT (datetime('now', 'utc'))
     );
   ''');
-
-  // Migración para agregar campos Total_space y Used_space si no existen
-  try {
-    await db.execute('ALTER TABLE Nfc_tags_history ADD COLUMN Total_space INTEGER DEFAULT 0');
-    debugPrint('✅ Columna Total_space agregada a Nfc_tags_history');
-  } catch (e) {
-    // La columna ya existe, ignorar
-  }
-
-  try {
-    await db.execute('ALTER TABLE Nfc_tags_history ADD COLUMN Used_space INTEGER DEFAULT 0');
-    debugPrint('✅ Columna Used_space agregada a Nfc_tags_history');
-  } catch (e) {
-    // La columna ya existe, ignorar
-  }
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Nfc_tags_history_tag_id ON Nfc_tags_history(Tag_id);');
   await db.execute(

@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/backend/sqlite/sqlite_manager.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
@@ -23,7 +23,7 @@ import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -707,7 +707,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       FFAppState().currentActivity,
                       r'''$.name_activity''',
                     ).toString(),
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -756,12 +756,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 indicatorPadding: EdgeInsets.all(4),
                 labelColor: Colors.white,
                 unselectedLabelColor: Color(0xFF00ff9f).withOpacity(0.6),
-                labelStyle: GoogleFonts.inter(
+                labelStyle: TextStyle(fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
-                unselectedLabelStyle: GoogleFonts.inter(
+                unselectedLabelStyle: TextStyle(fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -859,7 +859,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             SizedBox(height: 16),
             Text(
               'No hay pasos configurados',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 16,
                 color: Colors.white.withOpacity(0.6),
               ),
@@ -1040,7 +1040,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         children: [
                           Text(
                             stepName,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color:
@@ -1076,7 +1076,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         child: Text(
                           '$totalCompleted/$totalRequired',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: totalCompleted == totalRequired
@@ -1104,7 +1104,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         child: Text(
                           '*',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: FlutterFlowTheme.of(context).error,
@@ -1704,7 +1704,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                     Flexible(
                                       child: Text(
                                         statusName,
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 19,
                                           fontWeight: FontWeight.w800,
                                           color: (isDistanceExtractorType && (_distanceExtractorCalculated[statusId] ?? false))
@@ -2160,7 +2160,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                         statusName,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 19,
                                           fontWeight: FontWeight.w800,
                                           color: (isDistanceExtractorType && (_distanceExtractorCalculated[statusId] ?? false))
@@ -2303,7 +2303,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                       statusId,
                                     ) ??
                                     '',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white.withOpacity(0.9),
@@ -2337,7 +2337,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         child: Text(
                           '$totalCompleted/$totalRequired',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: totalCompleted == totalRequired
@@ -2699,7 +2699,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 Expanded(
                   child: Text(
                     statusName,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
                       color: (isDistanceExtractorType && (_distanceExtractorCalculated[statusId] ?? false))
@@ -2960,7 +2960,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           SizedBox(height: 16),
           Text(
             'Vista de mapa',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.white.withOpacity(0.6),
@@ -2969,7 +2969,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           SizedBox(height: 8),
           Text(
             'Integración con mapa próximamente',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.5),
             ),
@@ -3029,7 +3029,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     SizedBox(width: 8),
                     Text(
                       'Cancelar',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -3163,7 +3163,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     SizedBox(width: 8),
                     Text(
                       'Guardar',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -3245,7 +3245,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             children: [
                               Text(
                                 statusName,
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -3255,7 +3255,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               SizedBox(height: 2),
                               Text(
                                 'Selecciona la cantidad',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 12,
                                   color: Colors.white.withOpacity(0.7),
                                 ),
@@ -3303,7 +3303,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             child: Center(
                               child: Text(
                                 selectedValue.toString(),
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 48,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -3381,7 +3381,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         child: Text(
                           'Confirmar',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: FlutterFlowTheme.of(context).primary,
@@ -3456,7 +3456,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ),
         child: Text(
           value.toString(),
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 14,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
             color: Colors.white,
@@ -3533,7 +3533,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // Display del número
                 Text(
                   currentValue.toString(),
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -3622,7 +3622,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ),
         child: Text(
           value.toString(),
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
             color: Colors.white,
@@ -3806,14 +3806,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               child: TextField(
                 controller: controller,
                 autofocus: true,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Buscar...',
-                  hintStyle: GoogleFonts.inter(
+                  hintStyle: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.35),
                     fontWeight: FontWeight.w400,
@@ -3991,7 +3991,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             // Texto del item
             Text(
               breadcrumbItems[i],
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -4108,7 +4108,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // Display del número
                 Text(
                   currentValue.toString(),
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -4193,7 +4193,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ),
         child: Text(
           value.toString(),
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 12,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
             color: Colors.white,
@@ -4311,7 +4311,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Center(
               child: Text(
                 _formatColombianNumber(currentValue),
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: usedUpDown ? Colors.white : Color(0xFF00a86b),
@@ -4415,7 +4415,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 child: Center(
                   child: Text(
                     number.toString(),
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: isSelected ? Colors.white : Color(0xFF00a86b),
@@ -4465,7 +4465,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 SizedBox(width: 10),
                 Text(
                   'INGRESAR OTRO NÚMERO',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -4555,7 +4555,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Center(
               child: Text(
                 _formatColombianNumber(currentValue),
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: usedUpDown ? Colors.white : Color(0xFF00a86b),
@@ -4662,7 +4662,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 child: Center(
                   child: Text(
                     number.toString(),
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: isSelected ? Colors.white : Color(0xFF00a86b),
@@ -4712,7 +4712,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 SizedBox(width: 10),
                 Text(
                   'INGRESAR OTRO NÚMERO',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -4878,7 +4878,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             SizedBox(width: 6),
             Text(
               'PDF',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -4897,7 +4897,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final Map<int, Map<String, dynamic>> groupedByHeadquarter = {};
 
     // El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204},{DH:...}
+    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
 
     // Extraer todos los registros entre {}
     final regexRecords = RegExp(r'\{([^}]+)\}');
@@ -4940,6 +4940,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               break;
             case 'OP':
               record['operatorId'] = value;
+              break;
+            case 'OP2':
+              record['operator2Id'] = value; // Operador Cortero
               break;
             case 'VISITS':
               record['visits'] = int.tryParse(value) ?? 0;
@@ -5021,7 +5024,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final List<Map<String, dynamic>> parsedData = [];
 
     // El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204},{DH:...}
+    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
 
     // Extraer todos los registros entre {}
     final regexRecords = RegExp(r'\{([^}]+)\}');
@@ -5065,6 +5068,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               break;
             case 'OP':
               record['operatorId'] = value;
+              break;
+            case 'OP2':
+              record['operator2Id'] = value; // Operador Cortero
               break;
             case 'VISITS':
               record['visits'] = int.tryParse(value) ?? 0;
@@ -6021,7 +6027,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     SizedBox(height: 16),
                     Text(
                       'Esperando ubicación GPS...',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -6031,7 +6037,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     SizedBox(height: 8),
                     Text(
                       'Por favor espere mientras se obtiene una ubicación válida',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 13,
                         color: Colors.white70,
                       ),
@@ -6045,7 +6051,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       },
                       child: Text(
                         'Cancelar',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           color: Colors.redAccent,
                           fontWeight: FontWeight.w600,
                         ),
@@ -6442,7 +6448,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 'Resumen del TAG',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -6468,7 +6474,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       SizedBox(width: 3),
                       Text(
                         '${_tagReaderGeolocations[statusId]!.latitude.toStringAsFixed(5)}, ${_tagReaderGeolocations[statusId]!.longitude.toStringAsFixed(5)}',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 10,
                           color: Colors.white.withOpacity(0.7),
                         ),
@@ -6506,13 +6512,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final expansionKey = 'HE_$headquarterId';
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
-    // Agrupar por operador
+    // Agrupar por par de operadores (OP + OP2)
     final Map<String, Map<String, dynamic>> operatorGroups = {};
     for (var record in records) {
       final operatorId = record['operatorId'] as String? ?? 'N/A';
+      final operator2Id = record['operator2Id'] as String? ?? '';
 
-      if (!operatorGroups.containsKey(operatorId)) {
-        // Buscar nombre del operador en usersList
+      // Crear clave compuesta por OP y OP2
+      final operatorPairKey = operator2Id.isNotEmpty
+          ? '${operatorId}_$operator2Id'
+          : operatorId;
+
+      if (!operatorGroups.containsKey(operatorPairKey)) {
+        // Buscar nombre del operador principal en usersList
         String operatorName = 'Operador';
         final user = FFAppState().usersList.firstWhere(
               (u) => u.operID == operatorId,
@@ -6522,8 +6534,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           operatorName = user.nameUser;
         }
 
-        operatorGroups[operatorId] = {
+        // Buscar nombre del operador cortero (OP2) en usersList
+        String operator2Name = '';
+        if (operator2Id.isNotEmpty) {
+          final user2 = FFAppState().usersList.firstWhere(
+                (u) => u.operID == operator2Id,
+                orElse: () => UsersStruct(),
+              );
+          if (user2.nameUser.isNotEmpty) {
+            operator2Name = user2.nameUser;
+          }
+        }
+
+        operatorGroups[operatorPairKey] = {
+          'operatorId': operatorId,
+          'operator2Id': operator2Id,
           'operatorName': operatorName,
+          'operator2Name': operator2Name,
           'totalVisits': 0,
           'totalResults': 0,
           'records': <Map<String, dynamic>>[],
@@ -6534,11 +6561,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       // Usar el valor de resultados que viene del tag NFC
       final results = (record['results'] as int?) ?? 0;
 
-      operatorGroups[operatorId]!['totalVisits'] =
-          (operatorGroups[operatorId]!['totalVisits'] as int) + visits;
-      operatorGroups[operatorId]!['totalResults'] =
-          (operatorGroups[operatorId]!['totalResults'] as int) + results;
-      (operatorGroups[operatorId]!['records'] as List<Map<String, dynamic>>)
+      operatorGroups[operatorPairKey]!['totalVisits'] =
+          (operatorGroups[operatorPairKey]!['totalVisits'] as int) + visits;
+      operatorGroups[operatorPairKey]!['totalResults'] =
+          (operatorGroups[operatorPairKey]!['totalResults'] as int) + results;
+      (operatorGroups[operatorPairKey]!['records'] as List<Map<String, dynamic>>)
           .add(record);
     }
 
@@ -6586,7 +6613,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       children: [
                         Text(
                           loteName,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -6595,7 +6622,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.85),
@@ -6612,7 +6639,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ),
                     child: Text(
                       '${operatorGroups.length}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -6629,10 +6656,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: operatorGroups.entries.map((entry) {
-                  final operatorId = entry.key;
+                  final operatorPairKey = entry.key;
                   final operatorData = entry.value;
                   return _buildTagReaderOperatorGroup(
-                      headquarterId, operatorId, operatorData);
+                      headquarterId, operatorPairKey, operatorData);
                 }).toList(),
               ),
             ),
@@ -6642,14 +6669,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   Widget _buildTagReaderOperatorGroup(
-      int headquarterId, String operatorId, Map<String, dynamic> operatorData) {
+      int headquarterId, String operatorPairKey, Map<String, dynamic> operatorData) {
+    final operatorId = operatorData['operatorId'] as String? ?? 'N/A';
+    final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
+    final operator2Name = operatorData['operator2Name'] as String? ?? '';
     final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
     final records =
         operatorData['records'] as List<Map<String, dynamic>>? ?? [];
 
-    final expansionKey = 'TR_OP_${headquarterId}_$operatorId';
+    // Construir el texto de display para los operadores
+    final hasOperator2 = operator2Id.isNotEmpty;
+    final displayName = hasOperator2
+        ? '$operatorName / $operator2Name'
+        : operatorName;
+    final displayIds = hasOperator2
+        ? 'Op: $operatorId | Cortero: $operator2Id'
+        : 'Op: $operatorId';
+
+    final expansionKey = 'TR_OP_${headquarterId}_$operatorPairKey';
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     return Container(
@@ -6680,19 +6719,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     size: 24,
                   ),
                   SizedBox(width: 8),
-                  Icon(
-                    Icons.person_outline_rounded,
-                    color: Color(0xFF74C69D),
-                    size: 18,
-                  ),
+                  // Mostrar icono de dos personas si hay cortero
+                  if (hasOperator2)
+                    Icon(
+                      Icons.people_outline_rounded,
+                      color: Color(0xFF74C69D),
+                      size: 18,
+                    )
+                  else
+                    Icon(
+                      Icons.person_outline_rounded,
+                      color: Color(0xFF74C69D),
+                      size: 18,
+                    ),
                   SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          operatorName,
-                          style: GoogleFonts.inter(
+                          displayName,
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -6701,7 +6748,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             color: Colors.white.withOpacity(0.7),
                           ),
@@ -6709,11 +6756,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ],
                     ),
                   ),
-                  Text(
-                    'Op: $operatorId',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.white.withOpacity(0.6),
+                  Flexible(
+                    child: Text(
+                      displayIds,
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 10,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -6768,7 +6818,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 formattedDate,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 11,
                   color: Colors.white.withOpacity(0.7),
                 ),
@@ -6804,7 +6854,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         children: [
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: Colors.white.withOpacity(0.85),
@@ -6813,7 +6863,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           SizedBox(width: 4),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: color,
@@ -6862,7 +6912,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 'Registros escritos en TAG',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -6877,7 +6927,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ),
                 child: Text(
                   '$grandTotalVisits visitas',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -6917,13 +6967,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Obtener los registros desde el data
     final records = (data['records'] as List<Map<String, dynamic>>?) ?? [];
 
-    // Agrupar por operador (igual que tag-reader)
+    // Agrupar por par de operadores (OP + OP2)
     final Map<String, Map<String, dynamic>> operatorGroups = {};
     for (var record in records) {
       final operatorId = record['operatorId'] as String? ?? 'N/A';
+      final operator2Id = record['operator2Id'] as String? ?? '';
 
-      if (!operatorGroups.containsKey(operatorId)) {
-        // Buscar nombre del operador en usersList
+      // Crear clave compuesta por OP y OP2
+      final operatorPairKey = operator2Id.isNotEmpty
+          ? '${operatorId}_$operator2Id'
+          : operatorId;
+
+      if (!operatorGroups.containsKey(operatorPairKey)) {
+        // Buscar nombre del operador principal en usersList
         String operatorName = 'Operador';
         final user = FFAppState().usersList.firstWhere(
               (u) => u.operID == operatorId,
@@ -6933,8 +6989,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           operatorName = user.nameUser;
         }
 
-        operatorGroups[operatorId] = {
+        // Buscar nombre del operador cortero (OP2) en usersList
+        String operator2Name = '';
+        if (operator2Id.isNotEmpty) {
+          final user2 = FFAppState().usersList.firstWhere(
+                (u) => u.operID == operator2Id,
+                orElse: () => UsersStruct(),
+              );
+          if (user2.nameUser.isNotEmpty) {
+            operator2Name = user2.nameUser;
+          }
+        }
+
+        operatorGroups[operatorPairKey] = {
+          'operatorId': operatorId,
+          'operator2Id': operator2Id,
           'operatorName': operatorName,
+          'operator2Name': operator2Name,
           'totalVisits': 0,
           'totalResults': 0,
           'records': <Map<String, dynamic>>[],
@@ -6944,11 +7015,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final visits = (record['visits'] as int?) ?? 0;
       final results = (record['results'] as int?) ?? 0;
 
-      operatorGroups[operatorId]!['totalVisits'] =
-          (operatorGroups[operatorId]!['totalVisits'] as int) + visits;
-      operatorGroups[operatorId]!['totalResults'] =
-          (operatorGroups[operatorId]!['totalResults'] as int) + results;
-      (operatorGroups[operatorId]!['records'] as List<Map<String, dynamic>>)
+      operatorGroups[operatorPairKey]!['totalVisits'] =
+          (operatorGroups[operatorPairKey]!['totalVisits'] as int) + visits;
+      operatorGroups[operatorPairKey]!['totalResults'] =
+          (operatorGroups[operatorPairKey]!['totalResults'] as int) + results;
+      (operatorGroups[operatorPairKey]!['records'] as List<Map<String, dynamic>>)
           .add(record);
     }
 
@@ -6995,7 +7066,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       children: [
                         Text(
                           loteName,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -7004,7 +7075,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.85),
@@ -7021,7 +7092,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ),
                     child: Text(
                       '${operatorGroups.length}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -7038,10 +7109,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: operatorGroups.entries.map((entry) {
-                  final operatorId = entry.key;
+                  final operatorPairKey = entry.key;
                   final operatorData = entry.value;
                   return _buildTagWriterOperatorGroup(
-                      headquarterId, operatorId, operatorData);
+                      headquarterId, operatorPairKey, operatorData);
                 }).toList(),
               ),
             ),
@@ -7050,16 +7121,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  Widget _buildTagWriterOperatorGroup(int headquarterId, String operatorId,
+  Widget _buildTagWriterOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
+    final operatorId = operatorData['operatorId'] as String? ?? 'N/A';
+    final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
+    final operator2Name = operatorData['operator2Name'] as String? ?? '';
     final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
     final records =
         operatorData['records'] as List<Map<String, dynamic>>? ?? [];
 
-    final expansionKey = 'TW_OP_${headquarterId}_$operatorId';
+    final expansionKey = 'TW_OP_${headquarterId}_$operatorPairKey';
     final isExpanded = _tagWriterExpansionState[expansionKey] ?? false;
+
+    // Construir el texto de display para los operadores
+    final hasOperator2 = operator2Id.isNotEmpty;
+    final displayName = hasOperator2
+        ? '$operatorName / $operator2Name'
+        : operatorName;
+    final displayIds = hasOperator2
+        ? 'Op: $operatorId | Cortero: $operator2Id'
+        : 'Op: $operatorId';
 
     return Container(
       margin: EdgeInsets.only(bottom: 8),
@@ -7089,19 +7172,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     size: 24,
                   ),
                   SizedBox(width: 8),
-                  Icon(
-                    Icons.person_outline_rounded,
-                    color: Color(0xFF64B5F6),
-                    size: 18,
-                  ),
+                  // Mostrar dos iconos si hay cortero
+                  if (hasOperator2) ...[
+                    Icon(
+                      Icons.people_outline_rounded,
+                      color: Color(0xFF64B5F6),
+                      size: 18,
+                    ),
+                  ] else ...[
+                    Icon(
+                      Icons.person_outline_rounded,
+                      color: Color(0xFF64B5F6),
+                      size: 18,
+                    ),
+                  ],
                   SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          operatorName,
-                          style: GoogleFonts.inter(
+                          displayName,
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -7110,7 +7202,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             color: Colors.white.withOpacity(0.7),
                           ),
@@ -7118,11 +7210,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ],
                     ),
                   ),
-                  Text(
-                    'Op: $operatorId',
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      color: Colors.white.withOpacity(0.6),
+                  Flexible(
+                    child: Text(
+                      displayIds,
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 10,
+                        color: Colors.white.withOpacity(0.6),
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -7176,7 +7271,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 formattedDate,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 11,
                   color: Colors.white.withOpacity(0.7),
                 ),
@@ -7236,7 +7331,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 'Tag de origen leído',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -7251,7 +7346,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ),
                 child: Text(
                   '$grandTotalVisits visitas',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -7296,7 +7391,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       SizedBox(width: 12),
                       Text(
                         'TRANSFERENCIA EXITOSA',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -7315,7 +7410,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SnackBar(
                           content: Text(
                             'No hay contenido de origen disponible',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -7356,7 +7451,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               Expanded(
                                 child: Text(
                                   'Transferencia completada exitosamente',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -7398,7 +7493,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(width: 12),
                         Text(
                           'TRANSFERIR AHORA',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -7470,7 +7565,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       children: [
                         Text(
                           loteName,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -7479,7 +7574,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.85),
@@ -7496,7 +7591,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ),
                     child: Text(
                       '${records.length}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -7524,11 +7619,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagTransferRecord(Map<String, dynamic> record) {
     final operatorId = record['operatorId'] as String? ?? 'N/A';
+    final operator2Id = record['operator2Id'] as String? ?? '';
     final visits = record['visits'] as int? ?? 0;
     final results = record['results'] as int? ?? 0;
     final dateTime = record['dateTime'] as DateTime? ?? DateTime.now();
 
-    // Buscar el nombre del operador
+    // Buscar el nombre del operador principal
     String operatorName = 'Operador';
     final user = FFAppState().usersList.firstWhere(
           (u) => u.operID == operatorId,
@@ -7538,6 +7634,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     if (user.nameUser.isNotEmpty) {
       operatorName = user.nameUser;
     }
+
+    // Buscar el nombre del operador cortero (OP2)
+    String operator2Name = '';
+    if (operator2Id.isNotEmpty) {
+      final user2 = FFAppState().usersList.firstWhere(
+            (u) => u.operID == operator2Id,
+            orElse: () => UsersStruct(),
+          );
+      if (user2.nameUser.isNotEmpty) {
+        operator2Name = user2.nameUser;
+      }
+    }
+
+    // Construir textos de display
+    final hasOperator2 = operator2Id.isNotEmpty;
+    final displayName = hasOperator2
+        ? '$operatorName / $operator2Name'
+        : operatorName;
+    final displayIds = hasOperator2
+        ? 'Op: $operatorId | Cortero: $operator2Id'
+        : 'Op: $operatorId';
 
     // Formato de fecha: "Mié, 14 de Feb 2025"
     final dateFormatter = DateFormat('EEE, d \'de\' MMM yyyy HH:mm', 'es_ES');
@@ -7560,26 +7677,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           Row(
             children: [
               Icon(
-                Icons.person_outline_rounded,
+                hasOperator2 ? Icons.people_outline_rounded : Icons.person_outline_rounded,
                 color: Color(0xFF64B5F6),
                 size: 16,
               ),
               SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  operatorName,
-                  style: GoogleFonts.inter(
+                  displayName,
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
               ),
-              Text(
-                'Op: $operatorId',
-                style: GoogleFonts.inter(
-                  fontSize: 11,
-                  color: Colors.white.withOpacity(0.6),
+              Flexible(
+                child: Text(
+                  displayIds,
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 10,
+                    color: Colors.white.withOpacity(0.6),
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
@@ -7595,7 +7715,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 formattedDate,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 11,
                   color: Colors.white.withOpacity(0.7),
                 ),
@@ -7672,7 +7792,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 12),
               Text(
                 'Resultado Calculado',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: textColor,
@@ -7703,7 +7823,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   Center(
                     child: Text(
                       _formatColombianNumber(calculatedValue),
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                         color: valueColor,
@@ -7722,7 +7842,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     SizedBox(height: 8),
                     Text(
                       'Fórmula: $formula',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         color: hasBeenCalculated
                             ? Colors.white.withOpacity(0.7)
@@ -7774,7 +7894,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Center(
               child: Text(
                 displayValue,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -7817,7 +7937,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 'Distancia a Extractora',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -7838,7 +7958,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               children: [
                 Text(
                   'Desde TAG',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 11,
                     color: Colors.white.withOpacity(0.8),
                     fontWeight: FontWeight.w600,
@@ -7846,7 +7966,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ),
                 Text(
                   '${distanceFromTagKm.toStringAsFixed(2)} km',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -7861,7 +7981,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             // Título de la sección
             Text(
               'Desde Productos:',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 11,
                 color: Colors.white.withOpacity(0.7),
                 fontWeight: FontWeight.w600,
@@ -7893,7 +8013,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           children: [
                             Text(
                               loteName,
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 10,
                                 color: Colors.white.withOpacity(0.9),
                                 fontWeight: FontWeight.w600,
@@ -7904,7 +8024,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             if (line != null && palm != null)
                               Text(
                                 'L:$line P:$palm',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 9,
                                   color: Colors.white.withOpacity(0.6),
                                 ),
@@ -7915,7 +8035,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       SizedBox(width: 8),
                       Text(
                         '${distanceKm.toStringAsFixed(2)} km',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -7972,7 +8092,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 12),
               Text(
                 'Pesos de Lotes',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white.withOpacity(0.9),
@@ -8023,7 +8143,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         children: [
                           Text(
                             headquarterName,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
                               color: Colors.white.withOpacity(0.9),
@@ -8032,7 +8152,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           SizedBox(height: 4),
                           Text(
                             'ID: $headquarterId',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 11,
                               color: Colors.white.withOpacity(0.5),
                             ),
@@ -8050,7 +8170,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ),
                       child: Text(
                         '${weight.toStringAsFixed(2)} kg',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -8133,7 +8253,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   formattedDate,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: textColor,
@@ -8227,7 +8347,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 8),
               Text(
                 formattedTime,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: textColor,
@@ -8344,7 +8464,7 @@ class _FullScreenNumericKeyboardDialogState
                   children: [
                     Text(
                       'Ingresar Número',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF00ff9f),
@@ -8384,7 +8504,7 @@ class _FullScreenNumericKeyboardDialogState
                     ),
                     child: Text(
                       _currentValue.isEmpty ? '0' : _currentValue,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 64,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF52B788),
@@ -8496,7 +8616,7 @@ class _FullScreenNumericKeyboardDialogState
                                 SizedBox(width: 12),
                                 Text(
                                   'CONFIRMAR',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
@@ -8545,7 +8665,7 @@ class _FullScreenNumericKeyboardDialogState
           child: Center(
             child: Text(
               number,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 36,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,

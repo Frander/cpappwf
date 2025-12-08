@@ -1,9 +1,9 @@
-import '/backend/api_requests/api_calls.dart';
+﻿import '/backend/api_requests/api_calls.dart';
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'company_selection_grid_model.dart';
 export 'company_selection_grid_model.dart';
 
@@ -137,7 +137,7 @@ class _CompanySelectionGridWidgetState
                 children: [
                   Text(
                     'Selecciona tu Empresa',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -147,7 +147,7 @@ class _CompanySelectionGridWidgetState
                   SizedBox(height: 12),
                   Text(
                     'Elige la empresa para continuar',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       color: Colors.white.withOpacity(0.7),
                     ),
@@ -159,13 +159,13 @@ class _CompanySelectionGridWidgetState
                     controller: _model.textController,
                     focusNode: _model.textFieldFocusNode,
                     onChanged: _filterCompanies,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       color: Colors.white,
                       fontSize: 15,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Buscar empresa...',
-                      hintStyle: GoogleFonts.inter(
+                      hintStyle: TextStyle(fontFamily: 'Roboto',
                         color: Colors.white.withOpacity(0.4),
                       ),
                       prefixIcon: Icon(
@@ -214,7 +214,7 @@ class _CompanySelectionGridWidgetState
                       ? Center(
                           child: Text(
                             'No se encontraron empresas',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 16,
                               color: Colors.white.withOpacity(0.6),
                             ),
@@ -301,7 +301,7 @@ class _CompanySelectionGridWidgetState
                                       Flexible(
                                         child: Text(
                                           companyName,
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'Roboto',
                                             fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
@@ -315,7 +315,7 @@ class _CompanySelectionGridWidgetState
                                       SizedBox(height: 6),
                                       Text(
                                         'NIT: $companyNit',
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 10,
                                           color: Colors.white.withOpacity(0.6),
                                         ),

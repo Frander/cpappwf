@@ -1,9 +1,9 @@
-import '/flutter_flow/flutter_flow_count_controller.dart';
+﻿import '/flutter_flow/flutter_flow_count_controller.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'counter_control_component_model.dart';
 export 'counter_control_component_model.dart';
@@ -67,7 +67,7 @@ class _CounterControlComponentWidgetState
         countBuilder: (count) => Text(
           count.toString(),
           style: FlutterFlowTheme.of(context).titleLarge.override(
-                font: GoogleFonts.interTight(
+                font: TextStyle(fontFamily: 'Roboto',
                   fontWeight:
                       FlutterFlowTheme.of(context).titleLarge.fontWeight,
                   fontStyle: FlutterFlowTheme.of(context).titleLarge.fontStyle,

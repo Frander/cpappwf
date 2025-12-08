@@ -5,7 +5,6 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'zones_page_model.dart';
 export 'zones_page_model.dart';
@@ -111,7 +110,8 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                             style: FlutterFlowTheme.of(context)
                                 .bodyMedium
                                 .override(
-                                  font: GoogleFonts.inter(
+                                  font: TextStyle(
+                                    fontFamily: 'Roboto',
                                     fontWeight: FontWeight.bold,
                                     fontStyle: FlutterFlowTheme.of(context)
                                         .bodyMedium
@@ -159,7 +159,8 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                       labelStyle: FlutterFlowTheme.of(context)
                                           .labelMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(
+                                              fontFamily: 'Roboto',
                                               fontWeight:
                                                   FlutterFlowTheme.of(context)
                                                       .labelMedium
@@ -183,7 +184,8 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                       hintStyle: FlutterFlowTheme.of(context)
                                           .labelMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(
+                                              fontFamily: 'Roboto',
                                               fontWeight:
                                                   FlutterFlowTheme.of(context)
                                                       .labelMedium
@@ -244,7 +246,8 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: GoogleFonts.inter(
+                                          font: TextStyle(
+                                            fontFamily: 'Roboto',
                                             fontWeight:
                                                 FlutterFlowTheme.of(context)
                                                     .bodyMedium
@@ -406,8 +409,8 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                                                       .of(context)
                                                                   .bodyMedium
                                                                   .override(
-                                                                    font: GoogleFonts
-                                                                        .inter(
+                                                                    font: TextStyle(
+                                                                      fontFamily: 'Roboto',
                                                                       fontWeight:
                                                                           FontWeight
                                                                               .bold,

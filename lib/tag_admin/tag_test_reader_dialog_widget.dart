@@ -1,10 +1,10 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'tag_test_reader_dialog_model.dart';
@@ -202,7 +202,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     SizedBox(width: 12),
                     Text(
                       'Leer TAG NFC',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -251,7 +251,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     Text(
                       'ACERQUE EL TAG',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF3B82F6),
@@ -270,7 +270,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         SizedBox(width: 16),
                         Text(
                           'Leyendo TAG NFC...',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             color: Colors.white,
                           ),
@@ -300,7 +300,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     Expanded(
                       child: Text(
                         _model.errorMessage!,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -323,7 +323,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                       options: FFButtonOptions(
                         height: 48,
                         color: Color(0xFF374151),
-                        textStyle: GoogleFonts.inter(
+                        textStyle: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -343,7 +343,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         options: FFButtonOptions(
                           height: 48,
                           color: Color(0xFF3B82F6),
-                          textStyle: GoogleFonts.inter(
+                          textStyle: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -401,7 +401,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   SizedBox(width: 6),
                   Text(
                     'Resumen del TAG',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -416,7 +416,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     ),
                     child: Text(
                       '${tagData.length} ${tagData.length == 1 ? 'registro' : 'registros'}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -533,7 +533,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                       children: [
                         Text(
                           loteName,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -542,7 +542,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.85),
@@ -559,7 +559,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     ),
                     child: Text(
                       '${operatorGroups.length}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -638,7 +638,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                       children: [
                         Text(
                           operatorName,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -647,7 +647,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             color: Colors.white.withOpacity(0.7),
                           ),
@@ -657,7 +657,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   ),
                   Text(
                     '${records.length}',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF74C69D),
@@ -705,7 +705,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         Expanded(
                           child: Text(
                             formattedDate,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 11,
                               color: Colors.white.withOpacity(0.9),
                             ),
@@ -713,7 +713,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         ),
                         Text(
                           '$visits V',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF95D5B2),
@@ -722,7 +722,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         SizedBox(width: 8),
                         Text(
                           '$results R',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF95D5B2),

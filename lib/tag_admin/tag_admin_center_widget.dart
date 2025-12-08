@@ -1,4 +1,4 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/tag_admin/tag_configuration_stepper_widget.dart';
@@ -9,7 +9,7 @@ import '/tag_admin/tag_history_widget.dart';
 import '/components/nfc_clear_dialog_widget.dart';
 import '/components/nfc_transfer_dialog_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 
 class TagAdminCenterWidget extends StatefulWidget {
@@ -67,7 +67,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             SizedBox(width: 12),
             Text(
               'Centro de Administración NFC',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -101,7 +101,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                   Expanded(
                     child: Text(
                       'Configure y administre sus tags NFC antes de usarlos en campo',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         color: Colors.white60,
                         height: 1.3,
@@ -123,7 +123,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             // Section title
             Text(
               'Operaciones de TAG',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -228,7 +228,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                 children: [
                   Text(
                     'Configurar TAG',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -237,7 +237,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                   SizedBox(height: 6),
                   Text(
                     'Flujo completo de verificación y limpieza',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       color: Colors.white.withOpacity(0.9),
                     ),
@@ -284,7 +284,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             Text(
               title,
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -294,7 +294,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 12,
                 color: Colors.white60,
               ),

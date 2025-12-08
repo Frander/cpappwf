@@ -1,10 +1,10 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 
 /// Diálogo para escribir en el tag de destino durante una transferencia NFC
 class NfcTransferWriteDialogWidget extends StatefulWidget {
@@ -158,7 +158,7 @@ class _NfcTransferWriteDialogWidgetState
                     child: Text(
                       'TRANSFERIR A TAG DE DESTINO',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -206,7 +206,7 @@ class _NfcTransferWriteDialogWidgetState
           SizedBox(height: 30),
           Text(
             'ACERQUE EL TAG DE DESTINO',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -216,7 +216,7 @@ class _NfcTransferWriteDialogWidgetState
           Text(
             'El tag será limpiado y se escribirá\nel contenido del tag de origen',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
               height: 1.5,
@@ -246,7 +246,7 @@ class _NfcTransferWriteDialogWidgetState
           SizedBox(height: 30),
           Text(
             '¡Transferencia Exitosa!',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -256,7 +256,7 @@ class _NfcTransferWriteDialogWidgetState
           Text(
             'El contenido se ha transferido\ncorrectamente al tag de destino',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.7),
             ),
@@ -275,7 +275,7 @@ class _NfcTransferWriteDialogWidgetState
           SizedBox(height: 20),
           Text(
             'Error',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -287,7 +287,7 @@ class _NfcTransferWriteDialogWidgetState
             child: Text(
               errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.7),
               ),
@@ -313,7 +313,7 @@ class _NfcTransferWriteDialogWidgetState
               ),
               child: Text(
                 'Reintentar',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,

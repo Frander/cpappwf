@@ -1,4 +1,4 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -7,7 +7,7 @@ import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'calibrate_compass_component_model.dart';
 export 'calibrate_compass_component_model.dart';
@@ -63,7 +63,7 @@ class _CalibrateCompassComponentWidgetState
                 'Calibrar brújula y GPS',
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      font: GoogleFonts.inter(
+                      font: TextStyle(fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
@@ -83,7 +83,7 @@ class _CalibrateCompassComponentWidgetState
                 'Se detectó que la brújula y el GPS no están configurados correctamente, a continuación se solicitará que oprima el botón CALIBRAR y luego haga el movimiento como lo indica la imagen durante 40 segundos',
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      font: GoogleFonts.inter(
+                      font: TextStyle(fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
@@ -158,7 +158,7 @@ class _CalibrateCompassComponentWidgetState
                     'CALIBRAR',
                     textAlign: TextAlign.center,
                     style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: GoogleFonts.inter(
+                          font: TextStyle(fontFamily: 'Roboto',
                             fontWeight: FontWeight.bold,
                             fontStyle: FlutterFlowTheme.of(context)
                                 .bodyMedium
@@ -212,7 +212,7 @@ class _CalibrateCompassComponentWidgetState
               },
               textAlign: TextAlign.start,
               style: FlutterFlowTheme.of(context).headlineSmall.override(
-                    font: GoogleFonts.interTight(
+                    font: TextStyle(fontFamily: 'Roboto',
                       fontWeight:
                           FlutterFlowTheme.of(context).headlineSmall.fontWeight,
                       fontStyle:

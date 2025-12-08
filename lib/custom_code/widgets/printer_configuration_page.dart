@@ -12,9 +12,11 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'dart:io';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 
 // ============================================================================
 // WIDGET - CONFIGURACIÓN DE IMPRESORAS BLUETOOTH
@@ -38,12 +40,12 @@ class PrinterConfigurationPage extends StatefulWidget {
 class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
     with TickerProviderStateMixin {
   // Estado de Bluetooth
-  BluetoothState _bluetoothState = BluetoothState.UNKNOWN;
+  BluetoothAdapterState _bluetoothState = BluetoothAdapterState.unknown;
   bool _isScanning = false;
 
   // Lista de dispositivos
   List<BluetoothDevice> _pairedDevices = [];
-  List<BluetoothDiscoveryResult> _discoveredDevices = [];
+  List<ScanResult> _discoveredDevices = [];
 
   // Dispositivo seleccionado actualmente
   String? _selectedPrinterAddress;
@@ -54,7 +56,8 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
   late Animation<double> _pulseAnimation;
 
   // Subscripciones
-  StreamSubscription<BluetoothDiscoveryResult>? _discoverySubscription;
+  StreamSubscription<List<ScanResult>>? _scanSubscription;
+  StreamSubscription<BluetoothAdapterState>? _adapterStateSubscription;
 
   @override
   void initState() {
@@ -67,7 +70,8 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
   @override
   void dispose() {
     _pulseController.dispose();
-    _discoverySubscription?.cancel();
+    _scanSubscription?.cancel();
+    _adapterStateSubscription?.cancel();
     super.dispose();
   }
 
@@ -85,7 +89,7 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
   Future<void> _initBluetooth() async {
     try {
       // Obtener estado actual de Bluetooth
-      BluetoothState state = await FlutterBluetoothSerial.instance.state;
+      BluetoothAdapterState state = await FlutterBluePlus.adapterState.first;
 
       if (mounted) {
         setState(() {
@@ -94,16 +98,20 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
       }
 
       // Escuchar cambios en el estado de Bluetooth
-      FlutterBluetoothSerial.instance.onStateChanged().listen((state) {
+      _adapterStateSubscription = FlutterBluePlus.adapterState.listen((state) {
         if (mounted) {
           setState(() {
             _bluetoothState = state;
           });
+          // Si el Bluetooth se activa, cargar dispositivos
+          if (state == BluetoothAdapterState.on) {
+            _loadPairedDevices();
+          }
         }
       });
 
       // Si el Bluetooth está encendido, cargar dispositivos emparejados
-      if (state.isEnabled) {
+      if (state == BluetoothAdapterState.on) {
         await _loadPairedDevices();
       }
     } catch (e) {
@@ -114,18 +122,11 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
   Future<void> _loadPairedDevices() async {
     try {
       // Solicitar permisos antes de obtener dispositivos emparejados
-      Map<Permission, PermissionStatus> statuses = await [
-        Permission.bluetoothConnect,
-      ].request();
+      await _requestBluetoothPermissions();
 
-      debugPrint('📋 Permiso BLUETOOTH_CONNECT: ${statuses[Permission.bluetoothConnect]}');
-
-      if (statuses[Permission.bluetoothConnect]?.isGranted != true) {
-        debugPrint('⚠️ Permiso BLUETOOTH_CONNECT no concedido, intentando sin permiso...');
-      }
-
-      List<BluetoothDevice> devices =
-          await FlutterBluetoothSerial.instance.getBondedDevices();
+      // flutter_blue_plus obtiene dispositivos conectados del sistema
+      // Para obtener dispositivos emparejados/bonded necesitamos usar bondedDevices (solo Android)
+      List<BluetoothDevice> devices = await FlutterBluePlus.bondedDevices;
 
       if (mounted) {
         setState(() {
@@ -135,11 +136,56 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
 
       debugPrint('✅ Dispositivos emparejados cargados: ${devices.length}');
       for (var device in devices) {
-        debugPrint('   📱 ${device.name ?? 'Sin nombre'} (${device.address})');
+        debugPrint('   📱 ${device.platformName} (${device.remoteId})');
       }
     } catch (e) {
       debugPrint('❌ Error cargando dispositivos emparejados: $e');
       _showErrorSnackBar('Error al cargar dispositivos emparejados: ${e.toString()}');
+    }
+  }
+
+  Future<bool> _requestBluetoothPermissions() async {
+    try {
+      if (!Platform.isAndroid) return true;
+
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      final sdkVersion = androidInfo.version.sdkInt;
+
+      debugPrint('📱 SDK Version: $sdkVersion');
+
+      // Android 12+ (SDK 31+) requiere BLUETOOTH_SCAN y BLUETOOTH_CONNECT
+      if (sdkVersion >= 31) {
+        final scanStatus = await Permission.bluetoothScan.status;
+        final connectStatus = await Permission.bluetoothConnect.status;
+
+        if (scanStatus.isGranted && connectStatus.isGranted) {
+          debugPrint('✅ Permisos de Bluetooth ya otorgados');
+          return true;
+        }
+
+        debugPrint('🔐 Solicitando permisos de Bluetooth...');
+        final result = await [
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+          Permission.location,
+        ].request();
+
+        final granted = result[Permission.bluetoothScan]?.isGranted == true &&
+            result[Permission.bluetoothConnect]?.isGranted == true;
+
+        debugPrint(granted
+            ? '✅ Permisos de Bluetooth otorgados'
+            : '❌ Permisos de Bluetooth denegados');
+
+        return granted;
+      }
+
+      // Android < 12 solo necesita ubicación para escaneo
+      final locationStatus = await Permission.location.request();
+      return locationStatus.isGranted;
+    } catch (e) {
+      debugPrint('❌ Error solicitando permisos: $e');
+      return false;
     }
   }
 
@@ -220,32 +266,11 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
     if (_isScanning) return;
 
     try {
-      // Solicitar permisos de Bluetooth para Android 12+
-      Map<Permission, PermissionStatus> statuses = await [
-        Permission.bluetoothScan,
-        Permission.bluetoothConnect,
-        Permission.location, // Necesario para escaneo Bluetooth en Android
-      ].request();
-
-      debugPrint('📋 Permisos solicitados:');
-      debugPrint('   BLUETOOTH_SCAN: ${statuses[Permission.bluetoothScan]}');
-      debugPrint('   BLUETOOTH_CONNECT: ${statuses[Permission.bluetoothConnect]}');
-      debugPrint('   LOCATION: ${statuses[Permission.location]}');
-
-      // Verificar si los permisos fueron concedidos
-      if (statuses[Permission.bluetoothScan]?.isDenied == true ||
-          statuses[Permission.bluetoothConnect]?.isDenied == true ||
-          statuses[Permission.location]?.isDenied == true) {
+      // Solicitar permisos de Bluetooth
+      final hasPermissions = await _requestBluetoothPermissions();
+      if (!hasPermissions) {
         _showErrorSnackBar(
             'Se requieren permisos de Bluetooth y ubicación para escanear dispositivos');
-        return;
-      }
-
-      // Si los permisos fueron denegados permanentemente, abrir configuración
-      if (statuses[Permission.bluetoothScan]?.isPermanentlyDenied == true ||
-          statuses[Permission.bluetoothConnect]?.isPermanentlyDenied == true ||
-          statuses[Permission.location]?.isPermanentlyDenied == true) {
-        _showPermissionDialog();
         return;
       }
 
@@ -254,28 +279,18 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
         _discoveredDevices.clear();
       });
 
-      _discoverySubscription?.cancel();
-      _discoverySubscription =
-          FlutterBluetoothSerial.instance.startDiscovery().listen(
-        (result) {
+      // Cancelar escaneo anterior si existe
+      _scanSubscription?.cancel();
+      await FlutterBluePlus.stopScan();
+
+      // Escuchar resultados del escaneo
+      _scanSubscription = FlutterBluePlus.scanResults.listen(
+        (results) {
           if (mounted) {
             setState(() {
-              // Agregar solo si no está ya en la lista
-              final existingIndex = _discoveredDevices
-                  .indexWhere((d) => d.device.address == result.device.address);
-              if (existingIndex == -1) {
-                _discoveredDevices.add(result);
-              }
+              _discoveredDevices = results;
             });
           }
-        },
-        onDone: () {
-          if (mounted) {
-            setState(() {
-              _isScanning = false;
-            });
-          }
-          debugPrint('✅ Escaneo completado');
         },
         onError: (error) {
           if (mounted) {
@@ -287,6 +302,20 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
           _showErrorSnackBar('Error al escanear dispositivos');
         },
       );
+
+      // Iniciar escaneo BLE (timeout de 15 segundos)
+      await FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 15),
+        androidUsesFineLocation: true,
+      );
+
+      // Cuando termine el escaneo
+      if (mounted) {
+        setState(() {
+          _isScanning = false;
+        });
+      }
+      debugPrint('✅ Escaneo completado');
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -300,7 +329,8 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
 
   Future<void> _stopDiscovery() async {
     try {
-      await _discoverySubscription?.cancel();
+      await _scanSubscription?.cancel();
+      await FlutterBluePlus.stopScan();
       if (mounted) {
         setState(() {
           _isScanning = false;
@@ -314,7 +344,8 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
 
   Future<void> _requestBluetoothEnable() async {
     try {
-      await FlutterBluetoothSerial.instance.requestEnable();
+      // flutter_blue_plus usa turnOn() para solicitar activar Bluetooth
+      await FlutterBluePlus.turnOn();
     } catch (e) {
       debugPrint('❌ Error habilitando Bluetooth: $e');
       _showErrorSnackBar('Error al habilitar Bluetooth');
@@ -413,7 +444,7 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
             children: [
               _buildHeader(),
               Expanded(
-                child: _bluetoothState.isEnabled
+                child: _bluetoothState == BluetoothAdapterState.on
                     ? _buildPrinterList()
                     : _buildBluetoothDisabled(),
               ),
@@ -640,10 +671,10 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
             ..._pairedDevices.map((device) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildDeviceCard(
-                    name: device.name ?? 'Dispositivo desconocido',
-                    address: device.address,
+                    name: device.platformName.isNotEmpty ? device.platformName : 'Dispositivo desconocido',
+                    address: device.remoteId.str,
                     isPaired: true,
-                    isSelected: device.address == _selectedPrinterAddress,
+                    isSelected: device.remoteId.str == _selectedPrinterAddress,
                   ),
                 )),
 
@@ -722,12 +753,13 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
             ..._discoveredDevices.map((result) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _buildDeviceCard(
-                    name:
-                        result.device.name ?? 'Dispositivo desconocido',
-                    address: result.device.address,
-                    isPaired: result.device.isBonded,
+                    name: result.device.platformName.isNotEmpty
+                        ? result.device.platformName
+                        : 'Dispositivo desconocido',
+                    address: result.device.remoteId.str,
+                    isPaired: false, // Los dispositivos descubiertos no están emparejados aún
                     isSelected:
-                        result.device.address == _selectedPrinterAddress,
+                        result.device.remoteId.str == _selectedPrinterAddress,
                     rssi: result.rssi,
                   ),
                 )),

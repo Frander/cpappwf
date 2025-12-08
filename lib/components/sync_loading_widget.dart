@@ -1,7 +1,6 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'dart:math' as math;
 
 class SyncLoadingWidget extends StatefulWidget {
@@ -60,6 +59,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
 
     return Container(
       width: double.infinity,
+      height: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -72,11 +72,17 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
       ),
       child: SafeArea(
         child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(height: 40),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: MediaQuery.of(context).size.height -
+                         MediaQuery.of(context).padding.top -
+                         MediaQuery.of(context).padding.bottom,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(height: 40),
           // Logo animado
           AnimatedBuilder(
             animation: _pulseController,
@@ -161,7 +167,8 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                 child: Center(
                   child: Text(
                     '${(progress * 100).toInt()}%',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -182,7 +189,8 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                 // Texto del paso actual
                 Text(
                   'Paso ${widget.currentStep} de ${widget.totalSteps}',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.7),
                     letterSpacing: 1.0,
@@ -224,7 +232,8 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                   Text(
                     widget.stepMessage,
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -293,7 +302,8 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
           ),
           SizedBox(height: 40),
         ],
-      ),
+            ),
+          ),
         ),
       ),
     );
@@ -335,7 +345,8 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
         SizedBox(height: 6),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: TextStyle(
+            fontFamily: 'Roboto',
             fontSize: 10,
             color: isActive
                 ? Colors.white

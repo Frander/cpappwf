@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -6,7 +6,7 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'headquarters_page_model.dart';
 export 'headquarters_page_model.dart';
@@ -233,7 +233,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         labelStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               color: Color(0xFF00ff9f)
@@ -243,7 +243,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         hintStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: GoogleFonts.inter(),
+                                              font: TextStyle(fontFamily: 'Roboto',),
                                               color:
                                                   Colors.white.withOpacity(0.5),
                                               letterSpacing: 0.0,
@@ -259,7 +259,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.w600,
                                             ),
                                             color: Colors.white,
@@ -332,7 +332,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             SizedBox(width: 8),
                             Text(
                               '${filteredHeadquarters.length} lote${filteredHeadquarters.length != 1 ? 's' : ''}',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF00ff9f),
@@ -377,7 +377,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               SizedBox(width: 8),
                               Text(
                                 '$selectedCount seleccionado${selectedCount != 1 ? 's' : ''}',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -421,7 +421,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               SizedBox(height: 16),
                               Text(
                                 'No se encontraron lotes',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white.withOpacity(0.7),
@@ -431,7 +431,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               SizedBox(height: 8),
                               Text(
                                 'Intenta con otra búsqueda',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                   color: Colors.white.withOpacity(0.5),
@@ -515,7 +515,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                           SizedBox(width: 12),
                           Text(
                             'Continuar',
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 18,
                               fontWeight: FontWeight.w900,
                               letterSpacing: 1.0,
@@ -646,7 +646,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             textAlign: TextAlign.center,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
+                            style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 14,
                               fontWeight: FontWeight.bold,
                               color:

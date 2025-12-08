@@ -13,7 +13,6 @@ import '/index.dart';
 import 'start_page_widget.dart' show StartPageWidget;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class StartPageModel extends FlutterFlowModel<StartPageWidget> {

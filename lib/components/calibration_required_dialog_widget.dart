@@ -1,7 +1,7 @@
-import '/flutter_flow/flutter_flow_util.dart';
+﻿import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'calibration_required_dialog_model.dart';
 export 'calibration_required_dialog_model.dart';
 
@@ -207,7 +207,7 @@ class _CalibrationRequiredDialogWidgetState
                         child: Text(
                           'Calibración Requerida',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 26,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
@@ -226,7 +226,7 @@ class _CalibrationRequiredDialogWidgetState
                       child: Text(
                         'Sensores GPS y Brújula',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFFFFA726).withOpacity(0.8),
@@ -261,7 +261,7 @@ class _CalibrationRequiredDialogWidgetState
                         child: Text(
                           'Se detectó que la brújula y el GPS no están correctamente calibrados.\n\nPara poder realizar visitas de forma precisa, es necesario seguir el proceso de calibración.',
                           textAlign: TextAlign.center,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
                             color: Colors.white.withOpacity(0.9),
@@ -342,7 +342,7 @@ class _CalibrationRequiredDialogWidgetState
                                 SizedBox(width: 12),
                                 Text(
                                   'INICIAR CALIBRACIÓN',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 17,
                                     fontWeight: FontWeight.w900,
                                     color: Colors.white,
@@ -404,7 +404,7 @@ class _CalibrationRequiredDialogWidgetState
             children: [
               Text(
                 title,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -415,7 +415,7 @@ class _CalibrationRequiredDialogWidgetState
               SizedBox(height: 3),
               Text(
                 description,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: Colors.white.withOpacity(0.7),

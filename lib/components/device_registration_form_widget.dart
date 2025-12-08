@@ -1,7 +1,7 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'dart:math' as math;
 
 class DeviceRegistrationFormWidget extends StatefulWidget {
@@ -148,7 +148,7 @@ class _DeviceRegistrationFormWidgetState
                   // Título
                   Text(
                     'Registrar Nuevo Dispositivo',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -161,7 +161,7 @@ class _DeviceRegistrationFormWidgetState
 
                   Text(
                     'Complete la información para registrar el dispositivo CTR',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       color: Colors.white.withOpacity(0.7),
                       height: 1.4,
@@ -265,7 +265,7 @@ class _DeviceRegistrationFormWidgetState
                                 SizedBox(width: 12),
                                 Text(
                                   'REGISTRAR DISPOSITIVO',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
@@ -307,7 +307,7 @@ class _DeviceRegistrationFormWidgetState
         children: [
           Text(
             title,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF00a86b),
@@ -345,7 +345,7 @@ class _DeviceRegistrationFormWidgetState
               children: [
                 Text(
                   label,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
                     color: Colors.white.withOpacity(0.6),
                   ),
@@ -353,7 +353,7 @@ class _DeviceRegistrationFormWidgetState
                 SizedBox(height: 4),
                 Text(
                   value,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -385,7 +385,7 @@ class _DeviceRegistrationFormWidgetState
           children: [
             Text(
               label,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -405,13 +405,13 @@ class _DeviceRegistrationFormWidgetState
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             color: Colors.white,
             fontSize: 15,
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: GoogleFonts.inter(
+            hintStyle: TextStyle(fontFamily: 'Roboto',
               color: Colors.white.withOpacity(0.4),
             ),
             prefixIcon: Icon(

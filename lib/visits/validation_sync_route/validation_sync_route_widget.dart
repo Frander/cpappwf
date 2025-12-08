@@ -7,7 +7,6 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'validation_sync_route_model.dart';
 export 'validation_sync_route_model.dart';
@@ -116,7 +115,8 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                             style: FlutterFlowTheme.of(context)
                                 .headlineMedium
                                 .override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(
+                                    fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .headlineMedium
                                         .fontWeight,
@@ -144,7 +144,8 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                             style: FlutterFlowTheme.of(context)
                                 .headlineMedium
                                 .override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(
+                                    fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .headlineMedium
                                         .fontWeight,
@@ -175,7 +176,8 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                 style: FlutterFlowTheme.of(context)
                                     .labelMedium
                                     .override(
-                                      font: GoogleFonts.inter(
+                                      font: TextStyle(
+                                        fontFamily: 'Roboto',
                                         fontWeight: FontWeight.w600,
                                         fontStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
@@ -278,7 +280,8 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                               textStyle: FlutterFlowTheme.of(context)
                                   .titleSmall
                                   .override(
-                                    font: GoogleFonts.interTight(
+                                    font: TextStyle(
+                                      fontFamily: 'Roboto',
                                       fontWeight: FlutterFlowTheme.of(context)
                                           .titleSmall
                                           .fontWeight,
@@ -384,7 +387,8 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                               textStyle: FlutterFlowTheme.of(context)
                                   .titleSmall
                                   .override(
-                                    font: GoogleFonts.interTight(
+                                    font: TextStyle(
+                                      fontFamily: 'Roboto',
                                       fontWeight: FlutterFlowTheme.of(context)
                                           .titleSmall
                                           .fontWeight,

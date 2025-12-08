@@ -619,14 +619,6 @@ Future<void> _insertActivities(
   for (final activity in activities) {
     debugPrint('   🔍 Activity ID=${activity['id_activity']} "${activity['name_activity']}"');
 
-    // Contar cuántos status tiene esta actividad
-    final statusCount = activity['activity_status'] != null
-        ? (activity['activity_status'] as List).length
-        : 0;
-    final stepsCount = activity['activity_steps'] != null
-        ? (activity['activity_steps'] as List).length
-        : 0;
-    debugPrint('      ℹ️ Steps: $stepsCount, Status: $statusCount');
     final bool isDefault = (activity['id_activity'] == defaultActivityId);
 
     // Insertar actividad
@@ -748,7 +740,7 @@ Future<int> _insertStatusIfNotExists(
     conflictAlgorithm: ConflictAlgorithm.ignore,
   );
 
-  debugPrint('      ➕ Status ID=$idActivityStatus "$statusName" Factor=$factor');
+  // debugPrint('      ➕ Status ID=$idActivityStatus "$statusName" Factor=$factor');
 
   int childrenInserted = 0;
 

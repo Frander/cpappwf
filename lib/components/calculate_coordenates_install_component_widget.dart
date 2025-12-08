@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
@@ -10,7 +10,7 @@ import '/custom_code/actions/index.dart' as actions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'calculate_coordenates_install_component_model.dart';
 export 'calculate_coordenates_install_component_model.dart';
@@ -105,7 +105,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                 'Quedese cerca a la palma',
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      font: GoogleFonts.inter(
+                      font: TextStyle(fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
@@ -125,7 +125,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                 'Estamos calculando la ubicación exacta del dispositivo',
                 textAlign: TextAlign.center,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      font: GoogleFonts.inter(
+                      font: TextStyle(fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                         fontStyle:
                             FlutterFlowTheme.of(context).bodyMedium.fontStyle,
@@ -143,7 +143,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
               'Espere 5 segundos',
               textAlign: TextAlign.center,
               style: FlutterFlowTheme.of(context).bodyMedium.override(
-                    font: GoogleFonts.inter(
+                    font: TextStyle(fontFamily: 'Roboto',
                       fontWeight: FontWeight.bold,
                       fontStyle:
                           FlutterFlowTheme.of(context).bodyMedium.fontStyle,
@@ -224,7 +224,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                           'Palma registrada con éxito. Total palmas: ${FFAppState().productsAdd.length.toString()}',
                           style:
                               FlutterFlowTheme.of(context).titleMedium.override(
-                                    font: GoogleFonts.interTight(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .fontWeight,
@@ -257,7 +257,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                           'Se está tardando más de lo normal...',
                           style:
                               FlutterFlowTheme.of(context).titleMedium.override(
-                                    font: GoogleFonts.interTight(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FlutterFlowTheme.of(context)
                                           .titleMedium
                                           .fontWeight,
@@ -289,7 +289,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                 },
                 textAlign: TextAlign.start,
                 style: FlutterFlowTheme.of(context).headlineSmall.override(
-                      font: GoogleFonts.interTight(
+                      font: TextStyle(fontFamily: 'Roboto',
                         fontWeight: FlutterFlowTheme.of(context)
                             .headlineSmall
                             .fontWeight,

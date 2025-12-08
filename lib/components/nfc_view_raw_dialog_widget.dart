@@ -1,9 +1,9 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
@@ -181,7 +181,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       Expanded(
                         child: Text(
                           'Ver contenido del TAG',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -218,7 +218,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                     Text(
                       'Esperando TAG NFC...',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -228,7 +228,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                     Text(
                       'Acerque el TAG NFC al dispositivo',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 14,
                         color: Colors.white70,
                       ),
@@ -253,7 +253,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                     Expanded(
                       child: Text(
                         _model.errorMessage,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -273,7 +273,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                     children: [
                       Text(
                         'Contenido del TAG:',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -284,7 +284,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                         icon: Icon(Icons.copy, size: 18, color: Color(0xFF3B82F6)),
                         label: Text(
                           'Copiar',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             color: Color(0xFF3B82F6),
                             fontWeight: FontWeight.w600,
                           ),
@@ -305,7 +305,8 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                     child: SingleChildScrollView(
                       child: SelectableText(
                         _model.rawContent,
-                        style: GoogleFonts.robotoMono(
+                        style: TextStyle(
+                          fontFamily: 'Roboto Mono',
                           fontSize: 13,
                           color: Color(0xFF10B981),
                           height: 1.5,
@@ -316,7 +317,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                   SizedBox(height: 12),
                   Text(
                     'Caracteres: ${_model.rawContent.length}',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 12,
                       color: Colors.white60,
                     ),
@@ -338,7 +339,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       options: FFButtonOptions(
                         height: 48,
                         color: Color(0xFF3B82F6),
-                        textStyle: GoogleFonts.inter(
+                        textStyle: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -355,7 +356,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       options: FFButtonOptions(
                         height: 48,
                         color: Color(0xFF374151),
-                        textStyle: GoogleFonts.inter(
+                        textStyle: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,

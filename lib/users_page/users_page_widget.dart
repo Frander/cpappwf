@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/components/keyboard_num_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -9,7 +9,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'users_page_model.dart';
 export 'users_page_model.dart';
@@ -204,7 +204,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                               children: [
                                 Text(
                                   'Operadores',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 28,
                                     fontWeight: FontWeight.w800,
                                     color: Colors.white,
@@ -213,7 +213,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                 ),
                                 Text(
                                   'Selecciona un operador de la lista',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 13,
                                     fontWeight: FontWeight.w400,
                                     color: Colors.white.withOpacity(0.6),
@@ -277,14 +277,14 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                   }
                                   setState(() {});
                                 },
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   color: Colors.white,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w500,
                                 ),
                                 decoration: InputDecoration(
                                   hintText: 'Buscar por nombre...',
-                                  hintStyle: GoogleFonts.inter(
+                                  hintStyle: TextStyle(fontFamily: 'Roboto',
                                     color: Colors.white.withOpacity(0.4),
                                     fontSize: 15,
                                   ),
@@ -379,7 +379,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                   SizedBox(width: 8),
                                   Text(
                                     'Código',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 14,
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white,
@@ -430,7 +430,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                 SizedBox(height: 24),
                                 Text(
                                   'No se encontraron operadores',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white.withOpacity(0.8),
@@ -439,7 +439,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                 SizedBox(height: 8),
                                 Text(
                                   'Intenta con otro término de búsqueda',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 14,
                                     color: Colors.white.withOpacity(0.5),
                                   ),
@@ -521,7 +521,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                               child: Center(
                                                 child: Text(
                                                   initials,
-                                                  style: GoogleFonts.inter(
+                                                  style: TextStyle(fontFamily: 'Roboto',
                                                     fontSize: 24,
                                                     fontWeight: FontWeight.bold,
                                                     color: Colors.white,
@@ -539,7 +539,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                                 children: [
                                                   Text(
                                                     user.nameUser,
-                                                    style: GoogleFonts.inter(
+                                                    style: TextStyle(fontFamily: 'Roboto',
                                                       fontSize: 17,
                                                       fontWeight: FontWeight.w700,
                                                       color: Colors.white,
@@ -578,7 +578,7 @@ class _UsersPageWidgetState extends State<UsersPageWidget> with TickerProviderSt
                                                         SizedBox(width: 4),
                                                         Text(
                                                           'Código: ${user.operID}',
-                                                          style: GoogleFonts.inter(
+                                                          style: TextStyle(fontFamily: 'Roboto',
                                                             fontSize: 13,
                                                             fontWeight: FontWeight.w600,
                                                             color: Colors.white.withOpacity(0.9),

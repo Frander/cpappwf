@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -ExecutionPolicy Bypass -File replace_fonts.ps1:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

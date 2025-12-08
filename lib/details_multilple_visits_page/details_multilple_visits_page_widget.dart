@@ -1,10 +1,10 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'details_multilple_visits_page_model.dart';
 export 'details_multilple_visits_page_model.dart';
@@ -93,7 +93,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                   style: FlutterFlowTheme.of(context)
                                       .bodyMedium
                                       .override(
-                                        font: GoogleFonts.inter(
+                                        font: TextStyle(fontFamily: 'Roboto',
                                           fontWeight: FontWeight.w600,
                                           fontStyle:
                                               FlutterFlowTheme.of(context)
@@ -119,7 +119,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                 style: FlutterFlowTheme.of(context)
                                     .bodyMedium
                                     .override(
-                                      font: GoogleFonts.inter(
+                                      font: TextStyle(fontFamily: 'Roboto',
                                         fontWeight: FontWeight.w600,
                                         fontStyle: FlutterFlowTheme.of(context)
                                             .bodyMedium
@@ -192,8 +192,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                               .of(context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w600,
@@ -225,8 +225,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                               .of(context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w600,
@@ -255,8 +255,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                               .of(context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w600,
@@ -292,8 +292,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                                 .of(context)
                                                             .bodyMedium
                                                             .override(
-                                                              font: GoogleFonts
-                                                                  .inter(
+                                                              font: TextStyle(
+                                                                fontFamily: 'Roboto',
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w600,
@@ -324,8 +324,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                               .of(context)
                                                           .bodyMedium
                                                           .override(
-                                                            font: GoogleFonts
-                                                                .inter(
+                                                            font: TextStyle(
+                                                              fontFamily: 'Roboto',
                                                               fontWeight:
                                                                   FontWeight
                                                                       .w600,
@@ -361,8 +361,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                                 .of(context)
                                                             .bodyMedium
                                                             .override(
-                                                              font: GoogleFonts
-                                                                  .inter(
+                                                              font: TextStyle(
+                                                                fontFamily: 'Roboto',
                                                                 fontWeight:
                                                                     FontWeight
                                                                         .w600,
@@ -405,8 +405,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                                 .bodyMedium
                                                                 .override(
                                                                   font:
-                                                                      GoogleFonts
-                                                                          .inter(
+                                                                      TextStyle(
+                                                                    fontFamily: 'Roboto',
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600,
@@ -442,8 +442,8 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                                 .bodyMedium
                                                                 .override(
                                                                   font:
-                                                                      GoogleFonts
-                                                                          .inter(
+                                                                      TextStyle(
+                                                                    fontFamily: 'Roboto',
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .w600,
@@ -543,7 +543,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:
@@ -629,7 +629,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                           context)
                                                       .bodyMedium
                                                       .override(
-                                                        font: GoogleFonts.inter(
+                                                        font: TextStyle(fontFamily: 'Roboto',
                                                           fontWeight:
                                                               FontWeight.bold,
                                                           fontStyle:

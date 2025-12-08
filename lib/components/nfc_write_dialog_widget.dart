@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:convert';
@@ -6,7 +6,7 @@ import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'nfc_write_dialog_model.dart';
@@ -150,6 +150,19 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       // 4. Obtener ID operador desde AppState
       _model.operatorId = FFAppState().userSelected.operID;
 
+      // 4.1 Buscar el operador Cortero (OP2) desde visitDetails
+      // El Cortero viene de un status_name que contiene "cortero" (case insensitive)
+      String operator2Id = '';
+      for (var detail in FFAppState().visitDetails) {
+        final statusOption = detail.statusOption.toLowerCase();
+        if (statusOption.contains('cortero')) {
+          operator2Id = detail.statusResponse;
+          debugPrint('✅ Cortero encontrado: $operator2Id (status: ${detail.statusOption})');
+          break;
+        }
+      }
+      _model.operator2Id = operator2Id;
+
       // 5. Calcular lote actual usando geolocalización
       final currentHeadquarter = await actions.calculateCurrentHeadquarter(
         FFAppState().headquartersSelectedList.toList(),
@@ -201,11 +214,12 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
   }
 
   String _generateNfcData(DateTime dateTime) {
-    // Formato: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204}
+    // Formato: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204}
     final formattedDate =
         '${dateTime.year}_${dateTime.month.toString().padLeft(2, '0')}_${dateTime.day.toString().padLeft(2, '0')}_${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
 
-    return '{DH:$formattedDate;OP:${_model.operatorId};VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
+    // Incluir OP2 (Cortero) en el formato del tag
+    return '{DH:$formattedDate;OP:${_model.operatorId};OP2:${_model.operator2Id};VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
   }
 
   /// Cuenta visitas desde la base de datos SQLite
@@ -519,7 +533,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                       children: [
                         Text(
                           'ESCRIBIR TAG NFC',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -598,7 +612,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                         SizedBox(width: 12),
                         Text(
                           'Iniciar Escritura',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -626,7 +640,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           SizedBox(height: 20),
           Text(
             'Calculando datos...',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 18,
               color: Colors.white,
             ),
@@ -683,7 +697,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               children: [
                 Text(
                   'DATOS A ESCRIBIR',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Colors.white.withOpacity(0.6),
@@ -693,6 +707,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 SizedBox(height: 16),
                 _buildDataRow('Fecha/Hora', _formatDateTime(_model.dateHour)),
                 _buildDataRow('Operador', _model.operatorId),
+                if (_model.operator2Id.isNotEmpty)
+                  _buildDataRow('Cortero', _model.operator2Id),
                 _buildDataRow('Visitas', _model.totalVisits.toString()),
                 _buildDataRow('Resultados', _model.totalResults.toString()),
                 _buildDataRow('Lote',
@@ -702,7 +718,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 SizedBox(height: 16),
                 Text(
                   'FORMATO TAG:',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 10,
                     color: Colors.white.withOpacity(0.5),
                   ),
@@ -710,7 +726,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 SizedBox(height: 8),
                 Text(
                   _model.dataToWrite,
-                  style: GoogleFonts.robotoMono(
+                  style: TextStyle(
+                    fontFamily: 'Roboto Mono',
                     fontSize: 11,
                     color: Color(0xFF00a86b),
                   ),
@@ -731,14 +748,14 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         children: [
           Text(
             label,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.7),
             ),
           ),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -779,7 +796,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             needsAnotherTag
                 ? '⚠️ Acerque OTRO tag'
                 : 'Acerque el tag para escribir',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -791,7 +808,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 ? 'El contenido no cabe en el tag actual.\n\nEl contenido existente se conservará.\n\nAcerque un NUEVO tag para escribir.'
                 : 'Mantenga el dispositivo cerca del tag NFC',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
               height: 1.5,
@@ -816,7 +833,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                   SizedBox(width: 8),
                   Text(
                     'Esperando nuevo tag...',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 13,
                       color: Colors.white,
                       fontWeight: FontWeight.w500,
@@ -850,7 +867,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           SizedBox(height: 30),
           Text(
             '¡Tag Escrito Exitosamente!',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -870,7 +887,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           SizedBox(height: 20),
           Text(
             'Error',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -882,7 +899,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.7),
               ),

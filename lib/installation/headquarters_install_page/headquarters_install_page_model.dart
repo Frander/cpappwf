@@ -10,7 +10,6 @@ import '/index.dart';
 import 'headquarters_install_page_widget.dart'
     show HeadquartersInstallPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class HeadquartersInstallPageModel

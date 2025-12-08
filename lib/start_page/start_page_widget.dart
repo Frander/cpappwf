@@ -18,7 +18,6 @@ import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'start_page_model.dart';
 export 'start_page_model.dart';
@@ -71,9 +70,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       debugPrint('   UUID del dispositivo: ${_model.identifierCTR}');
 
       if (FFAppState().isSync == true) {
-        // Iniciar servicio de geolocalización en segundo plano
-        debugPrint('🚀 Iniciando servicio de geolocalización en segundo plano...');
-        await actions.startBackgroundLocationService();
+        // El servicio de geolocalización se iniciará en HomePage al cargar por primera vez
+        // debugPrint('🚀 Iniciando servicio de geolocalización en segundo plano...');
+        // await actions.startBackgroundLocationService();
 
         if (Navigator.of(context).canPop()) {
           context.pop();
@@ -239,9 +238,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
             debugPrint('✅ Login directo completado, navegando a HomePage');
 
-            // Iniciar servicio de geolocalización en segundo plano
-            debugPrint('🚀 Iniciando servicio de geolocalización en segundo plano...');
-            await actions.startBackgroundLocationService();
+            // El servicio de geolocalización se iniciará en HomePage al cargar por primera vez
+            // debugPrint('🚀 Iniciando servicio de geolocalización en segundo plano...');
+            // await actions.startBackgroundLocationService();
 
             if (Navigator.of(context).canPop()) {
               context.pop();
@@ -328,9 +327,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   elevation: 0,
                                   insetPadding: EdgeInsets.zero,
                                   backgroundColor: Colors.transparent,
-                                  child: Container(
-                                    height: MediaQuery.sizeOf(context).height * 0.4,
-                                    width: MediaQuery.sizeOf(context).width * 0.9,
+                                  child: SizedBox(
+                                    width: MediaQuery.sizeOf(context).width,
+                                    height: MediaQuery.sizeOf(context).height,
                                     child: SyncLoadingWidget(
                                       stepMessage: 'Iniciando sesión...',
                                       currentStep: 1,

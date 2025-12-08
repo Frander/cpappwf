@@ -1,4 +1,4 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:async';
@@ -6,7 +6,7 @@ import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'modern_calibrate_compass_model.dart';
 export 'modern_calibrate_compass_model.dart';
@@ -138,7 +138,7 @@ class _ModernCalibrateCompassWidgetState
           child: Text(
             'Calibración de Sensores',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 28,
               fontWeight: FontWeight.w900,
               letterSpacing: 0.5,
@@ -154,7 +154,7 @@ class _ModernCalibrateCompassWidgetState
         Text(
           'GPS y Brújula Magnética',
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: Color(0xFFFFA726).withOpacity(0.8),
@@ -261,7 +261,7 @@ class _ModernCalibrateCompassWidgetState
                 SizedBox(width: 12),
                 Text(
                   '¡Sensores calibrados con éxito!',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -279,7 +279,7 @@ class _ModernCalibrateCompassWidgetState
         Navigator.pop(context);
       },
       textAlign: TextAlign.center,
-      style: GoogleFonts.inter(
+      style: TextStyle(fontFamily: 'Roboto',
         fontSize: 72,
         fontWeight: FontWeight.w900,
         color: _model.timerMilliseconds > 0 && _model.timerMilliseconds < _model.timerInitialTimeMs
@@ -339,7 +339,7 @@ class _ModernCalibrateCompassWidgetState
               Expanded(
                 child: Text(
                   isCalibrating ? 'Calibrando sensores...' : '¿Cómo calibrar?',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -355,7 +355,7 @@ class _ModernCalibrateCompassWidgetState
                 ? 'Mueva el dispositivo siguiendo el patrón del número 8 como se muestra en la imagen. Mantenga el movimiento continuo durante toda la calibración.'
                 : 'Presione "INICIAR CALIBRACIÓN" y luego realice movimientos en forma de número 8 con el dispositivo durante 40 segundos, tal como se muestra en la imagen.',
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 13,
               fontWeight: FontWeight.w500,
               color: Colors.white.withOpacity(0.8),
@@ -441,7 +441,7 @@ class _ModernCalibrateCompassWidgetState
                     SizedBox(width: 16),
                     Text(
                       'CALIBRANDO...',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: Colors.white.withOpacity(0.7),
@@ -461,7 +461,7 @@ class _ModernCalibrateCompassWidgetState
                     SizedBox(width: 12),
                     Text(
                       'INICIAR CALIBRACIÓN',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 17,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
@@ -528,7 +528,7 @@ class _ModernCalibrateCompassWidgetState
         Text(
           label,
           textAlign: TextAlign.center,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 11,
             fontWeight: FontWeight.w600,
             color: Colors.white.withOpacity(0.7),

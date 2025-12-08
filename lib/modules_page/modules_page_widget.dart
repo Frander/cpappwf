@@ -1,4 +1,4 @@
-import '/components/calibrate_compass_component_widget.dart';
+﻿import '/components/calibrate_compass_component_widget.dart';
 import '/components/calibration_required_dialog_widget.dart';
 import '/components/modern_calibrate_compass_widget.dart';
 import '/components/info_dialog_widget.dart';
@@ -13,7 +13,7 @@ import '/index.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'modules_page_model.dart';
@@ -211,7 +211,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: GoogleFonts.inter(
+                                          font: TextStyle(fontFamily: 'Roboto',
                                             fontWeight: FontWeight.w600,
                                           ),
                                           color: Color(0xFF00a86b),
@@ -345,7 +345,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: GoogleFonts.inter(
+                                          font: TextStyle(fontFamily: 'Roboto',
                                             fontWeight: FontWeight.bold,
                                           ),
                                           color: Colors.white,
@@ -362,7 +362,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: GoogleFonts.inter(
+                                          font: TextStyle(fontFamily: 'Roboto',
                                             fontWeight: FontWeight.w500,
                                           ),
                                           color: Colors.white.withOpacity(0.9),
@@ -784,7 +784,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: FlutterFlowTheme.of(context).bodyMedium.override(
-                            font: GoogleFonts.inter(
+                            font: TextStyle(fontFamily: 'Roboto',
                               fontWeight: FontWeight.bold,
                             ),
                             color: textColor ?? Colors.white,

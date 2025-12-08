@@ -5,7 +5,6 @@ import 'dart:ui';
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import 'download_route_page_widget.dart' show DownloadRoutePageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class DownloadRoutePageModel extends FlutterFlowModel<DownloadRoutePageWidget> {

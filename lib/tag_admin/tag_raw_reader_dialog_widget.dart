@@ -1,10 +1,10 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'tag_raw_reader_dialog_model.dart';
 export 'tag_raw_reader_dialog_model.dart';
@@ -124,7 +124,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
             SizedBox(width: 12),
             Text(
               'Contenido copiado al portapapeles',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -170,7 +170,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                     SizedBox(width: 12),
                     Text(
                       'Contenido Raw del TAG',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -219,7 +219,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                     Text(
                       'ACERQUE EL TAG',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFF59E0B),
@@ -238,7 +238,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                         SizedBox(width: 16),
                         Text(
                           'Leyendo contenido raw...',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             color: Colors.white,
                           ),
@@ -280,7 +280,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                               children: [
                                 Text(
                                   'Contenido Raw',
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 14,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
@@ -310,7 +310,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                                         SizedBox(width: 6),
                                         Text(
                                           'Copiar',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'Roboto',
                                             fontSize: 12,
                                             fontWeight: FontWeight.w600,
                                             color: Color(0xFFF59E0B),
@@ -331,7 +331,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                               ),
                               child: SelectableText(
                                 _model.rawContent,
-                                style: GoogleFonts.jetBrainsMono(
+                                style: TextStyle(fontFamily: 'Roboto Mono',
                                   fontSize: 11,
                                   color: Color(0xFFF59E0B),
                                   height: 1.6,
@@ -367,7 +367,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                     Expanded(
                       child: Text(
                         _model.errorMessage!,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -390,7 +390,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                       options: FFButtonOptions(
                         height: 48,
                         color: Color(0xFF374151),
-                        textStyle: GoogleFonts.inter(
+                        textStyle: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -409,7 +409,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                         options: FFButtonOptions(
                           height: 48,
                           color: Color(0xFFF59E0B),
-                          textStyle: GoogleFonts.inter(
+                          textStyle: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -449,7 +449,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
               SizedBox(width: 8),
               Text(
                 'Información Técnica',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -476,7 +476,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
           SizedBox(width: 6),
           Text(
             '$label: ',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               color: Colors.white60,
             ),
@@ -484,7 +484,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
           Expanded(
             child: Text(
               value,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -520,7 +520,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
         children: [
           Text(
             'Registros Decodificados',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -548,7 +548,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                 children: [
                   Text(
                     'Registro #$index',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFF59E0B),
@@ -567,7 +567,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                           children: [
                             Text(
                               '$key: ',
-                              style: GoogleFonts.jetBrainsMono(
+                              style: TextStyle(fontFamily: 'Roboto Mono',
                                 fontSize: 10,
                                 color: Color(0xFFA78BFA),
                               ),
@@ -575,7 +575,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                             Expanded(
                               child: Text(
                                 value,
-                                style: GoogleFonts.jetBrainsMono(
+                                style: TextStyle(fontFamily: 'Roboto Mono',
                                   fontSize: 10,
                                   color: Color(0xFF10B981),
                                 ),

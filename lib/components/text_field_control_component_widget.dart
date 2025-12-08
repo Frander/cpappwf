@@ -1,8 +1,8 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'text_field_control_component_model.dart';
 export 'text_field_control_component_model.dart';
@@ -53,7 +53,7 @@ class _TextFieldControlComponentWidgetState
         decoration: InputDecoration(
           isDense: true,
           labelStyle: FlutterFlowTheme.of(context).labelMedium.override(
-                font: GoogleFonts.inter(
+                font: TextStyle(fontFamily: 'Roboto',
                   fontWeight:
                       FlutterFlowTheme.of(context).labelMedium.fontWeight,
                   fontStyle: FlutterFlowTheme.of(context).labelMedium.fontStyle,
@@ -64,7 +64,7 @@ class _TextFieldControlComponentWidgetState
               ),
           hintText: 'TextField',
           hintStyle: FlutterFlowTheme.of(context).labelMedium.override(
-                font: GoogleFonts.inter(
+                font: TextStyle(fontFamily: 'Roboto',
                   fontWeight:
                       FlutterFlowTheme.of(context).labelMedium.fontWeight,
                   fontStyle: FlutterFlowTheme.of(context).labelMedium.fontStyle,
@@ -105,7 +105,7 @@ class _TextFieldControlComponentWidgetState
           fillColor: FlutterFlowTheme.of(context).secondaryBackground,
         ),
         style: FlutterFlowTheme.of(context).bodyMedium.override(
-              font: GoogleFonts.inter(
+              font: TextStyle(fontFamily: 'Roboto',
                 fontWeight: FlutterFlowTheme.of(context).bodyMedium.fontWeight,
                 fontStyle: FlutterFlowTheme.of(context).bodyMedium.fontStyle,
               ),

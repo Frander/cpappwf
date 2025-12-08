@@ -13,6 +13,7 @@ class NfcWriteDialogModel extends FlutterFlowModel<NfcWriteDialogWidget> {
   int totalVisits = 0;
   int totalResults = 0;
   String operatorId = '';
+  String operator2Id = ''; // Operador Cortero (OP2)
   int headquarterId = 0;
   String headquarterName = '';
   DateTime? dateHour;

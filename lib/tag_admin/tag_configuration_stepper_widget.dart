@@ -1,10 +1,10 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 
 class TagConfigurationStepperWidget extends StatefulWidget {
@@ -172,7 +172,7 @@ class _TagConfigurationStepperWidgetState
                         SizedBox(width: 12),
                         Text(
                           'Configurar TAG',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -292,7 +292,7 @@ class _TagConfigurationStepperWidgetState
                   options: FFButtonOptions(
                     height: 50,
                     color: Color(0xFF3B82F6),
-                    textStyle: GoogleFonts.inter(
+                    textStyle: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -311,7 +311,7 @@ class _TagConfigurationStepperWidgetState
                     options: FFButtonOptions(
                       height: 50,
                       color: Color(0xFF10B981),
-                      textStyle: GoogleFonts.inter(
+                      textStyle: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -357,7 +357,7 @@ class _TagConfigurationStepperWidgetState
                 Expanded(
                   child: Text(
                     'Esta acción escribirá "0" en el TAG, eliminando su contenido actual.',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       color: Colors.white,
                       height: 1.5,
@@ -393,7 +393,7 @@ class _TagConfigurationStepperWidgetState
                   options: FFButtonOptions(
                     height: 50,
                     color: Color(0xFF374151),
-                    textStyle: GoogleFonts.inter(
+                    textStyle: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -412,7 +412,7 @@ class _TagConfigurationStepperWidgetState
                     height: 50,
                     color: Color(0xFFEF4444),
                     disabledColor: Color(0xFF4B5563),
-                    textStyle: GoogleFonts.inter(
+                    textStyle: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -476,7 +476,7 @@ class _TagConfigurationStepperWidgetState
                   options: FFButtonOptions(
                     height: 50,
                     color: Color(0xFF374151),
-                    textStyle: GoogleFonts.inter(
+                    textStyle: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -494,7 +494,7 @@ class _TagConfigurationStepperWidgetState
                   options: FFButtonOptions(
                     height: 50,
                     color: Color(0xFF10B981),
-                    textStyle: GoogleFonts.inter(
+                    textStyle: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -526,7 +526,7 @@ class _TagConfigurationStepperWidgetState
                   options: FFButtonOptions(
                     height: 50,
                     color: Color(0xFF8B5CF6),
-                    textStyle: GoogleFonts.inter(
+                    textStyle: TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -564,7 +564,7 @@ class _TagConfigurationStepperWidgetState
             children: [
               Text(
                 title,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -573,7 +573,7 @@ class _TagConfigurationStepperWidgetState
               SizedBox(height: 4),
               Text(
                 subtitle,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 13,
                   color: Colors.white60,
                 ),
@@ -613,7 +613,7 @@ class _TagConfigurationStepperWidgetState
           Text(
             title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -623,7 +623,7 @@ class _TagConfigurationStepperWidgetState
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 13,
               color: Colors.white60,
             ),
@@ -647,7 +647,7 @@ class _TagConfigurationStepperWidgetState
           SizedBox(height: 16),
           Text(
             message,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 15,
               color: Colors.white,
             ),
@@ -673,7 +673,7 @@ class _TagConfigurationStepperWidgetState
               SizedBox(width: 8),
               Text(
                 'Contenido del TAG',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -691,7 +691,7 @@ class _TagConfigurationStepperWidgetState
             ),
             child: Text(
               _showRaw ? _rawContent : _tagContent,
-              style: GoogleFonts.jetBrainsMono(
+              style: TextStyle(fontFamily: 'Roboto Mono',
                 fontSize: 12,
                 color: Color(0xFF10B981),
               ),
@@ -725,7 +725,7 @@ class _TagConfigurationStepperWidgetState
             SizedBox(width: 8),
             Text(
               _showRaw ? 'Ocultar Raw' : 'Ver Raw',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
                 color: _showRaw ? Color(0xFFF59E0B) : Colors.white60,
               ),
@@ -754,7 +754,7 @@ class _TagConfigurationStepperWidgetState
               children: [
                 Text(
                   '¡TAG Limpio!',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF10B981),
@@ -762,7 +762,7 @@ class _TagConfigurationStepperWidgetState
                 ),
                 Text(
                   'El TAG contiene solo "0"',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 13,
                     color: Colors.white70,
                   ),
@@ -793,7 +793,7 @@ class _TagConfigurationStepperWidgetState
               children: [
                 Text(
                   'TAG con Contenido',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFFEF4444),
@@ -801,7 +801,7 @@ class _TagConfigurationStepperWidgetState
                 ),
                 Text(
                   'El TAG no está limpio. Vuelva al paso 2.',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 13,
                     color: Colors.white70,
                   ),

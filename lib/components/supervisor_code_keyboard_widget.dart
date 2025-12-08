@@ -1,7 +1,7 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'dart:math' as math;
 
 class SupervisorCodeKeyboardWidget extends StatefulWidget {
@@ -169,7 +169,7 @@ class _SupervisorCodeKeyboardWidgetState
             // Título
             Text(
               'Código de Supervisor',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -180,7 +180,7 @@ class _SupervisorCodeKeyboardWidgetState
 
             Text(
               'Ingrese el código para continuar',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.7),
               ),
@@ -220,7 +220,7 @@ class _SupervisorCodeKeyboardWidgetState
                         ? Center(
                             child: Text(
                               'Ingrese el código',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 16,
                                 color: Colors.white.withOpacity(0.4),
                                 fontWeight: FontWeight.w500,
@@ -268,7 +268,7 @@ class _SupervisorCodeKeyboardWidgetState
             // Contador de dígitos
             Text(
               '${_code.length} / 12 dígitos',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 12,
                 color: Colors.white.withOpacity(0.5),
               ),
@@ -386,7 +386,7 @@ class _SupervisorCodeKeyboardWidgetState
                               SizedBox(width: 12),
                               Text(
                                 'VALIDAR CÓDIGO',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -440,7 +440,7 @@ class _SupervisorCodeKeyboardWidgetState
         child: Center(
           child: Text(
             number,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,

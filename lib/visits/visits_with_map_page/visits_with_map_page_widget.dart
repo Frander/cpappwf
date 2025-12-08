@@ -6,7 +6,6 @@ import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'visits_with_map_page_model.dart';
 export 'visits_with_map_page_model.dart';
@@ -178,7 +177,8 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                       FFAppState().activitySelectedJSON,
                       r'''$.name_activity''',
                     )?.toString() ?? 'Realizar Visitas',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF00ff9f),
@@ -226,12 +226,14 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                 indicatorPadding: EdgeInsets.all(4),
                 labelColor: Colors.white,
                 unselectedLabelColor: Color(0xFF00ff9f).withOpacity(0.6),
-                labelStyle: GoogleFonts.inter(
+                labelStyle: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
-                unselectedLabelStyle: GoogleFonts.inter(
+                unselectedLabelStyle: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
                 ),
@@ -318,7 +320,8 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
           SizedBox(height: 24),
           Text(
             'Mapa deshabilitado',
-            style: GoogleFonts.inter(
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white.withOpacity(0.8),
@@ -331,7 +334,8 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             child: Text(
               'Para habilitar el mapa, debe generar una ruta óptima desde la pantalla anterior',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.6),
                 letterSpacing: 0.3,

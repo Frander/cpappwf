@@ -1,9 +1,9 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'tag_test_writer_dialog_model.dart';
 export 'tag_test_writer_dialog_model.dart';
@@ -114,7 +114,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     SizedBox(width: 12),
                     Text(
                       'Escribir Datos de Prueba',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -150,7 +150,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                             SizedBox(width: 8),
                             Text(
                               'Datos de prueba',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
@@ -161,7 +161,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                         SizedBox(height: 12),
                         Text(
                           'Se escribirá el siguiente contenido de prueba en el TAG:',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             color: Colors.white70,
                           ),
@@ -179,7 +179,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                           ),
                           child: Text(
                             _model.dataToWrite,
-                            style: GoogleFonts.jetBrainsMono(
+                            style: TextStyle(fontFamily: 'Roboto Mono',
                               fontSize: 11,
                               color: Color(0xFF10B981),
                               height: 1.6,
@@ -227,7 +227,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     Text(
                       'ACERQUE EL TAG',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF10B981),
@@ -245,7 +245,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                         SizedBox(width: 16),
                         Text(
                           'Escribiendo datos de prueba...',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             color: Colors.white,
                           ),
@@ -276,7 +276,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     Text(
                       '¡TAG escrito exitosamente!',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF10B981),
@@ -286,7 +286,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     Text(
                       'Los datos de prueba han sido escritos en el TAG NFC.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 14,
                         color: Colors.white70,
                       ),
@@ -311,7 +311,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     Expanded(
                       child: Text(
                         _model.errorMessage!,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -334,7 +334,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                       options: FFButtonOptions(
                         height: 48,
                         color: Color(0xFF374151),
-                        textStyle: GoogleFonts.inter(
+                        textStyle: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -357,7 +357,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                         options: FFButtonOptions(
                           height: 48,
                           color: Color(0xFF10B981),
-                          textStyle: GoogleFonts.inter(
+                          textStyle: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -387,7 +387,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
         children: [
           Text(
             'Vista previa del contenido',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color: Colors.white70,
@@ -406,7 +406,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
               SizedBox(width: 6),
               Text(
                 '2 registros duplicados',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 11,
                   color: Color(0xFF3B82F6),
                   fontStyle: FontStyle.italic,
@@ -428,14 +428,14 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
           SizedBox(width: 6),
           Text(
             '$label: ',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               color: Colors.white60,
             ),
           ),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: Colors.white,

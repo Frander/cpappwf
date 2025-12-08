@@ -6,7 +6,6 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'news_page_widget.dart' show NewsPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class NewsPageModel extends FlutterFlowModel<NewsPageWidget> {

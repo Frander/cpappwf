@@ -8,7 +8,6 @@ import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'validation_sync_route_widget.dart' show ValidationSyncRouteWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class ValidationSyncRouteModel

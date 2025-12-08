@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_radio_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -8,7 +8,7 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'headquarters_install_page_model.dart';
 export 'headquarters_install_page_model.dart';
@@ -127,7 +127,7 @@ class _HeadquartersInstallPageWidgetState
                                   textStyle: FlutterFlowTheme.of(context)
                                       .labelMedium
                                       .override(
-                                        font: GoogleFonts.inter(
+                                        font: TextStyle(fontFamily: 'Roboto',
                                           fontWeight:
                                               FlutterFlowTheme.of(context)
                                                   .labelMedium
@@ -149,7 +149,7 @@ class _HeadquartersInstallPageWidgetState
                                       FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.bold,
                                               fontStyle:
                                                   FlutterFlowTheme.of(context)
@@ -183,7 +183,7 @@ class _HeadquartersInstallPageWidgetState
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -229,7 +229,7 @@ class _HeadquartersInstallPageWidgetState
                                       labelStyle: FlutterFlowTheme.of(context)
                                           .labelMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight:
                                                   FlutterFlowTheme.of(context)
                                                       .labelMedium
@@ -253,7 +253,7 @@ class _HeadquartersInstallPageWidgetState
                                       hintStyle: FlutterFlowTheme.of(context)
                                           .labelMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight:
                                                   FlutterFlowTheme.of(context)
                                                       .labelMedium
@@ -314,7 +314,7 @@ class _HeadquartersInstallPageWidgetState
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: GoogleFonts.inter(
+                                          font: TextStyle(fontFamily: 'Roboto',
                                             fontWeight:
                                                 FlutterFlowTheme.of(context)
                                                     .bodyMedium
@@ -484,8 +484,8 @@ class _HeadquartersInstallPageWidgetState
                                                                 .bodyMedium
                                                                 .override(
                                                                   font:
-                                                                      GoogleFonts
-                                                                          .inter(
+                                                                      TextStyle(
+                                                                    fontFamily: 'Roboto',
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .bold,

@@ -9,7 +9,6 @@ import '/index.dart';
 import 'validation_sync_install_component_widget.dart'
     show ValidationSyncInstallComponentWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class ValidationSyncInstallComponentModel

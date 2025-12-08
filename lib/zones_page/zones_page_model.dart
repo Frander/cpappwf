@@ -6,7 +6,6 @@ import 'dart:ui';
 import '/index.dart';
 import 'zones_page_widget.dart' show ZonesPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class ZonesPageModel extends FlutterFlowModel<ZonesPageWidget> {

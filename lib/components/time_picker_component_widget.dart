@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -8,7 +8,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'time_picker_component_model.dart';
 export 'time_picker_component_model.dart';
@@ -702,7 +702,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                         SizedBox(width: 12),
                         Text(
                           'Seleccionar Hora',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -723,7 +723,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                         ),
                         child: Text(
                           'AHORA',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -754,7 +754,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                       // Separador
                       Text(
                         ':',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 48,
                           fontWeight: FontWeight.bold,
                           color: Colors.white.withOpacity(0.8),
@@ -790,7 +790,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                         ),
                         child: Text(
                           'Cancelar',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.8),
@@ -818,7 +818,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                         ),
                         child: Text(
                           'Confirmar',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -890,7 +890,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
             children: [
               Text(
                 value.toString().padLeft(2, '0'),
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 56,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -900,7 +900,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
               SizedBox(height: 4),
               Text(
                 label,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: Colors.white.withOpacity(0.8),

@@ -1,9 +1,9 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'nfc_clear_dialog_model.dart';
 export 'nfc_clear_dialog_model.dart';
@@ -103,7 +103,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     SizedBox(width: 12),
                     Text(
                       'Limpiar TAG NFC',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -141,7 +141,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                             children: [
                               Text(
                                 '¡Advertencia!',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFFFBBF24),
@@ -150,7 +150,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                               SizedBox(height: 8),
                               Text(
                                 'Esta acción borrará TODA la información almacenada en el TAG NFC. Esta operación no se puede deshacer.',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 14,
                                   color: Colors.white70,
                                   height: 1.5,
@@ -174,7 +174,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                       children: [
                         Text(
                           'Antes de continuar:',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -221,7 +221,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     Text(
                       '⚠️ MANTENGA EL TAG CERCA',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFFEF4444),
@@ -249,7 +249,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                                 child: Text(
                                   'Limpiando TAG...\nNo retire el TAG hasta que finalice',
                                   textAlign: TextAlign.left,
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 13,
                                     color: Colors.white,
                                     height: 1.4,
@@ -265,7 +265,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     Text(
                       'Esto puede tomar unos segundos',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         color: Colors.white60,
                         fontStyle: FontStyle.italic,
@@ -295,7 +295,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     Text(
                       '¡TAG limpiado exitosamente!',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF10B981),
@@ -305,7 +305,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     Text(
                       'El TAG NFC ha sido borrado y está listo para ser utilizado nuevamente.',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 14,
                         color: Colors.white70,
                       ),
@@ -330,7 +330,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     Expanded(
                       child: Text(
                         _model.errorMessage,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -353,7 +353,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                       options: FFButtonOptions(
                         height: 48,
                         color: Color(0xFF374151),
-                        textStyle: GoogleFonts.inter(
+                        textStyle: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -376,7 +376,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                         options: FFButtonOptions(
                           height: 48,
                           color: Color(0xFFEF4444),
-                          textStyle: GoogleFonts.inter(
+                          textStyle: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -408,7 +408,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
                 color: Colors.white70,
               ),

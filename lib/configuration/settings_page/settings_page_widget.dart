@@ -1,4 +1,4 @@
-import '/components/info_dialog_widget.dart';
+﻿import '/components/info_dialog_widget.dart';
 import '/components/nfc_view_raw_dialog_widget.dart';
 import '/components/nfc_clear_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
@@ -7,7 +7,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'settings_page_model.dart';
 export 'settings_page_model.dart';
@@ -184,7 +184,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -208,7 +208,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                 style: FlutterFlowTheme.of(context)
                                     .bodyMedium
                                     .override(
-                                      font: GoogleFonts.inter(
+                                      font: TextStyle(fontFamily: 'Roboto',
                                         fontWeight: FontWeight.bold,
                                         fontStyle: FlutterFlowTheme.of(context)
                                             .bodyMedium
@@ -233,7 +233,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                 style: FlutterFlowTheme.of(context)
                                     .bodyMedium
                                     .override(
-                                      font: GoogleFonts.inter(
+                                      font: TextStyle(fontFamily: 'Roboto',
                                         fontWeight: FontWeight.bold,
                                         fontStyle: FlutterFlowTheme.of(context)
                                             .bodyMedium
@@ -318,7 +318,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(
@@ -403,7 +403,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(
@@ -493,7 +493,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(
@@ -578,7 +578,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(
@@ -674,7 +674,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(
@@ -765,7 +765,7 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: GoogleFonts.inter(
+                                                  font: TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
                                                     fontStyle:
                                                         FlutterFlowTheme.of(

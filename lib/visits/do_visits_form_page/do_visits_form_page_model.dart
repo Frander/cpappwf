@@ -11,7 +11,6 @@ import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'do_visits_form_page_widget.dart' show DoVisitsFormPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class DoVisitsFormPageModel extends FlutterFlowModel<DoVisitsFormPageWidget> {

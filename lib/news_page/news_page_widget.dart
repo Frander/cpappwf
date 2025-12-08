@@ -1,11 +1,11 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'news_page_model.dart';
 export 'news_page_model.dart';
@@ -114,7 +114,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget> {
                               style: FlutterFlowTheme.of(context)
                                   .bodyMedium
                                   .override(
-                                    font: GoogleFonts.inter(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FontWeight.bold,
                                       fontStyle: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -162,7 +162,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget> {
                                         labelStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight:
                                                     FlutterFlowTheme.of(context)
                                                         .labelMedium
@@ -186,7 +186,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget> {
                                         hintStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight:
                                                     FlutterFlowTheme.of(context)
                                                         .labelMedium
@@ -247,7 +247,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight:
                                                   FlutterFlowTheme.of(context)
                                                       .bodyMedium
@@ -337,8 +337,8 @@ class _NewsPageWidgetState extends State<NewsPageWidget> {
                                                     FlutterFlowTheme.of(context)
                                                         .titleMedium
                                                         .override(
-                                                          font: GoogleFonts
-                                                              .interTight(
+                                                          font: TextStyle(
+                                                            fontFamily: 'Roboto',
                                                             fontWeight:
                                                                 FlutterFlowTheme.of(
                                                                         context)
@@ -426,8 +426,8 @@ class _NewsPageWidgetState extends State<NewsPageWidget> {
                                                                 .bodyMedium
                                                                 .override(
                                                                   font:
-                                                                      GoogleFonts
-                                                                          .inter(
+                                                                      TextStyle(
+                                                                    fontFamily: 'Roboto',
                                                                     fontWeight:
                                                                         FontWeight
                                                                             .bold,

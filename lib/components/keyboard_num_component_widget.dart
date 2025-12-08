@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -7,7 +7,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'keyboard_num_component_model.dart';
 export 'keyboard_num_component_model.dart';
@@ -117,7 +117,7 @@ class _KeyboardNumComponentWidgetState
             Text(
               widget!.tittle,
               style: FlutterFlowTheme.of(context).headlineMedium.override(
-                    font: GoogleFonts.interTight(
+                    font: TextStyle(fontFamily: 'Roboto',
                       fontWeight: FontWeight.w600,
                       fontStyle:
                           FlutterFlowTheme.of(context).headlineMedium.fontStyle,
@@ -165,7 +165,7 @@ class _KeyboardNumComponentWidgetState
                               style: FlutterFlowTheme.of(context)
                                   .displayMedium
                                   .override(
-                                    font: GoogleFonts.interTight(
+                                    font: TextStyle(fontFamily: 'Roboto',
                                       fontWeight: FlutterFlowTheme.of(context)
                                           .displayMedium
                                           .fontWeight,
@@ -229,7 +229,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -291,7 +291,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -353,7 +353,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -421,7 +421,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -483,7 +483,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -545,7 +545,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -613,7 +613,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -675,7 +675,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -737,7 +737,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)
@@ -841,7 +841,7 @@ class _KeyboardNumComponentWidgetState
                                           style: FlutterFlowTheme.of(context)
                                               .headlineLarge
                                               .override(
-                                                font: GoogleFonts.interTight(
+                                                font: TextStyle(fontFamily: 'Roboto',
                                                   fontWeight:
                                                       FlutterFlowTheme.of(
                                                               context)

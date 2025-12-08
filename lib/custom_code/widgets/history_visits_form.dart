@@ -1,4 +1,4 @@
-// Automatic FlutterFlow imports
+﻿// Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
 import '/backend/schema/enums/enums.dart';
 import '/backend/sqlite/sqlite_manager.dart';
@@ -19,7 +19,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:carousel_slider/carousel_slider.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import '/backend/sqlite/global_db_singleton.dart';
 
 // ============================================================================
@@ -625,7 +625,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           SnackBar(
             content: Text(
               'Sincronización completada',
-              style: GoogleFonts.inter(color: Colors.white),
+              style: TextStyle(fontFamily: 'Roboto',color: Colors.white),
             ),
             backgroundColor: const Color(0xFF00C853),
             behavior: SnackBarBehavior.floating,
@@ -639,7 +639,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           SnackBar(
             content: Text(
               'Error en sincronización',
-              style: GoogleFonts.inter(color: Colors.white),
+              style: TextStyle(fontFamily: 'Roboto',color: Colors.white),
             ),
             backgroundColor: const Color(0xFFFF6B35),
             behavior: SnackBarBehavior.floating,
@@ -719,7 +719,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 children: [
                   Text(
                     'Dashboard Agronómico',
-                    style: GoogleFonts.orbitron(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                       foreground: Paint()
@@ -731,7 +731,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                   const SizedBox(height: 2),
                   Text(
                     'Sistema de Monitoreo en Tiempo Real',
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 10,
                       color: Colors.white70,
                     ),
@@ -811,7 +811,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       ),
                       child: Text(
                         _pendingSyncCount > 99 ? '99+' : '$_pendingSyncCount',
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 9,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -848,7 +848,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(height: 24),
           Text(
             'Cargando datos...',
-            style: GoogleFonts.orbitron(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               color: const Color(0xFF10B981),
             ),
@@ -888,7 +888,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       children: [
         Text(
           'ACTIVIDADES',
-          style: GoogleFonts.orbitron(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Colors.white,
@@ -964,7 +964,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       Expanded(
                         child: Text(
                           activity.activityName,
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -1021,7 +1021,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
         const SizedBox(height: 8),
         Text(
           value,
-          style: GoogleFonts.orbitron(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 20,
             fontWeight: FontWeight.bold,
             color: color,
@@ -1030,7 +1030,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
         const SizedBox(height: 4),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 11,
             color: Colors.white,
           ),
@@ -1058,7 +1058,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(width: 6),
           Text(
             _formatDateRangeAgo(firstDate, lastDate),
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 11,
               color: Colors.white,
               fontWeight: FontWeight.w500,
@@ -1074,7 +1074,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       return Center(
         child: Text(
           'No hay datos de estados',
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 12,
             color: Colors.white,
           ),
@@ -1090,7 +1090,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
         children: [
           Text(
             'Estados de la Actividad',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               color: Colors.white70,
               fontWeight: FontWeight.w500,
@@ -1117,7 +1117,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               Expanded(
                 child: Text(
                   status.statusName,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 11,
                     color: Colors.white,
                   ),
@@ -1128,7 +1128,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               const SizedBox(width: 8),
               Text(
                 '${status.count}',
-                style: GoogleFonts.orbitron(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                   color: const Color(0xFF10B981),
@@ -1162,7 +1162,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       return Center(
         child: Text(
           'No hay datos históricos',
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 12,
             color: Colors.white,
           ),
@@ -1211,7 +1211,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '${date.day}/${date.month}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 10,
                         color: Colors.white54,
                       ),
@@ -1230,7 +1230,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               getTitlesWidget: (value, meta) {
                 return Text(
                   value.toInt().toString(),
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 10,
                     color: Colors.white54,
                   ),
@@ -1296,7 +1296,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 final date = activity.dailyData[spot.x.toInt()].date;
                 return LineTooltipItem(
                   '${date.day}/${date.month}\n${spot.y.toInt()} visitas',
-                  GoogleFonts.inter(
+                  TextStyle(fontFamily: 'Roboto',
                     color: Colors.white,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -1320,7 +1320,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       children: [
         Text(
           'OPERADORES',
-          style: GoogleFonts.orbitron(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 18,
             fontWeight: FontWeight.w900,
             color: Colors.white,
@@ -1383,7 +1383,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                   Expanded(
                     child: Text(
                       operator.operatorName,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
                         color: Colors.white,
@@ -1526,7 +1526,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               Expanded(
                 child: Text(
                   label,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 11,
                     color: Colors.white70,
                   ),
@@ -1539,7 +1539,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.orbitron(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: color,
@@ -1563,14 +1563,14 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           children: [
             Text(
               'Eficiencia',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 12,
                 color: Colors.white,
               ),
             ),
             Text(
               '${efficiency.toStringAsFixed(1)}%',
-              style: GoogleFonts.orbitron(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
                 color: _getEfficiencyColor(efficiency),
@@ -1629,7 +1629,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       child: Center(
         child: Text(
           _getInitials(operatorName),
-          style: GoogleFonts.orbitron(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 16,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -1653,7 +1653,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(width: 4),
           Text(
             value,
-            style: GoogleFonts.orbitron(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -1734,7 +1734,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                     children: [
                       Text(
                         data.type.toUpperCase(),
-                        style: GoogleFonts.orbitron(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFFFF6B35),
@@ -1743,7 +1743,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       const SizedBox(height: 4),
                       Text(
                         data.description,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 13,
                           color: Colors.white,
                         ),
@@ -1771,7 +1771,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 const SizedBox(width: 8),
                 Text(
                   _formatDateTime(data.timestamp),
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
                     color: Colors.white54,
                   ),
@@ -1854,7 +1854,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                     children: [
                       Text(
                         (data['download_type'] as String).toUpperCase(),
-                        style: GoogleFonts.orbitron(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: const Color(0xFF10B981),
@@ -1863,7 +1863,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       const SizedBox(height: 4),
                       Text(
                         data['description'] as String,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 13,
                           color: Colors.white,
                         ),
@@ -1896,7 +1896,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       _formatDateTime(
                         DateTime.parse(data['downloaded_at'] as String),
                       ),
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         color: Colors.white54,
                       ),
@@ -1914,7 +1914,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       const SizedBox(width: 8),
                       Text(
                         _formatFileSize(data['file_size'] as int),
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 12,
                           color: Colors.white54,
                         ),
@@ -1954,7 +1954,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(height: 24),
           Text(
             message,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               color: Colors.white,
             ),
@@ -2200,7 +2200,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           ),
           title: Text(
             visit.activityName,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 15,
               fontWeight: FontWeight.w600,
               color: Colors.white,
@@ -2212,7 +2212,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               const SizedBox(height: 4),
               Text(
                 visit.headquarterName,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   color: Colors.white70,
                 ),
@@ -2228,7 +2228,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                   const SizedBox(width: 4),
                   Text(
                     _formatDateTime(visit.createdAt),
-                    style: GoogleFonts.inter(
+                    style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 11,
                       color: Colors.white54,
                     ),
@@ -2243,7 +2243,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 padding: const EdgeInsets.all(16),
                 child: Text(
                   'No hay detalles registrados',
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 13,
                     color: Colors.white54,
                   ),
@@ -2279,7 +2279,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               Expanded(
                 child: Text(
                   detail.statusName,
-                  style: GoogleFonts.inter(
+                  style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: const Color(0xFF00FF7F),
@@ -2358,7 +2358,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       ),
       child: Text(
         statusType.toUpperCase(),
-        style: GoogleFonts.inter(
+        style: TextStyle(fontFamily: 'Roboto',
           fontSize: 9,
           color: Colors.white54,
           fontWeight: FontWeight.w600,
@@ -2412,7 +2412,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       child: Center(
         child: Text(
           value.isNotEmpty ? value : '0',
-          style: GoogleFonts.orbitron(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 28,
             fontWeight: FontWeight.bold,
             color: const Color(0xFF95D5B2),
@@ -2439,7 +2439,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
         children: [
           Text(
             'Resultado Calculado',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 11,
               color: Colors.white70,
             ),
@@ -2447,7 +2447,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(height: 8),
           Text(
             value,
-            style: GoogleFonts.orbitron(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: const Color(0xFF95D5B2),
@@ -2457,7 +2457,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
             const SizedBox(height: 8),
             Text(
               'Fórmula: ${detail.defaultStatus}',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 10,
                 color: Colors.white54,
                 fontStyle: FontStyle.italic,
@@ -2485,7 +2485,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       child: Center(
         child: Text(
           value,
-          style: GoogleFonts.inter(
+          style: TextStyle(fontFamily: 'Roboto',
             fontSize: 24,
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -2509,7 +2509,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       ),
       child: Text(
         value,
-        style: GoogleFonts.inter(
+        style: TextStyle(fontFamily: 'Roboto',
           fontSize: 13,
           color: Colors.white,
         ),
@@ -2543,7 +2543,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           Expanded(
             child: Text(
               value,
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
@@ -2575,7 +2575,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               detail.statusResponse.isNotEmpty
                   ? detail.statusResponse
                   : 'Tag procesado',
-              style: GoogleFonts.inter(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
                 color: Colors.white,
               ),
@@ -2602,14 +2602,14 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
         children: [
           Text(
             'Distancia',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 11,
               color: Colors.white70,
             ),
           ),
           Text(
             '$value km',
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 18,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -2641,7 +2641,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           const SizedBox(width: 8),
           Text(
             value,
-            style: GoogleFonts.inter(
+            style: TextStyle(fontFamily: 'Roboto',
               fontSize: 13,
               color: Colors.white,
             ),
@@ -2666,7 +2666,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       ),
       child: Text(
         value,
-        style: GoogleFonts.inter(
+        style: TextStyle(fontFamily: 'Roboto',
           fontSize: 13,
           color: Colors.white,
         ),

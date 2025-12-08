@@ -1,11 +1,11 @@
-import '/flutter_flow/flutter_flow_theme.dart';
+﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/backend/schema/structs/index.dart';
@@ -285,7 +285,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                         labelStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: GoogleFonts.inter(
+                                              font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               color: Color(0xFF00ff9f).withOpacity(0.7),
@@ -294,7 +294,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                         hintStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: GoogleFonts.inter(),
+                                              font: TextStyle(fontFamily: 'Roboto',),
                                               color: Colors.white.withOpacity(0.5),
                                               letterSpacing: 0.0,
                                             ),
@@ -308,7 +308,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: GoogleFonts.inter(
+                                            font: TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.w600,
                                             ),
                                             color: Colors.white,
@@ -378,7 +378,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             SizedBox(width: 8),
                             Text(
                               '${filteredActivities.length} actividad${filteredActivities.length != 1 ? 'es' : ''}',
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF00ff9f),
@@ -409,7 +409,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                               SizedBox(height: 16),
                               Text(
                                 'Cargando actividades...',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
                                   color: Colors.white.withOpacity(0.7),
@@ -445,7 +445,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                   SizedBox(height: 16),
                                   Text(
                                     'No se encontraron actividades',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
                                       color: Colors.white.withOpacity(0.7),
@@ -455,7 +455,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                   SizedBox(height: 8),
                                   Text(
                                     'Intenta con otra búsqueda',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
                                       color: Colors.white.withOpacity(0.5),
@@ -564,7 +564,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                   child: Center(
                     child: Text(
                       '${index + 1}',
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
@@ -599,7 +599,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                   child: Text(
                     activityName,
                     style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: GoogleFonts.inter(
+                          font: TextStyle(fontFamily: 'Roboto',
                             fontWeight: FontWeight.bold,
                           ),
                           color: Colors.white,

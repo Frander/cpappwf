@@ -1,7 +1,7 @@
-import '/flutter_flow/flutter_flow_util.dart';
+﻿import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import '/app_state.dart';
 import 'advanced_sync_dialog_model.dart';
@@ -244,7 +244,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                             ? 'Sincronización Obligatoria'
                             : 'Sincronización Completa',
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.inter(
+                        style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 24,
                           fontWeight: FontWeight.w900,
                           letterSpacing: 0.5,
@@ -265,7 +265,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                           ? 'Requerida por la Actividad'
                           : 'Funciones Avanzadas',
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.inter(
+                      style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: (isSyncMandatory
@@ -381,7 +381,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                         isSyncMandatory
                                             ? 'Sincronización Obligatoria'
                                             : 'Conexión Requerida',
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 13,
                                           fontWeight: FontWeight.bold,
                                           color: isSyncMandatory
@@ -395,7 +395,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                         isSyncMandatory
                                             ? 'La actividad requiere sincronización completa antes de continuar'
                                             : 'Se necesita internet para sincronizar',
-                                        style: GoogleFonts.inter(
+                                        style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 11,
                                           fontWeight: FontWeight.w600,
                                           color: (isSyncMandatory
@@ -499,7 +499,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                         SizedBox(width: 12),
                                         Text(
                                           'Sincronizando...',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'Roboto',
                                             fontSize: 17,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
@@ -520,7 +520,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                         SizedBox(width: 12),
                                         Text(
                                           'SINCRONIZAR AHORA',
-                                          style: GoogleFonts.inter(
+                                          style: TextStyle(fontFamily: 'Roboto',
                                             fontSize: 17,
                                             fontWeight: FontWeight.w900,
                                             color: Colors.white,
@@ -589,7 +589,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                     isSyncMandatory
                                         ? 'VOLVER'
                                         : 'OMITIR ESTE PASO',
-                                    style: GoogleFonts.inter(
+                                    style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
                                       color: (isSyncMandatory
@@ -657,7 +657,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
             children: [
               Text(
                 title,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -668,7 +668,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
               SizedBox(height: 2),
               Text(
                 description,
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
                   color: Colors.white.withOpacity(0.7),

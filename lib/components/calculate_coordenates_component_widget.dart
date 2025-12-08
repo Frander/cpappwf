@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -12,7 +12,7 @@ import '/index.dart';
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'calculate_coordenates_component_model.dart';
 export 'calculate_coordenates_component_model.dart';
@@ -299,7 +299,7 @@ class _CalculateCoordenatesComponentWidgetState
                         'Visita registrada con éxito. Total visitas: ${FFAppState().visitCount.toString()}',
                         style:
                             FlutterFlowTheme.of(context).titleMedium.override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .titleMedium
                                         .fontWeight,
@@ -375,7 +375,7 @@ class _CalculateCoordenatesComponentWidgetState
                         'Visita registrada con éxito. Total visitas: ${FFAppState().visitCount.toString()}',
                         style:
                             FlutterFlowTheme.of(context).titleMedium.override(
-                                  font: GoogleFonts.interTight(
+                                  font: TextStyle(fontFamily: 'Roboto',
                                     fontWeight: FlutterFlowTheme.of(context)
                                         .titleMedium
                                         .fontWeight,
@@ -407,7 +407,7 @@ class _CalculateCoordenatesComponentWidgetState
                 if (_shouldSetState) safeSetState(() {});
               },
               textAlign: TextAlign.center,
-              style: GoogleFonts.orbitron(
+              style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 80,
                 fontWeight: FontWeight.bold,
                 color: Color(0xFF00FF7F),
@@ -500,7 +500,7 @@ class _CalculateCoordenatesComponentWidgetState
                                     Text(
                                       'Manténgase cerca',
                                       textAlign: TextAlign.center,
-                                      style: GoogleFonts.inter(
+                                      style: TextStyle(fontFamily: 'Roboto',
                                         fontSize: 20,
                                         fontWeight: FontWeight.w700,
                                         color: Colors.white,
@@ -513,7 +513,7 @@ class _CalculateCoordenatesComponentWidgetState
                                 Text(
                                   'Calculando ubicación exacta del dispositivo',
                                   textAlign: TextAlign.center,
-                                  style: GoogleFonts.inter(
+                                  style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 15,
                                     fontWeight: FontWeight.w400,
                                     color: Colors.white.withOpacity(0.8),

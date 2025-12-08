@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -7,7 +7,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
+
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'date_picker_component_model.dart';
@@ -717,7 +717,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                             children: [
                               Text(
                                 _getMonthName(_currentMonth.month),
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -725,7 +725,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                               ),
                               Text(
                                 '${_currentMonth.year}',
-                                style: GoogleFonts.inter(
+                                style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   color: Colors.white.withOpacity(0.8),
                                 ),
@@ -752,7 +752,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                         ),
                         child: Text(
                           'HOY',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -777,7 +777,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                             child: Text(
                               day,
                               textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
+                              style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white.withOpacity(0.6),
@@ -813,7 +813,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                         ),
                         child: Text(
                           'Cancelar',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white.withOpacity(0.8),
@@ -840,7 +840,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                         ),
                         child: Text(
                           'Confirmar',
-                          style: GoogleFonts.inter(
+                          style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -926,7 +926,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
             child: Center(
               child: Text(
                 '$day',
-                style: GoogleFonts.inter(
+                style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 16,
                   fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.w500,
                   color: isSelected
