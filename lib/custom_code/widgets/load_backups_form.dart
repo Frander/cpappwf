@@ -19,20 +19,12 @@ import 'package:intl/intl.dart';
 // ============================================================================
 // NOTA IMPORTANTE: BLUETOOTH
 // ============================================================================
-// Para habilitar la funcionalidad de Bluetooth, necesitas agregar uno de estos
-// paquetes a pubspec.yaml:
-//
-// 1. Para Bluetooth clásico (recomendado para transferencia de archivos):
-//    flutter_bluetooth_serial: ^0.4.0
-//
-// 2. Para Bluetooth Low Energy:
-//    flutter_blue_plus: ^1.32.7
-//
-// Luego descomentar las importaciones y código de Bluetooth más abajo.
+// Este widget usa flutter_blue_plus para la funcionalidad de Bluetooth.
 // ============================================================================
 
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:typed_data';
 import 'package:flutter/services.dart'; // Para MethodChannel
 import 'package:share_plus/share_plus.dart'; // Para compartir archivos
@@ -314,9 +306,9 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
 
   Future<void> _checkBluetoothStatus() async {
     try {
-      final isEnabled = await FlutterBluetoothSerial.instance.isEnabled;
+      final adapterState = await FlutterBluePlus.adapterState.first;
       setState(() {
-        _isBluetoothEnabled = isEnabled ?? false;
+        _isBluetoothEnabled = adapterState == BluetoothAdapterState.on;
       });
     } catch (e) {
       debugPrint('❌ Error verificando Bluetooth: $e');
@@ -326,22 +318,15 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
   Future<void> _enableBluetooth() async {
     try {
       // Solicitar permisos
-      if (Platform.isAndroid) {
-        final status = await Permission.bluetooth.request();
-        final scanStatus = await Permission.bluetoothScan.request();
-        final connectStatus = await Permission.bluetoothConnect.request();
-
-        if (!status.isGranted ||
-            !scanStatus.isGranted ||
-            !connectStatus.isGranted) {
-          throw Exception('Permisos de Bluetooth no otorgados');
-        }
-      }
+      await _requestBluetoothPermissions();
 
       // Habilitar Bluetooth
-      final result = await FlutterBluetoothSerial.instance.requestEnable();
+      await FlutterBluePlus.turnOn();
+
+      // Verificar estado después de solicitar
+      final adapterState = await FlutterBluePlus.adapterState.first;
       setState(() {
-        _isBluetoothEnabled = result ?? false;
+        _isBluetoothEnabled = adapterState == BluetoothAdapterState.on;
       });
 
       if (_isBluetoothEnabled) {
@@ -353,6 +338,30 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
     }
   }
 
+  Future<bool> _requestBluetoothPermissions() async {
+    try {
+      if (!Platform.isAndroid) return true;
+
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      final sdkVersion = androidInfo.version.sdkInt;
+
+      if (sdkVersion >= 31) {
+        final result = await [
+          Permission.bluetoothScan,
+          Permission.bluetoothConnect,
+        ].request();
+
+        return result[Permission.bluetoothScan]?.isGranted == true &&
+            result[Permission.bluetoothConnect]?.isGranted == true;
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error solicitando permisos: $e');
+      return false;
+    }
+  }
+
   Future<void> _scanForDevices() async {
     if (!_isBluetoothEnabled) {
       _showSnackBar('Bluetooth deshabilitado', isError: true);
@@ -360,25 +369,11 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
     }
 
     // Solicitar permisos de Bluetooth primero
-    try {
-      if (Platform.isAndroid) {
-        // Solicitar permisos de Bluetooth
-        Map<Permission, PermissionStatus> statuses = await [
-          Permission.bluetoothScan,
-          Permission.bluetoothConnect,
-        ].request();
-
-        // Verificar si todos los permisos fueron otorgados
-        bool allGranted = statuses.values.every((status) => status.isGranted);
-
-        if (!allGranted) {
-          _showSnackBar('Se requieren permisos de Bluetooth para continuar',
-              isError: true);
-          return;
-        }
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error solicitando permisos: $e');
+    final hasPermissions = await _requestBluetoothPermissions();
+    if (!hasPermissions) {
+      _showSnackBar('Se requieren permisos de Bluetooth para continuar',
+          isError: true);
+      return;
     }
 
     setState(() {
@@ -387,9 +382,8 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
     });
 
     try {
-      // Obtener dispositivos emparejados
-      final bondedDevices =
-          await FlutterBluetoothSerial.instance.getBondedDevices();
+      // Obtener dispositivos emparejados (bonded) usando flutter_blue_plus
+      final bondedDevices = await FlutterBluePlus.bondedDevices;
       setState(() {
         _devicesList = bondedDevices;
         _isScanning = false;
@@ -428,12 +422,10 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
       _transferStartTime = DateTime.now();
     });
 
-    BluetoothConnection? connection;
-
     try {
-      debugPrint(
-          '📤 Iniciando envío de ${selectedFiles.length} archivos a ${device.name ?? device.address}');
-      debugPrint('📱 Dirección del dispositivo: ${device.address}');
+      final deviceName = device.platformName.isNotEmpty ? device.platformName : device.remoteId.str;
+      debugPrint('📤 Iniciando envío de ${selectedFiles.length} archivos a $deviceName');
+      debugPrint('📱 Dirección del dispositivo: ${device.remoteId.str}');
 
       // Mostrar diálogo de espera de aceptación
       final shouldContinue = await _showConnectionWaitingDialog(device);
@@ -451,20 +443,30 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
       // Mostrar diálogo de progreso de transferencia
       _showTransferProgressDialog(device, selectedFiles);
 
-      // Intentar conectar al dispositivo con timeout extendido (30 segundos total)
-      // para dar tiempo a que el usuario del otro dispositivo acepte
-      connection = await BluetoothConnection.toAddress(device.address).timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw Exception(
-              'Timeout: El dispositivo no aceptó la conexión en 30 segundos');
-        },
-      );
-
+      // Conectar al dispositivo BLE
+      await device.connect(timeout: const Duration(seconds: 30));
       debugPrint('✅ Conectado exitosamente');
 
-      if (!connection.isConnected) {
-        throw Exception('La conexión no se estableció correctamente');
+      // Descubrir servicios
+      final services = await device.discoverServices();
+      debugPrint('📋 Servicios descubiertos: ${services.length}');
+
+      // Buscar característica de escritura
+      BluetoothCharacteristic? writeCharacteristic;
+      for (final service in services) {
+        for (final characteristic in service.characteristics) {
+          if (characteristic.properties.write ||
+              characteristic.properties.writeWithoutResponse) {
+            writeCharacteristic = characteristic;
+            debugPrint('✅ Característica de escritura encontrada: ${characteristic.uuid}');
+            break;
+          }
+        }
+        if (writeCharacteristic != null) break;
+      }
+
+      if (writeCharacteristic == null) {
+        throw Exception('No se encontró característica de escritura en el dispositivo');
       }
 
       for (int i = 0; i < selectedFiles.length; i++) {
@@ -487,15 +489,14 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
 
         // Enviar header con información del archivo
         final header = '${file.name}|${fileBytes.length}\n';
-        connection.output.add(Uint8List.fromList(header.codeUnits));
-        await connection.output.allSent;
+        await writeCharacteristic.write(Uint8List.fromList(header.codeUnits), withoutResponse: true);
         debugPrint('   📤 Header enviado');
 
         // Pequeña pausa para asegurar que el receptor procese el header
         await Future.delayed(const Duration(milliseconds: 100));
 
-        // Enviar archivo en chunks con progreso
-        const chunkSize = 1024; // 1KB chunks
+        // Enviar archivo en chunks con progreso (BLE tiene MTU limitado ~20 bytes típicamente)
+        const chunkSize = 20; // Tamaño típico de MTU para BLE
         int bytesTransferred = 0;
         final startTime = DateTime.now();
 
@@ -504,8 +505,11 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
               ? offset + chunkSize
               : fileBytes.length;
 
-          connection.output.add(fileBytes.sublist(offset, end));
-          await connection.output.allSent;
+          await writeCharacteristic.write(
+            fileBytes.sublist(offset, end),
+            withoutResponse: true,
+          );
+          await Future.delayed(const Duration(milliseconds: 20)); // Pausa entre chunks
 
           bytesTransferred = end;
 
@@ -538,8 +542,8 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
         _isSending = false;
       });
 
-      // Cerrar conexión
-      await connection.finish();
+      // Desconectar dispositivo
+      await device.disconnect();
       debugPrint('🔌 Conexión cerrada');
 
       // Cerrar diálogo de progreso y mostrar éxito
@@ -554,14 +558,12 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
         _isSending = false;
       });
 
-      // Intentar cerrar conexión si existe
+      // Intentar desconectar dispositivo
       try {
-        if (connection != null && connection.isConnected) {
-          await connection.finish();
-          debugPrint('🔌 Conexión cerrada después del error');
-        }
+        await device.disconnect();
+        debugPrint('🔌 Conexión cerrada después del error');
       } catch (closeError) {
-        debugPrint('⚠️ Error al cerrar conexión: $closeError');
+        debugPrint('⚠️ Error al desconectar: $closeError');
       }
 
       // Cerrar diálogo de progreso
@@ -574,10 +576,10 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
       if (e.toString().contains('timeout')) {
         errorMessage =
             'Timeout: El dispositivo no respondió. ¿Está preparado para recibir?';
-      } else if (e.toString().contains('read failed')) {
+      } else if (e.toString().contains('característica')) {
         errorMessage =
-            'Conexión rechazada. El dispositivo debe tener una app Bluetooth esperando recibir datos.';
-      } else if (e.toString().contains('socket')) {
+            'El dispositivo no soporta transferencia de archivos por BLE.';
+      } else if (e.toString().contains('connect')) {
         errorMessage =
             'Error de conexión. Verifica que el dispositivo esté cerca y disponible.';
       }
@@ -760,7 +762,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        device.name ?? device.address,
+                        device.platformName.isNotEmpty ? device.platformName : device.remoteId.str,
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -1028,8 +1030,9 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
                                                     CrossAxisAlignment.start,
                                                 children: [
                                                   Text(
-                                                    device.name ??
-                                                        'Dispositivo desconocido',
+                                                    device.platformName.isNotEmpty
+                                                        ? device.platformName
+                                                        : 'Dispositivo desconocido',
                                                     style: const TextStyle(
                                                       fontWeight:
                                                           FontWeight.w600,
@@ -1038,7 +1041,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
                                                   ),
                                                   const SizedBox(height: 4),
                                                   Text(
-                                                    device.address,
+                                                    device.remoteId.str,
                                                     style: TextStyle(
                                                       fontSize: 11,
                                                       color:
@@ -1157,7 +1160,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
 
                   // Dispositivo
                   Text(
-                    'a ${device.name ?? "dispositivo"}',
+                    'a ${device.platformName.isNotEmpty ? device.platformName : "dispositivo"}',
                     style: TextStyle(
                       fontSize: 14,
                       color: FlutterFlowTheme.of(context).secondaryText,

@@ -58,6 +58,7 @@ Future<void> initializeBackgroundLocationService() async {
     androidConfiguration: AndroidConfiguration(
       onStart: onStart,
       autoStart: false, // No iniciar automáticamente, lo haremos manualmente
+      autoStartOnBoot: false, // NO reiniciar cuando el dispositivo arranque
       isForegroundMode: true, // IMPORTANTE: Modo foreground para seguir vivo
       notificationChannelId: 'location_tracking_channel',
       initialNotificationTitle: 'ClickPalm GPS',

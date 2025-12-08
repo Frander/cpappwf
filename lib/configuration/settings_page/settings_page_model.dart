@@ -6,7 +6,6 @@ import 'dart:ui';
 import '/index.dart';
 import 'settings_page_widget.dart' show SettingsPageWidget;
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class SettingsPageModel extends FlutterFlowModel<SettingsPageWidget> {

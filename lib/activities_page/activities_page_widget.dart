@@ -504,6 +504,32 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
       onTap: () async {
         // Guardar actividad seleccionada como STRUCT
         FFAppState().activitySelected = activityItem;
+
+        // Buscar la actividad completa en activitiesJSON usando el id_activity
+        final activitiesJSON = FFAppState().activitiesJSON;
+        if (activitiesJSON != null) {
+          try {
+            final activitiesList = activitiesJSON is List ? activitiesJSON : [];
+            final activityJSON = activitiesList.firstWhere(
+              (activity) => getJsonField(activity, r'''$.id_activity''') == activityItem.idActivity,
+              orElse: () => null,
+            );
+
+            if (activityJSON != null) {
+              // Guardar el JSON completo de la actividad (con activity_steps y activity_status)
+              FFAppState().activitySelectedJSON = activityJSON;
+              FFAppState().currentActivity = activityJSON;
+              debugPrint('✅ Actividad encontrada en activitiesJSON: ${activityItem.nameActivity}');
+            } else {
+              debugPrint('⚠️ Actividad no encontrada en activitiesJSON, id_activity: ${activityItem.idActivity}');
+            }
+          } catch (e) {
+            debugPrint('❌ Error buscando actividad en activitiesJSON: $e');
+          }
+        } else {
+          debugPrint('⚠️ activitiesJSON es null, no se pudo cargar la actividad completa');
+        }
+
         FFAppState().update(() {});
         context.safePop();
       },

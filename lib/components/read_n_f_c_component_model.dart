@@ -6,7 +6,6 @@ import '/custom_code/actions/index.dart' as actions;
 import 'read_n_f_c_component_widget.dart' show ReadNFCComponentWidget;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 class ReadNFCComponentModel extends FlutterFlowModel<ReadNFCComponentWidget> {

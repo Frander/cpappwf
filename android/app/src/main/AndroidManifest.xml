@@ -80,6 +80,7 @@
       android:name="id.flutter.flutter_background_service.BackgroundService"
       android:foregroundServiceType="location"
       android:exported="true"
-      tools:replace="android:exported" />
+      android:stopWithTask="true"
+      tools:replace="android:exported,android:stopWithTask" />
   </application>
 </manifest>

@@ -171,10 +171,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   void _initializeExpansionStates() {
-    final activitySteps = getJsonField(
+    final activityStepsRaw = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_steps''',
-    ).toList();
+    );
+
+    // Si no hay activity_steps, retornar sin hacer nada
+    if (activityStepsRaw == null) return;
+
+    final activitySteps = activityStepsRaw.toList();
 
     for (var i = 0; i < activitySteps.length; i++) {
       final step = activitySteps[i];
@@ -528,10 +533,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   /// Valida recursivamente todos los steps requeridos en la jerarquía
   /// Retorna un mapa con los steps faltantes y su ruta para expansión
   Map<String, dynamic>? _validateRequiredStepsRecursive() {
-    final activitySteps = getJsonField(
+    final activityStepsRaw = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_steps''',
-    ).toList();
+    );
+    if (activityStepsRaw == null) return null;
+    final activitySteps = activityStepsRaw.toList();
 
     final visitDetails = FFAppState().visitDetails;
 
@@ -806,15 +813,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       r'''$.name_activity''',
     );
 
-    final activityStepsRaw = getJsonField(
+    final activityStepsRawData = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_steps''',
-    ).toList();
+    );
 
-    final activityStatusRaw = getJsonField(
+    final activityStatusRawData = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_status''',
-    ).toList();
+    );
+
+    // Si no hay datos, retornar widget vacío
+    if (activityStepsRawData == null || activityStatusRawData == null) {
+      return const SizedBox.shrink();
+    }
+
+    final activityStepsRaw = activityStepsRawData.toList();
+    final activityStatusRaw = activityStatusRawData.toList();
 
     // Ordenar steps por order_step
     final activitySteps = List.from(activityStepsRaw);
@@ -3924,8 +3939,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           }
 
           // Verificar si tiene status_childs
-          final statusChilds =
-              getJsonField(status, r'''$.activities_status_childs''').toList();
+          final statusChildsRaw =
+              getJsonField(status, r'''$.activities_status_childs''');
+          final statusChilds = statusChildsRaw?.toList() ?? [];
 
           for (var childStatus in statusChilds) {
             final childStatusId =
@@ -5290,10 +5306,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('');
     debugPrint('🔄 ===== RECALCULANDO TODAS LAS OPERACIONES =====');
 
-    final activitySteps = getJsonField(
+    final activityStepsRaw = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_steps''',
-    ).toList();
+    );
+    if (activityStepsRaw == null) return;
+    final activitySteps = activityStepsRaw.toList();
 
     int operationsFound = 0;
     int operationsCalculated = 0;
@@ -5398,20 +5416,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Obtener el step parent del status
     int parentStepId = 0;
     try {
-      final activitySteps = getJsonField(FFAppState().currentActivity, r'''$.activity_steps''').toList();
-      for (var step in activitySteps) {
-        final stepId = getJsonField(step, r'''$.id_activity_step''');
-        final statusList = getJsonField(step, r'''$.activity_status''').toList();
+      final activityStepsRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+      if (activityStepsRaw != null) {
+        final activitySteps = activityStepsRaw.toList();
+        for (var step in activitySteps) {
+          final stepId = getJsonField(step, r'''$.id_activity_step''');
+          final statusListRaw = getJsonField(step, r'''$.activity_status''');
+          if (statusListRaw == null) continue;
+          final statusList = statusListRaw.toList();
 
-        // Buscar en el nivel principal
-        for (var s in statusList) {
-          final sId = getJsonField(s, r'''$.id_activity_status''');
-          if (sId == statusId) {
-            parentStepId = stepId;
-            break;
+          // Buscar en el nivel principal
+          for (var s in statusList) {
+            final sId = getJsonField(s, r'''$.id_activity_status''');
+            if (sId == statusId) {
+              parentStepId = stepId;
+              break;
+            }
           }
+          if (parentStepId != 0) break;
         }
-        if (parentStepId != 0) break;
       }
     } catch (e) {
       debugPrint('   ⚠️  No se pudo encontrar el step parent: $e');
@@ -5513,15 +5536,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         // Buscar directamente por nombre comparando con los status name guardados
         // Primero obtener todos los status de la actividad
-        final activitySteps = getJsonField(
+        final activityStepsRaw = getJsonField(
           FFAppState().currentActivity,
           r'''$.activity_steps''',
-        ).toList();
+        );
+        final activitySteps = activityStepsRaw?.toList() ?? [];
 
-        final activityStatus = getJsonField(
+        final activityStatusRaw = getJsonField(
           FFAppState().currentActivity,
           r'''$.activity_status''',
-        ).toList();
+        );
+        final activityStatus = activityStatusRaw?.toList() ?? [];
 
         // Buscar el statusId del tag-reader por nombre
         int? targetTagReaderId;
@@ -5541,7 +5566,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // Si no se encontró en root, buscar en steps
         if (targetTagReaderId == null) {
           for (var step in activitySteps) {
-            final statusList = getJsonField(step, r'''$.activity_status''').toList();
+            final statusListRaw = getJsonField(step, r'''$.activity_status''');
+            final statusList = statusListRaw?.toList() ?? [];
             for (var status in statusList) {
               final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
               final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
@@ -5813,10 +5839,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   /// Busca un status por su ID en toda la estructura de activity
   dynamic _findStatusById(int statusId) {
-    final activitySteps = getJsonField(
+    final activityStepsRaw = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_steps''',
-    ).toList();
+    );
+    if (activityStepsRaw == null) return null;
+    final activitySteps = activityStepsRaw.toList();
 
     dynamic searchInStatus(dynamic status) {
       final currentId = getJsonField(status, r'''$.id_activity_status''');
@@ -5845,7 +5873,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     for (var step in activitySteps) {
-      final statusList = getJsonField(step, r'''$.activity_status''').toList();
+      final statusListRaw = getJsonField(step, r'''$.activity_status''');
+      final statusList = statusListRaw?.toList() ?? [];
       for (var status in statusList) {
         final found = searchInStatus(status);
         if (found != null) return found;

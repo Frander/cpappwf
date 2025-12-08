@@ -44,7 +44,6 @@ dependencies:
   equatable: 2.0.7
   flutter_animate: 4.5.0
   flutter_blue_plus: ^1.32.12
-  flutter_bluetooth_serial: ^0.4.0
   flutter_cache_manager: 3.4.1
   fl_chart: ^0.68.0
   carousel_slider: ^5.1.1

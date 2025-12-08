@@ -58,7 +58,7 @@ class MyApp extends StatefulWidget {
       context.findAncestorStateOfType<_MyAppState>()!;
 }
 
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Locale? _locale;
 
   ThemeMode _themeMode = ThemeMode.system;
@@ -85,11 +85,32 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
+    // Registrar observer para el ciclo de vida de la app
+    WidgetsBinding.instance.addObserver(this);
+
     _appStateNotifier = AppStateNotifier.instance;
     _router = createRouter(_appStateNotifier);
 
     // Keep the FlutterFlow splash active until animated splash completes
     // The animated splash will call _onSplashComplete when done
+  }
+
+  @override
+  void dispose() {
+    // Desregistrar observer
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    // Cuando la app se va a detached (cerrada completamente), detener el servicio
+    if (state == AppLifecycleState.detached) {
+      debugPrint('🛑 App cerrada - Deteniendo servicio de geolocalización...');
+      stopBackgroundLocationService();
+    }
   }
 
   void _onSplashComplete() {
