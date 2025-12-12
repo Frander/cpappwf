@@ -68,7 +68,16 @@ class GlobalDbSingleton {
         singleInstance: true,
       );
 
-      debugPrint('🔗 GlobalDbSingleton: Conexión inicializada en $_dbPath');
+      // IMPORTANTE: Habilitar WAL mode para mejor concurrencia con el servicio de segundo plano
+      // WAL permite lecturas y escrituras simultáneas sin bloqueos
+      // Usar rawQuery en lugar de execute para PRAGMA
+      await _database!.rawQuery('PRAGMA journal_mode=WAL');
+      // Tiempo de espera de bloqueo (5 segundos)
+      await _database!.rawQuery('PRAGMA busy_timeout=5000');
+      // Sincronización normal (balance entre seguridad y velocidad)
+      await _database!.rawQuery('PRAGMA synchronous=NORMAL');
+
+      debugPrint('🔗 GlobalDbSingleton: Conexión inicializada con WAL mode en $_dbPath');
       return _database!;
     } catch (e) {
       debugPrint('❌ GlobalDbSingleton: Error inicializando: $e');
@@ -87,23 +96,43 @@ class GlobalDbSingleton {
     return _dbPath!;
   }
 
-  /// Ejecutar una operación de forma segura
+  /// Ejecutar una operación de forma segura con reintentos para bloqueos
   /// NO cierra la conexión - usa el singleton
   Future<T> executeOperation<T>(Future<T> Function(Database db) operation) async {
-    try {
-      final db = await database;
-      return await operation(db);
-    } catch (e) {
-      // Si es error de conexión cerrada, intentar reconectar
-      if (e.toString().contains('database_closed')) {
-        debugPrint('⚠️ GlobalDbSingleton: Reconectando...');
-        _database = null;
+    const maxRetries = 3;
+    const baseDelay = Duration(milliseconds: 100);
+
+    for (int attempt = 0; attempt < maxRetries; attempt++) {
+      try {
         final db = await database;
         return await operation(db);
+      } catch (e) {
+        final errorStr = e.toString().toLowerCase();
+
+        // Si es error de conexión cerrada, intentar reconectar
+        if (errorStr.contains('database_closed')) {
+          debugPrint('⚠️ GlobalDbSingleton: Reconectando...');
+          _database = null;
+          continue; // Reintentar con nueva conexión
+        }
+
+        // Si es error de bloqueo, reintentar con backoff exponencial
+        if (errorStr.contains('locked') || errorStr.contains('busy')) {
+          if (attempt < maxRetries - 1) {
+            final delay = baseDelay * (1 << attempt); // 100ms, 200ms, 400ms
+            debugPrint('⏳ GlobalDbSingleton: DB bloqueada, reintentando en ${delay.inMilliseconds}ms (intento ${attempt + 1}/$maxRetries)');
+            await Future.delayed(delay);
+            continue;
+          }
+        }
+
+        debugPrint('❌ GlobalDbSingleton: Error en operación: $e');
+        rethrow;
       }
-      debugPrint('❌ GlobalDbSingleton: Error en operación: $e');
-      rethrow;
     }
+
+    // Si llegamos aquí, falló después de todos los reintentos
+    throw Exception('GlobalDbSingleton: Operación falló después de $maxRetries intentos');
   }
 
   /// Verificar que la tabla Location_tracking existe

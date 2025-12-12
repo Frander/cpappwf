@@ -147,21 +147,72 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       _model.totalVisits = totalVisits;
       _model.totalResults = totalResults;
 
-      // 4. Obtener ID operador desde AppState
+      // 4. Obtener ID y nombre del operador desde AppState
       _model.operatorId = FFAppState().userSelected.operID;
+      _model.operatorName = FFAppState().userSelected.nameUser;
 
       // 4.1 Buscar el operador Cortero (OP2) desde visitDetails
-      // El Cortero viene de un status_name que contiene "cortero" (case insensitive)
+      // El Cortero viene del step con name_step = "Cortero"
+      // Necesitamos buscar el id_activity_step del step "Cortero" y luego
+      // encontrar el visitDetail que corresponde a ese step
       String operator2Id = '';
-      for (var detail in FFAppState().visitDetails) {
-        final statusOption = detail.statusOption.toLowerCase();
-        if (statusOption.contains('cortero')) {
-          operator2Id = detail.statusResponse;
-          debugPrint('✅ Cortero encontrado: $operator2Id (status: ${detail.statusOption})');
-          break;
+
+      // Obtener los steps de la actividad actual (currentActivity ya está definido arriba)
+      final activityStepsRaw = getJsonField(currentActivity, r'''$.activity_steps''');
+
+      if (activityStepsRaw != null) {
+        final activitySteps = activityStepsRaw.toList();
+
+        // Buscar el step con name_step = "Cortero" (case insensitive)
+        int? corteroStepId;
+        for (var step in activitySteps) {
+          final stepName = getJsonField(step, r'''$.name_step''')?.toString() ?? '';
+          if (stepName.toLowerCase() == 'cortero') {
+            corteroStepId = getJsonField(step, r'''$.id_activity_step''');
+            debugPrint('🔍 Step Cortero encontrado: ID=$corteroStepId');
+            break;
+          }
+        }
+
+        // Si encontramos el step Cortero, buscar el visitDetail correspondiente
+        if (corteroStepId != null) {
+          for (var detail in FFAppState().visitDetails) {
+            // Buscar el visitDetail que pertenece al step Cortero
+            // y que tiene un status seleccionado (idActivityStatus > 0)
+            if (detail.idStepParent == corteroStepId &&
+                detail.idActivityStatus > 0) {
+              // statusResponse contiene el Oper_id del cortero seleccionado
+              operator2Id = detail.statusResponse;
+              debugPrint('✅ Cortero encontrado: OP2=$operator2Id (nombre: ${detail.statusOption})');
+              break;
+            }
+          }
+        } else {
+          debugPrint('⚠️ No se encontró step "Cortero" en la actividad');
         }
       }
       _model.operator2Id = operator2Id;
+
+      // 4.2 Buscar el nombre del Cortero en la base de datos SQLite
+      if (operator2Id.isNotEmpty) {
+        try {
+          final dbPath = FFAppState().pathDatabase;
+          if (dbPath.isNotEmpty) {
+            final db = await openDatabase(dbPath);
+            final result = await db.rawQuery(
+              'SELECT Name_user FROM Users WHERE Oper_id = ?',
+              [operator2Id],
+            );
+            if (result.isNotEmpty && result.first['Name_user'] != null) {
+              _model.operator2Name = result.first['Name_user'].toString();
+              debugPrint('✅ Nombre del Cortero: ${_model.operator2Name}');
+            }
+            await db.close();
+          }
+        } catch (e) {
+          debugPrint('⚠️ Error buscando nombre del Cortero: $e');
+        }
+      }
 
       // 5. Calcular lote actual usando geolocalización
       final currentHeadquarter = await actions.calculateCurrentHeadquarter(
@@ -222,10 +273,10 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     return '{DH:$formattedDate;OP:${_model.operatorId};OP2:${_model.operator2Id};VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
   }
 
-  /// Cuenta visitas desde la base de datos SQLite
-  /// Si [filterByStatus] es true, solo cuenta visitas con Status=0 (pendientes de sincronizar)
-  /// Si [filterByStatus] es false, cuenta TODAS las visitas
-  /// Retorna un Map con 'visits' (conteo) y 'results' (suma de factors)
+  /// Cuenta visitas desde la base de datos SQLite agrupadas por Lote (Id_headquarter)
+  /// Solo cuenta visitas con Status=0 (pendientes de escribir en TAG)
+  /// Retorna un Map con 'visits' (conteo total) y 'results' (suma total de factors)
+  /// También pobla _model.visitsByHeadquarter con los datos discriminados por lote
   Future<Map<String, int>> _countVisitsFromDatabase(bool filterByStatus) async {
     try {
       final dbPath = FFAppState().pathDatabase;
@@ -237,106 +288,133 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       final db = await openDatabase(dbPath);
 
       // IMPORTANTE: Solo contar visitas con Status = 0 (pendientes de escribir en tag)
-      // Estas son las visitas que aún NO han sido escritas en un tag NFC
+      // Status = 0 = visitas que AÚN NO han sido procesadas/escritas en TAG
+      // Status = 1 = visitas que YA fueron procesadas/escritas en TAG
 
-      // Contar visitas con Status = 0
-      final countResult = await db.rawQuery(
-        'SELECT COUNT(*) as count FROM Visits WHERE Status = 0',
-      );
+      // Obtener visitas pendientes agrupadas por Id_headquarter
+      final visitsGrouped = await db.rawQuery('''
+        SELECT
+          v.Id_headquarter,
+          h.Name_headquarter,
+          COUNT(*) as visit_count
+        FROM Visits v
+        LEFT JOIN Headquarters h ON v.Id_headquarter = h.Id_headquarter
+        WHERE v.Status = 0
+        GROUP BY v.Id_headquarter
+        ORDER BY v.Id_headquarter
+      ''');
 
-      final visitCount = Sqflite.firstIntValue(countResult) ?? 0;
-      debugPrint('📊 Visitas pendientes (Status=0) encontradas: $visitCount');
+      debugPrint('📊 Lotes con visitas pendientes: ${visitsGrouped.length}');
 
-      // Obtener los IDs de las visitas con Status = 0 para calcular results
-      final visitsResult = await db.rawQuery(
-        'SELECT Id_visit FROM Visits WHERE Status = 0',
-      );
-
+      int totalVisits = 0;
       int totalResults = 0;
+      List<HeadquarterVisitData> visitsByHq = [];
 
-      debugPrint('🔍 Calculando RESULTS sumando Factores de cada Visit_details:');
-      debugPrint('📋 Total de visitas a procesar: ${visitsResult.length}');
+      // Obtener lista de headquarters del AppState para buscar nombres
+      final headquartersList = FFAppState().headquartersSelectedList;
 
-      // Para cada visita, obtener sus detalles y sumar el factor
-      for (var visit in visitsResult) {
-        final idVisit = visit['Id_visit'] as int;
+      for (var hqGroup in visitsGrouped) {
+        final hqId = hqGroup['Id_headquarter'] as int;
+        final hqNameFromDb = hqGroup['Name_headquarter'];
+        final visitCount = hqGroup['visit_count'] as int;
 
-        // Obtener los detalles de la visita con sus factores individuales
-        final detailsResult = await db.rawQuery('''
-          SELECT
-            vd.Id_visit_detail,
-            vd.Id_activity_status,
-            ast.Factor,
-            ast.Status_name
-          FROM Visits_details vd
-          INNER JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
-          WHERE vd.Id_visit = ?
-        ''', [idVisit]);
-
-        debugPrint('  🔎 Visita Id_visit=$idVisit → ${detailsResult.length} detalles encontrados');
-
-        if (detailsResult.isEmpty) {
-          debugPrint('    ⚠️ Esta visita NO tiene Visits_details asociados');
-
-          // Verificar si existen detalles sin el JOIN
-          final checkDetails = await db.rawQuery('''
-            SELECT COUNT(*) as count FROM Visits_details WHERE Id_visit = ?
-          ''', [idVisit]);
-          final detailCount = checkDetails.first['count'] as int;
-          debugPrint('    ℹ️ Registros en Visits_details para esta visita: $detailCount');
-
-          if (detailCount > 0) {
-            // Hay detalles pero el JOIN falló, verificar los IDs
-            final detailsCheck = await db.rawQuery('''
-              SELECT Id_activity_status FROM Visits_details WHERE Id_visit = ?
-            ''', [idVisit]);
-            final activityStatusIds = detailsCheck.map((d) => d['Id_activity_status']).toList();
-            debugPrint('    ℹ️ Id_activity_status en Visits_details: $activityStatusIds');
-
-            // Verificar si esos IDs existen en Activities_status
-            for (var id in activityStatusIds) {
-              final statusCheck = await db.rawQuery('''
-                SELECT Id_activity_status, Status_name, Factor
-                FROM Activities_status
-                WHERE Id_activity_status = ?
-              ''', [id]);
-
-              if (statusCheck.isEmpty) {
-                debugPrint('    ❌ Id_activity_status=$id NO existe en Activities_status (dato huérfano!)');
-              } else {
-                final status = statusCheck.first;
-                final factor = status['Factor'];
-                final statusName = status['Status_name'];
-                debugPrint('    ✅ Id_activity_status=$id SÍ existe: "$statusName", Factor=$factor');
-              }
-            }
-          }
+        // Buscar el nombre del lote: primero en DB, luego en AppState, finalmente fallback
+        String hqName;
+        if (hqNameFromDb != null && hqNameFromDb.toString().isNotEmpty) {
+          hqName = hqNameFromDb.toString();
         } else {
-          debugPrint('  📍 Visita Id_visit=$idVisit (${detailsResult.length} detalles):');
+          // Buscar en headquartersSelectedList del AppState
+          final hqFromAppState = headquartersList.firstWhere(
+            (hq) => hq.idHeadquarter == hqId,
+            orElse: () => HeadquartersStruct(),
+          );
+          if (hqFromAppState.nameHeadquarter.isNotEmpty) {
+            hqName = hqFromAppState.nameHeadquarter;
+          } else {
+            hqName = hqId == 0 ? 'Sin lote asignado' : 'Lote #$hqId';
+          }
+        }
 
-          int visitTotal = 0;
+        debugPrint('🏢 Lote $hqId ($hqName): $visitCount visitas');
+
+        // Calcular results para este lote
+        int hqResults = 0;
+
+        // Obtener las visitas de este lote
+        final visitsResult = await db.rawQuery(
+          'SELECT Id_visit FROM Visits WHERE Status = 0 AND Id_headquarter = ?',
+          [hqId],
+        );
+
+        for (var visit in visitsResult) {
+          final idVisit = visit['Id_visit'] as int;
+
+          // DEBUG: Ver TODOS los detalles de la visita para entender qué se está guardando
+          final allDetails = await db.rawQuery('''
+            SELECT
+              ast.Factor,
+              ast.Type_status,
+              ast.Status_name
+            FROM Visits_details vd
+            INNER JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
+            WHERE vd.Id_visit = ?
+          ''', [idVisit]);
+
+          debugPrint('   📝 Visita $idVisit tiene ${allDetails.length} detalles:');
+          for (var d in allDetails) {
+            debugPrint('      - "${d['Status_name']}" tipo=${d['Type_status']} factor=${d['Factor']}');
+          }
+
+          // Solo sumar factores de tipo 'unique-option' con Factor > 0
+          // Esto incluye: "1 Racimo", "2 Racimos", etc.
+          // Excluye: "No hay racimos" (factor=0), "Despachar Fruta" (tag-writer)
+          final detailsResult = await db.rawQuery('''
+            SELECT
+              ast.Factor,
+              ast.Type_status,
+              ast.Status_name
+            FROM Visits_details vd
+            INNER JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
+            WHERE vd.Id_visit = ?
+              AND ast.Type_status = 'unique-option'
+              AND ast.Factor IS NOT NULL
+              AND ast.Factor > 0
+          ''', [idVisit]);
+
           for (var detail in detailsResult) {
             final factor = detail['Factor'];
-            final statusName = detail['Status_name'];
             final factorValue = (factor is int) ? factor : (factor is double ? factor.toInt() : 0);
-
-            visitTotal += factorValue;
-            debugPrint('    ➕ Status: "$statusName", Factor: $factorValue');
+            hqResults += factorValue;
+            debugPrint('      ✅ SUMANDO Factor: $factorValue de "${detail['Status_name']}"');
           }
-
-          totalResults += visitTotal;
-          debugPrint('    ✅ Subtotal visita $idVisit: $visitTotal');
         }
+
+        debugPrint('   📈 Results del lote $hqId: $hqResults');
+
+        totalVisits += visitCount;
+        totalResults += hqResults;
+
+        visitsByHq.add(HeadquarterVisitData(
+          headquarterId: hqId,
+          headquarterName: hqName,
+          visits: visitCount,
+          results: hqResults,
+        ));
       }
 
+      // Guardar los datos agrupados en el modelo
+      _model.visitsByHeadquarter = visitsByHq;
+
       debugPrint('═══════════════════════════════════════');
-      debugPrint('📊 TOTAL RESULTS (suma de todos los Factores): $totalResults');
+      debugPrint('📊 TOTAL VISITAS: $totalVisits');
+      debugPrint('📊 TOTAL RESULTS: $totalResults');
+      debugPrint('📊 LOTES: ${visitsByHq.length}');
       debugPrint('═══════════════════════════════════════');
 
       await db.close();
 
       return {
-        'visits': visitCount,
+        'visits': totalVisits,
         'results': totalResults,
       };
     } catch (e) {
@@ -706,12 +784,48 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 ),
                 SizedBox(height: 16),
                 _buildDataRow('Fecha/Hora', _formatDateTime(_model.dateHour)),
-                _buildDataRow('Operador', _model.operatorId),
+                _buildDataRow('Operador', _model.operatorName.isNotEmpty
+                    ? _model.operatorName
+                    : _model.operatorId),
                 if (_model.operator2Id.isNotEmpty)
-                  _buildDataRow('Cortero', _model.operator2Id),
-                _buildDataRow('Visitas', _model.totalVisits.toString()),
-                _buildDataRow('Resultados', _model.totalResults.toString()),
-                _buildDataRow('Lote',
+                  _buildDataRow('Cortero', _model.operator2Name.isNotEmpty
+                      ? _model.operator2Name
+                      : _model.operator2Id),
+                // Mostrar visitas y resultados discriminados por lote
+                if (_model.visitsByHeadquarter.isNotEmpty) ...[
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'DETALLE POR LOTE',
+                          style: TextStyle(fontFamily: 'Roboto',
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white.withOpacity(0.5),
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        ..._model.visitsByHeadquarter.map((hqData) =>
+                          _buildHeadquarterRow(hqData)
+                        ).toList(),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Divider(color: Colors.white.withOpacity(0.2), height: 1),
+                  SizedBox(height: 12),
+                ],
+                _buildDataRow('Total Visitas', _model.totalVisits.toString()),
+                _buildDataRow('Total Resultados', _model.totalResults.toString()),
+                _buildDataRow('Lote Destino',
                     '${_model.headquarterName} (#${_model.headquarterId})'),
                 SizedBox(height: 16),
                 Divider(color: Colors.white.withOpacity(0.2)),
@@ -759,6 +873,106 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Widget para mostrar fila de datos de un lote específico
+  Widget _buildHeadquarterRow(HeadquarterVisitData hqData) {
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Color(0xFF374151),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          // Icono y nombre del lote
+          Expanded(
+            flex: 2,
+            child: Row(
+              children: [
+                Icon(
+                  Icons.location_on,
+                  color: Color(0xFF10B981),
+                  size: 16,
+                ),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    hqData.headquarterName,
+                    style: TextStyle(fontFamily: 'Roboto',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Visitas
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Color(0xFF3B82F6).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'V:',
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 10,
+                    color: Color(0xFF3B82F6),
+                  ),
+                ),
+                SizedBox(width: 2),
+                Text(
+                  '${hqData.visits}',
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF3B82F6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(width: 8),
+          // Resultados
+          Container(
+            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Color(0xFF10B981).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'R:',
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 10,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+                SizedBox(width: 2),
+                Text(
+                  '${hqData.results}',
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -905,6 +1119,66 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               ),
             ),
           ),
+          SizedBox(height: 32),
+          // Botones de acción
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24),
+            child: Row(
+              children: [
+                // Botón Cancelar
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF374151),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Cancelar',
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                // Botón Reintentar
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      // Limpiar el error y reiniciar la escritura
+                      setState(() {
+                        _model.errorMessage = null;
+                        _model.isWriting = false;
+                      });
+                      _startWriting();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: Icon(Icons.refresh, size: 20),
+                    label: Text(
+                      'Reintentar',
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -912,6 +1186,29 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
   String _formatDateTime(DateTime? dateTime) {
     if (dateTime == null) return 'N/A';
-    return '${dateTime.day.toString().padLeft(2, '0')}/${dateTime.month.toString().padLeft(2, '0')}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+
+    // Nombres de días en español
+    const diasSemana = [
+      'Lunes', 'Martes', 'Miércoles', 'Jueves',
+      'Viernes', 'Sábado', 'Domingo'
+    ];
+
+    // Nombres de meses en español
+    const meses = [
+      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    final diaSemana = diasSemana[dateTime.weekday - 1];
+    final mes = meses[dateTime.month - 1];
+    final dia = dateTime.day;
+    final anio = dateTime.year;
+
+    // Formato 12 horas con am/pm
+    final hora12 = dateTime.hour == 0 ? 12 : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
+    final minuto = dateTime.minute.toString().padLeft(2, '0');
+    final amPm = dateTime.hour >= 12 ? 'pm' : 'am';
+
+    return '$diaSemana $dia de $mes $anio - $hora12:$minuto $amPm';
   }
 }

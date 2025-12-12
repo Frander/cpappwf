@@ -15,6 +15,7 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import 'package:geolocator/geolocator.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import 'home_page_model.dart';
 export 'home_page_model.dart';
@@ -123,10 +124,34 @@ class _HomePageWidgetState extends State<HomePageWidget>
       _userBadgeController.forward();
 
       // Iniciar servicio de geolocalización en segundo plano
-      debugPrint('🚀 Iniciando servicio de geolocalización en segundo plano desde HomePage...');
+      // IMPORTANTE: Verificar y solicitar permisos ANTES de iniciar el servicio
+      // porque el servicio de segundo plano no tiene acceso a UI/Activity
+      debugPrint('🚀 Verificando permisos de ubicación antes de iniciar servicio...');
       try {
-        await startBackgroundLocationService();
-        debugPrint('✅ Servicio de geolocalización iniciado correctamente');
+        // Verificar si el servicio de ubicación está habilitado
+        bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+        if (!serviceEnabled) {
+          debugPrint('⚠️ Servicio de ubicación deshabilitado. El usuario debe habilitarlo manualmente.');
+          // Opcionalmente mostrar diálogo al usuario
+        }
+
+        // Verificar permisos
+        LocationPermission permission = await Geolocator.checkPermission();
+        if (permission == LocationPermission.denied) {
+          debugPrint('📍 Solicitando permisos de ubicación...');
+          permission = await Geolocator.requestPermission();
+        }
+
+        if (permission == LocationPermission.denied ||
+            permission == LocationPermission.deniedForever) {
+          debugPrint('❌ Permisos de ubicación denegados. No se puede iniciar el servicio.');
+          // El servicio no se iniciará sin permisos
+        } else {
+          // Permisos otorgados, ahora sí iniciar el servicio
+          debugPrint('✅ Permisos de ubicación otorgados. Iniciando servicio...');
+          await startBackgroundLocationService();
+          debugPrint('✅ Servicio de geolocalización iniciado correctamente');
+        }
       } catch (e) {
         debugPrint('⚠️ Error al iniciar servicio de geolocalización: $e');
       }
@@ -1092,10 +1117,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 },
               ),
 
-              SizedBox(height: 12),
-
-              // Botón "REALIZAR VISITAS"
-              _buildFloatingActionButton(),
             ],
           ),
         ),
@@ -1664,71 +1685,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
     return dateFormat.format(first ?? last!);
   }
 
-  Widget _buildFloatingActionButton() {
-    return FloatingActionButton.extended(
-      onPressed: () async {
-        // Validar que haya un usuario seleccionado
-        if (FFAppState().userSelected.nameUser.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Debes tener un usuario registrado para realizar actividades',
-                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
-              ),
-              backgroundColor: FlutterFlowTheme.of(context).error,
-              duration: Duration(seconds: 3),
-            ),
-          );
-          return;
-        }
-
-        // La actividad ya está en FFAppState().activitySelectedJSON
-        // (se actualiza inmediatamente al seleccionar del buscador)
-
-        context.pushNamed(
-          DoActivitiesPageWidget.routeName,
-          queryParameters: {
-            'tittle': serializeParam(
-              'Realizar visitas',
-              ParamType.String,
-            ),
-          }.withoutNulls,
-          extra: <String, dynamic>{
-            kTransitionInfoKey: TransitionInfo(
-              hasTransition: true,
-              transitionType: PageTransitionType.bottomToTop,
-              duration: Duration(milliseconds: 800),
-            ),
-          },
-        );
-      },
-      backgroundColor: Color(0xFF00a86b),
-      elevation: 8,
-      label: Row(
-        children: [
-          Icon(
-            Icons.fact_check_rounded,
-            color: Colors.white,
-            size: 24,
-          ),
-          SizedBox(width: 8),
-          Text(
-            'REALIZAR VISITAS',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 15,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-              letterSpacing: 0.8,
-            ),
-          ),
-        ],
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(30),
-      ),
-    );
-  }
 }
 
 // Custom Painter para el gráfico de torta

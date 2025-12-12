@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(powershell -ExecutionPolicy Bypass -File replace_fonts.ps1:*)"
+      "Bash(powershell -ExecutionPolicy Bypass -File replace_fonts.ps1:*)",
+      "Bash(flutter analyze:*)",
+      "Bash(where:*)",
+      "Bash(dir \"C:\\Users\\JDieg\\clickpalm-release.jks\")"
     ],
     "deny": [],
     "ask": []

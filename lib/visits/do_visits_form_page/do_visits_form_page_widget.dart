@@ -116,6 +116,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // headquarterId -> weight
   final Map<int, double> _headquarterWeights = {};
 
+  // Lista de lotes que NO tienen peso promedio configurado
+  // Contiene: {headquarterId, headquarterName}
+  final List<Map<String, dynamic>> _headquartersWithoutWeight = [];
+
   // Map para almacenar distancias calculadas por statusId (OPCIÓN 1: desde TAG)
   final Map<int, double> _calculatedDistances = {};
 
@@ -1303,6 +1307,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     _lastTagReaderLocation = geolocation; // Guardar para distance-extractor
                   });
 
+                  // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
+                  final List<int> tagHeadquarterIds = [];
+                  for (var record in parsedData) {
+                    final hqId = record['headquarterId'] as int? ?? 0;
+                    if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                      tagHeadquarterIds.add(hqId);
+                    }
+                  }
+
+                  // Verificar si los lotes tienen peso promedio configurado
+                  if (tagHeadquarterIds.isNotEmpty) {
+                    debugPrint('🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                    await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                    // Si hay lotes sin peso, mostrar advertencia
+                    if (_headquartersWithoutWeight.isNotEmpty) {
+                      debugPrint('⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                      if (mounted) {
+                        _showWeightWarningDialog();
+                      }
+                    }
+                  }
+
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
                   await _autoCalculateRelatedDistances(statusId, statusName);
                 }
@@ -2009,6 +2036,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     _lastTagReaderLocation = geolocation; // Guardar para distance-extractor
                   });
 
+                  // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
+                  final List<int> tagHeadquarterIds = [];
+                  for (var record in parsedData) {
+                    final hqId = record['headquarterId'] as int? ?? 0;
+                    if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                      tagHeadquarterIds.add(hqId);
+                    }
+                  }
+
+                  // Verificar si los lotes tienen peso promedio configurado
+                  if (tagHeadquarterIds.isNotEmpty) {
+                    debugPrint('🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                    await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                    // Si hay lotes sin peso, mostrar advertencia
+                    if (_headquartersWithoutWeight.isNotEmpty) {
+                      debugPrint('⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                      if (mounted) {
+                        _showWeightWarningDialog();
+                      }
+                    }
+                  }
+
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
                   await _autoCalculateRelatedDistances(statusId, statusName);
                 }
@@ -2517,6 +2567,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation = geolocation; // Guardar para distance-extractor
                   });
+
+                  // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
+                  final List<int> tagHeadquarterIds = [];
+                  for (var record in parsedData) {
+                    final hqId = record['headquarterId'] as int? ?? 0;
+                    if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                      tagHeadquarterIds.add(hqId);
+                    }
+                  }
+
+                  // Verificar si los lotes tienen peso promedio configurado
+                  if (tagHeadquarterIds.isNotEmpty) {
+                    debugPrint('🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                    await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                    // Si hay lotes sin peso, mostrar advertencia
+                    if (_headquartersWithoutWeight.isNotEmpty) {
+                      debugPrint('⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                      if (mounted) {
+                        _showWeightWarningDialog();
+                      }
+                    }
+                  }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
                   await _autoCalculateRelatedDistances(statusId, statusName);
@@ -5481,6 +5554,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // ===== CARGAR WEIGHTS DE HEADQUARTERS DESDE SQLITE =====
 
   /// Carga los weights de headquarters desde SQLite para el mes/año actual
+  /// También identifica los lotes que NO tienen peso promedio configurado
   Future<void> _loadHeadquarterWeights(List<int> headquarterIds) async {
     try {
       final now = DateTime.now();
@@ -5489,7 +5563,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       debugPrint('📊 Cargando weights para ${headquarterIds.length} lotes (año: $currentYear, mes: $currentMonth)');
 
+      // Limpiar lista de lotes sin peso antes de cargar
+      _headquartersWithoutWeight.clear();
+
       for (var headquarterId in headquarterIds) {
+        // Buscar nombre del lote en AppState
+        String headquarterName = 'Lote $headquarterId';
+        try {
+          final headquarters = FFAppState().headquartersSelectedList;
+          final hq = headquarters.firstWhere(
+            (h) => h.idHeadquarter == headquarterId,
+            orElse: () => HeadquartersStruct(),
+          );
+          if (hq.nameHeadquarter.isNotEmpty) {
+            headquarterName = hq.nameHeadquarter;
+          }
+        } catch (e) {
+          // Usar nombre por defecto
+        }
+
         // Consultar SQLite
         final results = await SQLiteManager.instance.getHeadquarterWeights(
           headquarterId: headquarterId,
@@ -5502,14 +5594,227 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           setState(() {
             _headquarterWeights[headquarterId] = weight;
           });
-          debugPrint('   ✅ Lote $headquarterId: weight = $weight');
+          debugPrint('   ✅ Lote $headquarterId ($headquarterName): weight = $weight');
         } else {
-          debugPrint('   ⚠️ Lote $headquarterId: sin weight registrado');
+          // Agregar a la lista de lotes sin peso
+          _headquartersWithoutWeight.add({
+            'headquarterId': headquarterId,
+            'headquarterName': headquarterName,
+          });
+          debugPrint('   ⚠️ Lote $headquarterId ($headquarterName): SIN peso promedio configurado');
+        }
+      }
+
+      // Log resumen
+      if (_headquartersWithoutWeight.isNotEmpty) {
+        debugPrint('');
+        debugPrint('⚠️ ADVERTENCIA: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio:');
+        for (var hq in _headquartersWithoutWeight) {
+          debugPrint('   - ${hq['headquarterName']} (ID: ${hq['headquarterId']})');
         }
       }
     } catch (e) {
       debugPrint('❌ Error cargando weights: $e');
     }
+  }
+
+  /// Muestra un diálogo de advertencia cuando hay lotes sin peso promedio configurado
+  void _showWeightWarningDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            constraints: BoxConstraints(maxWidth: 400),
+            padding: EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF7F1D1D), Color(0xFF991B1B)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Color(0xFFDC2626).withOpacity(0.5),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 20,
+                  offset: Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono de advertencia
+                Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Color(0xFFDC2626).withOpacity(0.2),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Color(0xFFDC2626).withOpacity(0.5),
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.warning_amber_rounded,
+                    color: Color(0xFFFCA5A5),
+                    size: 40,
+                  ),
+                ),
+                SizedBox(height: 20),
+
+                // Título
+                Text(
+                  '⚠️ Peso Promedio No Configurado',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                SizedBox(height: 16),
+
+                // Descripción
+                Text(
+                  'Los siguientes lotes no tienen peso promedio configurado para el mes actual:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.85),
+                    height: 1.4,
+                  ),
+                ),
+                SizedBox(height: 16),
+
+                // Lista de lotes sin peso
+                Container(
+                  constraints: BoxConstraints(maxHeight: 150),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: _headquartersWithoutWeight.map((hq) {
+                        return Container(
+                          margin: EdgeInsets.only(bottom: 8),
+                          padding: EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Color(0xFFDC2626).withOpacity(0.3),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.location_on,
+                                color: Color(0xFFFCA5A5),
+                                size: 20,
+                              ),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '${hq['headquarterName']}',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'ID: ${hq['headquarterId']}',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 12,
+                                  color: Colors.white.withOpacity(0.6),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+                SizedBox(height: 16),
+
+                // Advertencia
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: Color(0xFFFFB020).withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Color(0xFFFFB020),
+                        size: 20,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          'El cálculo de peso NO se realizará para estos lotes.',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFFFFB020),
+                            height: 1.3,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 24),
+
+                // Botón cerrar
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Color(0xFFDC2626),
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: Text(
+                      'Entendido',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   /// Calcula la distancia desde el origen hasta la extractora
@@ -6699,7 +7004,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagReaderOperatorGroup(
       int headquarterId, String operatorPairKey, Map<String, dynamic> operatorData) {
-    final operatorId = operatorData['operatorId'] as String? ?? 'N/A';
     final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
     final operator2Name = operatorData['operator2Name'] as String? ?? '';
@@ -6708,14 +7012,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final records =
         operatorData['records'] as List<Map<String, dynamic>>? ?? [];
 
-    // Construir el texto de display para los operadores
+    // Verificar si hay operador cortero (OP2)
     final hasOperator2 = operator2Id.isNotEmpty;
-    final displayName = hasOperator2
-        ? '$operatorName / $operator2Name'
-        : operatorName;
-    final displayIds = hasOperator2
-        ? 'Op: $operatorId | Cortero: $operator2Id'
-        : 'Op: $operatorId';
 
     final expansionKey = 'TR_OP_${headquarterId}_$operatorPairKey';
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
@@ -6766,14 +7064,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Nombre del operador principal (OP)
                         Text(
-                          displayName,
+                          operatorName,
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
                         ),
+                        // Nombre del operador cortero (OP2) en línea separada
+                        if (hasOperator2) ...[
+                          SizedBox(height: 2),
+                          Text(
+                            operator2Name.isNotEmpty ? operator2Name : operator2Id,
+                            style: TextStyle(fontFamily: 'Roboto',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF74C69D),
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
@@ -6783,16 +7094,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  Flexible(
-                    child: Text(
-                      displayIds,
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 10,
-                        color: Colors.white.withOpacity(0.6),
-                      ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -7152,7 +7453,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagWriterOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
-    final operatorId = operatorData['operatorId'] as String? ?? 'N/A';
     final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
     final operator2Name = operatorData['operator2Name'] as String? ?? '';
@@ -7164,14 +7464,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final expansionKey = 'TW_OP_${headquarterId}_$operatorPairKey';
     final isExpanded = _tagWriterExpansionState[expansionKey] ?? false;
 
-    // Construir el texto de display para los operadores
+    // Verificar si hay operador cortero (OP2)
     final hasOperator2 = operator2Id.isNotEmpty;
-    final displayName = hasOperator2
-        ? '$operatorName / $operator2Name'
-        : operatorName;
-    final displayIds = hasOperator2
-        ? 'Op: $operatorId | Cortero: $operator2Id'
-        : 'Op: $operatorId';
 
     return Container(
       margin: EdgeInsets.only(bottom: 8),
@@ -7220,14 +7514,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Nombre del operador principal (OP)
                         Text(
-                          displayName,
+                          operatorName,
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
                         ),
+                        // Nombre del operador cortero (OP2) en línea separada
+                        if (hasOperator2) ...[
+                          SizedBox(height: 2),
+                          Text(
+                            operator2Name.isNotEmpty ? operator2Name : operator2Id,
+                            style: TextStyle(fontFamily: 'Roboto',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Color(0xFF64B5F6),
+                            ),
+                          ),
+                        ],
                         SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
@@ -7237,16 +7544,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  Flexible(
-                    child: Text(
-                      displayIds,
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 10,
-                        color: Colors.white.withOpacity(0.6),
-                      ),
-                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -8096,6 +8393,153 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // ===== VISUALIZACIÓN DE HEADQUARTER WEIGHTS =====
 
   Widget _buildHeadquarterWeightsDisplay() {
+    // Si hay lotes sin peso, mostrar SOLO advertencia
+    if (_headquartersWithoutWeight.isNotEmpty) {
+      return Container(
+        padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF7F1D1D), Color(0xFF991B1B)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Color(0xFFDC2626).withOpacity(0.5),
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.warning_amber_rounded,
+                  color: Color(0xFFFCA5A5),
+                  size: 28,
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Peso promedio no configurado',
+                    style: TextStyle(fontFamily: 'Roboto',
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: 12),
+            Text(
+              'Los siguientes lotes no tienen peso promedio configurado para el mes actual. No se puede realizar el cálculo.',
+              style: TextStyle(fontFamily: 'Roboto',
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.85),
+                height: 1.4,
+              ),
+            ),
+            SizedBox(height: 12),
+            // Lista de lotes sin peso
+            ..._headquartersWithoutWeight.map((hq) {
+              return Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Color(0xFFDC2626).withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: Color(0xFFFCA5A5),
+                        size: 20,
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              hq['headquarterName'],
+                              style: TextStyle(fontFamily: 'Roboto',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'ID: ${hq['headquarterId']}',
+                              style: TextStyle(fontFamily: 'Roboto',
+                                fontSize: 11,
+                                color: Colors.white.withOpacity(0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Color(0xFFDC2626).withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Sin peso',
+                          style: TextStyle(fontFamily: 'Roboto',
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFCA5A5),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }).toList(),
+            SizedBox(height: 8),
+            Container(
+              padding: EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Color(0xFFDC2626).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Color(0xFFFCA5A5),
+                    size: 18,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Configure el peso promedio en el sistema antes de continuar.',
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.8),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Si todos los lotes tienen peso, mostrar display normal
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(

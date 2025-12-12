@@ -448,26 +448,26 @@ Future<void> _cleanLoginDataTables(Transaction txn) async {
 // FUNCIONES DE INSERCIÓN
 // ============================================================================
 
-/// Inserta Types_points desde GET /TypesPoints
+/// Inserta Types_points desde GET /TypesPoints usando Batch
 Future<void> _insertTypesPoints(
   Transaction txn,
   List<Map<String, dynamic>> typesPoints,
 ) async {
-  debugPrint('📝 Insertando Types_points...');
+  debugPrint('📝 Insertando Types_points con Batch...');
 
-  int inserted = 0;
+  final batch = txn.batch();
   for (final type in typesPoints) {
-    await txn.insert('Types_points', {
+    batch.insert('Types_points', {
       'Id_type_point': type['id_type_point'],
       'Name_type': type['name_type'],
       'Color_type': type['color_type'],
       'Order_type': type['order_type'],
       'Virtual_points_count': type['virtual_points_count'] ?? 0,
     });
-    inserted++;
   }
+  await batch.commit(noResult: true);
 
-  debugPrint('   ✅ Insertados $inserted tipos de puntos');
+  debugPrint('   ✅ Insertados ${typesPoints.length} tipos de puntos');
 }
 
 /// Inserta la Company
@@ -496,19 +496,20 @@ Future<void> _insertCompany(
   debugPrint('   ✅ Company insertada: ${company['name_company']}');
 }
 
-/// Inserta Zones + Zones_polygons
+/// Inserta Zones + Zones_polygons usando Batch
 Future<void> _insertZones(
   Transaction txn,
   List<dynamic> zones,
 ) async {
-  debugPrint('📝 Insertando Zones...');
+  debugPrint('📝 Insertando Zones con Batch...');
 
-  int zonesInserted = 0;
-  int polygonsInserted = 0;
+  final batch = txn.batch();
+  int zonesCount = 0;
+  int polygonsCount = 0;
 
   for (final zone in zones) {
     // Insertar zona
-    await txn.insert('Zones', {
+    batch.insert('Zones', {
       'Id_zone': zone['id_zone'],
       'Id_company': zone['id_company'],
       'Name_zone': zone['name_zone'],
@@ -516,113 +517,126 @@ Future<void> _insertZones(
       'State_zone': zone['state_zone'],
       'Created_at': zone['created_at'],
     });
-    zonesInserted++;
+    zonesCount++;
 
     // Insertar polígonos de la zona
     if (zone['zones_polygons'] != null) {
       for (final polygon in zone['zones_polygons']) {
-        await txn.insert('Zones_polygons', {
+        batch.insert('Zones_polygons', {
           'Id_zone_polygon': polygon['id_zone_polygon'],
-          'Id_zone': zone['id_zone'], // ✅ Usar del padre por consistencia
+          'Id_zone': zone['id_zone'],
           'Latitude': polygon['latitude'],
           'Longitude': polygon['longitude'],
           'Created_at': polygon['created_at'],
         });
-        polygonsInserted++;
+        polygonsCount++;
       }
     }
   }
+  await batch.commit(noResult: true);
 
-  debugPrint('   ✅ Insertadas $zonesInserted zonas');
-  debugPrint('   ✅ Insertados $polygonsInserted polígonos de zonas');
+  debugPrint('   ✅ Insertadas $zonesCount zonas');
+  debugPrint('   ✅ Insertados $polygonsCount polígonos de zonas');
 }
 
-/// Inserta Users y marca el usuario por defecto
+/// Inserta Users y marca el usuario por defecto usando Batch
 Future<void> _insertUsers(
   Transaction txn,
   List<dynamic> users,
   int? defaultUserId,
 ) async {
-  debugPrint('📝 Insertando Users...');
+  debugPrint('📝 Insertando Users con Batch...');
 
-  int inserted = 0;
+  final batch = txn.batch();
+  String? defaultUserName;
+
   for (final user in users) {
     final bool isDefault = (user['id_user'] == defaultUserId);
+    if (isDefault) {
+      defaultUserName = user['name_user'];
+    }
 
-    await txn.insert('Users', {
+    batch.insert('Users', {
       'Id_user': user['id_user'],
       'Id_company': user['id_company'],
-      'Oper_id': user['operID'], // ✅ API usa camelCase
+      'Oper_id': user['operID'],
       'Name_user': user['name_user'],
       'Email': user['email'],
       'Created_at': user['created_at'],
-      'Modified_at': user['modifiedAt'], // ✅ API usa camelCase
+      'Modified_at': user['modifiedAt'],
       'Is_default': isDefault ? 1 : 0,
     });
-    inserted++;
-
-    if (isDefault) {
-      debugPrint('   🎯 Usuario por defecto: ${user['name_user']}');
-    }
   }
+  await batch.commit(noResult: true);
 
-  debugPrint('   ✅ Insertados $inserted usuarios');
+  if (defaultUserName != null) {
+    debugPrint('   🎯 Usuario por defecto: $defaultUserName');
+  }
+  debugPrint('   ✅ Insertados ${users.length} usuarios');
 }
 
-/// Inserta Devices y marca el dispositivo por defecto
+/// Inserta Devices y marca el dispositivo por defecto usando Batch
 Future<void> _insertDevices(
   Transaction txn,
   List<dynamic> devices,
   int? defaultDeviceId,
 ) async {
-  debugPrint('📝 Insertando Devices...');
+  debugPrint('📝 Insertando Devices con Batch...');
 
-  int inserted = 0;
+  final batch = txn.batch();
+  String? defaultDeviceName;
+
   for (final device in devices) {
     final bool isDefault = (device['id_device'] == defaultDeviceId);
+    if (isDefault) {
+      defaultDeviceName = device['device_name'];
+    }
 
-    await txn.insert('Devices', {
+    batch.insert('Devices', {
       'Id_device': device['id_device'],
       'Id_company': device['id_company'],
       'Device_name': device['device_name'],
-      'Cell_phone': device['cellPhone'], // ✅ API usa camelCase
+      'Cell_phone': device['cellPhone'],
       'Serial_id': device['serial_id'],
-      'Imei1': device['imeI1'], // ✅ API usa "imeI1" con I mayúscula
-      'Imei2': device['imeI2'], // ✅ API usa "imeI2" con I mayúscula
+      'Imei1': device['imeI1'],
+      'Imei2': device['imeI2'],
       'Model': device['model'],
       'State': device['state'],
       'Is_default': isDefault ? 1 : 0,
     });
-    inserted++;
-
-    if (isDefault) {
-      debugPrint('   🎯 Dispositivo por defecto: ${device['device_name']}');
-    }
   }
+  await batch.commit(noResult: true);
 
-  debugPrint('   ✅ Insertados $inserted dispositivos');
+  if (defaultDeviceName != null) {
+    debugPrint('   🎯 Dispositivo por defecto: $defaultDeviceName');
+  }
+  debugPrint('   ✅ Insertados ${devices.length} dispositivos');
 }
 
-/// Inserta Activities + Steps + Status y marca la actividad por defecto
+/// Inserta Activities + Steps + Status y marca la actividad por defecto usando Batch
 Future<void> _insertActivities(
   Transaction txn,
   List<dynamic> activities,
   int? defaultActivityId,
 ) async {
-  debugPrint('📝 Insertando Activities...');
+  debugPrint('📝 Insertando Activities con Batch...');
   debugPrint('   📊 Total activities desde API: ${activities.length}');
 
-  int activitiesInserted = 0;
-  int stepsInserted = 0;
-  int statusInserted = 0;
+  // Recolectar todos los datos antes de insertar
+  final List<Map<String, dynamic>> activitiesData = [];
+  final List<Map<String, dynamic>> stepsData = [];
+  final Set<int> statusIds = {}; // Para evitar duplicados
+  final List<Map<String, dynamic>> statusData = [];
+  String? defaultActivityName;
 
   for (final activity in activities) {
-    debugPrint('   🔍 Activity ID=${activity['id_activity']} "${activity['name_activity']}"');
-
     final bool isDefault = (activity['id_activity'] == defaultActivityId);
+    if (isDefault) {
+      defaultActivityName = activity['name_activity'];
+    }
 
-    // Insertar actividad
-    await txn.insert('Activities', {
+    // Agregar actividad
+    activitiesData.add({
       'Id_activity': activity['id_activity'],
       'Id_company': activity['id_company'],
       'Id_activity_parent': activity['id_activity_parent'],
@@ -639,228 +653,220 @@ Future<void> _insertActivities(
       'Created_at': activity['created_at'],
       'Is_default': isDefault ? 1 : 0,
     });
-    activitiesInserted++;
 
-    if (isDefault) {
-      debugPrint('   🎯 Actividad por defecto: ${activity['name_activity']}');
-    }
-
-    // Insertar steps de la actividad y sus status anidados
+    // Recolectar steps de la actividad
     if (activity['activity_steps'] != null) {
       for (final step in activity['activity_steps']) {
-        await txn.insert(
-          'Activities_steps',
-          {
-            'Id_activity_step': step['id_activity_step'],
-            'Id_activity': step['id_activity'],
-            'Type_step': step['type_step'],
-            'Order_step': step['order_step'],
-            'Default_value': step['default_value'],
-            'Unity': step['unity'],
-            'Calculation': step['calculation'],
-            'Name_step': step['name_step'],
-            'Status': step['status'],
-            'Is_required': step['is_required'] == true ? 1 : 0,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace, // Reemplazar si ya existe
-        );
-        stepsInserted++;
+        stepsData.add({
+          'Id_activity_step': step['id_activity_step'],
+          'Id_activity': step['id_activity'],
+          'Type_step': step['type_step'],
+          'Order_step': step['order_step'],
+          'Default_value': step['default_value'],
+          'Unity': step['unity'],
+          'Calculation': step['calculation'],
+          'Name_step': step['name_step'],
+          'Status': step['status'],
+          'Is_required': step['is_required'] == true ? 1 : 0,
+        });
 
-        // Insertar status padre del step (si existe)
+        // Recolectar status padre del step
         if (step['activity_step_parent'] != null) {
-          final parentStatus = step['activity_step_parent'];
-          final count = await _insertStatusIfNotExists(txn, parentStatus);
-          statusInserted += count;
+          _collectStatusRecursive(step['activity_step_parent'], statusIds, statusData);
         }
 
-        // Insertar status hijos del step (si existen)
+        // Recolectar status hijos del step
         if (step['activities_status'] != null) {
           for (final childStatus in step['activities_status']) {
-            final count = await _insertStatusIfNotExists(txn, childStatus);
-            statusInserted += count;
+            _collectStatusRecursive(childStatus, statusIds, statusData);
           }
         }
       }
     }
 
-    // Insertar status directos de la actividad
+    // Recolectar status directos de la actividad
     if (activity['activity_status'] != null) {
       for (final status in activity['activity_status']) {
-        final count = await _insertStatusIfNotExists(txn, status);
-        statusInserted += count;
+        _collectStatusRecursive(status, statusIds, statusData);
       }
     }
   }
 
-  debugPrint('   ✅ Insertadas $activitiesInserted actividades');
-  debugPrint('   ✅ Insertados $stepsInserted pasos de actividades');
-  debugPrint('   ✅ Insertados $statusInserted estados de actividades');
-}
+  // Insertar todo con Batch
+  final batch = txn.batch();
 
-/// Inserta un status si no existe, evitando duplicados
-/// Retorna 1 si insertó, 0 si ya existía
-Future<int> _insertStatusIfNotExists(
-  Transaction txn,
-  Map<String, dynamic> status,
-) async {
-  final idActivityStatus = status['id_activity_status'];
-  final statusName = status['status_name'];
-  final factor = status['factor'];
-
-  // Verificar si ya existe
-  final existing = await txn.rawQuery('''
-    SELECT Id_activity_status FROM Activities_status
-    WHERE Id_activity_status = ?
-  ''', [idActivityStatus]);
-
-  if (existing.isNotEmpty) {
-    // Ya existe, no insertar duplicado
-    return 0;
+  // Insertar activities
+  for (final data in activitiesData) {
+    batch.insert('Activities', data);
   }
 
-  // No existe, insertar
-  await txn.insert(
-    'Activities_status',
-    {
-      'Id_activity_status': idActivityStatus,
-      'Id_activity': status['id_activity'],
-      'Id_activity_step_parent': status['id_activity_step_parent'],
-      'Id_activity_status_parent': status['id_activity_status_parent'],
-      'Type_status': status['type_status'],
-      'Order_status': status['order_status'],
-      'Default_status': status['default_status'],
-      'Status_name': statusName,
-      'Color': status['color'],
-      'Peso': status['peso'],
-      'Castigo': status['castigo'],
-      'Boton': status['boton'],
-      'Factor': factor,
-      'Status': status['status'],
-    },
-    conflictAlgorithm: ConflictAlgorithm.ignore,
-  );
+  // Insertar steps
+  for (final data in stepsData) {
+    batch.insert('Activities_steps', data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
 
-  // debugPrint('      ➕ Status ID=$idActivityStatus "$statusName" Factor=$factor');
+  // Insertar status
+  for (final data in statusData) {
+    batch.insert('Activities_status', data, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
 
-  int childrenInserted = 0;
+  await batch.commit(noResult: true);
 
-  // Insertar recursivamente los status hijos (si existen)
+  if (defaultActivityName != null) {
+    debugPrint('   🎯 Actividad por defecto: $defaultActivityName');
+  }
+  debugPrint('   ✅ Insertadas ${activitiesData.length} actividades');
+  debugPrint('   ✅ Insertados ${stepsData.length} pasos de actividades');
+  debugPrint('   ✅ Insertados ${statusData.length} estados de actividades');
+}
+
+/// Recolecta status recursivamente sin duplicados (para Batch)
+void _collectStatusRecursive(
+  Map<String, dynamic> status,
+  Set<int> statusIds,
+  List<Map<String, dynamic>> statusData,
+) {
+  final idActivityStatus = status['id_activity_status'];
+  if (idActivityStatus == null || statusIds.contains(idActivityStatus)) {
+    return; // Ya existe o es inválido
+  }
+
+  statusIds.add(idActivityStatus);
+  statusData.add({
+    'Id_activity_status': idActivityStatus,
+    'Id_activity': status['id_activity'],
+    'Id_activity_step_parent': status['id_activity_step_parent'],
+    'Id_activity_status_parent': status['id_activity_status_parent'],
+    'Type_status': status['type_status'],
+    'Order_status': status['order_status'],
+    'Default_status': status['default_status'],
+    'Status_name': status['status_name'],
+    'Color': status['color'],
+    'Peso': status['peso'],
+    'Castigo': status['castigo'],
+    'Boton': status['boton'],
+    'Factor': status['factor'],
+    'Status': status['status'],
+  });
+
+  // Recolectar recursivamente los status hijos
   if (status['activities_status_childs'] != null) {
     for (final childStatus in status['activities_status_childs']) {
       if (childStatus is Map<String, dynamic>) {
-        childrenInserted += await _insertStatusIfNotExists(txn, childStatus);
+        _collectStatusRecursive(childStatus, statusIds, statusData);
       }
     }
   }
-
-  return 1 + childrenInserted;
 }
 
-/// MERGE Headquarters + Polygons + Weights (preserva datos locales)
+/// MERGE Headquarters + Polygons + Weights usando Batch (preserva datos locales)
 Future<void> _mergeHeadquarters(
   Transaction txn,
   List<dynamic> headquarters,
 ) async {
-  debugPrint('📝 Haciendo MERGE de Headquarters...');
+  debugPrint('📝 Haciendo MERGE de Headquarters con Batch...');
 
-  int merged = 0;
-  int polygonsInserted = 0;
-  int weightsInserted = 0;
+  // Recolectar datos
+  final List<Map<String, dynamic>> hqData = [];
+  final List<Map<String, dynamic>> polygonsData = [];
+  final List<Map<String, dynamic>> weightsData = [];
+  final Set<int> hqIdsToDeletePolygons = {};
 
   for (final hq in headquarters) {
-    // MERGE headquarters - Estrategia: INSERT OR IGNORE para no sobrescribir
-    // headquarters ya instalados con datos avanzados (Azimuth, Slope, etc.)
-    // Solo insertar campos básicos que vienen del Login
-    await txn.insert(
-      'Headquarters',
-      {
-        'Id_headquarter': hq['id_headquarter'],
-        'Id_zone': hq['id_zone'],
-        'Created_at': hq['created_at'],
-        'Name_headquarter': hq['name_headquarter'],
-        'Density_headquarter': hq['density_headquarter'],
-        'Seed_time': hq['seed_time'],
-        'State_headquarter': hq['state_headquarter'],
-        'Area_headquarter': hq['area_headquarter'],
-        'Polygon': hq['polygon'],
-        'Centroid_coordinate': hq['centroid_coordinate'],
-        // Nota: Si el headquarter ya existe (instalado por sync_install_module),
-        // NO se sobrescribe. Esto preserva campos avanzados como Azimuth, Slope, etc.
-      },
-      conflictAlgorithm:
-          ConflictAlgorithm.ignore, // ✅ CORREGIDO: No sobrescribir
-    );
-    merged++;
+    final hqId = hq['id_headquarter'];
 
-    // Eliminar polígonos antiguos y reinsertar
-    await txn.delete(
-      'Headquarters_polygons',
-      where: 'Id_headquarter = ?',
-      whereArgs: [hq['id_headquarter']],
-    );
+    // Agregar headquarters
+    hqData.add({
+      'Id_headquarter': hqId,
+      'Id_zone': hq['id_zone'],
+      'Created_at': hq['created_at'],
+      'Name_headquarter': hq['name_headquarter'],
+      'Density_headquarter': hq['density_headquarter'],
+      'Seed_time': hq['seed_time'],
+      'State_headquarter': hq['state_headquarter'],
+      'Area_headquarter': hq['area_headquarter'],
+      'Polygon': hq['polygon'],
+      'Centroid_coordinate': hq['centroid_coordinate'],
+    });
 
+    // Marcar para eliminar polígonos antiguos
+    hqIdsToDeletePolygons.add(hqId);
+
+    // Recolectar polígonos válidos
     if (hq['headquarters_polygons'] != null) {
       for (final polygon in hq['headquarters_polygons']) {
-        // Validar que el polígono tenga coordenadas válidas (NOT NULL)
-        // Algunos headquarters pueden no tener polígonos válidos
         if (polygon['latitude'] != null && polygon['longitude'] != null) {
-          await txn.insert('Headquarters_polygons', {
+          polygonsData.add({
             'Id_headquarter_polygon': polygon['id_headquarter_polygon'],
-            'Id_headquarter':
-                hq['id_headquarter'], // ✅ Usar del padre, no del polígono
+            'Id_headquarter': hqId,
             'Latitude': polygon['latitude'],
             'Longitude': polygon['longitude'],
             'Created_at': polygon['created_at'],
           });
-          polygonsInserted++;
-        } else {
-          debugPrint(
-              '   ⚠️ Polígono ${polygon['id_headquarter_polygon']} sin coordenadas válidas, se omite');
         }
       }
     }
 
-    // Insertar weights (pesos mensuales)
+    // Recolectar weights
     if (hq['headquarters_weights'] != null) {
       for (final weight in hq['headquarters_weights']) {
-        await txn.insert(
-          'Headquarters_weights',
-          {
-            'Id_headquarter_weight': weight['id_headquarter_weight'],
-            'Id_headquarter':
-                hq['id_headquarter'], // ✅ Usar del padre por seguridad
-            'Id_company': weight['id_company'],
-            'Date_year': weight['date_year'],
-            'Date_month': weight['date_month'],
-            'Weight': weight['weight'],
-            'Created_at': weight['created_at'],
-            'Modified_at': weight['modified_at'],
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-        weightsInserted++;
+        weightsData.add({
+          'Id_headquarter_weight': weight['id_headquarter_weight'],
+          'Id_headquarter': hqId,
+          'Id_company': weight['id_company'],
+          'Date_year': weight['date_year'],
+          'Date_month': weight['date_month'],
+          'Weight': weight['weight'],
+          'Created_at': weight['created_at'],
+          'Modified_at': weight['modified_at'],
+        });
       }
     }
   }
 
-  debugPrint('   ✅ MERGE de $merged lotes (headquarters)');
-  debugPrint('   ✅ Insertados $polygonsInserted polígonos de lotes');
-  debugPrint('   ✅ Insertados $weightsInserted pesos de lotes');
+  // Eliminar polígonos antiguos (esto debe hacerse antes del batch insert)
+  for (final hqId in hqIdsToDeletePolygons) {
+    await txn.delete(
+      'Headquarters_polygons',
+      where: 'Id_headquarter = ?',
+      whereArgs: [hqId],
+    );
+  }
+
+  // Insertar todo con Batch
+  final batch = txn.batch();
+
+  for (final data in hqData) {
+    batch.insert('Headquarters', data, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  for (final data in polygonsData) {
+    batch.insert('Headquarters_polygons', data);
+  }
+
+  for (final data in weightsData) {
+    batch.insert('Headquarters_weights', data, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+
+  await batch.commit(noResult: true);
+
+  debugPrint('   ✅ MERGE de ${hqData.length} lotes (headquarters)');
+  debugPrint('   ✅ Insertados ${polygonsData.length} polígonos de lotes');
+  debugPrint('   ✅ Insertados ${weightsData.length} pesos de lotes');
 }
 
-/// Inserta Products + Coordinates
+/// Inserta Products + Coordinates usando Batch
 Future<void> _insertProducts(
   Transaction txn,
   List<dynamic> products,
 ) async {
-  debugPrint('📝 Insertando Products...');
+  debugPrint('📝 Insertando Products con Batch...');
 
-  int productsInserted = 0;
-  int coordinatesInserted = 0;
+  final List<Map<String, dynamic>> productsData = [];
+  final List<Map<String, dynamic>> coordinatesData = [];
 
   for (final product in products) {
-    // Insertar producto - solo campos que existen en el schema
-    await txn.insert('Products', {
+    productsData.add({
       'Id_product': product['id_product'],
       'Id_headquarter': product['id_headquarter'],
       'Id_company': product['id_company'],
@@ -876,46 +882,57 @@ Future<void> _insertProducts(
       'Line': product['line'],
       'Palm': product['palm'],
     });
-    productsInserted++;
 
-    // Insertar coordenadas del producto
+    // Recolectar coordenadas del producto
     if (product['products_coordinates'] != null) {
       for (final coord in product['products_coordinates']) {
-        await txn.insert('Products_coordinates', {
+        coordinatesData.add({
           'Id_product_coordenate': coord['id_product_coordinate'],
           'Id_product': coord['id_product'],
           'Latitude': coord['latitude'],
           'Longitude': coord['longitude'],
         });
-        coordinatesInserted++;
       }
     }
   }
 
-  debugPrint('   ✅ Insertados $productsInserted productos');
-  debugPrint('   ✅ Insertadas $coordinatesInserted coordenadas de productos');
+  // Insertar todo con Batch
+  final batch = txn.batch();
+
+  for (final data in productsData) {
+    batch.insert('Products', data);
+  }
+
+  for (final data in coordinatesData) {
+    batch.insert('Products_coordinates', data);
+  }
+
+  await batch.commit(noResult: true);
+
+  debugPrint('   ✅ Insertados ${productsData.length} productos');
+  debugPrint('   ✅ Insertadas ${coordinatesData.length} coordenadas de productos');
 }
 
-/// Inserta News
+/// Inserta News usando Batch
 Future<void> _insertNews(
   Transaction txn,
   List<dynamic> news,
 ) async {
-  debugPrint('📝 Insertando News...');
+  debugPrint('📝 Insertando News con Batch...');
 
-  int inserted = 0;
+  final batch = txn.batch();
   for (final newItem in news) {
-    await txn.insert('News', {
+    batch.insert('News', {
       'Id_new': newItem['id_new'],
       'Id_company': newItem['id_company'],
       'Name_new': newItem['name_new'],
       'Descripcion_activity': newItem['descripcion_activity'],
       'Order_display': newItem['order_display'] ?? 0,
     });
-    inserted++;
   }
+  await batch.commit(noResult: true);
 
-  debugPrint('   ✅ Insertadas $inserted noticias');
+  debugPrint('   ✅ Insertadas ${news.length} noticias');
 }
 
 /// Inserta Login_sessions para tracking

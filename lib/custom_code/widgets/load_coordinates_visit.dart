@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
+import 'dart:ui';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -54,6 +56,42 @@ class GPSPoint {
 }
 
 // ============================================================================
+// MENSAJES DINÁMICOS PARA LA ESPERA
+// ============================================================================
+
+class _DynamicMessages {
+  static const List<String> waitingMessages = [
+    'Conectando con satélites GPS...',
+    'Triangulando tu posición...',
+    'Optimizando precisión de coordenadas...',
+    'Sincronizando señal GPS...',
+    'Calibrando ubicación exacta...',
+    'Procesando datos de geolocalización...',
+    'Verificando precisión del GPS...',
+    'Obteniendo coordenadas de alta precisión...',
+  ];
+
+  static const List<String> tips = [
+    '💡 Mantén el dispositivo en un lugar abierto',
+    '💡 Evita estar cerca de edificios altos',
+    '💡 El cielo despejado mejora la señal',
+    '💡 Mantén el GPS activado',
+    '💡 La primera lectura puede tardar más',
+    '💡 Mejor precisión en exteriores',
+  ];
+
+  static String getRandomMessage() {
+    final random = math.Random();
+    return waitingMessages[random.nextInt(waitingMessages.length)];
+  }
+
+  static String getRandomTip() {
+    final random = math.Random();
+    return tips[random.nextInt(tips.length)];
+  }
+}
+
+// ============================================================================
 // WIDGET PRINCIPAL - CARGA DE COORDENADAS PARA VISITA
 // ============================================================================
 
@@ -76,6 +114,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   // Contador
   int _countdown = 5;
   Timer? _countdownTimer;
+  Timer? _messageTimer;
 
   // Estado
   bool _isWaiting = false;
@@ -84,56 +123,82 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   bool _hasError = false;
   String _statusMessage = '';
   String _errorMessage = '';
+  String _dynamicMessage = _DynamicMessages.getRandomMessage();
+  String _currentTip = _DynamicMessages.getRandomTip();
 
   // GPS Points
   List<GPSPoint> _gpsPoints = [];
   int _retryAttempts = 0;
-  static const int _maxRetryAttempts =
-      3; // Después de 3 intentos, usar geolocator
+  static const int _maxRetryAttempts = 3;
 
   // Filtro de precisión GPS
-  static const double _maxHorizontalError = 10.0; // metros
-  static const int _maxWaitTimeSeconds = 40; // segundos máximo de espera
-  static const int _retryIntervalSeconds = 2; // intervalo entre reintentos
+  static const double _maxHorizontalError = 10.0;
+  static const int _maxWaitTimeSeconds = 40;
+  static const int _retryIntervalSeconds = 2;
+
+  // Progreso visual
+  int _elapsedSeconds = 0;
+  int _validPoints = 0;
 
   // Animaciones
   late AnimationController _pulseController;
   late AnimationController _rotateController;
   late AnimationController _scaleController;
+  late AnimationController _radarController;
+  late AnimationController _waveController;
+  late AnimationController _particleController;
+  late AnimationController _glowController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _rotateAnimation;
   late Animation<double> _scaleAnimation;
+  late Animation<double> _radarAnimation;
+  late Animation<double> _waveAnimation;
+  late Animation<double> _glowAnimation;
+
+  // Colores de la paleta verde oscuro
+  static const Color _darkGreen1 = Color(0xFF003420);
+  static const Color _darkGreen2 = Color(0xFF002415);
+  static const Color _darkGreen3 = Color(0xFF00150A);
+  static const Color _accentGreen = Color(0xFF00a86b);
+  static const Color _brightGreen = Color(0xFF00ff9f);
+  static const Color _successGreen = Color(0xFF00D9A5);
 
   @override
   void initState() {
     super.initState();
     _setupAnimations();
     _startCountdown();
+    _startMessageRotation();
   }
 
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _messageTimer?.cancel();
     _pulseController.dispose();
     _rotateController.dispose();
     _scaleController.dispose();
+    _radarController.dispose();
+    _waveController.dispose();
+    _particleController.dispose();
+    _glowController.dispose();
     super.dispose();
   }
 
   void _setupAnimations() {
     // Animación de pulso
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
+    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.08).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
     // Animación de rotación
     _rotateController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 3000),
       vsync: this,
     )..repeat();
 
@@ -143,13 +208,60 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
     // Animación de escala
     _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
 
     _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
+
+    // Animación de radar
+    _radarController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat();
+
+    _radarAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _radarController, curve: Curves.easeOut),
+    );
+
+    // Animación de ondas
+    _waveController = AnimationController(
+      duration: const Duration(milliseconds: 2500),
+      vsync: this,
+    )..repeat();
+
+    _waveAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _waveController, curve: Curves.easeOut),
+    );
+
+    // Animación de partículas
+    _particleController = AnimationController(
+      duration: const Duration(milliseconds: 4000),
+      vsync: this,
+    )..repeat();
+
+    // Animación de glow
+    _glowController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+  }
+
+  void _startMessageRotation() {
+    _messageTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (mounted && (_isWaiting || _countdown > 0)) {
+        setState(() {
+          _dynamicMessage = _DynamicMessages.getRandomMessage();
+          _currentTip = _DynamicMessages.getRandomTip();
+        });
+      }
+    });
   }
 
   void _startCountdown() {
@@ -176,11 +288,10 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     setState(() {
       _isWaiting = true;
       _statusMessage = 'Obteniendo coordenadas GPS precisas...';
+      _elapsedSeconds = 0;
     });
 
     try {
-      // ESTRATEGIA 1: Intentar obtener de AppState con filtro de precisión
-      // Loop con timeout de 40 segundos
       final startTime = DateTime.now();
       int attemptNumber = 0;
 
@@ -188,19 +299,19 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         attemptNumber++;
         final elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
 
-        // Verificar timeout
+        setState(() {
+          _elapsedSeconds = elapsedSeconds;
+        });
+
         if (elapsedSeconds >= _maxWaitTimeSeconds) {
-          debugPrint(
-              '⏱️ Timeout de $_maxWaitTimeSeconds segundos alcanzado. Intentando estrategia alternativa...');
+          debugPrint('⏱️ Timeout de $_maxWaitTimeSeconds segundos alcanzado.');
           break;
         }
 
         final geoLocationsList = FFAppState().geoLocationsList;
-        debugPrint(
-            '📍 [Intento $attemptNumber] Puntos GPS en AppState: ${geoLocationsList.length}');
+        debugPrint('📍 [Intento $attemptNumber] Puntos GPS en AppState: ${geoLocationsList.length}');
 
         if (geoLocationsList.isNotEmpty) {
-          // Obtener nivel de batería
           final battery = Battery();
           int batteryLevel = 100;
           try {
@@ -209,7 +320,6 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             debugPrint('⚠️ No se pudo obtener nivel de batería: $e');
           }
 
-          // Convertir y FILTRAR puntos con error <= 10 metros
           final allPoints = geoLocationsList.map((geoStruct) {
             return GPSPoint(
               latitude: geoStruct.latitude ?? 0.0,
@@ -221,74 +331,40 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             );
           }).toList();
 
-          // FILTRAR: Solo puntos con error <= 10 metros
           _gpsPoints = allPoints
               .where((point) => point.horizontalError <= _maxHorizontalError)
               .toList();
 
-          final rejectedCount = allPoints.length - _gpsPoints.length;
+          setState(() {
+            _validPoints = _gpsPoints.length;
+          });
 
-          debugPrint(
-              '🎯 Filtro de precisión aplicado (error <= ${_maxHorizontalError}m):');
-          debugPrint('   Total puntos: ${allPoints.length}');
-          debugPrint('   Puntos precisos: ${_gpsPoints.length}');
-          debugPrint('   Puntos rechazados: $rejectedCount');
-
-          if (rejectedCount > 0) {
-            debugPrint('   ⚠️ Errores rechazados:');
-            for (var point in allPoints) {
-              if (point.horizontalError > _maxHorizontalError) {
-                debugPrint(
-                    '      - ${point.horizontalError.toStringAsFixed(1)}m (RECHAZADO)');
-              }
-            }
-          }
-
-          // Si tenemos suficientes puntos precisos, crear visita
           if (_gpsPoints.length >= 2) {
-            debugPrint(
-                '✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 2)');
+            debugPrint('✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 2)');
             await _createVisit();
             return;
           }
 
-          // Actualizar mensaje para el usuario
           setState(() {
-            _statusMessage = 'Esperando señal GPS precisa...\n\n'
-                '📡 Precisión requerida: ≤ ${_maxHorizontalError}m\n'
-                '📍 Puntos válidos: ${_gpsPoints.length}/2\n'
-                '⏱️ Tiempo: ${elapsedSeconds}s / ${_maxWaitTimeSeconds}s\n'
-                '🔄 Reintentando en $_retryIntervalSeconds segundos...';
+            _statusMessage = 'Esperando señal GPS precisa...';
           });
 
-          debugPrint(
-              '⏳ Esperando $_retryIntervalSeconds segundos antes de reintentar...');
           await Future.delayed(Duration(seconds: _retryIntervalSeconds));
-
-          // Verificar si el widget sigue montado
           if (!mounted) return;
-
-          continue; // Reintentar
+          continue;
         } else {
-          // AppState vacío
-          debugPrint('⚠️ AppState vacío en intento $attemptNumber');
-
           setState(() {
-            _statusMessage = 'Esperando señal GPS del sistema...\n\n'
-                '⏱️ Tiempo: ${elapsedSeconds}s / ${_maxWaitTimeSeconds}s\n'
-                '🔄 Reintentando...';
+            _statusMessage = 'Buscando señal GPS...';
           });
 
           await Future.delayed(Duration(seconds: _retryIntervalSeconds));
-
           if (!mounted) return;
           continue;
         }
       }
 
-      // ESTRATEGIA 2: Si AppState está vacío, intentar SQLite con filtro de precisión
-      debugPrint(
-          '⚠️ Timeout alcanzado o AppState insuficiente, intentando SQLite...');
+      // Estrategia 2: SQLite
+      debugPrint('⚠️ Timeout alcanzado, intentando SQLite...');
 
       final Directory? externalDir = await getExternalStorageDirectory();
       if (externalDir == null) {
@@ -299,15 +375,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       final database = await openDatabase(dbPath);
 
-      // Consultar Location_tracking con filtro de precisión
       final List<Map<String, dynamic>> results = await database.rawQuery('''
-        SELECT
-          Latitude,
-          Longitude,
-          Altitude,
-          HorizontalError,
-          Battery,
-          CreatedAt
+        SELECT Latitude, Longitude, Altitude, HorizontalError, Battery, CreatedAt
         FROM Location_tracking
         WHERE HorizontalError <= ?
         ORDER BY CreatedAt DESC
@@ -316,44 +385,34 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       await database.close();
 
-      final allPointsFromDB =
-          results.map((row) => GPSPoint.fromMap(row)).toList();
-
-      // Aplicar el mismo filtro por consistencia
+      final allPointsFromDB = results.map((row) => GPSPoint.fromMap(row)).toList();
       _gpsPoints = allPointsFromDB
           .where((point) => point.horizontalError <= _maxHorizontalError)
           .toList();
 
-      debugPrint(
-          '📍 Puntos GPS precisos encontrados en SQLite: ${_gpsPoints.length} (error <= ${_maxHorizontalError}m)');
+      setState(() {
+        _validPoints = _gpsPoints.length;
+      });
 
       if (_gpsPoints.length >= 2) {
-        // Suficientes puntos GPS precisos
-        debugPrint('✅ Usando puntos de SQLite (precisión adecuada)');
+        debugPrint('✅ Usando puntos de SQLite');
         await _createVisit();
       } else {
-        // ESTRATEGIA 3: Fallback a geolocator directo
         _retryAttempts++;
 
         if (_retryAttempts >= _maxRetryAttempts) {
-          // Fallback: Usar geolocator para obtener coordenadas directamente del GPS
-          debugPrint(
-              '⚠️ No hay suficientes datos en AppState ni SQLite. Usando fallback de geolocator...');
+          debugPrint('⚠️ Usando fallback de geolocator...');
           setState(() {
-            _statusMessage =
-                'Obteniendo coordenadas directamente del GPS del dispositivo...';
+            _statusMessage = 'Obteniendo GPS directo del dispositivo...';
           });
-
           await _getGPSFromGeolocator();
           return;
         }
 
         setState(() {
-          _statusMessage =
-              'Se está tardando más de lo normal...\n\nPuntos GPS obtenidos: ${_gpsPoints.length}/2\nIntento ${_retryAttempts}/$_maxRetryAttempts\n\nEsperando más coordenadas...';
+          _statusMessage = 'Reintentando obtener coordenadas...';
         });
 
-        // Reiniciar contador para esperar 5 segundos más
         _countdown = 5;
         await Future.delayed(const Duration(seconds: 2));
 
@@ -374,59 +433,43 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     }
   }
 
-  // ==========================================================================
-  // FALLBACK: Obtener GPS directamente usando Geolocator
-  // ==========================================================================
-
   Future<void> _getGPSFromGeolocator() async {
     try {
-      // 1. Verificar si el servicio de ubicación está habilitado
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
-        throw Exception(
-            'El servicio de ubicación está deshabilitado.\n\nPor favor, habilita el GPS en tu dispositivo.');
+        throw Exception('El servicio de ubicación está deshabilitado.');
       }
 
-      // 2. Verificar permisos
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception(
-              'Permisos de ubicación denegados.\n\nPor favor, habilita los permisos de ubicación en la configuración.');
+          throw Exception('Permisos de ubicación denegados.');
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception(
-            'Permisos de ubicación denegados permanentemente.\n\nPor favor, habilita los permisos en la configuración del dispositivo.');
+        throw Exception('Permisos de ubicación denegados permanentemente.');
       }
 
-      // 3. Obtener nivel de batería
       final battery = Battery();
-      int batteryLevel = 0;
+      int batteryLevel = 100;
       try {
         batteryLevel = await battery.batteryLevel;
       } catch (e) {
         debugPrint('⚠️ No se pudo obtener nivel de batería: $e');
-        batteryLevel = 100; // Valor por defecto
       }
 
       setState(() {
-        _statusMessage =
-            'Obteniendo coordenadas GPS precisas del dispositivo...\n\n'
-            '📡 Precisión requerida: ≤ ${_maxHorizontalError}m\n'
-            'Esto puede tardar unos segundos.';
+        _statusMessage = 'Obteniendo GPS de alta precisión...';
       });
 
-      // 4. Obtener múltiples lecturas GPS con validación de precisión
       _gpsPoints.clear();
       List<GPSPoint> allAttempts = [];
 
       for (int i = 0; i < 5; i++) {
-        // Aumentado a 5 intentos
         try {
-          debugPrint('📍 Obteniendo punto GPS preciso ${i + 1}/5...');
+          debugPrint('📍 Obteniendo punto GPS ${i + 1}/5...');
 
           Position position = await Geolocator.getCurrentPosition(
             desiredAccuracy: LocationAccuracy.high,
@@ -444,77 +487,35 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
           allAttempts.add(gpsPoint);
 
-          debugPrint(
-              '📍 Punto GPS ${i + 1}/5: ${position.latitude}, ${position.longitude} (error: ±${position.accuracy.toStringAsFixed(1)}m)');
-
-          // Validar precisión
           if (position.accuracy <= _maxHorizontalError) {
             _gpsPoints.add(gpsPoint);
-            debugPrint('   ✅ ACEPTADO (error <= ${_maxHorizontalError}m)');
+            setState(() {
+              _validPoints = _gpsPoints.length;
+            });
 
-            // Si ya tenemos 2 puntos precisos, podemos parar
             if (_gpsPoints.length >= 2) {
-              debugPrint(
-                  '✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 2)');
               break;
             }
-          } else {
-            debugPrint(
-                '   ❌ RECHAZADO (error ${position.accuracy.toStringAsFixed(1)}m > ${_maxHorizontalError}m)');
           }
 
-          // Actualizar UI
-          setState(() {
-            _statusMessage = 'Obteniendo coordenadas GPS precisas...\n\n'
-                '📡 Precisión requerida: ≤ ${_maxHorizontalError}m\n'
-                '📍 Puntos válidos: ${_gpsPoints.length}/2\n'
-                '🔄 Intento: ${i + 1}/5';
-          });
-
-          // Pequeña espera entre lecturas
           if (i < 4 && _gpsPoints.length < 2) {
             await Future.delayed(const Duration(seconds: 1));
           }
         } catch (e) {
           debugPrint('⚠️ Error obteniendo punto GPS ${i + 1}: $e');
-          // Continuar con los siguientes intentos
         }
       }
-
-      // 5. Verificar que se obtuvieron al menos 2 puntos PRECISOS
-      debugPrint('');
-      debugPrint('📊 Resumen de intentos de geolocator:');
-      debugPrint('   Total intentos: ${allAttempts.length}');
-      debugPrint(
-          '   Puntos precisos (≤${_maxHorizontalError}m): ${_gpsPoints.length}');
-      debugPrint(
-          '   Puntos rechazados: ${allAttempts.length - _gpsPoints.length}');
 
       if (_gpsPoints.isEmpty) {
-        // Mostrar los errores de los puntos rechazados
         if (allAttempts.isNotEmpty) {
-          debugPrint(
-              '   ⚠️ Todos los puntos fueron rechazados por baja precisión:');
-          for (var point in allAttempts) {
-            debugPrint(
-                '      - Error: ${point.horizontalError.toStringAsFixed(1)}m (> ${_maxHorizontalError}m)');
-          }
           throw Exception(
-              'No se pudo obtener señal GPS con la precisión requerida.\n\n'
-              '📡 Precisión requerida: ≤ ${_maxHorizontalError}m\n'
-              '📍 Mejor precisión obtenida: ±${allAttempts.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b).toStringAsFixed(1)}m\n\n'
-              'Intenta moverte a un lugar con mejor señal GPS (cielo despejado, lejos de edificios).');
+              'No se pudo obtener señal GPS con precisión requerida (≤${_maxHorizontalError}m)');
         } else {
-          throw Exception(
-              'No se pudieron obtener coordenadas GPS del dispositivo.\n\n'
-              'Verifica que el GPS esté habilitado y que tengas buena señal.');
+          throw Exception('No se pudieron obtener coordenadas GPS del dispositivo.');
         }
       }
 
-      // Si solo se obtuvo 1 punto preciso, duplicarlo con timestamp diferente
       if (_gpsPoints.length == 1) {
-        debugPrint(
-            '⚠️ Solo se obtuvo 1 punto GPS preciso. Duplicando para cumplir requisito mínimo...');
         final originalPoint = _gpsPoints.first;
         _gpsPoints.add(GPSPoint(
           latitude: originalPoint.latitude,
@@ -526,10 +527,6 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         ));
       }
 
-      debugPrint(
-          '✅ Total de puntos GPS PRECISOS obtenidos desde geolocator: ${_gpsPoints.length}');
-
-      // 6. Continuar con la creación de la visita
       await _createVisit();
     } catch (e) {
       debugPrint('❌ Error en fallback de geolocator: $e');
@@ -544,41 +541,66 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   Future<void> _createVisit() async {
     setState(() {
       _isProcessing = true;
-      _statusMessage = 'Creando visita...';
+      _statusMessage = 'Guardando visita...';
     });
 
     try {
-      // Obtener datos del AppState
       final deviceDefault = FFAppState().deviceDefault;
       final userSelected = FFAppState().userSelected;
       final activitySelectedJSON = FFAppState().activitySelectedJSON;
       final visitDetails = FFAppState().visitDetails;
 
-      // Extraer id_activity del JSON
-      int idActivity = 0;
-      if (activitySelectedJSON != null && activitySelectedJSON.isNotEmpty) {
+      // PRIORIDAD 1: Usar activitySelected (struct que se persiste correctamente)
+      final activitySelected = FFAppState().activitySelected;
+      int idActivity = activitySelected.idActivity;
+
+      debugPrint('🔍 activitySelected.idActivity: $idActivity');
+      debugPrint('🔍 activitySelected.nameActivity: ${activitySelected.nameActivity}');
+
+      // PRIORIDAD 2: Si activitySelected no tiene ID, intentar con activitySelectedJSON
+      if (idActivity == 0 && activitySelectedJSON != null) {
+        debugPrint('🔍 Intentando con activitySelectedJSON...');
+        debugPrint('🔍 activitySelectedJSON tipo: ${activitySelectedJSON.runtimeType}');
+
         try {
-          // Verificar si activitySelectedJSON ya es un Map o es String
           dynamic activityData;
-          if (activitySelectedJSON is String) {
+
+          if (activitySelectedJSON is String && activitySelectedJSON.isNotEmpty) {
             activityData = jsonDecode(activitySelectedJSON);
           } else if (activitySelectedJSON is Map) {
             activityData = activitySelectedJSON;
           } else {
-            debugPrint(
-                '⚠️ activitySelectedJSON tiene tipo inesperado: ${activitySelectedJSON.runtimeType}');
-            activityData = null;
+            activityData = activitySelectedJSON;
           }
 
           if (activityData != null && activityData is Map) {
             idActivity = (activityData['id_activity'] as num?)?.toInt() ?? 0;
           }
+
+          // Intentar acceso dinámico si aún es 0
+          if (idActivity == 0 && activityData != null) {
+            try {
+              final dynamic idValue = activityData['id_activity'];
+              if (idValue is int) {
+                idActivity = idValue;
+              } else if (idValue is double) {
+                idActivity = idValue.toInt();
+              } else if (idValue is String) {
+                idActivity = int.tryParse(idValue) ?? 0;
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error accediendo a id_activity desde JSON: $e');
+            }
+          }
+
+          debugPrint('🔍 idActivity desde JSON: $idActivity');
         } catch (e) {
           debugPrint('⚠️ Error parseando activitySelectedJSON: $e');
         }
       }
 
-      // Validar datos necesarios
+      debugPrint('🔍 idActivity final: $idActivity');
+
       if (deviceDefault.idDevice == 0) {
         throw Exception('ID de dispositivo no encontrado');
       }
@@ -589,10 +611,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         throw Exception('ID de actividad no encontrado');
       }
 
-      // Usar el primer punto GPS como coordenadas principales de la visita
       final mainGPSPoint = _gpsPoints.first;
 
-      // Abrir base de datos (misma ruta que sync_visits_form.dart)
       final Directory? externalDir = await getExternalStorageDirectory();
       if (externalDir == null) {
         throw Exception('No se pudo acceder al almacenamiento externo');
@@ -602,173 +622,92 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       final database = await openDatabase(dbPath);
 
-      // Insertar en transacción
+      // Obtener el Id_headquarter del lote actual
+      // Prioridad 1: Usar el primer lote de headquartersSelectedList
+      int idHeadquarter = 0;
+      final headquartersList = FFAppState().headquartersSelectedList;
+
+      if (headquartersList.isNotEmpty) {
+        idHeadquarter = headquartersList.first.idHeadquarter;
+        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+      } else {
+        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
+      }
+
       int visitId = 0;
       await database.transaction((txn) async {
-        // 1. Insertar Visits
         visitId = await txn.rawInsert('''
           INSERT INTO Visits (
-            Id_company,
-            Id_activity,
-            Id_headquarter,
-            Id_product,
-            Id_bulk,
-            Id_user,
-            Id_device,
-            Id_status,
-            Created_at,
-            Battery,
-            Latitude,
-            Longitude,
-            Altitude,
-            Error_horizontal,
-            Id_virtual_point,
-            Status
+            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+            Id_user, Id_device, Id_status, Created_at, Battery,
+            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', [
-          userSelected.idCompany,
-          idActivity,
-          0, // Id_headquarter (puedes ajustarlo si lo tienes)
-          0, // Id_product (puedes ajustarlo si lo tienes)
-          0, // Id_bulk (puedes ajustarlo si lo tienes)
-          userSelected.idUser,
-          deviceDefault.idDevice,
-          0, // Id_status siempre 0 según especificación
-          DateTime.now().toUtc().toIso8601String(),
-          mainGPSPoint.battery,
-          mainGPSPoint.latitude,
-          mainGPSPoint.longitude,
-          mainGPSPoint.altitude,
-          mainGPSPoint.horizontalError,
-          null, // Id_virtual_point
-          0, // Status (false por defecto)
+          userSelected.idCompany, idActivity, idHeadquarter, 0, 0,
+          userSelected.idUser, deviceDefault.idDevice, 0,
+          DateTime.now().toUtc().toIso8601String(), mainGPSPoint.battery,
+          mainGPSPoint.latitude, mainGPSPoint.longitude, mainGPSPoint.altitude,
+          mainGPSPoint.horizontalError, null, 0,
         ]);
 
         debugPrint('✅ Visita creada con ID: $visitId');
 
-        // 2. Insertar Visits_details (filtrar registros de tipo STEP)
         final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
-
-        debugPrint('📝 Insertando ${detailsToInsert.length} detalles de visita:');
-
         int insertedCount = 0;
-        int skippedCount = 0;
 
         for (var detail in detailsToInsert) {
           final idActivityStatus = detail.idActivityStatus;
 
-          // Verificar si el Id_activity_status existe en Activities_status
           final statusCheck = await txn.rawQuery('''
-            SELECT Id_activity_status, Status_name, Factor
-            FROM Activities_status
-            WHERE Id_activity_status = ?
+            SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
           ''', [idActivityStatus]);
 
-          if (statusCheck.isEmpty) {
-            debugPrint('  ❌ SALTADO: Id_activity_status=$idActivityStatus NO existe en Activities_status');
-            debugPrint('     Tipo: ${detail.typeStatus}, Respuesta: ${detail.statusResponse}');
-            skippedCount++;
-            continue; // NO insertar este detalle huérfano
-          }
-
-          final statusInfo = statusCheck.first;
-          debugPrint('  ✅ Insertando: Id_activity_status=$idActivityStatus "${statusInfo['Status_name']}" Factor=${statusInfo['Factor']}');
+          if (statusCheck.isEmpty) continue;
 
           await txn.rawInsert('''
-            INSERT INTO Visits_details (
-              Id_visit,
-              Id_activity_status,
-              Status_option,
-              Status_response
-            ) VALUES (?, ?, ?, ?)
-          ''', [
-            visitId,
-            idActivityStatus,
-            detail.statusOption,
-            detail.statusResponse,
-          ]);
+            INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
+            VALUES (?, ?, ?, ?)
+          ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
 
           insertedCount++;
         }
 
-        if (skippedCount > 0) {
-          debugPrint('⚠️ ${skippedCount} detalles SALTADOS por tener Id_activity_status huérfano');
-        }
+        debugPrint('✅ $insertedCount detalles de visita insertados');
 
-        debugPrint('✅ $insertedCount detalles de visita insertados (${visitDetails.length - detailsToInsert.length} registros STEP excluidos)');
-
-        // 3. Insertar Visits_locations (últimos 10 puntos máximo de los últimos 6 segundos)
         final now = DateTime.now().toUtc();
         final sixSecondsAgo = now.subtract(const Duration(seconds: 6));
-
-        // Filtrar puntos: solo los de los últimos 6 segundos
         final recentPoints = _gpsPoints
             .where((point) => point.createdAt.isAfter(sixSecondsAgo))
             .toList();
-
-        // Ordenar por fecha descendente (más reciente primero)
         recentPoints.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-
-        // Tomar máximo 10 puntos
         final pointsToSave = recentPoints.take(10).toList();
 
-        debugPrint('');
-        debugPrint('📍 Filtro de Visits_locations aplicado:');
-        debugPrint('   Total puntos disponibles: ${_gpsPoints.length}');
-        debugPrint('   Puntos de últimos 6 segundos: ${recentPoints.length}');
-        debugPrint('   Puntos a guardar (máx 10): ${pointsToSave.length}');
-
-        // Insertar solo los puntos filtrados
         for (var gpsPoint in pointsToSave) {
           await txn.rawInsert('''
-            INSERT INTO Visits_locations (
-              Id_visit,
-              Latitude,
-              Longitude,
-              Altitude,
-              HorizontalError,
-              CreatedAt
-            ) VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?)
           ''', [
-            visitId,
-            gpsPoint.latitude,
-            gpsPoint.longitude,
-            gpsPoint.altitude,
-            gpsPoint.horizontalError,
-            gpsPoint.createdAt.toIso8601String(),
+            visitId, gpsPoint.latitude, gpsPoint.longitude, gpsPoint.altitude,
+            gpsPoint.horizontalError, gpsPoint.createdAt.toIso8601String(),
           ]);
         }
 
-        debugPrint(
-            '✅ ${pointsToSave.length} ubicaciones GPS insertadas (últimos 10 puntos de los últimos 6 segundos)');
+        debugPrint('✅ ${pointsToSave.length} ubicaciones GPS insertadas');
       });
 
       await database.close();
 
-      // Actualizar AppState
       FFAppState().update(() {
         FFAppState().visitCount = (FFAppState().visitCount ?? 0) + 1;
-
-        // Filtrar visitDetails usando removeVisits (mantiene solo los que tienen rememberStatus == true)
-        final int previousCount = FFAppState().visitDetails.length;
         FFAppState().visitDetails = removeVisits(FFAppState().visitDetails);
-        final int newCount = FFAppState().visitDetails.length;
-
-        debugPrint('🔄 visitDetails filtrado después de agregar visita:');
-        debugPrint('   Antes: $previousCount elementos');
-        debugPrint('   Después: $newCount elementos');
-        debugPrint(
-            '   Eliminados: ${previousCount - newCount} elementos sin rememberStatus');
       });
 
       setState(() {
         _isProcessing = false;
         _isComplete = true;
-        _statusMessage =
-            'Visita registrada exitosamente\n\nID: $visitId\nCoordenadas GPS: ${_gpsPoints.length}';
+        _statusMessage = 'ID: $visitId\nCoordenadas: ${_gpsPoints.length} puntos';
       });
 
-      // Cerrar automáticamente después de 2 segundos
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
         Navigator.pop(context, true);
@@ -788,14 +727,12 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     return Container(
       width: widget.width,
       height: widget.height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            FlutterFlowTheme.of(context).primaryBackground,
-            FlutterFlowTheme.of(context).secondaryBackground,
-          ],
+          colors: [_darkGreen1, _darkGreen2, _darkGreen3],
+          stops: [0.0, 0.5, 1.0],
         ),
       ),
       child: SafeArea(
@@ -813,391 +750,291 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   // ==========================================================================
-  // PANTALLA DE CONTADOR
+  // PANTALLA DE CONTADOR - DISEÑO EXTREMO
   // ==========================================================================
 
   Widget _buildCountdownScreen() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            FlutterFlowTheme.of(context).secondaryBackground,
-            FlutterFlowTheme.of(context).primaryBackground,
-          ],
+    return Stack(
+      children: [
+        // Partículas flotantes de fondo
+        ...List.generate(20, (index) => _buildFloatingParticle(index)),
+
+        // Contenido principal con scroll para evitar overflow
+        Center(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Título con glassmorphism
+                  _buildGlassTitle('Preparando Visita'),
+
+                  const SizedBox(height: 30),
+
+                  // Contador circular con radar y ondas
+                  _buildAnimatedCounter(),
+
+                  const SizedBox(height: 25),
+
+                  // Mensaje dinámico
+                  _buildDynamicMessageCard(),
+
+                  const SizedBox(height: 20),
+
+                  // Tip animado
+                  _buildAnimatedTip(),
+
+                  const SizedBox(height: 25),
+
+                  // PIN de ubicación animado
+                  _buildAnimatedLocationPin(),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Título con efecto glass
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+      ],
+    );
+  }
+
+  Widget _buildFloatingParticle(int index) {
+    final random = math.Random(index);
+    final size = 3.0 + random.nextDouble() * 5;
+    final startX = random.nextDouble();
+
+    return AnimatedBuilder(
+      animation: _particleController,
+      builder: (context, child) {
+        final progress = (_particleController.value + index * 0.05) % 1.0;
+        return Positioned(
+          left: MediaQuery.of(context).size.width * startX,
+          top: MediaQuery.of(context).size.height * (1 - progress),
+          child: Opacity(
+            opacity: (1 - progress) * 0.6,
+            child: Container(
+              width: size,
+              height: size,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).primary.withValues(alpha: 0.2),
-                    FlutterFlowTheme.of(context)
-                        .secondary
-                        .withValues(alpha: 0.2),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  width: 1.5,
-                ),
+                shape: BoxShape.circle,
+                color: _brightGreen.withValues(alpha: 0.5),
                 boxShadow: [
                   BoxShadow(
-                    color: FlutterFlowTheme.of(context)
-                        .primary
-                        .withValues(alpha: 0.3),
-                    blurRadius: 20,
+                    color: _brightGreen.withValues(alpha: 0.3),
+                    blurRadius: 8,
                     spreadRadius: 2,
                   ),
                 ],
               ),
-              child: const Text(
-                'Preparando Visita',
-                style: TextStyle(
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlassTitle(String text) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                _accentGreen.withValues(alpha: 0.25),
+                _brightGreen.withValues(alpha: 0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: _brightGreen.withValues(alpha: 0.4),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: _accentGreen.withValues(alpha: 0.3),
+                blurRadius: 25,
+                spreadRadius: 3,
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.satellite_alt, color: _brightGreen, size: 28),
+              const SizedBox(width: 14),
+              Text(
+                text,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 24,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w900,
                   color: Colors.white,
+                  letterSpacing: 1.2,
                 ),
               ),
-            ),
-
-            const SizedBox(height: 60),
-
-            // Contador circular animado con fondo mejorado
-            ScaleTransition(
-              scale: _scaleAnimation,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Anillo giratorio de fondo
-                  RotationTransition(
-                    turns: _rotateAnimation,
-                    child: Container(
-                      width: 220,
-                      height: 220,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            FlutterFlowTheme.of(context)
-                                .primary
-                                .withValues(alpha: 0.3),
-                            FlutterFlowTheme.of(context)
-                                .secondary
-                                .withValues(alpha: 0.3),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Círculo de progreso con gradiente moderno
-                  ScaleTransition(
-                    scale: _pulseAnimation,
-                    child: Container(
-                      width: 200,
-                      height: 200,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            FlutterFlowTheme.of(context).primary,
-                            FlutterFlowTheme.of(context).secondary,
-                          ],
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: FlutterFlowTheme.of(context)
-                                .primary
-                                .withValues(alpha: 0.5),
-                            blurRadius: 40,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: Center(
-                        child: Text(
-                          '$_countdown',
-                          style: const TextStyle(
-                            fontSize: 80,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Indicador de progreso circular
-                  SizedBox(
-                    width: 240,
-                    height: 240,
-                    child: CircularProgressIndicator(
-                      value: (5 - _countdown) / 5,
-                      strokeWidth: 6,
-                      backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withValues(alpha: 0.3),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // Mensaje con contenedor glass
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.gps_fixed,
-                    color: Colors.white.withValues(alpha: 0.7),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Obteniendo coordenadas GPS...',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 80),
-
-            // PIN animado en la parte inferior
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: Column(
-                children: [
-                  // PIN con efecto de sombra y gradiente
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Sombra pulsante del PIN
-                      Container(
-                        width: 80,
-                        height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              FlutterFlowTheme.of(context)
-                                  .error
-                                  .withValues(alpha: 0.4),
-                              FlutterFlowTheme.of(context)
-                                  .error
-                                  .withValues(alpha: 0.0),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Contenedor del PIN
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              FlutterFlowTheme.of(context).error,
-                              FlutterFlowTheme.of(context).error,
-                            ],
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: FlutterFlowTheme.of(context)
-                                  .error
-                                  .withValues(alpha: 0.5),
-                              blurRadius: 20,
-                              spreadRadius: 3,
-                            ),
-                          ],
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.3),
-                            width: 2,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.location_on,
-                          color: Colors.white,
-                          size: 32,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // Texto debajo del PIN
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          FlutterFlowTheme.of(context)
-                              .error
-                              .withValues(alpha: 0.2),
-                          FlutterFlowTheme.of(context)
-                              .error
-                              .withValues(alpha: 0.2),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: FlutterFlowTheme.of(context)
-                            .error
-                            .withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      'Ubicación actual',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ==========================================================================
-  // PANTALLA DE ESPERA
-  // ==========================================================================
-
-  Widget _buildWaitingScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildAnimatedCounter() {
+    return ScaleTransition(
+      scale: _scaleAnimation,
+      child: SizedBox(
+        width: 280,
+        height: 280,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            // Ícono animado
+            // Ondas de radar expandiéndose
+            ...List.generate(3, (index) {
+              return AnimatedBuilder(
+                animation: _radarController,
+                builder: (context, child) {
+                  final delay = index * 0.33;
+                  final progress = (_radarAnimation.value + delay) % 1.0;
+                  return Container(
+                    width: 200 + (progress * 80),
+                    height: 200 + (progress * 80),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _brightGreen.withValues(alpha: (1 - progress) * 0.5),
+                        width: 2,
+                      ),
+                    ),
+                  );
+                },
+              );
+            }),
+
+            // Anillo giratorio exterior
             RotationTransition(
               turns: _rotateAnimation,
               child: Container(
-                width: 120,
-                height: 120,
+                width: 240,
+                height: 240,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: LinearGradient(
+                  gradient: SweepGradient(
+                    colors: [
+                      Colors.transparent,
+                      _accentGreen.withValues(alpha: 0.3),
+                      _brightGreen.withValues(alpha: 0.6),
+                      _accentGreen.withValues(alpha: 0.3),
+                      Colors.transparent,
+                    ],
+                    stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+                  ),
+                ),
+              ),
+            ),
+
+            // Círculo de fondo con glow
+            AnimatedBuilder(
+              animation: _glowController,
+              builder: (context, child) {
+                return Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        _accentGreen.withValues(alpha: 0.2 * _glowAnimation.value),
+                        _darkGreen1.withValues(alpha: 0.8),
+                      ],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _brightGreen.withValues(alpha: 0.3 * _glowAnimation.value),
+                        blurRadius: 40,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
+            // Círculo principal con contador
+            ScaleTransition(
+              scale: _pulseAnimation,
+              child: Container(
+                width: 180,
+                height: 180,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      FlutterFlowTheme.of(context).warning,
-                      FlutterFlowTheme.of(context)
-                          .warning
-                          .withValues(alpha: 0.7),
-                    ],
+                    colors: [_accentGreen, Color(0xFF006644)],
+                  ),
+                  border: Border.all(
+                    color: _brightGreen.withValues(alpha: 0.5),
+                    width: 3,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: FlutterFlowTheme.of(context)
-                          .warning
-                          .withValues(alpha: 0.4),
+                      color: _accentGreen.withValues(alpha: 0.6),
                       blurRadius: 30,
                       spreadRadius: 5,
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.gps_fixed,
-                  color: Colors.white,
-                  size: 60,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '$_countdown',
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 72,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black38,
+                              blurRadius: 10,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        'segundos',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.8),
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
 
-            const SizedBox(height: 40),
-
-            // Mensaje
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color:
-                    FlutterFlowTheme.of(context).warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: FlutterFlowTheme.of(context)
-                      .warning
-                      .withValues(alpha: 0.3),
-                  width: 2,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Icon(
-                    Icons.schedule_rounded,
-                    color: FlutterFlowTheme.of(context).warning,
-                    size: 32,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _statusMessage,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 15,
-                      height: 1.5,
-                      color: FlutterFlowTheme.of(context).primaryText,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Indicador de progreso
+            // Indicador de progreso circular
             SizedBox(
-              width: 200,
-              child: LinearProgressIndicator(
-                backgroundColor: FlutterFlowTheme.of(context)
-                    .alternate
-                    .withValues(alpha: 0.3),
+              width: 260,
+              height: 260,
+              child: CircularProgressIndicator(
+                value: (5 - _countdown) / 5,
+                strokeWidth: 4,
+                backgroundColor: Colors.transparent,
                 valueColor: AlwaysStoppedAnimation<Color>(
-                  FlutterFlowTheme.of(context).warning,
+                  _brightGreen.withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -1207,69 +1044,181 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     );
   }
 
-  // ==========================================================================
-  // PANTALLA DE PROCESAMIENTO
-  // ==========================================================================
-
-  Widget _buildProcessingScreen() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Spinner animado
-          RotationTransition(
-            turns: _rotateAnimation,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).primary,
-                    FlutterFlowTheme.of(context).secondary,
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: FlutterFlowTheme.of(context)
-                        .primary
-                        .withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    spreadRadius: 5,
+  Widget _buildDynamicMessageCard() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 500),
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.2),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: ClipRRect(
+        key: ValueKey(_dynamicMessage),
+        borderRadius: BorderRadius.circular(16),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: _brightGreen.withValues(alpha: 0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(_brightGreen),
                   ),
-                ],
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  _dynamicMessage,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedTip() {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 600),
+      child: Container(
+        key: ValueKey(_currentTip),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        decoration: BoxDecoration(
+          color: _accentGreen.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: _accentGreen.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Text(
+          _currentTip,
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 13,
+            color: Colors.white.withValues(alpha: 0.8),
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAnimatedLocationPin() {
+    return ScaleTransition(
+      scale: _pulseAnimation,
+      child: Column(
+        children: [
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              // Onda de expansión
+              AnimatedBuilder(
+                animation: _waveController,
+                builder: (context, child) {
+                  return Container(
+                    width: 80 + (_waveAnimation.value * 40),
+                    height: 80 + (_waveAnimation.value * 40),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: (1 - _waveAnimation.value) * 0.5),
+                        width: 2,
+                      ),
+                    ),
+                  );
+                },
               ),
-              child: const Icon(
-                Icons.cloud_upload_rounded,
+              // Glow
+              Container(
+                width: 70,
+                height: 70,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      Colors.redAccent.withValues(alpha: 0.4),
+                      Colors.redAccent.withValues(alpha: 0.0),
+                    ],
+                  ),
+                ),
+              ),
+              // Pin
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.redAccent.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      spreadRadius: 3,
+                    ),
+                  ],
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    width: 2,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.location_on,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: Colors.redAccent.withValues(alpha: 0.4),
+                width: 1,
+              ),
+            ),
+            child: const Text(
+              'Tu ubicación',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
                 color: Colors.white,
-                size: 60,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 40),
-
-          Text(
-            _statusMessage,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
-              color: FlutterFlowTheme.of(context).primaryText,
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          SizedBox(
-            width: 200,
-            child: LinearProgressIndicator(
-              backgroundColor:
-                  FlutterFlowTheme.of(context).alternate.withValues(alpha: 0.3),
-              valueColor: AlwaysStoppedAnimation<Color>(
-                FlutterFlowTheme.of(context).primary,
+                letterSpacing: 0.5,
               ),
             ),
           ),
@@ -1279,86 +1228,441 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   // ==========================================================================
-  // PANTALLA DE ÉXITO
+  // PANTALLA DE ESPERA - DISEÑO EXTREMO
   // ==========================================================================
 
-  Widget _buildSuccessScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Ícono de éxito
-            Container(
-              width: 140,
-              height: 140,
+  Widget _buildWaitingScreen() {
+    final progress = _elapsedSeconds / _maxWaitTimeSeconds;
+
+    return Stack(
+      children: [
+        // Partículas
+        ...List.generate(15, (index) => _buildFloatingParticle(index)),
+
+        Center(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Icono de satélite con radar
+                  _buildSatelliteRadar(),
+
+                  const SizedBox(height: 25),
+
+                  // Barra de progreso circular grande
+                  _buildCircularProgressWithInfo(progress),
+
+                  const SizedBox(height: 20),
+
+                  // Card de estado con glassmorphism
+                  _buildStatusCard(),
+
+                  const SizedBox(height: 16),
+
+                  // Tip animado
+                  _buildAnimatedTip(),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSatelliteRadar() {
+    return SizedBox(
+      width: 140,
+      height: 140,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Ondas de radar
+          ...List.generate(3, (index) {
+            return AnimatedBuilder(
+              animation: _radarController,
+              builder: (context, child) {
+                final delay = index * 0.33;
+                final progress = (_radarAnimation.value + delay) % 1.0;
+                return Container(
+                  width: 60 + (progress * 80),
+                  height: 60 + (progress * 80),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _brightGreen.withValues(alpha:(1 - progress) * 0.6),
+                      width: 2,
+                    ),
+                  ),
+                );
+              },
+            );
+          }),
+
+          // Círculo central con icono
+          RotationTransition(
+            turns: _rotateAnimation,
+            child: Container(
+              width: 90,
+              height: 90,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).success,
-                    FlutterFlowTheme.of(context).success.withValues(alpha: 0.8),
-                  ],
+                  colors: [_accentGreen, Color(0xFF006644)],
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: FlutterFlowTheme.of(context)
-                        .success
-                        .withValues(alpha: 0.5),
-                    blurRadius: 40,
-                    spreadRadius: 10,
+                    color: _accentGreen.withValues(alpha:0.5),
+                    blurRadius: 25,
+                    spreadRadius: 5,
                   ),
                 ],
               ),
               child: const Icon(
-                Icons.check_circle_rounded,
+                Icons.satellite_alt,
                 color: Colors.white,
-                size: 80,
+                size: 45,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 40),
-
-            Text(
-              '¡Visita Registrada!',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: FlutterFlowTheme.of(context).primaryText,
+  Widget _buildCircularProgressWithInfo(double progress) {
+    return SizedBox(
+      width: 200,
+      height: 200,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Fondo
+          Container(
+            width: 180,
+            height: 180,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withValues(alpha:0.3),
+              border: Border.all(
+                color: _accentGreen.withValues(alpha:0.2),
+                width: 2,
               ),
             ),
+          ),
 
-            const SizedBox(height: 16),
+          // Progreso circular
+          SizedBox(
+            width: 180,
+            height: 180,
+            child: CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 8,
+              backgroundColor: Colors.white.withValues(alpha:0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(_brightGreen),
+            ),
+          ),
 
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color:
-                    FlutterFlowTheme.of(context).success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: FlutterFlowTheme.of(context)
-                      .success
-                      .withValues(alpha: 0.3),
-                  width: 2,
+          // Info central
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                '${_elapsedSeconds}s',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 36,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                 ),
               ),
-              child: Text(
-                _statusMessage,
-                textAlign: TextAlign.center,
+              Text(
+                'de ${_maxWaitTimeSeconds}s',
                 style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
-                  height: 1.6,
-                  color: FlutterFlowTheme.of(context).secondaryText,
+                  color: Colors.white.withValues(alpha:0.7),
                 ),
               ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: _validPoints >= 2 ? _successGreen.withValues(alpha:0.3) : _accentGreen.withValues(alpha:0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '$_validPoints/2 puntos',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: _validPoints >= 2 ? _successGreen : _brightGreen,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusCard() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha:0.4),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: _brightGreen.withValues(alpha:0.3),
+              width: 1.5,
             ),
-          ],
+            boxShadow: [
+              BoxShadow(
+                color: _accentGreen.withValues(alpha:0.2),
+                blurRadius: 20,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.gps_fixed, color: _brightGreen, size: 24),
+                  const SizedBox(width: 12),
+                  Text(
+                    _statusMessage,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildInfoChip(Icons.precision_manufacturing, '≤${_maxHorizontalError}m'),
+                  const SizedBox(width: 12),
+                  _buildInfoChip(Icons.verified, '$_validPoints válidos'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildInfoChip(IconData icon, String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: _accentGreen.withValues(alpha:0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _accentGreen.withValues(alpha:0.4),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: _brightGreen, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha:0.9),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // PANTALLA DE PROCESAMIENTO
+  // ==========================================================================
+
+  Widget _buildProcessingScreen() {
+    return Stack(
+      children: [
+        ...List.generate(10, (index) => _buildFloatingParticle(index)),
+        Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Spinner con gradiente
+              RotationTransition(
+                turns: _rotateAnimation,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [_accentGreen, Color(0xFF006644)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: _accentGreen.withValues(alpha:0.5),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.cloud_upload_rounded,
+                    color: Colors.white,
+                    size: 55,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 40),
+
+              Text(
+                _statusMessage,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: 200,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    minHeight: 6,
+                    backgroundColor: Colors.white.withValues(alpha:0.2),
+                    valueColor: const AlwaysStoppedAnimation<Color>(_brightGreen),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ==========================================================================
+  // PANTALLA DE ÉXITO
+  // ==========================================================================
+
+  Widget _buildSuccessScreen() {
+    return Stack(
+      children: [
+        ...List.generate(25, (index) => _buildFloatingParticle(index)),
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Icono de éxito con animación
+                ScaleTransition(
+                  scale: _pulseAnimation,
+                  child: Container(
+                    width: 140,
+                    height: 140,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [_successGreen, Color(0xFF00B88D)],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _successGreen.withValues(alpha:0.6),
+                          blurRadius: 40,
+                          spreadRadius: 10,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.check_circle_rounded,
+                      color: Colors.white,
+                      size: 80,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                const Text(
+                  '¡Visita Registrada!',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                    letterSpacing: 1,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: _successGreen.withValues(alpha:0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _successGreen.withValues(alpha:0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        _statusMessage,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          height: 1.6,
+                          color: Colors.white.withValues(alpha:0.9),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1367,131 +1671,134 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   // ==========================================================================
 
   Widget _buildErrorScreen() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Ícono de error
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).error,
-                    FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
-                  ],
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: FlutterFlowTheme.of(context)
-                        .error
-                        .withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    spreadRadius: 5,
-                  ),
-                ],
-              ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                color: Colors.white,
-                size: 80,
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            Text(
-              'Error',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: FlutterFlowTheme.of(context).primaryText,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color:
-                    FlutterFlowTheme.of(context).error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color:
-                      FlutterFlowTheme.of(context).error.withValues(alpha: 0.3),
-                  width: 2,
-                ),
-              ),
-              child: Text(
-                _errorMessage,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 14,
-                  height: 1.6,
-                  color: FlutterFlowTheme.of(context).secondaryText,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Botones
-            Row(
+    return Stack(
+      children: [
+        Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context, false),
-                  icon: const Icon(Icons.close, size: 20),
-                  label: const Text('Cerrar'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FlutterFlowTheme.of(context).error,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
+                Container(
+                  width: 140,
+                  height: 140,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.redAccent.withValues(alpha:0.5),
+                        blurRadius: 30,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.error_outline_rounded,
+                    color: Colors.white,
+                    size: 80,
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                const Text(
+                  'Error',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                    child: Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha:0.2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha:0.4),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Text(
+                        _errorMessage,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          height: 1.6,
+                          color: Colors.white.withValues(alpha:0.9),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _hasError = false;
-                      _errorMessage = '';
-                      _retryAttempts = 0;
-                      _countdown = 5;
-                      _gpsPoints.clear();
-                    });
-                    _startCountdown();
-                  },
-                  icon: const Icon(Icons.refresh, size: 20),
-                  label: const Text('Reintentar'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: FlutterFlowTheme.of(context).primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 24,
-                      vertical: 16,
+
+                const SizedBox(height: 32),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildActionButton(
+                      'Cerrar',
+                      Icons.close,
+                      Colors.redAccent,
+                      () => Navigator.pop(context, false),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    const SizedBox(width: 16),
+                    _buildActionButton(
+                      'Reintentar',
+                      Icons.refresh,
+                      _accentGreen,
+                      () {
+                        setState(() {
+                          _hasError = false;
+                          _errorMessage = '';
+                          _retryAttempts = 0;
+                          _countdown = 5;
+                          _gpsPoints.clear();
+                          _validPoints = 0;
+                          _elapsedSeconds = 0;
+                        });
+                        _startCountdown();
+                      },
                     ),
-                  ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildActionButton(String label, IconData icon, Color color, VoidCallback onPressed) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 20),
+      label: Text(label),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+        ),
+        elevation: 8,
+        shadowColor: color.withValues(alpha:0.5),
       ),
     );
   }
