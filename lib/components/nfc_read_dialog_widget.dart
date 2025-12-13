@@ -203,7 +203,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       barrierDismissible: false,
       builder: (dialogContext) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
           child: Dialog(
             backgroundColor: Colors.transparent,
             child: Container(
@@ -479,17 +479,28 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
 
           if (dateHour != null && operatorId != null) {
             // Buscar operador en usersList
+            // operatorId contiene el idUser (identificador numérico del usuario)
             String operatorName = 'Desconocido';
             String operatorIdentification = '';
 
-            final user = FFAppState().usersList.firstWhere(
-                  (u) => u.operID == operatorId,
-                  orElse: () => UsersStruct(),
-                );
+            try {
+              final idUserFromTag = int.tryParse(operatorId);
+              if (idUserFromTag != null) {
+                final user = FFAppState().usersList.firstWhere(
+                      (u) => u.idUser == idUserFromTag,
+                      orElse: () => UsersStruct(),
+                    );
 
-            if (user.nameUser.isNotEmpty) {
-              operatorName = user.nameUser;
-              operatorIdentification = user.operID;
+                if (user.nameUser.isNotEmpty) {
+                  operatorName = user.nameUser;
+                  operatorIdentification = user.operID;
+                  debugPrint('✅ Operador encontrado por idUser=$idUserFromTag: $operatorName');
+                } else {
+                  debugPrint('❌ No se encontró operador con idUser=$idUserFromTag');
+                }
+              }
+            } catch (e) {
+              debugPrint('❌ Error buscando operador: $e');
             }
 
             // Buscar lote en headquartersList

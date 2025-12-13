@@ -4,7 +4,17 @@
       "Bash(powershell -ExecutionPolicy Bypass -File replace_fonts.ps1:*)",
       "Bash(flutter analyze:*)",
       "Bash(where:*)",
-      "Bash(dir \"C:\\Users\\JDieg\\clickpalm-release.jks\")"
+      "Bash(dir \"C:\\Users\\JDieg\\clickpalm-release.jks\")",
+      "Bash(for:*)",
+      "Bash(do if [ -f \"$file\" ])",
+      "Bash(then basename \"$file\" _widget.dart)",
+      "Bash(xargs:*)",
+      "Bash(powershell -Command \"(Get-Content ''lib/visits/do_visits_form_page/do_visits_form_page_widget.dart'' -Raw) -replace ''\\.withOpacity\\(([^)]+)\\)'', ''.withValues(alpha: $1)'' | Set-Content ''lib/visits/do_visits_form_page/do_visits_form_page_widget.dart'' -NoNewline\")",
+      "Bash(git checkout:*)",
+      "Bash(python:*)",
+      "Bash(node -e:*)",
+      "Bash(dart fix:*)",
+      "Bash(powershell -Command:*)"
     ],
     "deny": [],
     "ask": []

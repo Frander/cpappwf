@@ -742,7 +742,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(20),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Padding(
               padding: EdgeInsets.all(12.0),
               child: Column(

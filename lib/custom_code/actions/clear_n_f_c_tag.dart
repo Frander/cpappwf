@@ -20,10 +20,10 @@ import 'dart:typed_data';
 
 /// Limpia completamente un TAG NFC escribiendo ceros en todos los sectores
 Future<bool> clearNFCTag(BuildContext context) async {
-  // Verificar si NFC está disponible
-  bool nfcAvailable = await NfcManager.instance.isAvailable();
-  if (!nfcAvailable) {
-    debugPrint('❌ NFC no está disponible');
+  // Verificar si NFC está disponible y activado
+  bool nfcReady = await checkNfcStatus(context, showAlert: true);
+  if (!nfcReady) {
+    debugPrint('❌ NFC no está disponible o está desactivado');
     return false;
   }
 

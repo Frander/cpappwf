@@ -107,7 +107,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         _model.connectionJSON = await actions.checkInternetQuality();
         if (functions.jsonDynamicToBool(getJsonField(
               _model.connectionJSON,
-              r'''$.isGoodConnection''',
+              r'''$.hasInternet''',
             )) ==
             true) {
           // Paso 3: Iniciando sesión
@@ -467,25 +467,468 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               // Usuario quiere registrar un nuevo dispositivo
               debugPrint('📱 Usuario solicitó agregar nuevo dispositivo');
 
-              // TODO: Implementar flujo de registro de nuevo dispositivo
-              // Por ahora, mostrar mensaje informativo
-              await showDialog(
+              // LOOP: Validar código de supervisor - no avanza hasta que sea correcto
+              bool supervisorValidated = false;
+              int supervisorCompanyId = selectedCompany!.idCompany;
+
+              while (!supervisorValidated) {
+                // Mostrar teclado de supervisor (sin opción de retroceder)
+                String? enteredCode = await showDialog<String>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (dialogContext) {
+                    return PopScope(
+                      canPop: false,
+                      child: Dialog(
+                        elevation: 0,
+                        insetPadding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        child: Container(
+                          width: MediaQuery.sizeOf(context).width,
+                          height: MediaQuery.sizeOf(context).height,
+                          child: SupervisorCodeKeyboardWidget(
+                            onCodeEntered: (String code) async {
+                              Navigator.pop(dialogContext, code);
+                            },
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+
+                if (enteredCode == null || enteredCode.isEmpty) {
+                  continue;
+                }
+
+                // Mostrar loading mientras valida
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (loadingContext) {
+                    return Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: DeviceRegistrationLoadingWidget(
+                        message: 'Validando código de supervisor...',
+                      ),
+                    );
+                  },
+                );
+
+                try {
+                  // Llamar API para validar supervisor por operID
+                  ApiCallResponse? supervisorResponse =
+                      await APIClickPalmGroup.usersbyoperidGETCall.call(
+                    operID: enteredCode,
+                  );
+
+                  // Cerrar loading
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.pop(context);
+                  }
+
+                  if (supervisorResponse.succeeded &&
+                      supervisorResponse.jsonBody != null) {
+                    var supervisorData = supervisorResponse.jsonBody;
+
+                    // Verificar permisos del usuario
+                    List<dynamic> permissions = getJsonField(
+                      supervisorData,
+                      r'''$.users_permissions''',
+                      true,
+                    ) ?? [];
+
+                    bool isSupervisor = false;
+                    for (var permission in permissions) {
+                      String? permissionName = getJsonField(
+                        permission,
+                        r'''$.name_permission''',
+                      )?.toString();
+
+                      if (permissionName?.toUpperCase() == 'SUPERVISOR') {
+                        isSupervisor = true;
+                        break;
+                      }
+                    }
+
+                    if (!isSupervisor) {
+                      await showDialog(
+                        context: context,
+                        builder: (dialogContext) {
+                          return Dialog(
+                            elevation: 0,
+                            insetPadding: EdgeInsets.zero,
+                            backgroundColor: Colors.transparent,
+                            child: Container(
+                              height: MediaQuery.sizeOf(context).height * 0.6,
+                              width: MediaQuery.sizeOf(context).width * 0.8,
+                              child: InfoDialogWidget(
+                                info: 'El código ingresado no corresponde a un supervisor. Intente nuevamente.',
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                      continue;
+                    }
+
+                    // Verificar que el supervisor pertenece a la empresa seleccionada
+                    int supervisorCompany = getJsonField(
+                      supervisorData,
+                      r'''$.id_company''',
+                    ) ?? 0;
+
+                    if (supervisorCompany != selectedCompany!.idCompany) {
+                      await showDialog(
+                        context: context,
+                        builder: (dialogContext) {
+                          return Dialog(
+                            elevation: 0,
+                            insetPadding: EdgeInsets.zero,
+                            backgroundColor: Colors.transparent,
+                            child: Container(
+                              height: MediaQuery.sizeOf(context).height * 0.6,
+                              width: MediaQuery.sizeOf(context).width * 0.8,
+                              child: InfoDialogWidget(
+                                info: 'El supervisor no pertenece a la empresa seleccionada. Intente con otro código.',
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                      continue;
+                    }
+
+                    supervisorValidated = true;
+                  } else {
+                    await showDialog(
+                      context: context,
+                      builder: (dialogContext) {
+                        return Dialog(
+                          elevation: 0,
+                          insetPadding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          child: Container(
+                            height: MediaQuery.sizeOf(context).height * 0.6,
+                            width: MediaQuery.sizeOf(context).width * 0.8,
+                            child: InfoDialogWidget(
+                              info: 'No se encontró un usuario con ese código. Intente nuevamente.',
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                    continue;
+                  }
+                } catch (e) {
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.pop(context);
+                  }
+
+                  await showDialog(
+                    context: context,
+                    builder: (dialogContext) {
+                      return Dialog(
+                        elevation: 0,
+                        insetPadding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        child: Container(
+                          height: MediaQuery.sizeOf(context).height * 0.6,
+                          width: MediaQuery.sizeOf(context).width * 0.8,
+                          child: InfoDialogWidget(
+                            info: 'Error al validar supervisor: ${e.toString()}. Intente nuevamente.',
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                  continue;
+                }
+              }
+
+              // Supervisor validado, continuar con el registro
+              // Obtener información del dispositivo
+              String deviceModel = await actions.getDeviceModel();
+              String deviceSerialId = await actions.getAndroidSerialId();
+              String deviceImei = _model.identifierCTR ?? '';
+
+              // Mostrar formulario de registro
+              Map<String, String>? deviceFormData =
+                  await showDialog<Map<String, String>>(
                 context: context,
+                barrierDismissible: false,
                 builder: (dialogContext) {
-                  return Dialog(
-                    elevation: 0,
-                    insetPadding: EdgeInsets.zero,
-                    backgroundColor: Colors.transparent,
-                    child: Container(
-                      height: MediaQuery.sizeOf(context).height * 0.4,
-                      width: MediaQuery.sizeOf(context).width * 0.8,
-                      child: InfoDialogWidget(
-                        info: 'Registro de nuevo dispositivo no implementado en este flujo. Por favor, contacte al administrador.',
+                  return PopScope(
+                    canPop: false,
+                    child: Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: DeviceRegistrationFormWidget(
+                        deviceImei: deviceImei,
+                        deviceModel: deviceModel,
+                        deviceSerialId: deviceSerialId,
+                        supervisorCompanyId: supervisorCompanyId,
+                        onSubmit: (String deviceName, String? cellPhone) async {
+                          Navigator.pop(dialogContext, {
+                            'deviceName': deviceName,
+                            'cellPhone': cellPhone ?? '',
+                          });
+                        },
                       ),
                     ),
                   );
                 },
               );
+
+              if (deviceFormData != null) {
+                // Mostrar loading durante registro
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (loadingContext) {
+                    return Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: DeviceRegistrationLoadingWidget(
+                        message: 'Registrando dispositivo CTR...',
+                      ),
+                    );
+                  },
+                );
+
+                try {
+                  // Crear dispositivo con POST /Devices
+                  ApiCallResponse? createDeviceResponse =
+                      await APIClickPalmGroup.devicesPOSTCall.call(
+                    idDevice: 0,
+                    idCompany: supervisorCompanyId,
+                    deviceName: deviceFormData['deviceName']!,
+                    cellPhone: deviceFormData['cellPhone'],
+                    serialId: deviceSerialId,
+                    imeI1: deviceImei,
+                    imeI2: deviceImei,
+                    model: deviceModel,
+                    state: 'A',
+                  );
+
+                  // Cerrar loading
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.pop(context);
+                  }
+
+                  if (createDeviceResponse?.succeeded ?? false) {
+                    // Guardar el IMEI persistentemente
+                    await actions.savePersistentId(
+                      context,
+                      deviceImei,
+                    );
+
+                    // Mostrar loading para login
+                    showDialog(
+                      context: context,
+                      barrierDismissible: false,
+                      builder: (loadingContext) {
+                        return Dialog(
+                          elevation: 0,
+                          insetPadding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          child: DeviceRegistrationLoadingWidget(
+                            message: 'Iniciando sesión...',
+                          ),
+                        );
+                      },
+                    );
+
+                    // Hacer login con el nuevo dispositivo
+                    _model.apiResultLoginRegister =
+                        await APIClickPalmGroup.usersLoginPOSTCall.call(
+                      typeLogin: 'IMEI',
+                      username: deviceImei,
+                    );
+
+                    if ((_model.apiResultLoginRegister?.succeeded ?? true)) {
+                      // Sincronizar datos
+                      _model.pathDBSQLiteRegister = await actions.validateDbSqlite(
+                        context,
+                      );
+                      _model.customSyncLoginResult1 = await actions.syncLogin(
+                        context,
+                        deviceImei,
+                        deviceImei,
+                        getJsonField(
+                          (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                          r'''$''',
+                        ),
+                      );
+
+                      // Actualizar FFAppState
+                      FFAppState().loginResponse = getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$''',
+                      );
+                      FFAppState().userSelected =
+                          UsersStruct.maybeFromMap(getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.user_default''',
+                      ))!;
+                      FFAppState().companyDefault =
+                          CompaniesStruct.maybeFromMap(getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.company''',
+                      ))!;
+                      FFAppState().deviceDefault =
+                          DevicesStruct.maybeFromMap(getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.device_default''',
+                      ))!;
+                      FFAppState().headquartersList = (getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.headquarters''',
+                        true,
+                      )!
+                              .toList()
+                              .map<HeadquartersStruct?>(
+                                  HeadquartersStruct.maybeFromMap)
+                              .toList() as Iterable<HeadquartersStruct?>)
+                          .withoutNulls
+                          .toList()
+                          .cast<HeadquartersStruct>();
+                      FFAppState().usersList = (getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.users''',
+                        true,
+                      )!
+                              .toList()
+                              .map<UsersStruct?>(UsersStruct.maybeFromMap)
+                              .toList() as Iterable<UsersStruct?>)
+                          .withoutNulls
+                          .toList()
+                          .cast<UsersStruct>();
+                      FFAppState().activitiesJSON = getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.activities''',
+                      );
+                      FFAppState().zonesList = (getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.zones''',
+                        true,
+                      )!
+                              .toList()
+                              .map<ZonesStruct?>(ZonesStruct.maybeFromMap)
+                              .toList() as Iterable<ZonesStruct?>)
+                          .withoutNulls
+                          .toList()
+                          .cast<ZonesStruct>();
+                      FFAppState().newsList = (getJsonField(
+                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
+                        r'''$.news''',
+                        true,
+                      )!
+                              .toList()
+                              .map<NewsStruct?>(NewsStruct.maybeFromMap)
+                              .toList() as Iterable<NewsStruct?>)
+                          .withoutNulls
+                          .toList()
+                          .cast<NewsStruct>();
+                      FFAppState().pathDatabase = _model.pathDBSQLiteRegister!;
+                      FFAppState().androidID = deviceImei;
+                      FFAppState().isSync = true;
+                      FFAppState().lastSync = getCurrentTimestamp;
+                      FFAppState().headquarterSelected = HeadquartersStruct();
+                      FFAppState().zoneSelected = ZonesStruct();
+                      FFAppState().headquartersSelectedList = [];
+                      FFAppState().isStabilized = false;
+                      FFAppState().visitDetails = [];
+
+                      // Cerrar loading y navegar
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.pop(context);
+                      }
+
+                      debugPrint('✅ Registro completado, navegando a HomePage');
+                      context.pushNamed(
+                        HomePageWidget.routeName,
+                        extra: <String, dynamic>{
+                          kTransitionInfoKey: TransitionInfo(
+                            hasTransition: true,
+                            transitionType: PageTransitionType.fade,
+                            duration: Duration(milliseconds: 1000),
+                          ),
+                        },
+                      );
+                      return;
+                    } else {
+                      // Error en login
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.pop(context);
+                      }
+                      await showDialog(
+                        context: context,
+                        builder: (dialogContext) {
+                          return Dialog(
+                            elevation: 0,
+                            insetPadding: EdgeInsets.zero,
+                            backgroundColor: Colors.transparent,
+                            child: Container(
+                              height: MediaQuery.sizeOf(context).height * 0.4,
+                              width: MediaQuery.sizeOf(context).width * 0.8,
+                              child: InfoDialogWidget(
+                                info: 'Error al iniciar sesión con el nuevo dispositivo.',
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                  } else {
+                    // Error al crear dispositivo
+                    await showDialog(
+                      context: context,
+                      builder: (dialogContext) {
+                        return Dialog(
+                          elevation: 0,
+                          insetPadding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          child: Container(
+                            height: MediaQuery.sizeOf(context).height * 0.4,
+                            width: MediaQuery.sizeOf(context).width * 0.8,
+                            child: InfoDialogWidget(
+                              info: 'Error al registrar el dispositivo. Intente nuevamente.',
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  }
+                } catch (e) {
+                  // Cerrar loading si está abierto
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.pop(context);
+                  }
+
+                  await showDialog(
+                    context: context,
+                    builder: (dialogContext) {
+                      return Dialog(
+                        elevation: 0,
+                        insetPadding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        child: Container(
+                          height: MediaQuery.sizeOf(context).height * 0.4,
+                          width: MediaQuery.sizeOf(context).width * 0.8,
+                          child: InfoDialogWidget(
+                            info: 'Error durante el registro: ${e.toString()}',
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                }
+              }
             }
 
             return;
@@ -533,7 +976,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         _model.connectionJSON = await actions.checkInternetQuality();
         if (functions.jsonDynamicToBool(getJsonField(
               _model.connectionJSON,
-              r'''$.isGoodConnection''',
+              r'''$.hasInternet''',
             )) ==
             true) {
           // Paso 3: Buscando dispositivo en el sistema

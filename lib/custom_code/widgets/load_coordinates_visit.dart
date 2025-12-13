@@ -1,18 +1,11 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
 import '/flutter_flow/custom_functions.dart'; // Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 import 'dart:ui';
@@ -140,20 +133,22 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   int _elapsedSeconds = 0;
   int _validPoints = 0;
 
-  // Animaciones
+  // Modo de rendimiento - detectado automáticamente basado en refresh rate
+  late bool _isLowPerformanceMode;
+
+  // Animaciones esenciales (siempre activas)
   late AnimationController _pulseController;
   late AnimationController _rotateController;
   late AnimationController _scaleController;
   late AnimationController _radarController;
-  late AnimationController _waveController;
-  late AnimationController _particleController;
-  late AnimationController _glowController;
   late Animation<double> _pulseAnimation;
   late Animation<double> _rotateAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _radarAnimation;
-  late Animation<double> _waveAnimation;
-  late Animation<double> _glowAnimation;
+
+  // Animaciones opcionales (solo en modo alto rendimiento)
+  AnimationController? _particleController;
+  AnimationController? _glowController;
 
   // Colores de la paleta verde oscuro
   static const Color _darkGreen1 = Color(0xFF003420);
@@ -179,26 +174,29 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     _rotateController.dispose();
     _scaleController.dispose();
     _radarController.dispose();
-    _waveController.dispose();
-    _particleController.dispose();
-    _glowController.dispose();
+    _particleController?.dispose();
+    _glowController?.dispose();
     super.dispose();
   }
 
   void _setupAnimations() {
-    // Animación de pulso
+    // Detectar modo de rendimiento basado en la memoria del dispositivo
+    // En dispositivos de gama baja, reducimos animaciones
+    _isLowPerformanceMode = _detectLowPerformanceMode();
+
+    // Animación de pulso - ESENCIAL (más lenta en modo bajo rendimiento)
     _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: Duration(milliseconds: _isLowPerformanceMode ? 2000 : 1500),
       vsync: this,
     )..repeat(reverse: true);
 
-    _pulseAnimation = Tween<double>(begin: 0.95, end: 1.08).animate(
+    _pulseAnimation = Tween<double>(begin: 0.97, end: 1.03).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Animación de rotación
+    // Animación de rotación - ESENCIAL (más lenta en modo bajo rendimiento)
     _rotateController = AnimationController(
-      duration: const Duration(milliseconds: 3000),
+      duration: Duration(milliseconds: _isLowPerformanceMode ? 5000 : 3000),
       vsync: this,
     )..repeat();
 
@@ -206,7 +204,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       CurvedAnimation(parent: _rotateController, curve: Curves.linear),
     );
 
-    // Animación de escala
+    // Animación de escala - ESENCIAL
     _scaleController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
@@ -216,9 +214,9 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       CurvedAnimation(parent: _scaleController, curve: Curves.elasticOut),
     );
 
-    // Animación de radar
+    // Animación de radar - ESENCIAL (reducida en modo bajo rendimiento)
     _radarController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
+      duration: Duration(milliseconds: _isLowPerformanceMode ? 3000 : 2000),
       vsync: this,
     )..repeat();
 
@@ -226,31 +224,41 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       CurvedAnimation(parent: _radarController, curve: Curves.easeOut),
     );
 
-    // Animación de ondas
-    _waveController = AnimationController(
-      duration: const Duration(milliseconds: 2500),
-      vsync: this,
-    )..repeat();
+    // Animaciones OPCIONALES - solo en modo alto rendimiento
+    if (!_isLowPerformanceMode) {
+      // Animación de partículas
+      _particleController = AnimationController(
+        duration: const Duration(milliseconds: 4000),
+        vsync: this,
+      )..repeat();
 
-    _waveAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _waveController, curve: Curves.easeOut),
+      // Animación de glow
+      _glowController = AnimationController(
+        duration: const Duration(milliseconds: 2000),
+        vsync: this,
+      )..repeat(reverse: true);
+    }
+  }
+
+  /// Detecta si el dispositivo es de bajo rendimiento
+  bool _detectLowPerformanceMode() {
+    // Usar el tamaño de la pantalla como indicador aproximado
+    // Dispositivos pequeños o con poca RAM típicamente tienen pantallas más pequeñas
+    final window = WidgetsBinding.instance.platformDispatcher.views.first;
+    final devicePixelRatio = window.devicePixelRatio;
+    final physicalSize = window.physicalSize;
+
+    // Si el dispositivo tiene baja densidad de píxeles o pantalla pequeña,
+    // probablemente es de gama media/baja
+    final screenDiagonal = math.sqrt(
+      math.pow(physicalSize.width / devicePixelRatio, 2) +
+      math.pow(physicalSize.height / devicePixelRatio, 2)
     );
 
-    // Animación de partículas
-    _particleController = AnimationController(
-      duration: const Duration(milliseconds: 4000),
-      vsync: this,
-    )..repeat();
-
-    // Animación de glow
-    _glowController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
-
-    _glowAnimation = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
-    );
+    // Dispositivos con pantalla < 5.5" o densidad < 2.5 se consideran de bajo rendimiento
+    // También activamos modo bajo si la densidad es muy alta (> 3.5) ya que eso significa
+    // más píxeles que renderizar
+    return devicePixelRatio < 2.0 || devicePixelRatio > 3.5 || screenDiagonal < 600;
   }
 
   void _startMessageRotation() {
@@ -322,10 +330,10 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
           final allPoints = geoLocationsList.map((geoStruct) {
             return GPSPoint(
-              latitude: geoStruct.latitude ?? 0.0,
-              longitude: geoStruct.longitude ?? 0.0,
-              altitude: geoStruct.altitude ?? 0.0,
-              horizontalError: geoStruct.errorHorizontal ?? 0.0,
+              latitude: geoStruct.latitude,
+              longitude: geoStruct.longitude,
+              altitude: geoStruct.altitude,
+              horizontalError: geoStruct.errorHorizontal,
               createdAt: geoStruct.dateHourRead ?? DateTime.now().toUtc(),
               battery: batteryLevel,
             );
@@ -349,7 +357,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             _statusMessage = 'Esperando señal GPS precisa...';
           });
 
-          await Future.delayed(Duration(seconds: _retryIntervalSeconds));
+          await Future.delayed(const Duration(seconds: _retryIntervalSeconds));
           if (!mounted) return;
           continue;
         } else {
@@ -357,7 +365,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             _statusMessage = 'Buscando señal GPS...';
           });
 
-          await Future.delayed(Duration(seconds: _retryIntervalSeconds));
+          await Future.delayed(const Duration(seconds: _retryIntervalSeconds));
           if (!mounted) return;
           continue;
         }
@@ -472,14 +480,16 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
           debugPrint('📍 Obteniendo punto GPS ${i + 1}/5...');
 
           Position position = await Geolocator.getCurrentPosition(
-            desiredAccuracy: LocationAccuracy.high,
-            timeLimit: const Duration(seconds: 10),
+            locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              timeLimit: Duration(seconds: 10),
+            ),
           );
 
           final gpsPoint = GPSPoint(
             latitude: position.latitude,
             longitude: position.longitude,
-            altitude: position.altitude ?? 0.0,
+            altitude: position.altitude,
             horizontalError: position.accuracy,
             createdAt: DateTime.now().toUtc(),
             battery: batteryLevel,
@@ -698,7 +708,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       await database.close();
 
       FFAppState().update(() {
-        FFAppState().visitCount = (FFAppState().visitCount ?? 0) + 1;
+        FFAppState().visitCount = FFAppState().visitCount + 1;
         FFAppState().visitDetails = removeVisits(FFAppState().visitDetails);
       });
 
@@ -724,27 +734,41 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Container(
-      width: widget.width,
-      height: widget.height,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
+      width: widget.width ?? screenWidth,
+      height: widget.height ?? screenHeight * 0.92, // Ocupa 92% del alto
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [_darkGreen1, _darkGreen2, _darkGreen3],
           stops: [0.0, 0.5, 1.0],
         ),
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: _accentGreen.withValues(alpha: 0.3),
+            blurRadius: 30,
+            spreadRadius: 5,
+          ),
+        ],
       ),
-      child: SafeArea(
-        child: _hasError
-            ? _buildErrorScreen()
-            : _isComplete
-                ? _buildSuccessScreen()
-                : _isProcessing
-                    ? _buildProcessingScreen()
-                    : _isWaiting
-                        ? _buildWaitingScreen()
-                        : _buildCountdownScreen(),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: SafeArea(
+          child: _hasError
+              ? _buildErrorScreen()
+              : _isComplete
+                  ? _buildSuccessScreen()
+                  : _isProcessing
+                      ? _buildProcessingScreen()
+                      : _isWaiting
+                          ? _buildWaitingScreen()
+                          : _buildCountdownScreen(),
+        ),
       ),
     );
   }
@@ -754,77 +778,152 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   // ==========================================================================
 
   Widget _buildCountdownScreen() {
-    return Stack(
-      children: [
-        // Partículas flotantes de fondo
-        ...List.generate(20, (index) => _buildFloatingParticle(index)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableHeight = constraints.maxHeight;
+        final isCompact = availableHeight < 600;
+        final isVeryCompact = availableHeight < 500;
 
-        // Contenido principal con scroll para evitar overflow
-        Center(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Título con glassmorphism
-                  _buildGlassTitle('Preparando Visita'),
+        return Stack(
+          children: [
+            // Partículas flotantes de fondo - SOLO en modo alto rendimiento
+            if (!_isLowPerformanceMode)
+              ...List.generate(8, (index) => _buildFloatingParticle(index)),
 
-                  const SizedBox(height: 30),
+            // Contenido principal adaptativo
+            Positioned.fill(
+              child: Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: isVeryCompact ? 8 : (isCompact ? 16 : 24),
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: availableHeight - (isVeryCompact ? 16 : (isCompact ? 32 : 48)),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Título con glassmorphism
+                        _buildGlassTitle('Preparando Visita'),
 
-                  // Contador circular con radar y ondas
-                  _buildAnimatedCounter(),
+                        SizedBox(height: isVeryCompact ? 8 : 16),
 
-                  const SizedBox(height: 25),
+                        // Contador circular con radar y ondas - se adapta al espacio
+                        _buildAnimatedCounter(isCompact: isCompact),
 
-                  // Mensaje dinámico
-                  _buildDynamicMessageCard(),
+                        SizedBox(height: isVeryCompact ? 8 : 16),
 
-                  const SizedBox(height: 20),
+                        // Mensaje dinámico
+                        _buildDynamicMessageCard(),
 
-                  // Tip animado
-                  _buildAnimatedTip(),
+                        SizedBox(height: isVeryCompact ? 6 : (isCompact ? 12 : 20)),
 
-                  const SizedBox(height: 25),
+                        // Tip animado
+                        if (!isVeryCompact) _buildAnimatedTip(),
 
-                  // PIN de ubicación animado
-                  _buildAnimatedLocationPin(),
-                ],
+                        SizedBox(height: isVeryCompact ? 8 : 16),
+
+                        // PIN de ubicación animado
+                        _buildAnimatedLocationPin(isCompact: isCompact),
+
+                        SizedBox(height: isVeryCompact ? 4 : (isCompact ? 8 : 16)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
   Widget _buildFloatingParticle(int index) {
+    // Solo construir si el controller existe (modo alto rendimiento)
+    if (_particleController == null) return const SizedBox.shrink();
+
     final random = math.Random(index);
-    final size = 3.0 + random.nextDouble() * 5;
+    final size = 3.0 + random.nextDouble() * 4;
     final startX = random.nextDouble();
 
     return AnimatedBuilder(
-      animation: _particleController,
+      animation: _particleController!,
       builder: (context, child) {
-        final progress = (_particleController.value + index * 0.05) % 1.0;
+        final progress = (_particleController!.value + index * 0.05) % 1.0;
         return Positioned(
           left: MediaQuery.of(context).size.width * startX,
           top: MediaQuery.of(context).size.height * (1 - progress),
           child: Opacity(
-            opacity: (1 - progress) * 0.6,
+            opacity: (1 - progress) * 0.5,
             child: Container(
               width: size,
               height: size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _brightGreen.withValues(alpha: 0.5),
+                color: _brightGreen.withValues(alpha: 0.4),
+                // Sin boxShadow para mejor rendimiento
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlassTitle(String text) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isNarrow = constraints.maxWidth < 300;
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(isNarrow ? 18 : 24),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+            child: Container(
+              padding: EdgeInsets.symmetric(
+                horizontal: isNarrow ? 20 : 40,
+                vertical: isNarrow ? 12 : 18,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _accentGreen.withValues(alpha: 0.25),
+                    _brightGreen.withValues(alpha: 0.1),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(isNarrow ? 18 : 24),
+                border: Border.all(
+                  color: _brightGreen.withValues(alpha: 0.4),
+                  width: 1.5,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: _brightGreen.withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    spreadRadius: 2,
+                    color: _accentGreen.withValues(alpha: 0.3),
+                    blurRadius: 25,
+                    spreadRadius: 3,
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.satellite_alt, color: _brightGreen, size: isNarrow ? 22 : 28),
+                  SizedBox(width: isNarrow ? 10 : 14),
+                  Flexible(
+                    child: Text(
+                      text,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: isNarrow ? 18 : 24,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -835,74 +934,31 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     );
   }
 
-  Widget _buildGlassTitle(String text) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 18),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                _accentGreen.withValues(alpha: 0.25),
-                _brightGreen.withValues(alpha: 0.1),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: _brightGreen.withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: _accentGreen.withValues(alpha: 0.3),
-                blurRadius: 25,
-                spreadRadius: 3,
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.satellite_alt, color: _brightGreen, size: 28),
-              const SizedBox(width: 14),
-              Text(
-                text,
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  Widget _buildAnimatedCounter({bool isCompact = false}) {
+    final size = isCompact ? 220.0 : 280.0;
+    final innerSize = isCompact ? 140.0 : 180.0;
+    final fontSize = isCompact ? 56.0 : 72.0;
 
-  Widget _buildAnimatedCounter() {
     return ScaleTransition(
       scale: _scaleAnimation,
       child: SizedBox(
-        width: 280,
-        height: 280,
+        width: size,
+        height: size,
         child: Stack(
           alignment: Alignment.center,
           children: [
             // Ondas de radar expandiéndose
             ...List.generate(3, (index) {
+              final radarBaseSize = isCompact ? 150.0 : 200.0;
+              final radarExpand = isCompact ? 60.0 : 80.0;
               return AnimatedBuilder(
                 animation: _radarController,
                 builder: (context, child) {
                   final delay = index * 0.33;
                   final progress = (_radarAnimation.value + delay) % 1.0;
                   return Container(
-                    width: 200 + (progress * 80),
-                    height: 200 + (progress * 80),
+                    width: radarBaseSize + (progress * radarExpand),
+                    height: radarBaseSize + (progress * radarExpand),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
@@ -919,8 +975,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             RotationTransition(
               turns: _rotateAnimation,
               child: Container(
-                width: 240,
-                height: 240,
+                width: isCompact ? 190.0 : 240.0,
+                height: isCompact ? 190.0 : 240.0,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: SweepGradient(
@@ -937,39 +993,57 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
               ),
             ),
 
-            // Círculo de fondo con glow
-            AnimatedBuilder(
-              animation: _glowController,
-              builder: (context, child) {
-                return Container(
-                  width: 200,
-                  height: 200,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        _accentGreen.withValues(alpha: 0.2 * _glowAnimation.value),
-                        _darkGreen1.withValues(alpha: 0.8),
+            // Círculo de fondo con glow - versión simplificada en modo bajo rendimiento
+            if (_glowController != null)
+              AnimatedBuilder(
+                animation: _glowController!,
+                builder: (context, child) {
+                  final glowSize = isCompact ? 160.0 : 200.0;
+                  final glowValue = _glowController!.value;
+                  return Container(
+                    width: glowSize,
+                    height: glowSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          _accentGreen.withValues(alpha: 0.2 * glowValue),
+                          _darkGreen1.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _brightGreen.withValues(alpha: 0.2 * glowValue),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
                       ],
                     ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: _brightGreen.withValues(alpha: 0.3 * _glowAnimation.value),
-                        blurRadius: 40,
-                        spreadRadius: 10,
-                      ),
+                  );
+                },
+              )
+            else
+              // Versión estática para modo bajo rendimiento
+              Container(
+                width: isCompact ? 160.0 : 200.0,
+                height: isCompact ? 160.0 : 200.0,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      _accentGreen.withValues(alpha: 0.15),
+                      _darkGreen1.withValues(alpha: 0.8),
                     ],
                   ),
-                );
-              },
-            ),
+                ),
+              ),
 
             // Círculo principal con contador
             ScaleTransition(
               scale: _pulseAnimation,
               child: Container(
-                width: 180,
-                height: 180,
+                width: innerSize,
+                height: innerSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: const LinearGradient(
@@ -995,12 +1069,12 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                     children: [
                       Text(
                         '$_countdown',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Roboto',
-                          fontSize: 72,
+                          fontSize: fontSize,
                           fontWeight: FontWeight.w900,
                           color: Colors.white,
-                          shadows: [
+                          shadows: const [
                             Shadow(
                               color: Colors.black38,
                               blurRadius: 10,
@@ -1013,7 +1087,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                         'segundos',
                         style: TextStyle(
                           fontFamily: 'Roboto',
-                          fontSize: 14,
+                          fontSize: isCompact ? 12.0 : 14.0,
                           fontWeight: FontWeight.w600,
                           color: Colors.white.withValues(alpha: 0.8),
                           letterSpacing: 2,
@@ -1063,12 +1137,13 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         key: ValueKey(_dynamicMessage),
         borderRadius: BorderRadius.circular(16),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            constraints: const BoxConstraints(maxWidth: 280),
             decoration: BoxDecoration(
               color: Colors.black.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: _brightGreen.withValues(alpha: 0.3),
                 width: 1,
@@ -1077,22 +1152,26 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
+                const SizedBox(
+                  width: 16,
+                  height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
                     valueColor: AlwaysStoppedAnimation<Color>(_brightGreen),
                   ),
                 ),
-                const SizedBox(width: 14),
-                Text(
-                  _dynamicMessage,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white.withValues(alpha: 0.9),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    _dynamicMessage,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.9),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ),
               ],
@@ -1108,7 +1187,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       duration: const Duration(milliseconds: 600),
       child: Container(
         key: ValueKey(_currentTip),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        constraints: const BoxConstraints(maxWidth: 300),
         decoration: BoxDecoration(
           color: _accentGreen.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(12),
@@ -1121,49 +1201,61 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
           _currentTip,
           style: TextStyle(
             fontFamily: 'Roboto',
-            fontSize: 13,
+            fontSize: 12,
             color: Colors.white.withValues(alpha: 0.8),
             fontWeight: FontWeight.w500,
           ),
+          textAlign: TextAlign.center,
+          overflow: TextOverflow.ellipsis,
+          maxLines: 2,
         ),
       ),
     );
   }
 
-  Widget _buildAnimatedLocationPin() {
+  Widget _buildAnimatedLocationPin({bool isCompact = false}) {
+    final baseSize = isCompact ? 60.0 : 80.0;
+    final expandSize = isCompact ? 30.0 : 40.0;
+    final glowSize = isCompact ? 54.0 : 70.0;
+    final pinSize = isCompact ? 44.0 : 56.0;
+    final iconSize = isCompact ? 22.0 : 28.0;
+
     return ScaleTransition(
       scale: _pulseAnimation,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Stack(
             alignment: Alignment.center,
             children: [
-              // Onda de expansión
-              AnimatedBuilder(
-                animation: _waveController,
-                builder: (context, child) {
-                  return Container(
-                    width: 80 + (_waveAnimation.value * 40),
-                    height: 80 + (_waveAnimation.value * 40),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.redAccent.withValues(alpha: (1 - _waveAnimation.value) * 0.5),
-                        width: 2,
+              // Onda de expansión - usa radarController (reutilizado)
+              if (!_isLowPerformanceMode)
+                AnimatedBuilder(
+                  animation: _radarController,
+                  builder: (context, child) {
+                    final waveValue = _radarAnimation.value;
+                    return Container(
+                      width: baseSize + (waveValue * expandSize),
+                      height: baseSize + (waveValue * expandSize),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha: (1 - waveValue) * 0.4),
+                          width: 2,
+                        ),
                       ),
-                    ),
-                  );
-                },
-              ),
-              // Glow
+                    );
+                  },
+                ),
+              // Glow - simplificado
               Container(
-                width: 70,
-                height: 70,
+                width: glowSize,
+                height: glowSize,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      Colors.redAccent.withValues(alpha: 0.4),
+                      Colors.redAccent.withValues(alpha: 0.3),
                       Colors.redAccent.withValues(alpha: 0.0),
                     ],
                   ),
@@ -1171,8 +1263,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
               ),
               // Pin
               Container(
-                width: 56,
-                height: 56,
+                width: pinSize,
+                height: pinSize,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
@@ -1180,11 +1272,11 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                     colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
                   ),
                   shape: BoxShape.circle,
-                  boxShadow: [
+                  boxShadow: _isLowPerformanceMode ? null : [
                     BoxShadow(
-                      color: Colors.redAccent.withValues(alpha: 0.5),
-                      blurRadius: 20,
-                      spreadRadius: 3,
+                      color: Colors.redAccent.withValues(alpha: 0.4),
+                      blurRadius: 15,
+                      spreadRadius: 2,
                     ),
                   ],
                   border: Border.all(
@@ -1192,17 +1284,20 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                     width: 2,
                   ),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.location_on,
                   color: Colors.white,
-                  size: 28,
+                  size: iconSize,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isCompact ? 8 : 12),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 12 : 16,
+              vertical: isCompact ? 6 : 8,
+            ),
             decoration: BoxDecoration(
               color: Colors.redAccent.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
@@ -1211,11 +1306,11 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                 width: 1,
               ),
             ),
-            child: const Text(
+            child: Text(
               'Tu ubicación',
               style: TextStyle(
                 fontFamily: 'Roboto',
-                fontSize: 12,
+                fontSize: isCompact ? 10 : 12,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
                 letterSpacing: 0.5,
@@ -1234,50 +1329,65 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   Widget _buildWaitingScreen() {
     final progress = _elapsedSeconds / _maxWaitTimeSeconds;
 
-    return Stack(
-      children: [
-        // Partículas
-        ...List.generate(15, (index) => _buildFloatingParticle(index)),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableHeight = constraints.maxHeight;
+        final isCompact = availableHeight < 600;
 
-        Center(
-          child: SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Padding(
-              padding: const EdgeInsets.all(24),
+        return Stack(
+          children: [
+            // Partículas
+            ...List.generate(15, (index) => _buildFloatingParticle(index)),
+
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: isCompact ? 16 : 24,
+              ),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Icono de satélite con radar
-                  _buildSatelliteRadar(),
+                  // Espacio flexible superior
+                  const Spacer(flex: 1),
 
-                  const SizedBox(height: 25),
+                  // Icono de satélite con radar
+                  _buildSatelliteRadar(isCompact: isCompact),
+
+                  SizedBox(height: isCompact ? 16 : 25),
 
                   // Barra de progreso circular grande
-                  _buildCircularProgressWithInfo(progress),
+                  _buildCircularProgressWithInfo(progress, isCompact: isCompact),
 
-                  const SizedBox(height: 20),
+                  SizedBox(height: isCompact ? 14 : 20),
 
                   // Card de estado con glassmorphism
                   _buildStatusCard(),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: isCompact ? 10 : 16),
 
                   // Tip animado
                   _buildAnimatedTip(),
+
+                  // Espacio flexible inferior
+                  const Spacer(flex: 1),
                 ],
               ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 
-  Widget _buildSatelliteRadar() {
+  Widget _buildSatelliteRadar({bool isCompact = false}) {
+    final containerSize = isCompact ? 110.0 : 140.0;
+    final radarBase = isCompact ? 45.0 : 60.0;
+    final radarExpand = isCompact ? 60.0 : 80.0;
+    final centerSize = isCompact ? 70.0 : 90.0;
+    final iconSize = isCompact ? 35.0 : 45.0;
+
     return SizedBox(
-      width: 140,
-      height: 140,
+      width: containerSize,
+      height: containerSize,
       child: Stack(
         alignment: Alignment.center,
         children: [
@@ -1289,8 +1399,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                 final delay = index * 0.33;
                 final progress = (_radarAnimation.value + delay) % 1.0;
                 return Container(
-                  width: 60 + (progress * 80),
-                  height: 60 + (progress * 80),
+                  width: radarBase + (progress * radarExpand),
+                  height: radarBase + (progress * radarExpand),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(
@@ -1307,8 +1417,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
           RotationTransition(
             turns: _rotateAnimation,
             child: Container(
-              width: 90,
-              height: 90,
+              width: centerSize,
+              height: centerSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: const LinearGradient(
@@ -1324,10 +1434,10 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                   ),
                 ],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.satellite_alt,
                 color: Colors.white,
-                size: 45,
+                size: iconSize,
               ),
             ),
           ),
@@ -1336,17 +1446,22 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     );
   }
 
-  Widget _buildCircularProgressWithInfo(double progress) {
+  Widget _buildCircularProgressWithInfo(double progress, {bool isCompact = false}) {
+    final containerSize = isCompact ? 160.0 : 200.0;
+    final innerSize = isCompact ? 145.0 : 180.0;
+    final timerFontSize = isCompact ? 28.0 : 36.0;
+    final subFontSize = isCompact ? 12.0 : 14.0;
+
     return SizedBox(
-      width: 200,
-      height: 200,
+      width: containerSize,
+      height: containerSize,
       child: Stack(
         alignment: Alignment.center,
         children: [
           // Fondo
           Container(
-            width: 180,
-            height: 180,
+            width: innerSize,
+            height: innerSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.black.withValues(alpha:0.3),
@@ -1359,13 +1474,13 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
           // Progreso circular
           SizedBox(
-            width: 180,
-            height: 180,
+            width: innerSize,
+            height: innerSize,
             child: CircularProgressIndicator(
               value: progress,
-              strokeWidth: 8,
+              strokeWidth: isCompact ? 6 : 8,
               backgroundColor: Colors.white.withValues(alpha:0.1),
-              valueColor: AlwaysStoppedAnimation<Color>(_brightGreen),
+              valueColor: const AlwaysStoppedAnimation<Color>(_brightGreen),
             ),
           ),
 
@@ -1375,9 +1490,9 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             children: [
               Text(
                 '${_elapsedSeconds}s',
-                style: const TextStyle(
+                style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 36,
+                  fontSize: timerFontSize,
                   fontWeight: FontWeight.w900,
                   color: Colors.white,
                 ),
@@ -1386,13 +1501,16 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                 'de ${_maxWaitTimeSeconds}s',
                 style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 14,
+                  fontSize: subFontSize,
                   color: Colors.white.withValues(alpha:0.7),
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: isCompact ? 6 : 8),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isCompact ? 10 : 12,
+                  vertical: isCompact ? 3 : 4,
+                ),
                 decoration: BoxDecoration(
                   color: _validPoints >= 2 ? _successGreen.withValues(alpha:0.3) : _accentGreen.withValues(alpha:0.3),
                   borderRadius: BorderRadius.circular(8),
@@ -1401,7 +1519,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                   '$_validPoints/2 puntos',
                   style: TextStyle(
                     fontFamily: 'Roboto',
-                    fontSize: 12,
+                    fontSize: isCompact ? 10 : 12,
                     fontWeight: FontWeight.w700,
                     color: _validPoints >= 2 ? _successGreen : _brightGreen,
                   ),
@@ -1418,7 +1536,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     return ClipRRect(
       borderRadius: BorderRadius.circular(20),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
@@ -1441,7 +1559,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.gps_fixed, color: _brightGreen, size: 24),
+                  const Icon(Icons.gps_fixed, color: _brightGreen, size: 24),
                   const SizedBox(width: 12),
                   Text(
                     _statusMessage,
@@ -1455,13 +1573,16 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildInfoChip(Icons.precision_manufacturing, '≤${_maxHorizontalError}m'),
-                  const SizedBox(width: 12),
-                  _buildInfoChip(Icons.verified, '$_validPoints válidos'),
-                ],
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildInfoChip(Icons.precision_manufacturing, '≤${_maxHorizontalError}m'),
+                    const SizedBox(width: 12),
+                    _buildInfoChip(Icons.verified, '$_validPoints válidos'),
+                  ],
+                ),
               ),
             ],
           ),
@@ -1473,6 +1594,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   Widget _buildInfoChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      constraints: const BoxConstraints(maxWidth: 110),
       decoration: BoxDecoration(
         color: _accentGreen.withValues(alpha:0.2),
         borderRadius: BorderRadius.circular(8),
@@ -1486,13 +1608,17 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         children: [
           Icon(icon, color: _brightGreen, size: 16),
           const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha:0.9),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withValues(alpha:0.9),
+              ),
             ),
           ),
         ],
@@ -1580,7 +1706,9 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   Widget _buildSuccessScreen() {
     return Stack(
       children: [
-        ...List.generate(25, (index) => _buildFloatingParticle(index)),
+        // Partículas solo en modo alto rendimiento (reducidas de 25 a 10)
+        if (!_isLowPerformanceMode)
+          ...List.generate(10, (index) => _buildFloatingParticle(index)),
         Center(
           child: Padding(
             padding: const EdgeInsets.all(32),
@@ -1600,11 +1728,12 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                         end: Alignment.bottomRight,
                         colors: [_successGreen, Color(0xFF00B88D)],
                       ),
-                      boxShadow: [
+                      // BoxShadow solo en modo alto rendimiento
+                      boxShadow: _isLowPerformanceMode ? null : [
                         BoxShadow(
-                          color: _successGreen.withValues(alpha:0.6),
-                          blurRadius: 40,
-                          spreadRadius: 10,
+                          color: _successGreen.withValues(alpha: 0.4),
+                          blurRadius: 20,
+                          spreadRadius: 5,
                         ),
                       ],
                     ),
@@ -1631,33 +1760,57 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
                 const SizedBox(height: 20),
 
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: _successGreen.withValues(alpha:0.2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _successGreen.withValues(alpha:0.4),
-                          width: 1.5,
-                        ),
+                // BackdropFilter solo en modo alto rendimiento
+                if (_isLowPerformanceMode)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: _successGreen.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _successGreen.withValues(alpha: 0.4),
+                        width: 1.5,
                       ),
-                      child: Text(
-                        _statusMessage,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          height: 1.6,
-                          color: Colors.white.withValues(alpha:0.9),
+                    ),
+                    child: Text(
+                      _statusMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        height: 1.6,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  )
+                else
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: _successGreen.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: _successGreen.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          _statusMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 14,
+                            height: 1.6,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
               ],
             ),
           ),
@@ -1689,11 +1842,12 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                       end: Alignment.bottomRight,
                       colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
                     ),
-                    boxShadow: [
+                    // BoxShadow solo en modo alto rendimiento
+                    boxShadow: _isLowPerformanceMode ? null : [
                       BoxShadow(
-                        color: Colors.redAccent.withValues(alpha:0.5),
-                        blurRadius: 30,
-                        spreadRadius: 5,
+                        color: Colors.redAccent.withValues(alpha: 0.4),
+                        blurRadius: 20,
+                        spreadRadius: 3,
                       ),
                     ],
                   ),
@@ -1718,33 +1872,57 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
                 const SizedBox(height: 20),
 
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha:0.2),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.redAccent.withValues(alpha:0.4),
-                          width: 1.5,
-                        ),
+                // BackdropFilter solo en modo alto rendimiento
+                if (_isLowPerformanceMode)
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.25),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.4),
+                        width: 1.5,
                       ),
-                      child: Text(
-                        _errorMessage,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          height: 1.6,
-                          color: Colors.white.withValues(alpha:0.9),
+                    ),
+                    child: Text(
+                      _errorMessage,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        height: 1.6,
+                        color: Colors.white.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  )
+                else
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+                      child: Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.redAccent.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.redAccent.withValues(alpha: 0.4),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Text(
+                          _errorMessage,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 14,
+                            height: 1.6,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
 
                 const SizedBox(height: 32),
 

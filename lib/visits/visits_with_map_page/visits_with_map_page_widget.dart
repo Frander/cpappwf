@@ -4,8 +4,10 @@ import '/flutter_flow/flutter_flow_util.dart';
 import '/visits/do_visits_form_page/do_visits_form_page_widget.dart';
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
+import '/index.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'visits_with_map_page_model.dart';
 export 'visits_with_map_page_model.dart';
@@ -173,19 +175,62 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    getJsonField(
-                      FFAppState().activitySelectedJSON,
-                      r'''$.name_activity''',
-                    )?.toString() ?? 'Realizar Visitas',
+                    FFAppState().activitySelected.nameActivity.isNotEmpty
+                        ? FFAppState().activitySelected.nameActivity
+                        : 'Realizar Visitas',
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF00ff9f),
+                      color: Colors.white,
                       letterSpacing: 0.5,
+                      height: 1.2,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                SizedBox(width: 12),
+                // Botón de Novedades
+                InkWell(
+                  splashColor: Colors.transparent,
+                  focusColor: Colors.transparent,
+                  hoverColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  onTap: () async {
+                    HapticFeedback.mediumImpact();
+                    context.pushNamed(
+                      NewsPageWidget.routeName,
+                      extra: <String, dynamic>{
+                        kTransitionInfoKey: TransitionInfo(
+                          hasTransition: true,
+                          transitionType: PageTransitionType.fade,
+                          duration: Duration(milliseconds: 500),
+                        ),
+                      },
+                    );
+                  },
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withOpacity(0.2),
+                          Colors.white.withOpacity(0.1),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: Color(0xFFFF9800).withOpacity(0.5),
+                        width: 1,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.warning_amber_rounded,
+                      color: Color(0xFFFF9800),
+                      size: 20,
+                    ),
                   ),
                 ),
               ],

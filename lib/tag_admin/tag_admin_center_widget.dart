@@ -65,12 +65,16 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
               child: Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 24),
             ),
             SizedBox(width: 12),
-            Text(
-              'Centro de Administración NFC',
-              style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+            Expanded(
+              child: Text(
+                'Centro de Administración NFC',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontFamily: 'Roboto',
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
             ),
           ],

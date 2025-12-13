@@ -101,7 +101,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
       barrierDismissible: false,
       builder: (BuildContext context) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
           child: Dialog(
             backgroundColor: Colors.transparent,
             child: Container(

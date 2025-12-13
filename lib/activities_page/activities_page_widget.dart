@@ -261,7 +261,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                             child: Padding(
                               padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                               child: Row(
@@ -562,7 +562,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Row(
               children: [
                 // Número de índice

@@ -57,7 +57,14 @@ Future<VisitsStruct?> createVisit(
       debugPrint('       Status Option: ${detail.statusOption ?? "null"}');
       debugPrint('       Status Response: ${detail.statusResponse ?? "null"}');
       debugPrint('       ID Visit Detail: ${detail.idVisitDetail ?? "null"}');
+      debugPrint('       Type Status: ${detail.typeStatus ?? "null"}');
+      debugPrint('       Remember Status: ${detail.rememberStatus}');
     }
+
+    // 0.5. NUEVO: Limpiar status de tipo tag-reader, tag-writer, tag-transfer con rememberStatus = false
+    final cleanedVisitsDetails = _cleanTagStatusByRememberFlag(visitsDetails);
+    
+    debugPrint('🧹 LIMPIEZA DE TAGS: ${visitsDetails.length} detalles → ${cleanedVisitsDetails.length} detalles después de filtrar');
 
     // 1. Crear el objeto VisitsStruct (igual que createVisitsObject)
     final visitsStruct = VisitsStruct(
@@ -71,7 +78,7 @@ Future<VisitsStruct?> createVisit(
       idUser: idUser,
       idDevice: idDevice,
       locationDefault: locationDefault,
-      visitsDetails: visitsDetails,
+      visitsDetails: cleanedVisitsDetails,
       locationsAdd: locationsAdd,
     );
 
@@ -419,6 +426,30 @@ Map<String, double> _parseLocationString(String locationString) {
       'errorHorizontal': 0.0,
     };
   }
+}
+
+/// Limpia los status de tipo tag-reader, tag-writer, tag-transfer con rememberStatus = false
+/// Solo mantiene los status que deben ser recordados
+List<VisitsDetailsStruct> _cleanTagStatusByRememberFlag(
+    List<VisitsDetailsStruct> visitsDetails) {
+  debugPrint('🧹 LIMPIEZA DE STATUS: Filtrando status de tipos NFC con rememberStatus=false');
+  
+  // Tipos de status que se deben limpiar si rememberStatus es false
+  const nfcOperationTypes = {'tag-reader', 'tag-writer', 'tag-transfer'};
+
+  final filteredDetails = visitsDetails.where((detail) {
+    final typeStatus = detail.typeStatus.toLowerCase();
+    final shouldRemove = nfcOperationTypes.contains(typeStatus) && !detail.rememberStatus;
+    
+    if (shouldRemove) {
+      debugPrint('   ❌ Removiendo: ${detail.statusOption} (tipo=$typeStatus, remember=${detail.rememberStatus})');
+    }
+    
+    return !shouldRemove;
+  }).toList();
+
+  debugPrint('✅ Limpieza completada: ${visitsDetails.length} → ${filteredDetails.length}');
+  return filteredDetails;
 }
 
 Future<String> _getBestDocumentsPath() async {

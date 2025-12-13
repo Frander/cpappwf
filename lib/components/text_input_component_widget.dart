@@ -276,7 +276,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                             child: Padding(
                               padding: EdgeInsets.all(24),
                               child: Column(

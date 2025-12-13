@@ -461,13 +461,21 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
 
       if (!operatorGroups.containsKey(operatorId)) {
         // Buscar nombre del operador en usersList
+        // operatorId contiene el idUser (identificador numérico del usuario)
         String operatorName = 'Operador';
-        final user = FFAppState().usersList.firstWhere(
-          (u) => u.operID == operatorId,
-          orElse: () => UsersStruct(),
-        );
-        if (user.nameUser.isNotEmpty) {
-          operatorName = user.nameUser;
+        try {
+          final idUserFromTag = int.tryParse(operatorId);
+          if (idUserFromTag != null) {
+            final user = FFAppState().usersList.firstWhere(
+              (u) => u.idUser == idUserFromTag,
+              orElse: () => UsersStruct(),
+            );
+            if (user.nameUser.isNotEmpty) {
+              operatorName = user.nameUser;
+            }
+          }
+        } catch (e) {
+          debugPrint('Error buscando operador: $e');
         }
 
         operatorGroups[operatorId] = {

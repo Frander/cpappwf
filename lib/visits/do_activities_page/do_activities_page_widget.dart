@@ -44,8 +44,11 @@ class DoActivitiesPageWidget extends StatefulWidget {
   State<DoActivitiesPageWidget> createState() => _DoActivitiesPageWidgetState();
 }
 
-class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
+class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
+    with SingleTickerProviderStateMixin {
   late DoActivitiesPageModel _model;
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnimation;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -53,6 +56,16 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => DoActivitiesPageModel());
+
+    // Inicializar animación de pulso para indicador GPS
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: Duration(milliseconds: 1200),
+    );
+    _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+    _pulseController.repeat(reverse: true);
 
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       unawaited(
@@ -72,6 +85,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
 
   @override
   void dispose() {
+    _pulseController.dispose();
     _model.dispose();
     super.dispose();
   }
@@ -999,6 +1013,82 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
 
                         SizedBox(height: 8),
 
+                        // Indicador de estado GPS en tiempo real
+                        AnimatedBuilder(
+                          animation: _pulseController,
+                          builder: (context, child) {
+                            final isStabilized = FFAppState().isStabilized;
+                            return AnimatedContainer(
+                              duration: const Duration(milliseconds: 300),
+                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              margin: EdgeInsets.symmetric(horizontal: 20),
+                              decoration: BoxDecoration(
+                                color: isStabilized
+                                    ? Color(0xFF00a86b).withOpacity(0.15)
+                                    : Color(0xFFFF6B6B).withOpacity(0.15 * _pulseAnimation.value),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isStabilized
+                                      ? Color(0xFF00a86b).withOpacity(0.4)
+                                      : Color(0xFFFF6B6B).withOpacity(0.4 * _pulseAnimation.value),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Icono animado de GPS
+                                  Transform.scale(
+                                    scale: isStabilized ? 1.0 : _pulseAnimation.value,
+                                    child: Icon(
+                                      isStabilized
+                                          ? Icons.gps_fixed_rounded
+                                          : Icons.gps_not_fixed_rounded,
+                                      color: isStabilized
+                                          ? Color(0xFF00ff9f)
+                                          : Color(0xFFFF6B6B),
+                                      size: 18,
+                                    ),
+                                  ),
+                                  SizedBox(width: 8),
+                                  // Texto del estado
+                                  Text(
+                                    isStabilized
+                                        ? 'GPS estabilizado'
+                                        : 'Estabilizando GPS...',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: isStabilized
+                                          ? Color(0xFF00ff9f)
+                                          : Color(0xFFFF6B6B),
+                                      letterSpacing: 0.3,
+                                    ),
+                                  ),
+                                  // Indicador de carga cuando no está estabilizado
+                                  if (!isStabilized) ...[
+                                    SizedBox(width: 10),
+                                    SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Color(0xFFFF6B6B).withOpacity(_pulseAnimation.value),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+
+                        SizedBox(height: 8),
+
                         // Hint para long press
                         Padding(
                           padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1022,30 +1112,6 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
                               ),
                             ],
                           ),
-                        ),
-
-                        SizedBox(height: 16),
-
-                        // Novedades
-                        _buildActionCard(
-                          context,
-                          icon: Icons.new_releases_rounded,
-                          iconColor: Color(0xFFFF9800),
-                          title: 'Novedades',
-                          subtitle:
-                              'Si algo interrumpe el trabajo, reportelo aquí',
-                          onTap: () async {
-                            context.pushNamed(
-                              NewsPageWidget.routeName,
-                              extra: <String, dynamic>{
-                                kTransitionInfoKey: TransitionInfo(
-                                  hasTransition: true,
-                                  transitionType: PageTransitionType.fade,
-                                  duration: Duration(milliseconds: 1000),
-                                ),
-                              },
-                            );
-                          },
                         ),
 
                         SizedBox(height: 16),
@@ -1289,111 +1355,6 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget> {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionCard(
-    BuildContext context, {
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      splashColor: Colors.transparent,
-      focusColor: Colors.transparent,
-      hoverColor: Colors.transparent,
-      highlightColor: Colors.transparent,
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsetsDirectional.fromSTEB(16.0, 16.0, 16.0, 16.0),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withOpacity(0.15),
-              Colors.white.withOpacity(0.05),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Color(0xFF00a86b).withOpacity(0.3),
-            width: 1.5,
-          ),
-          boxShadow: [
-            BoxShadow(
-              blurRadius: 15,
-              color: Color(0xFF00a86b).withOpacity(0.2),
-              offset: Offset(0, 6),
-              spreadRadius: 0,
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        iconColor.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                    ),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 28,
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: FlutterFlowTheme.of(context).bodyMedium.override(
-                              font: TextStyle(fontFamily: 'Roboto',
-                                fontWeight: FontWeight.bold,
-                              ),
-                              color: Color(0xFF00ff9f),
-                              fontSize: 16,
-                              letterSpacing: 0.5,
-                            ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: FlutterFlowTheme.of(context).bodyMedium.override(
-                              font: TextStyle(fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w500,
-                              ),
-                              color: Colors.white.withOpacity(0.8),
-                              fontSize: 13,
-                              letterSpacing: 0.3,
-                            ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
         ),
       ),
     );

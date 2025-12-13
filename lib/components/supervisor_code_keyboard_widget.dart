@@ -119,11 +119,13 @@ class _SupervisorCodeKeyboardWidgetState
         ),
       ),
       child: SafeArea(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: MediaQuery.sizeOf(context).height - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom,
-            ),
+        bottom: true,
+        top: true,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+          ),
+          child: SingleChildScrollView(
             child: Column(
               children: [
                 SizedBox(height: 20),

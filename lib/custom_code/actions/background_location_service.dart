@@ -1,11 +1,4 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -17,14 +10,11 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geodesy/geodesy.dart';
-import 'package:proj4dart/proj4dart.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:io';
-import 'package:battery_plus/battery_plus.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 // Importar las clases del archivo get_location_list.dart
@@ -249,7 +239,6 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
   DateTime? lastSensorUpdate;
   DateTime? lastGPSUpdate;
   AccelerometerEvent? lastAccelEvent;
-  GyroscopeEvent? lastGyroEvent;
 
   // Suscripciones a sensores
   StreamSubscription<AccelerometerEvent>? accelSub;
@@ -272,8 +261,6 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
     gyroSub =
         gyroscopeEventStream(samplingPeriod: const Duration(milliseconds: 200))
             .listen((event) {
-      lastGyroEvent = event;
-
       if (lastAccelEvent != null && lastSensorUpdate != null) {
         final now = DateTime.now();
         final dt = now.difference(lastSensorUpdate!).inMilliseconds / 1000.0;
@@ -291,8 +278,8 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
         }
 
         lastSensorUpdate = now;
-      } else if (lastSensorUpdate == null) {
-        lastSensorUpdate = DateTime.now();
+      } else {
+        lastSensorUpdate ??= DateTime.now();
       }
     });
 
@@ -411,6 +398,9 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
         isStabilized = true;
         debugPrint(
             '✅ Servicio en segundo plano estabilizado después de ${elapsed}s');
+
+        // Notificar al hilo principal que el GPS está estabilizado
+        service.invoke('gpsStabilized', {'stabilized': true});
       }
 
       // Conversión a UTM
@@ -422,8 +412,7 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
       final measAlt = position.altitude;
 
       // Multipath y HDOP
-      final isMultipath =
-          multipathDetector.isLikelyMultipath(position, movementDetector);
+      multipathDetector.isLikelyMultipath(position, movementDetector);
       final multipathPenalty = multipathDetector.getMultipathPenalty();
       final baseAccuracy = HDOPCorrector.adjustAccuracyByDOP(position);
       final adjustedAccuracy = baseAccuracy * multipathPenalty;
@@ -590,6 +579,35 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 /// Función pública para iniciar el servicio
 Future<void> startBackgroundLocationService() async {
   final service = FlutterBackgroundService();
+
+  // IMPORTANTE: Verificar permisos ANTES de iniciar el servicio
+  // Esto debe hacerse en el hilo principal donde hay Activity/UI disponible
+  debugPrint('🔐 Verificando permisos de ubicación antes de iniciar servicio...');
+
+  var permission = await Geolocator.checkPermission();
+  if (permission == LocationPermission.denied) {
+    debugPrint('📍 Solicitando permisos de ubicación...');
+    permission = await Geolocator.requestPermission();
+    if (permission == LocationPermission.denied) {
+      debugPrint('❌ Permisos de ubicación denegados por el usuario');
+      return;
+    }
+  }
+
+  if (permission == LocationPermission.deniedForever) {
+    debugPrint('❌ Permisos de ubicación denegados permanentemente. El usuario debe habilitarlos en Configuración.');
+    return;
+  }
+
+  // Verificar que los servicios de ubicación estén habilitados
+  if (!await Geolocator.isLocationServiceEnabled()) {
+    debugPrint('❌ Servicios de ubicación deshabilitados. Solicitando activación...');
+    // Intentar abrir configuración de ubicación
+    await Geolocator.openLocationSettings();
+    return;
+  }
+
+  debugPrint('✅ Permisos de ubicación verificados: $permission');
 
   // Inicializar si no está inicializado
   if (!await service.isRunning()) {

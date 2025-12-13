@@ -56,3 +56,4 @@ export 'background_location_service.dart'
         startBackgroundLocationService,
         stopBackgroundLocationService,
         isBackgroundLocationServiceRunning;
+export 'check_nfc_status.dart' show checkNfcStatus, openNfcSettings, NfcStatus;

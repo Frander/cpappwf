@@ -24,9 +24,9 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
 Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
-  // Verificar si NFC está disponible en el dispositivo
-  bool nfcAvailable = await NfcManager.instance.isAvailable();
-  if (!nfcAvailable) {
+  // Verificar si NFC está disponible y activado usando la nueva función
+  bool nfcReady = await checkNfcStatus(context, showAlert: true);
+  if (!nfcReady) {
     FFAppState().update(() {
       FFAppState().nfcRead = ''; // Actualizar AppState pero no cerrar popup
     });

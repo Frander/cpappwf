@@ -1,4 +1,4 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/backend/sqlite/sqlite_manager.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
@@ -11,10 +11,8 @@ import '/components/text_input_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'package:flutter/services.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import 'dart:io';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -23,8 +21,6 @@ import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
-
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'do_visits_form_page_model.dart';
@@ -34,7 +30,7 @@ class DoVisitsFormPageWidget extends StatefulWidget {
   const DoVisitsFormPageWidget({
     super.key,
     String? tittle,
-  }) : this.tittle = tittle ?? 'Módulo ClickPalm';
+  }) : tittle = tittle ?? 'Módulo ClickPalm';
 
   final String tittle;
 
@@ -125,7 +121,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Map para almacenar distancias desde producto (OPCIÓN 2: lista por cada lote)
   // statusId -> List<{headquarterId, headquarterName, distance}>
-  final Map<int, List<Map<String, dynamic>>> _calculatedDistancesFromProduct = {};
+  final Map<int, List<Map<String, dynamic>>> _calculatedDistancesFromProduct =
+      {};
 
   // Map para rastrear si una distancia fue calculada al menos una vez por statusId
   final Map<int, bool> _distanceExtractorCalculated = {};
@@ -133,18 +130,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para almacenar la última coordenada del tag-reader
   ReadGeoStruct? _lastTagReaderLocation;
 
-  // Flag para controlar si ya se mostró el log de renderizado inicial
-  bool _hasLoggedInitialRender = false;
-
   // Set para rastrear qué status ya se loguearon (para evitar spam en logs)
   final Set<int> _loggedStatusIds = {};
+
+  // ============================================================================
+  // CACHÉ DE RENDIMIENTO - LOTE 1
+  // ============================================================================
+
+  // Caché de activity steps y status ordenados (evita parseo y sorting en cada rebuild)
+  List<dynamic> _cachedActivitySteps = [];
+  List<dynamic> _cachedActivityStatus = [];
+  bool _isDataCacheInitialized = false;
+
+  // Caché de búsquedas en visitDetails (evita O(n) en cada rebuild)
+  final Map<String, bool> _visitDetailsSearchCache = {};
+  int _lastVisitDetailsLength = 0;
 
   // Getter para obtener el texto de Unity o "Resultados" por defecto
   String get _unityLabel {
     final unityValue = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.Unity''',
-    )?.toString() ?? '';
+          FFAppState().currentActivity,
+          r'''$.Unity''',
+        )?.toString() ??
+        '';
 
     return unityValue.isNotEmpty ? unityValue : 'Resultados';
   }
@@ -154,6 +162,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     super.initState();
     _model = createModel(context, () => DoVisitsFormPageModel());
     _tabController = TabController(length: 2, vsync: this);
+    _initializeDataCache(); // LOTE 1: Inicializar caché de datos
     _initializeExpansionStates();
 
     // Restaurar caché del formulario si existe
@@ -161,6 +170,68 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       _restoreFormCache();
       _initializeDateTimeDefaults();
     });
+  }
+
+  // ============================================================================
+  // LOTE 1: INICIALIZACIÓN DE CACHÉ DE DATOS
+  // ============================================================================
+
+  /// Inicializa el caché de activity steps y status ordenados
+  /// Se ejecuta una sola vez en initState, evitando parseo y sorting en cada rebuild
+  void _initializeDataCache() {
+    final activityStepsRawData = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.activity_steps''',
+    );
+
+    final activityStatusRawData = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.activity_status''',
+    );
+
+    // Cachear y ordenar activity steps
+    if (activityStepsRawData != null) {
+      _cachedActivitySteps = List.from(activityStepsRawData.toList());
+      _cachedActivitySteps.sort((a, b) {
+        final orderA = getJsonField(a, r'''$.order_step''') ?? 999;
+        final orderB = getJsonField(b, r'''$.order_step''') ?? 999;
+        return orderA.compareTo(orderB);
+      });
+    }
+
+    // Cachear y ordenar activity status
+    if (activityStatusRawData != null) {
+      _cachedActivityStatus = List.from(activityStatusRawData.toList());
+      _cachedActivityStatus.sort((a, b) {
+        final orderA = getJsonField(a, r'''$.order_status''') ?? 999;
+        final orderB = getJsonField(b, r'''$.order_status''') ?? 999;
+        return orderA.compareTo(orderB);
+      });
+    }
+
+    _isDataCacheInitialized = true;
+  }
+
+  /// Invalida el caché de búsquedas cuando cambia visitDetails
+  void _invalidateSearchCacheIfNeeded() {
+    final currentLength = FFAppState().visitDetails.length;
+    if (currentLength != _lastVisitDetailsLength) {
+      _visitDetailsSearchCache.clear();
+      _lastVisitDetailsLength = currentLength;
+    }
+  }
+
+  /// Búsqueda cacheada en visitDetails (evita O(n) repetido)
+  bool _cachedSearchInVisitDetails(int id, String type) {
+    final cacheKey = '${type}_$id';
+    if (!_visitDetailsSearchCache.containsKey(cacheKey)) {
+      _visitDetailsSearchCache[cacheKey] = functions.searchInVisitsDetails(
+        FFAppState().visitDetails.toList(),
+        id,
+        type,
+      );
+    }
+    return _visitDetailsSearchCache[cacheKey]!;
   }
 
   @override
@@ -197,7 +268,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   /// Genera una clave única para el caché basada en la actividad
   String _getCacheKey() {
-    final activityId = getJsonField(FFAppState().currentActivity, r'''$.id_activity''');
+    final activityId =
+        getJsonField(FFAppState().currentActivity, r'''$.id_activity''');
     return 'form_cache_activity_$activityId';
   }
 
@@ -212,7 +284,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       // Crear un mapa con todo el estado del formulario
       final cacheData = <String, dynamic>{
-        'visitDetails': FFAppState().visitDetails.map((v) => v.toMap()).toList(),
+        'visitDetails':
+            FFAppState().visitDetails.map((v) => v.toMap()).toList(),
         'statusValuesByName': _statusValuesByName,
         'calculatedValues': _calculatedValues,
         'numbersOperationCalculated': _numbersOperationCalculated,
@@ -233,8 +306,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       FFAppState().formCacheMap[cacheKey] = cacheData;
 
       debugPrint('✅ Caché guardado exitosamente');
-      debugPrint('   - visitDetails: ${FFAppState().visitDetails.length} items');
-      debugPrint('   - statusValuesByName: ${_statusValuesByName.length} valores');
+      debugPrint(
+          '   - visitDetails: ${FFAppState().visitDetails.length} items');
+      debugPrint(
+          '   - statusValuesByName: ${_statusValuesByName.length} valores');
       debugPrint('   - tagReaderData: ${_tagReaderData.length} tags');
       debugPrint('💾 ===== FIN GUARDADO DE CACHÉ =====');
       debugPrint('');
@@ -279,7 +354,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       // Restaurar visitDetails
       if (cacheData['visitDetails'] != null) {
         final visitDetailsList = (cacheData['visitDetails'] as List)
-            .map((item) => VisitsDetailsStruct.fromMap(item as Map<String, dynamic>))
+            .map((item) =>
+                VisitsDetailsStruct.fromMap(item as Map<String, dynamic>))
             .toList();
         FFAppState().visitDetails = visitDetailsList;
         debugPrint('   ✓ Restaurados ${visitDetailsList.length} visitDetails');
@@ -291,7 +367,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         _statusValuesByName.addAll(
           Map<String, double>.from(cacheData['statusValuesByName'] as Map),
         );
-        debugPrint('   ✓ Restaurados ${_statusValuesByName.length} valores numéricos');
+        debugPrint(
+            '   ✓ Restaurados ${_statusValuesByName.length} valores numéricos');
       }
 
       // Restaurar valores calculados
@@ -300,7 +377,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         _calculatedValues.addAll(
           Map<int, double>.from(cacheData['calculatedValues'] as Map),
         );
-        debugPrint('   ✓ Restaurados ${_calculatedValues.length} valores calculados');
+        debugPrint(
+            '   ✓ Restaurados ${_calculatedValues.length} valores calculados');
       }
 
       // Restaurar flags de cálculo
@@ -315,7 +393,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (cacheData['tagReaderData'] != null) {
         _tagReaderData.clear();
         _tagReaderData.addAll(
-          Map<int, List<Map<String, dynamic>>>.from(cacheData['tagReaderData'] as Map),
+          Map<int, List<Map<String, dynamic>>>.from(
+              cacheData['tagReaderData'] as Map),
         );
         debugPrint('   ✓ Restaurados ${_tagReaderData.length} tag readers');
       }
@@ -324,7 +403,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (cacheData['tagTransferData'] != null) {
         _tagTransferData.clear();
         _tagTransferData.addAll(
-          Map<int, Map<int, Map<String, dynamic>>>.from(cacheData['tagTransferData'] as Map),
+          Map<int, Map<int, Map<String, dynamic>>>.from(
+              cacheData['tagTransferData'] as Map),
         );
         debugPrint('   ✓ Restaurados ${_tagTransferData.length} tag transfers');
       }
@@ -341,7 +421,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (cacheData['tagWriterData'] != null) {
         _tagWriterData.clear();
         _tagWriterData.addAll(
-          Map<int, Map<int, Map<String, dynamic>>>.from(cacheData['tagWriterData'] as Map),
+          Map<int, Map<int, Map<String, dynamic>>>.from(
+              cacheData['tagWriterData'] as Map),
         );
         debugPrint('   ✓ Restaurados ${_tagWriterData.length} tag writers');
       }
@@ -352,7 +433,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         _calculatedDistances.addAll(
           Map<int, double>.from(cacheData['calculatedDistances'] as Map),
         );
-        debugPrint('   ✓ Restauradas ${_calculatedDistances.length} distancias');
+        debugPrint(
+            '   ✓ Restauradas ${_calculatedDistances.length} distancias');
       }
 
       // Restaurar flags de distancia
@@ -389,26 +471,35 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('📅 ===== INICIALIZANDO DEFAULTS DE FECHA/HORA =====');
 
     final activitySteps = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_steps''',
-    )?.toList() ?? [];
+          FFAppState().currentActivity,
+          r'''$.activity_steps''',
+        )?.toList() ??
+        [];
 
     int initialized = 0;
 
     // Función recursiva para procesar status
     void processStatus(dynamic status, int parentStepId) {
-      final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+      final typeStatus =
+          getJsonField(status, r'''$.type_status''')?.toString() ?? '';
       final statusId = getJsonField(status, r'''$.id_activity_status''');
-      final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
-      final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString()?.toUpperCase() ?? '';
-      final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+      final statusName =
+          getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+      final defaultStatus = getJsonField(status, r'''$.default_status''')
+              ?.toString()
+              .toUpperCase() ??
+          '';
+      final rememberStatus =
+          getJsonField(status, r'''$.remember_status''') == true;
 
-      debugPrint('   🔎 Procesando: "$statusName" tipo=$typeStatus default="$defaultStatus"');
+      debugPrint(
+          '   🔎 Procesando: "$statusName" tipo=$typeStatus default="$defaultStatus"');
 
       // Verificar si es tipo date o time y tiene comando
       if (typeStatus.toLowerCase() == 'date' && defaultStatus == '=DATENOW') {
         // Verificar si ya existe en visitDetails
-        final existingValue = functions.statusResponseByActivityStatusAlternative(
+        final existingValue =
+            functions.statusResponseByActivityStatusAlternative(
           statusId,
           FFAppState().visitDetails.toList(),
           parentStepId,
@@ -443,9 +534,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         } else {
           debugPrint('📅 DATE ya tiene valor, saltando: $statusName');
         }
-      } else if (typeStatus.toLowerCase() == 'time' && (defaultStatus == '=TIMENOW' || defaultStatus == '=HOURNOW')) {
+      } else if (typeStatus.toLowerCase() == 'time' &&
+          (defaultStatus == '=TIMENOW' || defaultStatus == '=HOURNOW')) {
         // Verificar si ya existe en visitDetails
-        final existingValue = functions.statusResponseByActivityStatusAlternative(
+        final existingValue =
+            functions.statusResponseByActivityStatusAlternative(
           statusId,
           FFAppState().visitDetails.toList(),
           parentStepId,
@@ -483,17 +576,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
 
       // Buscar recursivamente en steps_childs
-      final stepsChilds = getJsonField(status, r'''$.steps_childs''')?.toList() ?? [];
+      final stepsChilds =
+          getJsonField(status, r'''$.steps_childs''')?.toList() ?? [];
       for (var childStep in stepsChilds) {
         final childStepId = getJsonField(childStep, r'''$.id_activity_step''');
-        final childStatusList = getJsonField(childStep, r'''$.activity_status''')?.toList() ?? [];
+        final childStatusList =
+            getJsonField(childStep, r'''$.activity_status''')?.toList() ?? [];
         for (var childStatus in childStatusList) {
           processStatus(childStatus, childStepId);
         }
       }
 
       // Buscar recursivamente en status_childs
-      final statusChilds = getJsonField(status, r'''$.status_childs''')?.toList() ?? [];
+      final statusChilds =
+          getJsonField(status, r'''$.status_childs''')?.toList() ?? [];
       for (var childStatus in statusChilds) {
         processStatus(childStatus, parentStepId);
       }
@@ -501,9 +597,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // 1. Recorrer status raíz (activity_status)
     final activitiesStatus = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_status''',
-    )?.toList() ?? [];
+          FFAppState().currentActivity,
+          r'''$.activity_status''',
+        )?.toList() ??
+        [];
 
     debugPrint('🔍 Buscando en ${activitiesStatus.length} status raíz...');
     for (var status in activitiesStatus) {
@@ -514,7 +611,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('🔍 Buscando en ${activitySteps.length} steps...');
     for (var step in activitySteps) {
       final stepId = getJsonField(step, r'''$.id_activity_step''');
-      final statusList = getJsonField(step, r'''$.activity_status''')?.toList() ?? [];
+      final statusList =
+          getJsonField(step, r'''$.activity_status''')?.toList() ?? [];
       for (var status in statusList) {
         processStatus(status, stepId);
       }
@@ -547,12 +645,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final visitDetails = FFAppState().visitDetails;
 
     // Función recursiva para validar steps y sus hijos
-    Map<String, dynamic>? _checkStep(dynamic step, List<int> parentPath) {
+    Map<String, dynamic>? checkStep(dynamic step, List<int> parentPath) {
       final stepId = getJsonField(step, r'''$.id_activity_step''');
       final stepName = getJsonField(step, r'''$.name_step''').toString();
       final isRequired = getJsonField(step, r'''$.is_required''') == true;
-      final activitiesStatusRaw = getJsonField(step, r'''$.activities_status''');
-      final activitiesStatus = activitiesStatusRaw != null ? (activitiesStatusRaw is List ? activitiesStatusRaw : []) : [];
+      final activitiesStatusRaw =
+          getJsonField(step, r'''$.activities_status''');
+      final activitiesStatus = activitiesStatusRaw != null
+          ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+          : [];
 
       // Si no es requerido, no validar
       if (!isRequired) {
@@ -594,7 +695,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
               for (var childStep in stepsChilds) {
                 final childResult =
-                    _checkStep(childStep, [...parentPath, stepId]);
+                    checkStep(childStep, [...parentPath, stepId]);
                 if (childResult != null) {
                   return childResult; // Retornar el primer error encontrado
                 }
@@ -609,7 +710,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Validar todos los steps de nivel raíz
     for (var step in activitySteps) {
-      final result = _checkStep(step, []);
+      final result = checkStep(step, []);
       if (result != null) {
         return result; // Retornar el primer step faltante
       }
@@ -627,7 +728,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     // Hacer scroll al elemento (pequeño delay para que el árbol se expanda)
-    Future.delayed(Duration(milliseconds: 300), () {
+    Future.delayed(const Duration(milliseconds: 300), () {
       // Aquí podrías agregar lógica de scroll si tienes una GlobalKey para el step
       debugPrint('Árbol expandido hasta stepId: ${path.last}');
     });
@@ -635,7 +736,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   @override
   Widget build(BuildContext context) {
-    context.watch<FFAppState>();
+    // LOTE 1: Usar Selector para escuchar solo cambios en visitDetails
+    // en lugar de context.watch<FFAppState>() que escucha TODOS los cambios
+    // ignore: unused_local_variable
+    final _ = context.select<FFAppState, int>(
+      (state) => state.visitDetails.length,
+    );
+
+    // Invalidar caché de búsquedas si cambió visitDetails
+    _invalidateSearchCacheIfNeeded();
 
     return GestureDetector(
       onTap: () {
@@ -656,214 +765,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  Widget _buildModernHeader() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF00a86b).withOpacity(0.2),
-            Colors.transparent,
-          ],
-        ),
-      ),
-      child: Column(
-        children: [
-          // Fila con botón back y título
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: [
-                InkWell(
-                  onTap: () async {
-                    context.pushNamed(
-                      DoActivitiesPageWidget.routeName,
-                      extra: <String, dynamic>{
-                        kTransitionInfoKey: TransitionInfo(
-                          hasTransition: true,
-                          transitionType: PageTransitionType.fade,
-                          duration: Duration(milliseconds: 500),
-                        ),
-                      },
-                    );
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.2),
-                          Colors.white.withOpacity(0.1),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: Color(0xFF00a86b).withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.chevron_left_rounded,
-                      color: Color(0xFF00ff9f),
-                      size: 24,
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    getJsonField(
-                      FFAppState().currentActivity,
-                      r'''$.name_activity''',
-                    ).toString(),
-                    style: TextStyle(fontFamily: 'Roboto',
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Tabs compactos
-          Container(
-            height: 40,
-            margin: EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withOpacity(0.15),
-                  Colors.white.withOpacity(0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Color(0xFF00a86b).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: TabBar(
-                controller: _tabController,
-                // INVERTIDO: Verde para tab seleccionado
-                indicator: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF00a86b),
-                      Color(0xFF00d980),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicatorPadding: EdgeInsets.all(4),
-                labelColor: Colors.white,
-                unselectedLabelColor: Color(0xFF00ff9f).withOpacity(0.6),
-                labelStyle: TextStyle(fontFamily: 'Roboto',
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-                unselectedLabelStyle: TextStyle(fontFamily: 'Roboto',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-                tabs: [
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.edit_note_rounded, size: 18),
-                        SizedBox(width: 6),
-                        Text('Formulario'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.map_rounded, size: 18),
-                        SizedBox(width: 6),
-                        Text('Mapa'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
-
   Widget _buildFormContent() {
-    final idActivity = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.id_activity''',
-    );
-    final activityName = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.name_activity''',
-    );
-
-    final activityStepsRawData = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_steps''',
-    );
-
-    final activityStatusRawData = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_status''',
-    );
-
-    // Si no hay datos, retornar widget vacío
-    if (activityStepsRawData == null || activityStatusRawData == null) {
+    // LOTE 1: Usar datos cacheados en lugar de parsear y ordenar en cada rebuild
+    if (!_isDataCacheInitialized) {
       return const SizedBox.shrink();
     }
 
-    final activityStepsRaw = activityStepsRawData.toList();
-    final activityStatusRaw = activityStatusRawData.toList();
-
-    // Ordenar steps por order_step
-    final activitySteps = List.from(activityStepsRaw);
-    activitySteps.sort((a, b) {
-      final orderA = getJsonField(a, r'''$.order_step''') ?? 999;
-      final orderB = getJsonField(b, r'''$.order_step''') ?? 999;
-      return orderA.compareTo(orderB);
-    });
-
-    // Ordenar status por order_status
-    final activityStatus = List.from(activityStatusRaw);
-    activityStatus.sort((a, b) {
-      final orderA = getJsonField(a, r'''$.order_status''') ?? 999;
-      final orderB = getJsonField(b, r'''$.order_status''') ?? 999;
-      return orderA.compareTo(orderB);
-    });
-
-    // Log de renderizado del formulario completo (solo la primera vez)
-    if (!_hasLoggedInitialRender) {
-      _hasLoggedInitialRender = true;
-      // Logs de renderizado comentados para evitar spam en consola
-      // debugPrint('');
-      // debugPrint('═══════════════════════════════════════════════════════');
-      // debugPrint('🚀 INICIANDO RENDERIZADO DE FORMULARIO');
-      // debugPrint('   Actividad: $activityName (ID: $idActivity)');
-      // debugPrint('   Total Steps: ${activitySteps.length}');
-      // debugPrint('   Total Status Raíz: ${activityStatus.length}');
-      // debugPrint('═══════════════════════════════════════════════════════');
-      // debugPrint('');
-    }
+    // Usar los datos ya ordenados del caché
+    final activitySteps = _cachedActivitySteps;
+    final activityStatus = _cachedActivityStatus;
 
     if (activitySteps.isEmpty && activityStatus.isEmpty) {
       return Center(
@@ -873,14 +783,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             Icon(
               Icons.inbox_rounded,
               size: 64,
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'No hay pasos configurados',
-              style: TextStyle(fontFamily: 'Roboto',
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 16,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -889,9 +800,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     return ListView.separated(
-      padding: EdgeInsets.fromLTRB(12, 0, 12, 12),
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: activitySteps.length + activityStatus.length,
-      separatorBuilder: (_, __) => SizedBox(height: 12),
+      separatorBuilder: (_, __) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         if (index < activitySteps.length) {
           return _buildStepCard(activitySteps[index], level: 0);
@@ -914,33 +825,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final typeStep = getJsonField(step, r'''$.type_step''').toString();
     final isRequired = getJsonField(step, r'''$.is_required''') == true;
     final activitiesStatusRaw = getJsonField(step, r'''$.activities_status''');
-    final activitiesStatus = activitiesStatusRaw != null ? (activitiesStatusRaw is List ? activitiesStatusRaw : []) : [];
+    final activitiesStatus = activitiesStatusRaw != null
+        ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+        : [];
 
-    // Log de renderizado (comentado para evitar spam en consola)
-    // debugPrint('📋 RENDERIZANDO STEP: nombre="$stepName" tipo="$typeStep" ID=$stepId nivel=$level requerido=$isRequired');
+    // Log de renderizado
+    debugPrint('📋 RENDERIZANDO STEP: nombre="$stepName" tipo="$typeStep" ID=$stepId nivel=$level requerido=$isRequired activitiesStatus=${activitiesStatus.length}');
 
     // Obtener estado de expansión (funciona para todos los tipos de steps)
     final isExpanded = _stepExpansionState[stepId] ?? false;
-    final hasValue = functions.searchInVisitsDetails(
-      FFAppState().visitDetails.toList(),
-      stepId,
-      'STEP',
-    );
+    // LOTE 1: Usar búsqueda cacheada en lugar de O(n) repetido
+    final hasValue = _cachedSearchInVisitDetails(stepId, 'STEP');
 
     // Calcular cuántos status son requeridos o cuántos steps hijos existen
     int totalRequired = 0;
     int totalCompleted = 0;
 
     for (var status in activitiesStatus) {
-      final statusId = getJsonField(status, r'''$.id_activity_status''');
-      final statusCompleted = functions.searchInVisitsDetails(
-        FFAppState().visitDetails.toList(),
-        statusId,
-        'STATUS',
-      );
-
-      final stepsChildsRaw = getJsonField(status, r'''$.activities_steps_childs''');
-      final stepsChilds = stepsChildsRaw != null ? (stepsChildsRaw is List ? stepsChildsRaw : []) : [];
+      final stepsChildsRaw =
+          getJsonField(status, r'''$.activities_steps_childs''');
+      final stepsChilds = stepsChildsRaw != null
+          ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+          : [];
 
       // Si este status tiene steps hijos, contar los requeridos
       for (var childStep in stepsChilds) {
@@ -950,20 +856,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           totalRequired++;
           final childStepId =
               getJsonField(childStep, r'''$.id_activity_step''');
-          final childCompleted = functions.searchInVisitsDetails(
-            FFAppState().visitDetails.toList(),
-            childStepId,
-            'STEP',
-          );
+          // LOTE 1: Usar búsqueda cacheada
+          final childCompleted =
+              _cachedSearchInVisitDetails(childStepId, 'STEP');
           if (childCompleted) {
             totalCompleted++;
           }
         }
       }
     }
-
-    // Calcular indentación basada en el nivel
-    final leftPadding = 12.0 + (level * 20.0);
 
     return Column(
       children: [
@@ -980,7 +881,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           },
           child: Container(
             margin: EdgeInsets.only(left: level * 8.0),
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -988,26 +889,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // INVERTIDO: Verde cuando completado, Naranja cuando NO completado
                 colors: hasValue
                     ? [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        const Color(0xFF00a86b),
+                        const Color(0xFF00d980),
                       ]
                     : [
-                        Color(0xFFF1F8F4),
-                        Color(0xFFFAFDFB),
+                        const Color(0xFFF1F8F4),
+                        const Color(0xFFFAFDFB),
                       ],
               ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: hasValue ? Color(0xFF00a86b) : Color(0xFFE8F5E9),
+                color: hasValue
+                    ? const Color(0xFF00a86b)
+                    : const Color(0xFFE8F5E9),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
                   blurRadius: 12,
                   color: hasValue
-                      ? Color(0xFF00a86b).withOpacity(0.4)
-                      : Color(0xFFE8F5E9).withOpacity(0.4),
-                  offset: Offset(0, 4),
+                      ? const Color(0xFF00a86b).withValues(alpha: 0.4)
+                      : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -1022,9 +925,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       Container(
                         width: 3,
                         height: 24,
-                        margin: EdgeInsets.only(right: 8),
+                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
+                          gradient: const LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
@@ -1041,17 +944,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         isExpanded
                             ? Icons.expand_more_rounded
                             : Icons.chevron_right_rounded,
-                        color: hasValue ? Colors.white : Color(0xFF00a86b),
+                        color:
+                            hasValue ? Colors.white : const Color(0xFF00a86b),
                         size: 36,
                         weight: 700,
                       ),
-                    if (activitiesStatus.isEmpty)
-                      Icon(
-                        Icons.circle,
-                        size: 10,
-                        color: hasValue ? Colors.white : Color(0xFF00a86b),
-                      ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     // Nombre del step
                     Expanded(
                       child: Column(
@@ -1059,11 +957,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         children: [
                           Text(
                             stepName,
-                            style: TextStyle(fontFamily: 'Roboto',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color:
-                                  hasValue ? Colors.white : Color(0xFF00a86b),
+                              color: hasValue
+                                  ? Colors.white
+                                  : const Color(0xFF00a86b),
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -1075,31 +975,32 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     // Badge de progreso (si hay steps hijos requeridos)
                     if (totalRequired > 0)
                       Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        margin: EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
                           // INVERTIDO: Verde cuando completado, Warning cuando incompleto
                           color: totalCompleted == totalRequired
-                              ? Color(0xFF00a86b).withOpacity(0.3)
+                              ? const Color(0xFF00a86b).withValues(alpha: 0.3)
                               : FlutterFlowTheme.of(context)
                                   .warning
-                                  .withOpacity(0.2),
+                                  .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: totalCompleted == totalRequired
-                                ? Color(0xFF00a86b)
+                                ? const Color(0xFF00a86b)
                                 : FlutterFlowTheme.of(context).warning,
                             width: 1,
                           ),
                         ),
                         child: Text(
                           '$totalCompleted/$totalRequired',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: totalCompleted == totalRequired
-                                ? Color(0xFF00a86b)
+                                ? const Color(0xFF00a86b)
                                 : FlutterFlowTheme.of(context).warning,
                             letterSpacing: 0.5,
                           ),
@@ -1108,13 +1009,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     // Badge de requerido (solo mostrar cuando NO tiene valor)
                     if (isRequired && !hasValue)
                       Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        margin: EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
                           color: FlutterFlowTheme.of(context)
                               .error
-                              .withOpacity(0.2),
+                              .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: FlutterFlowTheme.of(context).error,
@@ -1123,7 +1024,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         child: Text(
                           '*',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: FlutterFlowTheme.of(context).error,
@@ -1138,11 +1040,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         activitiesStatus.isNotEmpty &&
                         isExpanded)
                       Padding(
-                        padding: EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.only(right: 8),
                         child: _buildCompactSearchButton(stepId),
                       ),
-                    // Check icon moderno
-                    if (hasValue) _buildModernCheckIcon(),
                   ],
                 ),
               ),
@@ -1157,19 +1057,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         // Lista de opciones (cuando está expandido)
         if (isExpanded && activitiesStatus.isNotEmpty)
-          AnimatedContainer(
-            duration: Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            margin: EdgeInsets.only(left: level * 8.0 + 8, top: 8),
-            child: Column(
-              children: [
-                // Lista filtrada de status
-                ...(_filterStatusList(stepId, activitiesStatus))
-                    .map<Widget>((status) {
-                  return _buildStatusOption(step, status, level: level + 1);
-                }).toList(),
-              ],
-            ),
+          Builder(
+            builder: (context) {
+              debugPrint('   ✅ MOSTRANDO OPCIONES: paso la condición isExpanded=$isExpanded && activitiesStatus.isNotEmpty=${activitiesStatus.isNotEmpty}');
+              final filteredList = _filterStatusList(stepId, activitiesStatus);
+              debugPrint('   📋 Lista filtrada: ${filteredList.length} opciones de ${activitiesStatus.length}');
+              return AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                curve: Curves.easeInOut,
+                margin: EdgeInsets.only(left: level * 8.0 + 8, top: 8),
+                child: Column(
+                  children: [
+                    // Lista filtrada de status
+                    ...(_filterStatusList(stepId, activitiesStatus))
+                        .map<Widget>((status) {
+                      return _buildStatusOption(step, status, level: level + 1);
+                    }),
+                  ],
+                ),
+              );
+            },
           ),
       ],
     );
@@ -1185,19 +1092,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // debugPrint('  🔹 RENDERIZANDO STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level');
     final statusColor =
         getJsonField(status, r'''$.color''')?.toString() ?? '#00ff9f';
-    final stepsChildsRaw = getJsonField(status, r'''$.activities_steps_childs''');
-    final stepsChilds = stepsChildsRaw != null ? (stepsChildsRaw is List ? stepsChildsRaw : []) : [];
-    final statusChildsRaw = getJsonField(status, r'''$.activities_status_childs''');
-    final statusChilds = statusChildsRaw != null ? (statusChildsRaw is List ? statusChildsRaw : []) : [];
+    final stepsChildsRaw =
+        getJsonField(status, r'''$.activities_steps_childs''');
+    final stepsChilds = stepsChildsRaw != null
+        ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+        : [];
+    final statusChildsRaw =
+        getJsonField(status, r'''$.activities_status_childs''');
+    final statusChilds = statusChildsRaw != null
+        ? (statusChildsRaw is List ? statusChildsRaw : [])
+        : [];
     final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
 
-    final isSelected = functions.searchInVisitsDetails(
-      FFAppState().visitDetails.toList(),
-      statusId,
-      'STATUS',
-    );
+    // LOTE 1: Usar búsqueda cacheada
+    final isSelected = _cachedSearchInVisitDetails(statusId, 'STATUS');
 
-    final expansionKey = '${parentStepId}_${statusId}';
+    final expansionKey = '${parentStepId}_$statusId';
     final isExpanded = _statusExpansionState[expansionKey] ?? false;
 
     // Verificar si tiene algún tipo de hijos
@@ -1208,11 +1118,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isTagWriterType = typeStatus.toLowerCase() == 'tag-writer';
     final isTagReaderType = typeStatus.toLowerCase() == 'tag-reader';
     final isTagTransferType = typeStatus.toLowerCase() == 'tag-transfer';
-    final isNumbersOperationType = typeStatus.toLowerCase() == 'numbers-operation';
-    final isHeadquarterWeightType = typeStatus.toLowerCase() == 'headquarter-weight';
+    final isNumbersOperationType =
+        typeStatus.toLowerCase() == 'numbers-operation';
+    final isHeadquarterWeightType =
+        typeStatus.toLowerCase() == 'headquarter-weight';
     final isLabelInfoType = typeStatus.toLowerCase() == 'label-info';
-    final isDistanceExtractorType = typeStatus.toLowerCase() == 'distance-extractor';
-    final isDynamicPrintingType = typeStatus.toLowerCase() == 'dynamic-printing';
+    final isDistanceExtractorType =
+        typeStatus.toLowerCase() == 'distance-extractor';
+    final isDynamicPrintingType =
+        typeStatus.toLowerCase() == 'dynamic-printing';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -1220,7 +1134,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         final hex = hexColor.replaceAll('#', '');
         return Color(int.parse('FF$hex', radix: 16));
       } catch (e) {
-        return Color(0xFF00ff9f); // Color por defecto
+        return const Color(0xFF00ff9f); // Color por defecto
       }
     }
 
@@ -1253,7 +1167,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -1283,7 +1197,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -1296,6 +1210,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               final nfcContent = FFAppState().nfcRead;
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Esperar por una geolocalización válida antes de mostrar el resumen
+                if (!mounted) return;
                 final geolocation = await _waitForValidGeolocation(context);
 
                 if (geolocation != null) {
@@ -1304,7 +1219,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   setState(() {
                     _tagReaderData[statusId] = parsedData;
                     _tagReaderGeolocations[statusId] = geolocation;
-                    _lastTagReaderLocation = geolocation; // Guardar para distance-extractor
+                    _lastTagReaderLocation =
+                        geolocation; // Guardar para distance-extractor
                   });
 
                   // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
@@ -1318,12 +1234,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                   // Verificar si los lotes tienen peso promedio configurado
                   if (tagHeadquarterIds.isNotEmpty) {
-                    debugPrint('🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                    debugPrint(
+                        '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
                     await _loadHeadquarterWeights(tagHeadquarterIds);
 
                     // Si hay lotes sin peso, mostrar advertencia
                     if (_headquartersWithoutWeight.isNotEmpty) {
-                      debugPrint('⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                      debugPrint(
+                          '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
                       if (mounted) {
                         _showWeightWarningDialog();
                       }
@@ -1352,7 +1270,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -1363,20 +1281,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
               // Procesar el contenido del tag de origen desde FFAppState
               final nfcContent = FFAppState().nfcRead;
-              debugPrint('📄 TAG-TRANSFER: Contenido del tag de origen leído: ${nfcContent.length} caracteres');
+              debugPrint(
+                  '📄 TAG-TRANSFER: Contenido del tag de origen leído: ${nfcContent.length} caracteres');
 
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Parsear el contenido del tag y agrupar por headquarterId
                 final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
-                debugPrint('📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
+                debugPrint(
+                    '📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
 
                 // Guardar los datos del tag de origen
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                 });
 
-                debugPrint('✅ TAG-TRANSFER: Tag de origen guardado correctamente');
-                debugPrint('💡 TAG-TRANSFER: Ahora el usuario puede presionar "Transferir ahora"');
+                debugPrint(
+                    '✅ TAG-TRANSFER: Tag de origen guardado correctamente');
+                debugPrint(
+                    '💡 TAG-TRANSFER: Ahora el usuario puede presionar "Transferir ahora"');
 
                 // Seleccionar el status
                 await _onStatusSelected(parentStep, status);
@@ -1384,7 +1306,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 debugPrint('❌ TAG-TRANSFER: Error al leer tag de origen');
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Text('❌ Error al leer el tag de origen'),
                       backgroundColor: Colors.red,
                       duration: Duration(seconds: 2),
@@ -1399,7 +1321,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo numbers-operation, calcular el valor automáticamente
             if (isNumbersOperationType) {
-              final formula = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+              final formula =
+                  getJsonField(status, r'''$.default_status''')?.toString() ??
+                      '';
               if (formula.isNotEmpty) {
                 final result = _evaluateFormula(formula);
                 if (result != null) {
@@ -1488,13 +1412,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             }
 
             // Si es tipo date, abrir el componente selector de fechas
-            debugPrint('📅 Intentando abrir calendario para: $statusName');
-            debugPrint('📅 typeStatus actual: "$typeStatus"');
-            debugPrint('📅 typeStatus lowercase: "${typeStatus.toLowerCase()}"');
-            debugPrint('📅 Comparación con "date": ${typeStatus.toLowerCase() == 'date'}');
-
             if (typeStatus.toLowerCase() == 'date') {
-              debugPrint('✅ ✅ ✅ Condición date cumplida, abriendo dialog en pantalla completa...');
+              debugPrint(
+                  '✅ ✅ ✅ Condición date cumplida, abriendo dialog en pantalla completa...');
               try {
                 await showDialog(
                   context: context,
@@ -1520,7 +1440,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo time, abrir el componente selector de horas
             if (typeStatus.toLowerCase() == 'time') {
-              debugPrint('⏰ Condición time cumplida, abriendo dialog en pantalla completa...');
+              debugPrint(
+                  '⏰ Condición time cumplida, abriendo dialog en pantalla completa...');
               await showDialog(
                 context: context,
                 barrierDismissible: false,
@@ -1581,7 +1502,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     final siblingStatusId = getJsonField(
                         siblingStatus, r'''$.id_activity_status''');
                     final siblingExpansionKey =
-                        '${parentStepId}_${siblingStatusId}';
+                        '${parentStepId}_$siblingStatusId';
                     _statusExpansionState[siblingExpansionKey] = false;
                   }
                 }
@@ -1613,18 +1534,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     getJsonField(parentStep, r'''$.activities_status''')
                         .toList();
                 for (var siblingStatus in parentStepStatuses) {
-                  final siblingStatusId = getJsonField(
-                      siblingStatus, r'''$.id_activity_status''');
+                  final siblingStatusId =
+                      getJsonField(siblingStatus, r'''$.id_activity_status''');
                   final siblingExpansionKey =
-                      '${parentStepId}_${siblingStatusId}';
+                      '${parentStepId}_$siblingStatusId';
                   _statusExpansionState[siblingExpansionKey] = false;
                 }
               }
             });
           },
           child: Container(
-            margin: EdgeInsets.only(bottom: 8),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -1636,12 +1557,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         !isTagReaderType &&
                         !isDistanceExtractorType)
                     ? [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        const Color(0xFF00a86b),
+                        const Color(0xFF00d980),
                       ]
                     : [
-                        Color(0xFFF1F8F4),
-                        Color(0xFFFAFDFB),
+                        const Color(0xFFF1F8F4),
+                        const Color(0xFFFAFDFB),
                       ],
               ),
               borderRadius: BorderRadius.circular(12),
@@ -1652,8 +1573,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         !isTagWriterType &&
                         !isTagReaderType &&
                         !isDistanceExtractorType)
-                    ? Color(0xFF00a86b)
-                    : Color(0xFFE8F5E9),
+                    ? const Color(0xFF00a86b)
+                    : const Color(0xFFE8F5E9),
                 width: 2,
               ),
             ),
@@ -1674,7 +1595,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                   !isTagWriterType &&
                                   !isTagReaderType)
                               ? Colors.white
-                              : Color(0xFF00a86b),
+                              : const Color(0xFF00a86b),
                           width: 3,
                         ),
                         color: isSelected ? Colors.white : Colors.transparent,
@@ -1684,7 +1605,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               child: Container(
                                 width: 12,
                                 height: 12,
-                                decoration: BoxDecoration(
+                                decoration: const BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: Color(0xFF00a86b),
                                 ),
@@ -1692,18 +1613,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             )
                           : null,
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     // Icono específico para date y time, indicador de color para otros tipos
                     if (!isTagReaderType && !isTagWriterType)
                       Container(
                         width: 32,
                         height: 40,
                         decoration: BoxDecoration(
-                          color: typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time'
-                              ? color.withOpacity(0.2)
+                          color: typeStatus.toLowerCase() == 'date' ||
+                                  typeStatus.toLowerCase() == 'time'
+                              ? color.withValues(alpha: 0.2)
                               : color,
                           borderRadius: BorderRadius.circular(6),
-                          border: typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time'
+                          border: typeStatus.toLowerCase() == 'date' ||
+                                  typeStatus.toLowerCase() == 'time'
                               ? Border.all(
                                   color: color,
                                   width: 2,
@@ -1711,9 +1634,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               : null,
                           boxShadow: [
                             BoxShadow(
-                              color: color.withOpacity(0.6),
+                              color: color.withValues(alpha: 0.6),
                               blurRadius: 12,
-                              offset: Offset(0, 3),
+                              offset: const Offset(0, 3),
                             ),
                           ],
                         ),
@@ -1732,7 +1655,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 : null,
                       ),
                     if (!isTagReaderType && !isTagWriterType)
-                      SizedBox(width: 14),
+                      const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1746,18 +1669,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                     Flexible(
                                       child: Text(
                                         statusName,
-                                        style: TextStyle(fontFamily: 'Roboto',
+                                        style: TextStyle(
+                                          fontFamily: 'Roboto',
                                           fontSize: 19,
                                           fontWeight: FontWeight.w800,
-                                          color: (isDistanceExtractorType && (_distanceExtractorCalculated[statusId] ?? false))
-                                              ? Color(0xFF00695C) // Verde oscuro para distance-extractor calculado
+                                          color: (isDistanceExtractorType &&
+                                                  (_distanceExtractorCalculated[
+                                                          statusId] ??
+                                                      false))
+                                              ? const Color(
+                                                  0xFF00695C) // Verde oscuro para distance-extractor calculado
                                               : (isSelected &&
-                                                  !isNumberType &&
-                                                  !isTagWriterType &&
-                                                  !isTagReaderType &&
-                                                  !isDistanceExtractorType)
-                                              ? Colors.white
-                                              : Color(0xFF00a86b),
+                                                      !isNumberType &&
+                                                      !isTagWriterType &&
+                                                      !isTagReaderType &&
+                                                      !isDistanceExtractorType)
+                                                  ? Colors.white
+                                                  : const Color(0xFF00a86b),
                                           letterSpacing: 0.3,
                                         ),
                                         overflow: TextOverflow.ellipsis,
@@ -1767,12 +1695,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                     // Mostrar fecha seleccionada para tipo date (con IgnorePointer para que no bloquee taps)
                                     if (typeStatus.toLowerCase() == 'date')
                                       IgnorePointer(
-                                        child: _buildDateValueDisplay(statusId, parentStepId),
+                                        child: _buildDateValueDisplay(
+                                            statusId, parentStepId),
                                       ),
                                     // Mostrar hora seleccionada para tipo time (con IgnorePointer para que no bloquee taps)
                                     if (typeStatus.toLowerCase() == 'time')
                                       IgnorePointer(
-                                        child: _buildTimeValueDisplay(statusId, parentStepId),
+                                        child: _buildTimeValueDisplay(
+                                            statusId, parentStepId),
                                       ),
                                   ],
                                 ),
@@ -1780,7 +1710,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               // Control numérico compacto inline (- [número] +) al lado del nombre
                               if (typeStatus.toLowerCase() == 'number')
                                 Padding(
-                                  padding: EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.only(left: 8),
                                   child:
                                       _buildCompactInlineNumberControlForStatus(
                                     parentStep: parentStep,
@@ -1793,28 +1723,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           if (isTagReaderType &&
                               _tagReaderData.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildTagReaderSummary(statusId: statusId),
                             ),
                           // Resumen del tag-writer (solo para tipo tag-writer) - DEBAJO
                           if (isTagWriterType &&
                               _tagWriterData.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildTagWriterSummary(statusId: statusId),
                             ),
                           // Resumen del tag-transfer (solo para tipo tag-transfer) - DEBAJO
                           if (isTagTransferType &&
                               _tagTransferData.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: _buildTagTransferSummary(statusId: statusId),
+                              padding: const EdgeInsets.only(top: 8),
+                              child:
+                                  _buildTagTransferSummary(statusId: statusId),
                             ),
                           // Valor calculado de numbers-operation - DEBAJO
                           if (isNumbersOperationType &&
                               _calculatedValues.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildNumbersOperationDisplay(
                                 statusId: statusId,
                                 status: status,
@@ -1823,7 +1754,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           // Display para label-info - DEBAJO
                           if (isLabelInfoType)
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildLabelInfoDisplay(
                                 statusName: statusName,
                                 statusId: statusId,
@@ -1834,7 +1765,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           if (isDistanceExtractorType &&
                               _calculatedDistances.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildDistanceExtractorDisplay(
                                 statusId: statusId,
                               ),
@@ -1843,13 +1774,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           if (isHeadquarterWeightType &&
                               _headquarterWeights.isNotEmpty)
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildHeadquarterWeightsDisplay(),
                             ),
                           // Cajones numéricos del 1 al 5 (solo para tipo number) - DEBAJO
                           if (typeStatus.toLowerCase() == 'number')
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildNumberBoxesForStatus(
                                 parentStep: parentStep,
                                 status: status,
@@ -1865,7 +1796,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             : Icons.chevron_right_rounded,
                         size: 32,
                         weight: 700,
-                        color: Color(0xFF00a86b),
+                        color: const Color(0xFF00a86b),
                       ),
                   ],
                 ),
@@ -1877,27 +1808,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // Hijos expandidos (status o steps childs)
         if (isExpanded && hasChildren)
           AnimatedContainer(
-            duration: Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            margin: EdgeInsets.only(left: 12, bottom: 8),
+            margin: const EdgeInsets.only(left: 12, bottom: 8),
             child: Column(
               children: [
                 // ✅ PRIMERO: Mostrar status childs (opciones inmediatas del mismo nivel)
                 ...statusChilds.map<Widget>((childStatus) {
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _buildStatusOption(status, childStatus,
                         level: level + 1),
                   );
-                }).toList(),
+                }),
 
                 // ✅ SEGUNDO: Mostrar steps childs (pasos adicionales más profundos)
                 ...stepsChilds.map<Widget>((childStep) {
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _buildStepCard(childStep, level: level + 1),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -1913,24 +1844,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
     final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-    final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-    final stepsChildsRaw = getJsonField(status, r'''$.activities_steps_childs''');
-    final stepsChilds = stepsChildsRaw != null ? (stepsChildsRaw is List ? stepsChildsRaw : []) : [];
-    final statusChildsRaw = getJsonField(status, r'''$.activities_status_childs''');
-    final statusChilds = statusChildsRaw != null ? (statusChildsRaw is List ? statusChildsRaw : []) : [];
+    final defaultStatus =
+        getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+    final stepsChildsRaw =
+        getJsonField(status, r'''$.activities_steps_childs''');
+    final stepsChilds = stepsChildsRaw != null
+        ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+        : [];
+    final statusChildsRaw =
+        getJsonField(status, r'''$.activities_status_childs''');
+    final statusChilds = statusChildsRaw != null
+        ? (statusChildsRaw is List ? statusChildsRaw : [])
+        : [];
 
     // Log de renderizado (solo la primera vez para cada status)
     if (!_loggedStatusIds.contains(statusId)) {
       _loggedStatusIds.add(statusId);
-      debugPrint('🎯 RENDERIZANDO ROOT STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level default_status="$defaultStatus"');
+      debugPrint(
+          '🎯 RENDERIZANDO ROOT STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level default_status="$defaultStatus"');
     }
 
     final isExpanded = _rootStatusExpansionState[statusId] ?? false;
-    final hasValue = functions.searchInVisitsDetails(
-      FFAppState().visitDetails.toList(),
-      statusId,
-      'STATUS',
-    );
+    // LOTE 1: Usar búsqueda cacheada
+    final hasValue = _cachedSearchInVisitDetails(statusId, 'STATUS');
 
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
 
@@ -1939,11 +1875,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isTagWriterType = typeStatus.toLowerCase() == 'tag-writer';
     final isTagReaderType = typeStatus.toLowerCase() == 'tag-reader';
     final isTagTransferType = typeStatus.toLowerCase() == 'tag-transfer';
-    final isNumbersOperationType = typeStatus.toLowerCase() == 'numbers-operation';
-    final isHeadquarterWeightType = typeStatus.toLowerCase() == 'headquarter-weight';
+    final isNumbersOperationType =
+        typeStatus.toLowerCase() == 'numbers-operation';
+    final isHeadquarterWeightType =
+        typeStatus.toLowerCase() == 'headquarter-weight';
     final isLabelInfoType = typeStatus.toLowerCase() == 'label-info';
-    final isDistanceExtractorType = typeStatus.toLowerCase() == 'distance-extractor';
-    final isDynamicPrintingType = typeStatus.toLowerCase() == 'dynamic-printing';
+    final isDistanceExtractorType =
+        typeStatus.toLowerCase() == 'distance-extractor';
+    final isDynamicPrintingType =
+        typeStatus.toLowerCase() == 'dynamic-printing';
 
     // Calcular progreso de steps hijos requeridos
     int totalRequired = 0;
@@ -1955,11 +1895,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (childRequired) {
         totalRequired++;
         final childStepId = getJsonField(childStep, r'''$.id_activity_step''');
-        final childCompleted = functions.searchInVisitsDetails(
-          FFAppState().visitDetails.toList(),
-          childStepId,
-          'STEP',
-        );
+        // LOTE 1: Usar búsqueda cacheada
+        final childCompleted = _cachedSearchInVisitDetails(childStepId, 'STEP');
         if (childCompleted) {
           totalCompleted++;
         }
@@ -1982,7 +1919,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -2012,7 +1949,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -2025,6 +1962,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               final nfcContent = FFAppState().nfcRead;
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Esperar por una geolocalización válida antes de mostrar el resumen
+                if (!mounted) return;
                 final geolocation = await _waitForValidGeolocation(context);
 
                 if (geolocation != null) {
@@ -2033,7 +1971,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   setState(() {
                     _tagReaderData[statusId] = parsedData;
                     _tagReaderGeolocations[statusId] = geolocation;
-                    _lastTagReaderLocation = geolocation; // Guardar para distance-extractor
+                    _lastTagReaderLocation =
+                        geolocation; // Guardar para distance-extractor
                   });
 
                   // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
@@ -2047,12 +1986,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                   // Verificar si los lotes tienen peso promedio configurado
                   if (tagHeadquarterIds.isNotEmpty) {
-                    debugPrint('🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                    debugPrint(
+                        '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
                     await _loadHeadquarterWeights(tagHeadquarterIds);
 
                     // Si hay lotes sin peso, mostrar advertencia
                     if (_headquartersWithoutWeight.isNotEmpty) {
-                      debugPrint('⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                      debugPrint(
+                          '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
                       if (mounted) {
                         _showWeightWarningDialog();
                       }
@@ -2068,11 +2009,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, abrir el componente de transferencia NFC
             if (isTagTransferType) {
-              final result = await showDialog<bool>(
+              await showDialog<bool>(
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -2083,15 +2024,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
               // readNFC cierra el diálogo automáticamente después de leer
               // Procesar el contenido del tag desde FFAppState
-              debugPrint('✅ TAG-TRANSFER: Diálogo cerrado, procesando contenido');
+              debugPrint(
+                  '✅ TAG-TRANSFER: Diálogo cerrado, procesando contenido');
               final nfcContent = FFAppState().nfcRead;
               debugPrint(
                   '📄 TAG-TRANSFER: Contenido desde FFAppState: $nfcContent');
 
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Parsear el contenido del tag y agrupar por headquarterId
-                final parsedData =
-                    _parseNfcTagContentByHeadquarter(nfcContent);
+                final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
                 debugPrint(
                     '📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
                 setState(() {
@@ -2108,7 +2049,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo dynamic-printing, el botón maneja su propia lógica
             if (isDynamicPrintingType) {
-              debugPrint('🖨️ DYNAMIC-PRINTING: Tipo detectado, ignorando tap del contenedor');
+              debugPrint(
+                  '🖨️ DYNAMIC-PRINTING: Tipo detectado, ignorando tap del contenedor');
               return;
             }
 
@@ -2134,7 +2076,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           },
           child: Container(
             margin: EdgeInsets.only(left: level * 8.0),
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -2142,20 +2084,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // INVERTIDO: Verde oscuro si tiene valor (y no es number ni tag-writer), Naranja si NO tiene valor
                 colors: (hasValue && !isNumberType && !isTagWriterType)
                     ? [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        const Color(0xFF00a86b),
+                        const Color(0xFF00d980),
                       ]
                     : [
-                        Color(0xFFF1F8F4),
-                        Color(0xFFFAFDFB),
+                        const Color(0xFFF1F8F4),
+                        const Color(0xFFFAFDFB),
                       ],
               ),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 // INVERTIDO: Verde oscuro si tiene valor (y no es number ni tag-writer), Naranja si NO tiene valor
                 color: (hasValue && !isNumberType && !isTagWriterType)
-                    ? Color(0xFF00a86b)
-                    : Color(0xFFE8F5E9),
+                    ? const Color(0xFF00a86b)
+                    : const Color(0xFFE8F5E9),
                 width: 2,
               ),
               boxShadow: [
@@ -2166,9 +2108,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           !isNumberType &&
                           !isTagWriterType &&
                           !isTagReaderType)
-                      ? Color(0xFF00a86b).withOpacity(0.4)
-                      : Color(0xFFE8F5E9).withOpacity(0.4),
-                  offset: Offset(0, 4),
+                      ? const Color(0xFF00a86b).withValues(alpha: 0.4)
+                      : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
@@ -2186,7 +2128,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             : Icons.chevron_right_rounded,
                         color: (hasValue && !isNumberType && !isTagWriterType)
                             ? Colors.white
-                            : Color(0xFF00a86b),
+                            : const Color(0xFF00a86b),
                         size: 36,
                         weight: 700,
                       ),
@@ -2205,10 +2147,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                         : Icons.check_circle_outline_rounded,
                         color: (hasValue && !isNumberType && !isTagWriterType)
                             ? Colors.white
-                            : Color(0xFF00a86b),
+                            : const Color(0xFF00a86b),
                         size: 28,
                       ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     // Nombre del status
                     Expanded(
                       child: Column(
@@ -2225,17 +2167,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                         statusName,
                                         maxLines: 2,
                                         overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(fontFamily: 'Roboto',
+                                        style: TextStyle(
+                                          fontFamily: 'Roboto',
                                           fontSize: 19,
                                           fontWeight: FontWeight.w800,
-                                          color: (isDistanceExtractorType && (_distanceExtractorCalculated[statusId] ?? false))
-                                              ? Color(0xFF00695C) // Verde oscuro para distance-extractor calculado
+                                          color: (isDistanceExtractorType &&
+                                                  (_distanceExtractorCalculated[
+                                                          statusId] ??
+                                                      false))
+                                              ? const Color(
+                                                  0xFF00695C) // Verde oscuro para distance-extractor calculado
                                               : (hasValue &&
-                                                  !isNumberType &&
-                                                  !isTagWriterType &&
-                                                  !isDistanceExtractorType)
-                                              ? Colors.white
-                                              : Color(0xFF00a86b),
+                                                      !isNumberType &&
+                                                      !isTagWriterType &&
+                                                      !isDistanceExtractorType)
+                                                  ? Colors.white
+                                                  : const Color(0xFF00a86b),
                                           letterSpacing: 0.3,
                                         ),
                                       ),
@@ -2245,29 +2192,66 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               ),
                               // Mostrar valor de hora (inline)
                               if (typeStatus.toLowerCase() == 'time')
-                                _buildTimeValueDisplay(statusId, 0, hasValue: hasValue),
+                                _buildTimeValueDisplay(statusId, 0,
+                                    hasValue: hasValue),
                               // Control numérico compacto inline (- [número] +) al lado del nombre
                               if (isNumberType)
                                 Padding(
-                                  padding: EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.only(left: 8),
                                   child: _buildCompactInlineNumberControl(
                                       status: status),
+                                ),
+                              // Botón de limpieza inline para tag-writer (antes del botón de lectura)
+                              if (isTagWriterType &&
+                                  _tagWriterData.containsKey(statusId))
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: _buildTagWriterCleanupButton(
+                                    statusId: statusId,
+                                  ),
                                 ),
                               // Botón inline para tag-writer (NFC)
                               if (isTagWriterType)
                                 Padding(
-                                  padding: EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.only(left: 8),
                                   child: _buildTagWriterButton(
                                     context: context,
                                     statusName: statusName,
                                     statusId: statusId,
                                   ),
                                 ),
+                              // Botón de limpieza inline para tag-reader (antes del botón de lectura)
+                              if (isTagReaderType &&
+                                  _tagReaderData.containsKey(statusId))
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: _buildTagReaderCleanupButton(
+                                    statusId: statusId,
+                                  ),
+                                ),
                               // Botón inline para tag-reader (NFC)
                               if (isTagReaderType)
                                 Padding(
-                                  padding: EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.only(left: 8),
                                   child: _buildTagReaderButton(
+                                    context: context,
+                                    statusName: statusName,
+                                  ),
+                                ),
+                              // Botón de limpieza inline para tag-transfer (antes del botón de lectura)
+                              if (isTagTransferType &&
+                                  _tagTransferData.containsKey(statusId))
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: _buildTagTransferCleanupButton(
+                                    statusId: statusId,
+                                  ),
+                                ),
+                              // Botón inline para tag-transfer (NFC)
+                              if (isTagTransferType)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 8),
+                                  child: _buildTagTransferButton(
                                     context: context,
                                     statusName: statusName,
                                   ),
@@ -2275,7 +2259,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               // Botón inline para dynamic-printing
                               if (isDynamicPrintingType)
                                 Padding(
-                                  padding: EdgeInsets.only(left: 8),
+                                  padding: const EdgeInsets.only(left: 8),
                                   child: _buildDynamicPrintingButton(
                                     context: context,
                                     statusName: statusName,
@@ -2287,35 +2271,37 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           // Mostrar valor de fecha en fila separada DEBAJO del nombre
                           if (typeStatus.toLowerCase() == 'date')
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: _buildDateValueDisplay(statusId, 0, hasValue: hasValue),
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildDateValueDisplay(statusId, 0,
+                                  hasValue: hasValue),
                             ),
                           // Resumen del tag-reader (solo para tipo tag-reader) - DEBAJO
                           if (isTagReaderType &&
                               _tagReaderData.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildTagReaderSummary(statusId: statusId),
                             ),
                           // Resumen del tag-writer (solo para tipo tag-writer) - DEBAJO
                           if (isTagWriterType &&
                               _tagWriterData.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildTagWriterSummary(statusId: statusId),
                             ),
                           // Resumen del tag-transfer (solo para tipo tag-transfer) - DEBAJO
                           if (isTagTransferType &&
                               _tagTransferData.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: _buildTagTransferSummary(statusId: statusId),
+                              padding: const EdgeInsets.only(top: 8),
+                              child:
+                                  _buildTagTransferSummary(statusId: statusId),
                             ),
                           // Valor calculado de numbers-operation - DEBAJO
                           if (isNumbersOperationType &&
                               _calculatedValues.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildNumbersOperationDisplay(
                                 statusId: statusId,
                                 status: status,
@@ -2324,7 +2310,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           // Display para label-info - DEBAJO
                           if (isLabelInfoType)
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildLabelInfoDisplay(
                                 statusName: statusName,
                                 statusId: statusId,
@@ -2335,7 +2321,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           if (isDistanceExtractorType &&
                               _calculatedDistances.containsKey(statusId))
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildDistanceExtractorDisplay(
                                 statusId: statusId,
                               ),
@@ -2344,13 +2330,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           if (isHeadquarterWeightType &&
                               _headquarterWeights.isNotEmpty)
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildHeadquarterWeightsDisplay(),
                             ),
                           // Cajones numéricos del 1 al 5 (solo para tipo number) - DEBAJO
                           if (isNumberType)
                             Padding(
-                              padding: EdgeInsets.only(top: 8),
+                              padding: const EdgeInsets.only(top: 8),
                               child: _buildNumberBoxes(status: status),
                             ),
                           if (!isNumberType &&
@@ -2361,17 +2347,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                       statusId) !=
                                   'N/A')
                             Padding(
-                              padding: EdgeInsets.only(top: 4),
+                              padding: const EdgeInsets.only(top: 4),
                               child: Text(
                                 functions.showCurrentStatus(
                                       FFAppState().visitDetails.toList(),
                                       statusId,
                                     ) ??
                                     '',
-                                style: TextStyle(fontFamily: 'Roboto',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                   letterSpacing: 0.2,
                                 ),
                               ),
@@ -2382,39 +2369,37 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     // Badge de progreso (si hay steps hijos requeridos)
                     if (totalRequired > 0)
                       Container(
-                        padding:
-                            EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        margin: EdgeInsets.only(right: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 4),
+                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
                           // INVERTIDO: Verde cuando completado, Warning cuando incompleto
                           color: totalCompleted == totalRequired
-                              ? Color(0xFF00a86b).withOpacity(0.3)
+                              ? const Color(0xFF00a86b).withValues(alpha: 0.3)
                               : FlutterFlowTheme.of(context)
                                   .warning
-                                  .withOpacity(0.2),
+                                  .withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
                             color: totalCompleted == totalRequired
-                                ? Color(0xFF00a86b)
+                                ? const Color(0xFF00a86b)
                                 : FlutterFlowTheme.of(context).warning,
                             width: 1,
                           ),
                         ),
                         child: Text(
                           '$totalCompleted/$totalRequired',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: totalCompleted == totalRequired
-                                ? Color(0xFF00a86b)
+                                ? const Color(0xFF00a86b)
                                 : FlutterFlowTheme.of(context).warning,
                             letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                    // Check icon moderno (solo si NO es tipo number)
-                    if (hasValue && !hasChildren && !isNumberType)
-                      _buildModernCheckIcon(),
                   ],
                 ),
               ),
@@ -2425,7 +2410,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // Hijos expandidos (steps o status childs)
         if (isExpanded && hasChildren)
           AnimatedContainer(
-            duration: Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             margin: EdgeInsets.only(left: level * 8.0 + 8, top: 8),
             child: Column(
@@ -2433,19 +2418,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // Mostrar status childs primero
                 ...statusChilds.map<Widget>((childStatus) {
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _buildRootStatusChildOption(status, childStatus,
                         level: level + 1),
                   );
-                }).toList(),
+                }),
 
                 // Mostrar steps childs
                 ...stepsChilds.map<Widget>((childStep) {
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _buildStepCard(childStep, level: level + 1),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -2464,24 +2449,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         getJsonField(childStatus, r'''$.color''')?.toString() ?? '#00ff9f';
     final parentStatusId =
         getJsonField(parentStatus, r'''$.id_activity_status''');
-    final stepsChildsRaw = getJsonField(childStatus, r'''$.activities_steps_childs''');
-    final stepsChilds = stepsChildsRaw != null ? (stepsChildsRaw is List ? stepsChildsRaw : []) : [];
-    final statusChildsRaw = getJsonField(childStatus, r'''$.activities_status_childs''');
-    final statusChilds = statusChildsRaw != null ? (statusChildsRaw is List ? statusChildsRaw : []) : [];
+    final stepsChildsRaw =
+        getJsonField(childStatus, r'''$.activities_steps_childs''');
+    final stepsChilds = stepsChildsRaw != null
+        ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+        : [];
+    final statusChildsRaw =
+        getJsonField(childStatus, r'''$.activities_status_childs''');
+    final statusChilds = statusChildsRaw != null
+        ? (statusChildsRaw is List ? statusChildsRaw : [])
+        : [];
 
     // Log de renderizado (solo la primera vez para cada status)
     if (!_loggedStatusIds.contains(statusId)) {
       _loggedStatusIds.add(statusId);
-      debugPrint('🔸 RENDERIZANDO ROOT STATUS CHILD: nombre="$statusName" tipo="$typeStatus" ID=$statusId parentID=$parentStatusId nivel=$level');
+      debugPrint(
+          '🔸 RENDERIZANDO ROOT STATUS CHILD: nombre="$statusName" tipo="$typeStatus" ID=$statusId parentID=$parentStatusId nivel=$level');
     }
 
-    final isSelected = functions.searchInVisitsDetails(
-      FFAppState().visitDetails.toList(),
-      statusId,
-      'STATUS',
-    );
+    // LOTE 1: Usar búsqueda cacheada
+    final isSelected = _cachedSearchInVisitDetails(statusId, 'STATUS');
 
-    final expansionKey = 'root_${parentStatusId}_${statusId}';
+    final expansionKey = 'root_${parentStatusId}_$statusId';
     final isExpanded = _statusExpansionState[expansionKey] ?? false;
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
 
@@ -2490,7 +2479,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isTagWriterType = typeStatus.toLowerCase() == 'tag-writer';
     final isTagReaderType = typeStatus.toLowerCase() == 'tag-reader';
     final isTagTransferType = typeStatus.toLowerCase() == 'tag-transfer';
-    final isDistanceExtractorType = typeStatus.toLowerCase() == 'distance-extractor';
+    final isDistanceExtractorType =
+        typeStatus.toLowerCase() == 'distance-extractor';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -2498,7 +2488,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         final hex = hexColor.replaceAll('#', '');
         return Color(int.parse('FF$hex', radix: 16));
       } catch (e) {
-        return Color(0xFF00ff9f); // Color por defecto
+        return const Color(0xFF00ff9f); // Color por defecto
       }
     }
 
@@ -2514,7 +2504,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -2544,7 +2534,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -2557,6 +2547,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               final nfcContent = FFAppState().nfcRead;
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Esperar por una geolocalización válida antes de mostrar el resumen
+                if (!mounted) return;
                 final geolocation = await _waitForValidGeolocation(context);
 
                 if (geolocation != null) {
@@ -2565,7 +2556,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   setState(() {
                     _tagReaderData[statusId] = parsedData;
                     _tagReaderGeolocations[statusId] = geolocation;
-                    _lastTagReaderLocation = geolocation; // Guardar para distance-extractor
+                    _lastTagReaderLocation =
+                        geolocation; // Guardar para distance-extractor
                   });
 
                   // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
@@ -2579,12 +2571,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                   // Verificar si los lotes tienen peso promedio configurado
                   if (tagHeadquarterIds.isNotEmpty) {
-                    debugPrint('🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                    debugPrint(
+                        '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
                     await _loadHeadquarterWeights(tagHeadquarterIds);
 
                     // Si hay lotes sin peso, mostrar advertencia
                     if (_headquartersWithoutWeight.isNotEmpty) {
-                      debugPrint('⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                      debugPrint(
+                          '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
                       if (mounted) {
                         _showWeightWarningDialog();
                       }
@@ -2600,11 +2594,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, abrir el componente de transferencia NFC
             if (isTagTransferType) {
-              final result = await showDialog<bool>(
+              await showDialog<bool>(
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -2615,15 +2609,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
               // readNFC cierra el diálogo automáticamente después de leer
               // Procesar el contenido del tag desde FFAppState
-              debugPrint('✅ TAG-TRANSFER: Diálogo cerrado, procesando contenido');
+              debugPrint(
+                  '✅ TAG-TRANSFER: Diálogo cerrado, procesando contenido');
               final nfcContent = FFAppState().nfcRead;
               debugPrint(
                   '📄 TAG-TRANSFER: Contenido desde FFAppState: $nfcContent');
 
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Parsear el contenido del tag y agrupar por headquarterId
-                final parsedData =
-                    _parseNfcTagContentByHeadquarter(nfcContent);
+                final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
                 debugPrint(
                     '📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
                 setState(() {
@@ -2658,7 +2652,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     final siblingStatusId = getJsonField(
                         siblingStatus, r'''$.id_activity_status''');
                     final siblingExpansionKey =
-                        'root_${parentStatusId}_${siblingStatusId}';
+                        'root_${parentStatusId}_$siblingStatusId';
                     _statusExpansionState[siblingExpansionKey] = false;
                   }
                 }
@@ -2686,22 +2680,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 _rootStatusExpansionState[parentStatusId] = false;
 
                 // También colapsar todos los status hermanos (hijos del mismo padre)
-                final parentStatusChilds =
-                    getJsonField(parentStatus, r'''$.activities_status_childs''')
-                        .toList();
+                final parentStatusChilds = getJsonField(
+                        parentStatus, r'''$.activities_status_childs''')
+                    .toList();
                 for (var siblingStatus in parentStatusChilds) {
-                  final siblingStatusId = getJsonField(
-                      siblingStatus, r'''$.id_activity_status''');
+                  final siblingStatusId =
+                      getJsonField(siblingStatus, r'''$.id_activity_status''');
                   final siblingExpansionKey =
-                      'root_${parentStatusId}_${siblingStatusId}';
+                      'root_${parentStatusId}_$siblingStatusId';
                   _statusExpansionState[siblingExpansionKey] = false;
                 }
               }
             });
           },
           child: Container(
-            margin: EdgeInsets.only(bottom: 8),
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -2713,12 +2707,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         !isTagReaderType &&
                         !isDistanceExtractorType)
                     ? [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        const Color(0xFF00a86b),
+                        const Color(0xFF00d980),
                       ]
                     : [
-                        Color(0xFFF1F8F4),
-                        Color(0xFFFAFDFB),
+                        const Color(0xFFF1F8F4),
+                        const Color(0xFFFAFDFB),
                       ],
               ),
               borderRadius: BorderRadius.circular(12),
@@ -2729,8 +2723,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         !isTagWriterType &&
                         !isTagReaderType &&
                         !isDistanceExtractorType)
-                    ? Color(0xFF00a86b)
-                    : Color(0xFFE8F5E9),
+                    ? const Color(0xFF00a86b)
+                    : const Color(0xFFE8F5E9),
                 width: 2,
               ),
             ),
@@ -2748,7 +2742,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               !isTagWriterType &&
                               !isTagReaderType)
                           ? Colors.white
-                          : Color(0xFF00a86b),
+                          : const Color(0xFF00a86b),
                       width: 3,
                     ),
                     color: isSelected ? Colors.white : Colors.transparent,
@@ -2758,7 +2752,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           child: Container(
                             width: 12,
                             height: 12,
-                            decoration: BoxDecoration(
+                            decoration: const BoxDecoration(
                               shape: BoxShape.circle,
                               color: Color(0xFF00a86b),
                             ),
@@ -2766,7 +2760,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         )
                       : null,
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 // Indicador de color
                 Container(
                   width: 32,
@@ -2776,29 +2770,32 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     borderRadius: BorderRadius.circular(6),
                     boxShadow: [
                       BoxShadow(
-                        color: color.withOpacity(0.6),
+                        color: color.withValues(alpha: 0.6),
                         blurRadius: 12,
-                        offset: Offset(0, 3),
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
                 ),
-                SizedBox(width: 14),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Text(
                     statusName,
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 19,
                       fontWeight: FontWeight.w800,
-                      color: (isDistanceExtractorType && (_distanceExtractorCalculated[statusId] ?? false))
-                          ? Color(0xFF00695C) // Verde oscuro para distance-extractor calculado
+                      color: (isDistanceExtractorType &&
+                              (_distanceExtractorCalculated[statusId] ?? false))
+                          ? const Color(
+                              0xFF00695C) // Verde oscuro para distance-extractor calculado
                           : (isSelected &&
-                              !isNumberType &&
-                              !isTagWriterType &&
-                              !isTagReaderType &&
-                              !isDistanceExtractorType)
-                          ? Colors.white
-                          : Color(0xFF00a86b),
+                                  !isNumberType &&
+                                  !isTagWriterType &&
+                                  !isTagReaderType &&
+                                  !isDistanceExtractorType)
+                              ? Colors.white
+                              : const Color(0xFF00a86b),
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -2810,7 +2807,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         : Icons.chevron_right_rounded,
                     size: 32,
                     weight: 700,
-                    color: Color(0xFF00a86b),
+                    color: const Color(0xFF00a86b),
                   ),
               ],
             ),
@@ -2820,28 +2817,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // Hijos expandidos (status o steps childs)
         if (isExpanded && hasChildren)
           AnimatedContainer(
-            duration: Duration(milliseconds: 300),
+            duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            margin: EdgeInsets.only(left: 12, bottom: 8),
+            margin: const EdgeInsets.only(left: 12, bottom: 8),
             child: Column(
               children: [
                 // ✅ PRIMERO: Mostrar status childs (opciones inmediatas del mismo nivel)
                 ...statusChilds.map<Widget>((nestedStatus) {
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _buildRootStatusChildOption(
                         childStatus, nestedStatus,
                         level: level + 1),
                   );
-                }).toList(),
+                }),
 
                 // ✅ SEGUNDO: Mostrar steps childs (pasos adicionales más profundos)
                 ...stepsChilds.map<Widget>((childStep) {
                   return Padding(
-                    padding: EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.only(bottom: 8),
                     child: _buildStepCard(childStep, level: level + 1),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -2881,7 +2878,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   int _getCurrentNumberValue(int statusId, String defaultStatus) {
     for (var detail in FFAppState().visitDetails) {
       if (detail.idActivityStatus == statusId) {
-        return int.tryParse(detail.statusResponse ?? '0') ?? 0;
+        return int.tryParse(detail.statusResponse) ?? 0;
       }
     }
     return int.tryParse(defaultStatus) ?? 0;
@@ -2952,6 +2949,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final rememberStatus =
         getJsonField(status, r'''$.remember_status''') == true;
     final stepName = getJsonField(parentStep, r'''$.name_step''').toString();
+    final typeStep = getJsonField(parentStep, r'''$.type_step''').toString();
 
     // LÓGICA CLAVE: Por cada id_step_parent solo puede haber UN id_activity_status activo
     // Si selecciono otro status en el mismo step, ELIMINAR el anterior y AGREGAR el nuevo
@@ -2971,13 +2969,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     // 2. Agregar el nuevo status seleccionado
+    // Aplicar la lógica correcta según el tipo del step padre
+    String finalStatusOption = statusName;
+    String finalStatusResponse = defaultStatus;
+
+    // Si el step padre es de tipo "reference-list", invertir los valores
+    if (typeStep.toLowerCase() == 'reference-list') {
+      finalStatusOption = stepName; // Nombre del step padre
+      finalStatusResponse = statusName; // Nombre del status seleccionado
+    }
+
     FFAppState().addToVisitDetails(
       VisitsDetailsStruct(
         idVisitDetail: 0,
         idVisit: 0,
         idActivityStatus: statusId,
-        statusOption: statusName,
-        statusResponse: defaultStatus,
+        statusOption: finalStatusOption,
+        statusResponse: finalStatusResponse,
         idStepParent: parentStepId,
         rememberStatus: rememberStatus,
         defaultStatus: defaultStatus,
@@ -3035,45 +3043,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     setState(() {});
   }
 
-  Widget _buildMapContent() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.map_rounded,
-            size: 64,
-            color: Colors.white.withOpacity(0.3),
-          ),
-          SizedBox(height: 16),
-          Text(
-            'Vista de mapa',
-            style: TextStyle(fontFamily: 'Roboto',
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.6),
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Integración con mapa próximamente',
-            style: TextStyle(fontFamily: 'Roboto',
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildNavigationButtons() {
     // Verificar si is_sync es true para mostrar el botón Guardar
     final currentActivity = FFAppState().currentActivity;
     final isSync = getJsonField(currentActivity, r'''$.is_sync''') == true;
 
     return Padding(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
           Expanded(
@@ -3082,7 +3058,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 context.pushNamed(
                   DoActivitiesPageWidget.routeName,
                   extra: <String, dynamic>{
-                    kTransitionInfoKey: TransitionInfo(
+                    kTransitionInfoKey: const TransitionInfo(
                       hasTransition: true,
                       transitionType: PageTransitionType.fade,
                       duration: Duration(milliseconds: 500),
@@ -3096,20 +3072,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   gradient: LinearGradient(
                     colors: [
                       FlutterFlowTheme.of(context).error,
-                      FlutterFlowTheme.of(context).error.withOpacity(0.8),
+                      FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
                       blurRadius: 12,
-                      color:
-                          FlutterFlowTheme.of(context).error.withOpacity(0.4),
-                      offset: Offset(0, 6),
+                      color: FlutterFlowTheme.of(context)
+                          .error
+                          .withValues(alpha: 0.4),
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.chevron_left_rounded,
@@ -3117,7 +3094,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     SizedBox(width: 8),
                     Text(
                       'Cancelar',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -3131,591 +3109,146 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
           // Solo mostrar el separador y el botón Guardar si is_sync es true
           if (isSync) ...[
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
-            child: InkWell(
-              onTap: () async {
-                // Validar steps requeridos antes de guardar
-                final validationResult = _validateRequiredStepsRecursive();
+              child: InkWell(
+                onTap: () async {
+                  // Validar steps requeridos antes de guardar
+                  final validationResult = _validateRequiredStepsRecursive();
 
-                if (validationResult != null) {
-                  // Hay un step requerido sin completar
-                  final stepName = validationResult['stepName'] as String;
-                  final message = validationResult['message'] as String;
-                  final path = validationResult['path'] as List<int>;
+                  if (validationResult != null) {
+                    // Hay un step requerido sin completar
+                    final message = validationResult['message'] as String;
+                    final path = validationResult['path'] as List<int>;
 
-                  // Expandir el árbol hasta el step faltante
-                  _expandTreeToStep(path);
+                    // Expandir el árbol hasta el step faltante
+                    _expandTreeToStep(path);
 
-                  // Mostrar mensaje de error específico
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.error_outline_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              SizedBox(width: 8),
-                              Text(
-                                'Campo Requerido',
-                                style: TextStyle(
+                    // Mostrar mensaje de error específico
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(
+                                  Icons.error_outline_rounded,
                                   color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
+                                  size: 20,
                                 ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: 6),
-                          Text(
-                            message,
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w500,
-                              fontSize: 13,
+                                SizedBox(width: 8),
+                                Text(
+                                  'Campo Requerido',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                      duration: Duration(milliseconds: 4000),
-                      backgroundColor: FlutterFlowTheme.of(context).error,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      margin: EdgeInsets.all(16),
-                    ),
-                  );
-                  return;
-                }
-
-                // Si la validación pasó, mostrar diálogo con LoadCoordinatesVisit
-                await showDialog<bool>(
-                  context: context,
-                  barrierDismissible: false,
-                  barrierColor: Colors.black.withOpacity(0.85),
-                  builder: (dialogContext) {
-                    return Dialog(
-                      backgroundColor: Colors.transparent,
-                      elevation: 0,
-                      insetPadding: EdgeInsets.zero,
-                      child: Container(
-                        height: MediaQuery.sizeOf(context).height * 0.75,
-                        width: MediaQuery.sizeOf(context).width * 0.95,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(32),
-                          child: custom_widgets.LoadCoordinatesVisit(
-                            width: MediaQuery.sizeOf(context).width * 0.95,
-                            height: MediaQuery.sizeOf(context).height * 0.75,
-                          ),
+                            const SizedBox(height: 6),
+                            Text(
+                              message,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
                         ),
+                        duration: const Duration(milliseconds: 4000),
+                        backgroundColor: FlutterFlowTheme.of(context).error,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        margin: const EdgeInsets.all(16),
                       ),
                     );
-                  },
-                );
+                    return;
+                  }
 
-                // El widget LoadCoordinatesVisit se cierra automáticamente
-                // El formulario permanece abierto para permitir crear más visitas
-                // visitDetails ya fue limpiado automáticamente (solo quedaron los con remember_status = true)
-              },
-              child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      FlutterFlowTheme.of(context).primary,
-                      FlutterFlowTheme.of(context).primary.withOpacity(0.8),
+                  // Si la validación pasó, mostrar diálogo con LoadCoordinatesVisit
+                  await showDialog<bool>(
+                    context: context,
+                    barrierDismissible: false,
+                    barrierColor: Colors.black.withValues(alpha: 0.85),
+                    builder: (dialogContext) {
+                      return Dialog(
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        insetPadding: EdgeInsets.zero,
+                        child: SizedBox(
+                          height: MediaQuery.sizeOf(context).height * 0.75,
+                          width: MediaQuery.sizeOf(context).width * 0.95,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(32),
+                            child: custom_widgets.LoadCoordinatesVisit(
+                              width: MediaQuery.sizeOf(context).width * 0.95,
+                              height: MediaQuery.sizeOf(context).height * 0.75,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
+
+                  // NUEVO: Limpiar los datos de tags que NO deben ser recordados después de crear la visita
+                  _cleanupTagDatasByRememberFlag();
+
+                  // El widget LoadCoordinatesVisit se cierra automáticamente
+                  // El formulario permanece abierto para permitir crear más visitas
+                  // visitDetails ya fue limpiado automáticamente (solo quedaron los con remember_status = true)
+                },
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        FlutterFlowTheme.of(context).primary,
+                        FlutterFlowTheme.of(context)
+                            .primary
+                            .withValues(alpha: 0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 12,
+                        color: FlutterFlowTheme.of(context)
+                            .primary
+                            .withValues(alpha: 0.4),
+                        offset: const Offset(0, 6),
+                      ),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 12,
-                      color:
-                          FlutterFlowTheme.of(context).primary.withOpacity(0.4),
-                      offset: Offset(0, 6),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle_rounded,
-                        color: Colors.white, size: 24),
-                    SizedBox(width: 8),
-                    Text(
-                      'Guardar',
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_rounded,
+                          color: Colors.white, size: 24),
+                      SizedBox(width: 8),
+                      Text(
+                        'Guardar',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
             ),
           ],
         ],
-      ),
-    );
-  }
-
-  // ==========================================================================
-  // SELECTOR NUMÉRICO MODERNO
-  // ==========================================================================
-
-  Future<int?> _showModernNumberPicker({
-    required String statusName,
-    required int currentValue,
-  }) async {
-    int selectedValue = currentValue;
-
-    return await showDialog<int>(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.7),
-      builder: (BuildContext dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              child: Container(
-                padding: EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      FlutterFlowTheme.of(context).primary,
-                      FlutterFlowTheme.of(context).secondary,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color:
-                          FlutterFlowTheme.of(context).primary.withOpacity(0.4),
-                      blurRadius: 30,
-                      offset: Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Título
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            Icons.numbers_rounded,
-                            color: Colors.white,
-                            size: 24,
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                statusName,
-                                style: TextStyle(fontFamily: 'Roboto',
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Selecciona la cantidad',
-                                style: TextStyle(fontFamily: 'Roboto',
-                                  fontSize: 12,
-                                  color: Colors.white.withOpacity(0.7),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => Navigator.pop(dialogContext),
-                          icon: Icon(Icons.close_rounded, color: Colors.white),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 32),
-
-                    // Display del número con controles
-                    Container(
-                      padding:
-                          EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withOpacity(0.3),
-                          width: 2,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Botón menos
-                          _buildCircularButton(
-                            icon: Icons.remove_rounded,
-                            onTap: () {
-                              if (selectedValue > 0) {
-                                setDialogState(() {
-                                  selectedValue--;
-                                });
-                              }
-                            },
-                          ),
-
-                          // Display del número
-                          Expanded(
-                            child: Center(
-                              child: Text(
-                                selectedValue.toString(),
-                                style: TextStyle(fontFamily: 'Roboto',
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: -1,
-                                ),
-                              ),
-                            ),
-                          ),
-
-                          // Botón más
-                          _buildCircularButton(
-                            icon: Icons.add_rounded,
-                            onTap: () {
-                              setDialogState(() {
-                                selectedValue++;
-                              });
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    SizedBox(height: 24),
-
-                    // Botones rápidos
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      alignment: WrapAlignment.center,
-                      children: [
-                        _buildQuickButton(0, selectedValue, setDialogState,
-                            (val) => selectedValue = val),
-                        _buildQuickButton(10, selectedValue, setDialogState,
-                            (val) => selectedValue = val),
-                        _buildQuickButton(25, selectedValue, setDialogState,
-                            (val) => selectedValue = val),
-                        _buildQuickButton(50, selectedValue, setDialogState,
-                            (val) => selectedValue = val),
-                        _buildQuickButton(100, selectedValue, setDialogState,
-                            (val) => selectedValue = val),
-                      ],
-                    ),
-
-                    SizedBox(height: 32),
-
-                    // Botón confirmar
-                    Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.white,
-                            Colors.white.withOpacity(0.9),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.3),
-                            blurRadius: 15,
-                            offset: Offset(0, 5),
-                          ),
-                        ],
-                      ),
-                      child: ElevatedButton(
-                        onPressed: () =>
-                            Navigator.pop(dialogContext, selectedValue),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          'Confirmar',
-                          style: TextStyle(fontFamily: 'Roboto',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: FlutterFlowTheme.of(context).primary,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  Widget _buildCircularButton({
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        width: 56,
-        height: 56,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.2),
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: Colors.white.withOpacity(0.4),
-            width: 2,
-          ),
-        ),
-        child: Icon(
-          icon,
-          color: Colors.white,
-          size: 28,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickButton(
-    int value,
-    int currentValue,
-    StateSetter setDialogState,
-    Function(int) onSelected,
-  ) {
-    final isSelected = currentValue == value;
-
-    return InkWell(
-      onTap: () {
-        setDialogState(() {
-          onSelected(value);
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.white.withOpacity(0.3)
-              : Colors.white.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? Colors.white.withOpacity(0.6)
-                : Colors.white.withOpacity(0.2),
-            width: isSelected ? 2 : 1,
-          ),
-        ),
-        child: Text(
-          value.toString(),
-          style: TextStyle(fontFamily: 'Roboto',
-            fontSize: 14,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ==========================================================================
-  // CONTROL NUMÉRICO INLINE COMPACTO
-  // ==========================================================================
-
-  Widget _buildInlineNumberControl({
-    required dynamic parentStep,
-    required dynamic status,
-  }) {
-    final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final statusName = getJsonField(status, r'''$.status_name''').toString();
-    final defaultStatus =
-        getJsonField(status, r'''$.default_status''').toString();
-
-    int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
-
-    return Padding(
-      padding: EdgeInsets.only(left: 12, right: 12),
-      child: Container(
-        padding: EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            // Display y controles +/-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Botón -
-                InkWell(
-                  onTap: () {
-                    if (currentValue > 0) {
-                      setState(() {
-                        _updateNumberValue(
-                            parentStep, status, currentValue - 1);
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.remove_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: 20),
-
-                // Display del número
-                Text(
-                  currentValue.toString(),
-                  style: TextStyle(fontFamily: 'Roboto',
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-
-                SizedBox(width: 20),
-
-                // Botón +
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _updateNumberValue(parentStep, status, currentValue + 1);
-                    });
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: 12),
-
-            // Botones rápidos
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildCompactQuickButton(0, currentValue, parentStep, status),
-                _buildCompactQuickButton(10, currentValue, parentStep, status),
-                _buildCompactQuickButton(25, currentValue, parentStep, status),
-                _buildCompactQuickButton(50, currentValue, parentStep, status),
-                _buildCompactQuickButton(100, currentValue, parentStep, status),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactQuickButton(
-    int value,
-    int currentValue,
-    dynamic parentStep,
-    dynamic status,
-  ) {
-    final isSelected = currentValue == value;
-
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _updateNumberValue(parentStep, status, value);
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.white.withOpacity(0.25)
-              : Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected
-                ? Colors.white.withOpacity(0.5)
-                : Colors.white.withOpacity(0.15),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          value.toString(),
-          style: TextStyle(fontFamily: 'Roboto',
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
       ),
     );
   }
@@ -3832,17 +3365,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         decoration: BoxDecoration(
           // INVERTIDO: Verde cuando expandido
           color: isExpanded
-              ? Color(0xFF00a86b).withOpacity(0.2)
-              : Colors.white.withOpacity(0.08),
+              ? const Color(0xFF00a86b).withValues(alpha: 0.2)
+              : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isExpanded
-                ? Color(0xFF00a86b).withOpacity(0.4)
-                : Colors.white.withOpacity(0.15),
+                ? const Color(0xFF00a86b).withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
-        child: Icon(
+        child: const Icon(
           Icons.search_rounded,
           size: 16,
           color: Color(0xFF00a86b),
@@ -3862,16 +3395,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final hasText = (_searchQueries[stepId] ?? '').isNotEmpty;
 
     return Padding(
-      padding: EdgeInsets.only(left: 12, right: 12, bottom: 8, top: 8),
+      padding: const EdgeInsets.only(left: 12, right: 12, bottom: 8, top: 8),
       child: Container(
         height: 44,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha: 0.06),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: hasText
-                ? FlutterFlowTheme.of(context).primary.withOpacity(0.4)
-                : Colors.white.withOpacity(0.15),
+                ? FlutterFlowTheme.of(context).primary.withValues(alpha: 0.4)
+                : Colors.white.withValues(alpha: 0.15),
             width: 1,
           ),
         ),
@@ -3879,13 +3412,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           children: [
             // Icono de búsqueda
             Padding(
-              padding: EdgeInsets.only(left: 14, right: 10),
+              padding: const EdgeInsets.only(left: 14, right: 10),
               child: Icon(
                 Icons.search_rounded,
                 size: 20,
                 color: hasText
-                    ? FlutterFlowTheme.of(context).primary.withOpacity(0.8)
-                    : Color(0xFF00a86b),
+                    ? FlutterFlowTheme.of(context)
+                        .primary
+                        .withValues(alpha: 0.8)
+                    : const Color(0xFF00a86b),
               ),
             ),
 
@@ -3894,21 +3429,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               child: TextField(
                 controller: controller,
                 autofocus: true,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   color: Colors.white,
                   fontWeight: FontWeight.w500,
                 ),
                 decoration: InputDecoration(
                   hintText: 'Buscar...',
-                  hintStyle: TextStyle(fontFamily: 'Roboto',
+                  hintStyle: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.35),
+                    color: Colors.white.withValues(alpha: 0.35),
                     fontWeight: FontWeight.w400,
                   ),
                   border: InputBorder.none,
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onChanged: (value) {
                   setState(() {
@@ -3928,18 +3465,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 });
               },
               child: Padding(
-                padding: EdgeInsets.only(right: 12, left: 8),
+                padding: const EdgeInsets.only(right: 12, left: 8),
                 child: Container(
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.close_rounded,
                     size: 14,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -3964,8 +3501,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final stepVisits = visitDetails
           .where((visit) =>
                   visit.idStepParent == currentStepId &&
-                  visit.statusOption != null &&
-                  visit.statusOption!.isNotEmpty &&
+                  visit.statusOption.isNotEmpty &&
                   visit.statusOption != 'N/A' &&
                   visit.typeStatus !=
                       'STEP' // ✅ Excluir entradas de tipo STEP (son metadata interna)
@@ -3976,15 +3512,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       // Tomar la última (más reciente) que tenga datos válidos
       final selectedVisit = stepVisits.last;
-      final statusOption = selectedVisit.statusOption!;
+      final statusOption = selectedVisit.statusOption;
       final statusId = selectedVisit.idActivityStatus;
 
       // Agregar el nombre del status seleccionado
       breadcrumbItems.add(statusOption);
 
       // Buscar el status completo en el JSON para ver si tiene hijos
-      final activitiesStatusRaw = getJsonField(currentStep, r'''$.activities_status''');
-      final activitiesStatus = activitiesStatusRaw != null ? (activitiesStatusRaw is List ? activitiesStatusRaw : []) : [];
+      final activitiesStatusRaw =
+          getJsonField(currentStep, r'''$.activities_status''');
+      final activitiesStatus = activitiesStatusRaw != null
+          ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+          : [];
 
       for (var status in activitiesStatus) {
         final currentStatusId =
@@ -3993,8 +3532,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // Buscar por ID en lugar de nombre
         if (currentStatusId == statusId) {
           // Verificar si tiene steps_childs
-          final stepsChildsRaw = getJsonField(status, r'''$.activities_steps_childs''');
-          final stepsChilds = stepsChildsRaw != null ? (stepsChildsRaw is List ? stepsChildsRaw : []) : [];
+          final stepsChildsRaw =
+              getJsonField(status, r'''$.activities_steps_childs''');
+          final stepsChilds = stepsChildsRaw != null
+              ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+              : [];
 
           // Procesar cada step_child recursivamente
           for (var childStep in stepsChilds) {
@@ -4058,29 +3600,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Si no hay selecciones, no mostrar nada
     if (breadcrumbItems.isEmpty) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     // Construir el widget del breadcrumb
     return Padding(
-      padding: EdgeInsets.only(top: 6),
+      padding: const EdgeInsets.only(top: 6),
       child: Wrap(
         spacing: 6,
         runSpacing: 6,
         children: [
           for (int i = 0; i < breadcrumbItems.length; i++) ...[
-            // Icono de inicio solo para el primer item
-            if (i == 0)
-              Icon(
-                Icons.radio_button_checked,
-                size: 16,
-                color: Colors.white,
-              ),
-
             // Texto del item
             Text(
               breadcrumbItems[i],
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -4093,7 +3628,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               Icon(
                 Icons.chevron_right_rounded,
                 size: 20,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
           ],
         ],
@@ -4101,196 +3636,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  // ==========================================================================
-  // CHECK ICON MODERNO Y ELEGANTE
-  // ==========================================================================
-
-  Widget _buildModernCheckIcon() {
-    return Container(
-      width: 40,
-      height: 40,
-      margin: EdgeInsets.only(left: 8),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFF00a86b),
-            Color(0xFF00d980),
-          ],
-        ),
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: Color(0xFF00a86b).withOpacity(0.4),
-            blurRadius: 12,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Icon(
-        Icons.check_circle_rounded,
-        color: Colors.white,
-        size: 28,
-      ),
-    );
-  }
-
   // ===== MÉTODOS PARA ROOT NUMBER CONTROL =====
-
-  Widget _buildInlineRootNumberControl({required dynamic status}) {
-    final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final statusName = getJsonField(status, r'''$.status_name''').toString();
-    final defaultStatus =
-        getJsonField(status, r'''$.default_status''').toString();
-
-    int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
-
-    return Padding(
-      padding: EdgeInsets.only(left: 12, right: 12),
-      child: Container(
-        padding: EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.2),
-            width: 1,
-          ),
-        ),
-        child: Column(
-          children: [
-            // Display y controles +/-
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Botón -
-                InkWell(
-                  onTap: () {
-                    if (currentValue > 0) {
-                      setState(() {
-                        _updateRootNumberValue(status, currentValue - 1);
-                      });
-                    }
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.remove_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-
-                SizedBox(width: 20),
-
-                // Display del número
-                Text(
-                  currentValue.toString(),
-                  style: TextStyle(fontFamily: 'Roboto',
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-
-                SizedBox(width: 20),
-
-                // Botón +
-                InkWell(
-                  onTap: () {
-                    setState(() {
-                      _updateRootNumberValue(status, currentValue + 1);
-                    });
-                  },
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.add_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            SizedBox(height: 12),
-
-            // Botones rápidos
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              alignment: WrapAlignment.center,
-              children: [
-                _buildCompactQuickButtonRoot(0, currentValue, status),
-                _buildCompactQuickButtonRoot(10, currentValue, status),
-                _buildCompactQuickButtonRoot(25, currentValue, status),
-                _buildCompactQuickButtonRoot(50, currentValue, status),
-                _buildCompactQuickButtonRoot(100, currentValue, status),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactQuickButtonRoot(
-      int value, int currentValue, dynamic status) {
-    final isSelected = currentValue == value;
-
-    return InkWell(
-      onTap: () {
-        setState(() {
-          _updateRootNumberValue(status, value);
-        });
-      },
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? Colors.white.withOpacity(0.25)
-              : Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected
-                ? Colors.white.withOpacity(0.5)
-                : Colors.white.withOpacity(0.15),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Text(
-          value.toString(),
-          style: TextStyle(fontFamily: 'Roboto',
-            fontSize: 12,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
 
   void _updateRootNumberValue(dynamic status, int newValue) async {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
@@ -4340,24 +3686,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       decoration: BoxDecoration(
         // INVERTIDO: Verde oscuro si usado (up/down), Naranja si NO usado
         gradient: usedUpDown
-            ? LinearGradient(
+            ? const LinearGradient(
                 colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)], // Verde oscuro
               )
-            : LinearGradient(
+            : const LinearGradient(
                 colors: [Color(0xFFF1F8F4), Color(0xFFFAFDFB)],
               ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: usedUpDown ? Color(0xFF1B4332) : Color(0xFFE8F5E9),
+          color: usedUpDown ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
             color: usedUpDown
-                ? Color(0xFF1B4332).withOpacity(0.4)
-                : Color(0xFFE8F5E9).withOpacity(0.4),
+                ? const Color(0xFF1B4332).withValues(alpha: 0.4)
+                : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
             blurRadius: 8,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -4378,7 +3724,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(9),
@@ -4387,7 +3733,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
               child: Icon(
                 Icons.remove_rounded,
-                color: usedUpDown ? Colors.white : Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
                 size: 20,
               ),
             ),
@@ -4395,15 +3741,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
           // Display del número
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            constraints: BoxConstraints(minWidth: 50),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            constraints: const BoxConstraints(minWidth: 50),
             child: Center(
               child: Text(
                 _formatColombianNumber(currentValue),
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: usedUpDown ? Colors.white : Color(0xFF00a86b),
+                  color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
                   letterSpacing: -0.5,
                 ),
               ),
@@ -4422,7 +3769,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.only(
                   topRight: Radius.circular(9),
@@ -4431,7 +3778,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
               child: Icon(
                 Icons.add_rounded,
-                color: usedUpDown ? Colors.white : Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
                 size: 20,
               ),
             ),
@@ -4478,36 +3825,40 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     end: Alignment.bottomRight,
                     colors: isSelected
                         ? [
-                            Color(0xFF00a86b),
-                            Color(0xFF00d980),
+                            const Color(0xFF00a86b),
+                            const Color(0xFF00d980),
                           ]
                         : [
-                            Color(0xFFF1F8F4),
-                            Color(0xFFFAFDFB),
+                            const Color(0xFFF1F8F4),
+                            const Color(0xFFFAFDFB),
                           ],
                   ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected ? Color(0xFF00a86b) : Color(0xFFE8F5E9),
+                    color: isSelected
+                        ? const Color(0xFF00a86b)
+                        : const Color(0xFFE8F5E9),
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: isSelected
-                          ? Color(0xFF00a86b).withOpacity(0.5)
-                          : Color(0xFFE8F5E9).withOpacity(0.5),
+                          ? const Color(0xFF00a86b).withValues(alpha: 0.5)
+                          : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
                       blurRadius: 12,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Center(
                   child: Text(
                     number.toString(),
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : Color(0xFF00a86b),
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF00a86b),
                     ),
                   ),
                 ),
@@ -4515,35 +3866,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             );
           }),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         // Botón INGRESAR OTRO NUMERO
         InkWell(
           onTap: () async {
             final result = await _showFullScreenNumericKeyboard(currentValue);
             if (result != null) {
               setState(() {
-                _numberUsedUpDown[statusId] = true; // Marcar como usado con teclado custom
+                _numberUsedUpDown[statusId] =
+                    true; // Marcar como usado con teclado custom
                 _updateRootNumberValue(status, result);
               });
             }
           },
           child: Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)], // Verde oscuro
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Color(0xFF1B4332).withOpacity(0.4),
+                  color: const Color(0xFF1B4332).withValues(alpha: 0.4),
                   blurRadius: 8,
-                  offset: Offset(0, 4),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Row(
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
@@ -4554,7 +3906,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 SizedBox(width: 10),
                 Text(
                   'INGRESAR OTRO NÚMERO',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -4584,24 +3937,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       decoration: BoxDecoration(
         // INVERTIDO: Verde oscuro si usado (up/down), Naranja si NO usado
         gradient: usedUpDown
-            ? LinearGradient(
+            ? const LinearGradient(
                 colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)], // Verde oscuro
               )
-            : LinearGradient(
+            : const LinearGradient(
                 colors: [Color(0xFFF1F8F4), Color(0xFFFAFDFB)],
               ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: usedUpDown ? Color(0xFF1B4332) : Color(0xFFE8F5E9),
+          color: usedUpDown ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
             color: usedUpDown
-                ? Color(0xFF1B4332).withOpacity(0.4)
-                : Color(0xFFE8F5E9).withOpacity(0.4),
+                ? const Color(0xFF1B4332).withValues(alpha: 0.4)
+                : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
             blurRadius: 8,
-            offset: Offset(0, 3),
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -4622,7 +3975,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(9),
@@ -4631,7 +3984,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
               child: Icon(
                 Icons.remove_rounded,
-                color: usedUpDown ? Colors.white : Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
                 size: 20,
               ),
             ),
@@ -4639,15 +3992,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
           // Display del número
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            constraints: BoxConstraints(minWidth: 50),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            constraints: const BoxConstraints(minWidth: 50),
             child: Center(
               child: Text(
                 _formatColombianNumber(currentValue),
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: usedUpDown ? Colors.white : Color(0xFF00a86b),
+                  color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
                   letterSpacing: -0.5,
                 ),
               ),
@@ -4666,7 +4020,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Container(
               width: 40,
               height: 40,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Colors.transparent,
                 borderRadius: BorderRadius.only(
                   topRight: Radius.circular(9),
@@ -4675,7 +4029,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
               child: Icon(
                 Icons.add_rounded,
-                color: usedUpDown ? Colors.white : Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
                 size: 20,
               ),
             ),
@@ -4725,36 +4079,40 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     end: Alignment.bottomRight,
                     colors: isSelected
                         ? [
-                            Color(0xFF00a86b),
-                            Color(0xFF00d980),
+                            const Color(0xFF00a86b),
+                            const Color(0xFF00d980),
                           ]
                         : [
-                            Color(0xFFF1F8F4),
-                            Color(0xFFFAFDFB),
+                            const Color(0xFFF1F8F4),
+                            const Color(0xFFFAFDFB),
                           ],
                   ),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isSelected ? Color(0xFF00a86b) : Color(0xFFE8F5E9),
+                    color: isSelected
+                        ? const Color(0xFF00a86b)
+                        : const Color(0xFFE8F5E9),
                     width: 2,
                   ),
                   boxShadow: [
                     BoxShadow(
                       color: isSelected
-                          ? Color(0xFF00a86b).withOpacity(0.5)
-                          : Color(0xFFE8F5E9).withOpacity(0.5),
+                          ? const Color(0xFF00a86b).withValues(alpha: 0.5)
+                          : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
                       blurRadius: 12,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
                 child: Center(
                   child: Text(
                     number.toString(),
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? Colors.white : Color(0xFF00a86b),
+                      color:
+                          isSelected ? Colors.white : const Color(0xFF00a86b),
                     ),
                   ),
                 ),
@@ -4762,35 +4120,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             );
           }),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         // Botón INGRESAR OTRO NUMERO
         InkWell(
           onTap: () async {
             final result = await _showFullScreenNumericKeyboard(currentValue);
             if (result != null) {
               setState(() {
-                _numberUsedUpDown[statusId] = true; // Marcar como usado con teclado custom
+                _numberUsedUpDown[statusId] =
+                    true; // Marcar como usado con teclado custom
                 _updateNumberValue(parentStep, status, result);
               });
             }
           },
           child: Container(
             width: double.infinity,
-            padding: EdgeInsets.symmetric(vertical: 14),
+            padding: const EdgeInsets.symmetric(vertical: 14),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)], // Verde oscuro
               ),
               borderRadius: BorderRadius.circular(12),
               boxShadow: [
                 BoxShadow(
-                  color: Color(0xFF1B4332).withOpacity(0.4),
+                  color: const Color(0xFF1B4332).withValues(alpha: 0.4),
                   blurRadius: 8,
-                  offset: Offset(0, 4),
+                  offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Row(
+            child: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(
@@ -4801,7 +4160,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 SizedBox(width: 10),
                 Text(
                   'INGRESAR OTRO NÚMERO',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -4829,7 +4189,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           barrierDismissible: false,
           context: context,
           builder: (dialogContext) {
-            return Dialog(
+            return const Dialog(
               elevation: 0,
               insetPadding: EdgeInsets.zero,
               backgroundColor: Colors.transparent,
@@ -4851,9 +4211,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
       },
       child: Container(
-        padding: EdgeInsets.all(8),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF2196F3), Color(0xFF64B5F6)],
@@ -4861,13 +4221,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Color(0xFF2196F3).withOpacity(0.4),
+              color: const Color(0xFF2196F3).withValues(alpha: 0.4),
               blurRadius: 8,
-              offset: Offset(0, 3),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: Icon(
+        child: const Icon(
           Icons.nfc_rounded,
           color: Colors.white,
           size: 20,
@@ -4891,12 +4251,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         try {
           // Obtener el HTML template desde default_status
-          var htmlTemplate = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-          debugPrint('📄 HTML template obtenido: ${htmlTemplate.length} caracteres');
+          var htmlTemplate =
+              getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+          debugPrint(
+              '📄 HTML template obtenido: ${htmlTemplate.length} caracteres');
 
           if (htmlTemplate.isEmpty) {
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Text('⚠️ No hay plantilla HTML configurada'),
                 backgroundColor: Colors.orange,
               ),
@@ -4906,7 +4268,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
           // Decodificar HTML entities (por si vienen escapadas del JSON)
           htmlTemplate = _decodeHtmlEntities(htmlTemplate);
-          debugPrint('📄 HTML decodificado (primeros 500 chars): ${htmlTemplate.substring(0, htmlTemplate.length > 500 ? 500 : htmlTemplate.length)}...');
+          debugPrint(
+              '📄 HTML decodificado (primeros 500 chars): ${htmlTemplate.substring(0, htmlTemplate.length > 500 ? 500 : htmlTemplate.length)}...');
 
           // Procesar placeholders con acceso completo al estado del formulario
           debugPrint('');
@@ -4914,7 +4277,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           final processedHTML = _processHTMLPlaceholders(htmlTemplate);
           debugPrint('✅ ===== FIN PROCESAMIENTO DE PLACEHOLDERS =====');
           debugPrint('');
-          debugPrint('📄 HTML procesado (primeros 500 chars): ${processedHTML.substring(0, processedHTML.length > 500 ? 500 : processedHTML.length)}...');
+          debugPrint(
+              '📄 HTML procesado (primeros 500 chars): ${processedHTML.substring(0, processedHTML.length > 500 ? 500 : processedHTML.length)}...');
 
           // Abrir el previsualizador HTML con opción de imprimir
           await actions.previewAndPrintHTML(
@@ -4925,13 +4289,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
           debugPrint('✅ Vista previa cerrada');
         } catch (e) {
-          // Cerrar loading si está abierto
-          if (Navigator.canPop(context)) {
-            Navigator.of(context).pop();
-          }
-
           debugPrint('❌ Error generando PDF: $e');
-          ScaffoldMessenger.of(context).showSnackBar(
+          // Cerrar loading si está abierto
+          if (!mounted) return;
+          if (Navigator.canPop(this.context)) {
+            Navigator.of(this.context).pop();
+          }
+          ScaffoldMessenger.of(this.context).showSnackBar(
             SnackBar(
               content: Text('❌ Error al generar PDF: $e'),
               backgroundColor: Colors.red,
@@ -4940,9 +4304,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
       },
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFFFF6B6B), Color(0xFFEE5A6F)],
@@ -4950,13 +4314,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Color(0xFFFF6B6B).withOpacity(0.4),
+              color: const Color(0xFFFF6B6B).withValues(alpha: 0.4),
               blurRadius: 8,
-              offset: Offset(0, 3),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: Row(
+        child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
@@ -4967,7 +4331,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             SizedBox(width: 6),
             Text(
               'PDF',
-              style: TextStyle(fontFamily: 'Roboto',
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -4997,7 +4362,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (recordContent == null) continue;
 
       // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {};
+      final Map<String, dynamic> record = {
+        'operatorId': '',
+        'operator2Id': '',
+        'visits': 0,
+        'results': 0,
+        'headquarterId': 0,
+        'dateTime': DateTime.now(),
+      };
       final fields = recordContent.split(';');
 
       for (var field in fields) {
@@ -5031,7 +4403,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               record['operatorId'] = value;
               break;
             case 'OP2':
-              record['operator2Id'] = value; // Operador Cortero
+              // Si OP2 es "false" (string literal), dejarlo como vacío
+              record['operator2Id'] = (value == 'false') ? '' : value;
               break;
             case 'VISITS':
               record['visits'] = int.tryParse(value) ?? 0;
@@ -5046,8 +4419,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
       }
 
-      if (record.isNotEmpty) {
-        final heId = record['headquarterId'] as int? ?? 0;
+      if (record['headquarterId'] != 0) {
+        final heId = record['headquarterId'] as int;
 
         // Si el lote no existe en el map, crearlo
         if (!groupedByHeadquarter.containsKey(heId)) {
@@ -5082,9 +4455,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return InkWell(
       onTap: () {}, // El tap se maneja en el InkWell padre
       child: Container(
-        padding: EdgeInsets.all(8),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
@@ -5092,14 +4465,238 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Color(0xFF4CAF50).withOpacity(0.4),
+              color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
               blurRadius: 8,
-              offset: Offset(0, 3),
+              offset: const Offset(0, 3),
             ),
           ],
         ),
-        child: Icon(
+        child: const Icon(
           Icons.nfc_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTagTransferButton({
+    required BuildContext context,
+    required String statusName,
+  }) {
+    return InkWell(
+      onTap: () {}, // El tap se maneja en el InkWell padre
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFFFA500), Color(0xFFFFB74D)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFA500).withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.nfc_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  /// Botón de limpieza inline para tag-reader
+  Widget _buildTagReaderCleanupButton({
+    required int statusId,
+  }) {
+    return InkWell(
+      onTap: () {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Limpiar Tag Reader'),
+              content: const Text(
+                  '¿Estás seguro de que deseas limpiar los datos del tag reader? Esta acción no se puede deshacer.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _tagReaderData.remove(statusId);
+                      _tagReaderGeolocations.remove(statusId);
+                      _headquartersWithoutWeight.clear();
+                      _headquarterWeights.clear();
+                    });
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('✅ Datos de tag reader limpiados')),
+                    );
+                  },
+                  child: const Text('Limpiar',
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE57373), Color(0xFFEF9A9A)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE57373).withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  /// Botón de limpieza inline para tag-writer
+  Widget _buildTagWriterCleanupButton({
+    required int statusId,
+  }) {
+    return InkWell(
+      onTap: () {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Limpiar Tag Writer'),
+              content: const Text(
+                  '¿Estás seguro de que deseas limpiar los datos del tag writer? Esta acción no se puede deshacer.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _tagWriterData.remove(statusId);
+                    });
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('✅ Datos de tag writer limpiados')),
+                    );
+                  },
+                  child: const Text('Limpiar',
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE57373), Color(0xFFEF9A9A)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE57373).withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.delete_rounded,
+          color: Colors.white,
+          size: 20,
+        ),
+      ),
+    );
+  }
+
+  /// Botón de limpieza inline para tag-transfer
+  Widget _buildTagTransferCleanupButton({
+    required int statusId,
+  }) {
+    return InkWell(
+      onTap: () {
+        showDialog<void>(
+          context: context,
+          builder: (dialogContext) {
+            return AlertDialog(
+              title: const Text('Limpiar Tag Transfer'),
+              content: const Text(
+                  '¿Estás seguro de que deseas limpiar los datos del tag transfer? Esta acción no se puede deshacer.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('Cancelar'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() {
+                      _tagTransferData.remove(statusId);
+                    });
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text('✅ Datos de tag transfer limpiados')),
+                    );
+                  },
+                  child: const Text('Limpiar',
+                      style: TextStyle(color: Colors.red)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE57373), Color(0xFFEF9A9A)],
+          ),
+          borderRadius: BorderRadius.circular(8),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFE57373).withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.delete_rounded,
           color: Colors.white,
           size: 20,
         ),
@@ -5124,7 +4721,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (recordContent == null) continue;
 
       // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {};
+      final Map<String, dynamic> record = {
+        'operatorId': '',
+        'operator2Id': '',
+        'visits': 0,
+        'results': 0,
+        'headquarterId': 0,
+        'dateTime': DateTime.now(),
+      };
       final fields = recordContent.split(';');
 
       for (var field in fields) {
@@ -5159,7 +4763,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               record['operatorId'] = value;
               break;
             case 'OP2':
-              record['operator2Id'] = value; // Operador Cortero
+              // Si OP2 es "false" (string literal), dejarlo como vacío
+              record['operator2Id'] = (value == 'false') ? '' : value;
               break;
             case 'VISITS':
               record['visits'] = int.tryParse(value) ?? 0;
@@ -5174,7 +4779,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
       }
 
-      if (record.isNotEmpty) {
+      if (record['operatorId'].toString().isNotEmpty) {
         parsedData.add(record);
       }
     }
@@ -5193,7 +4798,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('📋 Fórmula original: "$formula"');
       debugPrint('📊 Valores disponibles en _statusValuesByName:');
       if (_statusValuesByName.isEmpty) {
-        debugPrint('   ⚠️  El map está VACÍO - no hay valores numéricos guardados');
+        debugPrint(
+            '   ⚠️  El map está VACÍO - no hay valores numéricos guardados');
       } else {
         for (var entry in _statusValuesByName.entries) {
           debugPrint('   ✓ ${entry.key} = ${entry.value}');
@@ -5208,7 +4814,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('📝 Expresión después de remover "=": "$expression"');
 
       // Reemplazar nombres de status por sus valores (case-insensitive)
-      String originalExpression = expression;
       int replacementCount = 0;
       for (var entry in _statusValuesByName.entries) {
         final statusName = entry.key;
@@ -5223,7 +4828,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
 
       if (replacementCount == 0) {
-        debugPrint('   ⚠️  NO se hicieron reemplazos - posiblemente los nombres en la fórmula no coinciden');
+        debugPrint(
+            '   ⚠️  NO se hicieron reemplazos - posiblemente los nombres en la fórmula no coinciden');
       } else {
         debugPrint('   ✅ Total de reemplazos: $replacementCount');
       }
@@ -5290,10 +4896,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         // Extraer el número a la derecha
         int rightEnd = opIndex + 1;
-        while (rightEnd < expression.length && _isNumberChar(expression[rightEnd])) {
+        while (rightEnd < expression.length &&
+            _isNumberChar(expression[rightEnd])) {
           rightEnd++;
         }
-        final rightNum = double.parse(expression.substring(opIndex + 1, rightEnd));
+        final rightNum =
+            double.parse(expression.substring(opIndex + 1, rightEnd));
 
         // Calcular el resultado
         double result;
@@ -5334,36 +4942,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final bool isNegative = intValue < 0;
     final String absValue = intValue.abs().toString();
 
-    // Separar en grupos de 3 desde la derecha
-    final List<String> parts = [];
-    for (int i = absValue.length; i > 0; i -= 3) {
-      final int start = i - 3 < 0 ? 0 : i - 3;
-      parts.insert(0, absValue.substring(start, i));
-    }
-
-    // Unir con puntos y comilla simple
-    String formatted = '';
-    for (int i = 0; i < parts.length; i++) {
-      if (i > 0) {
-        // Usar comilla simple para separar millones, puntos para miles
-        formatted += (i == parts.length - 2 && parts.length > 2) ? '.' : '.';
-        // Si es el primer separador y hay más de 2 grupos, usar comilla simple
-        if (i == 1 && parts.length > 2) {
-          formatted = parts[0] + "'" + parts.sublist(1).join('.');
-          break;
-        }
-      }
-      formatted += parts[i];
-    }
-
     // Simplificar: usar punto para miles, comilla para millones
     final regex = RegExp(r'(\d)(?=(\d{3})+(?!\d))');
-    String result = absValue.replaceAllMapped(regex, (match) => '${match.group(1)}.');
+    String result =
+        absValue.replaceAllMapped(regex, (match) => '${match.group(1)}.');
 
     // Cambiar el primer punto por comilla simple si hay más de 6 dígitos (millones)
     if (absValue.length > 6) {
       final parts = result.split('.');
-      result = parts[0] + "'" + parts.sublist(1).join('.');
+      result = "${parts[0]}'${parts.sublist(1).join('.')}";
     }
 
     return isNegative ? '-$result' : result;
@@ -5371,7 +4958,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   /// Verifica si un carácter es parte de un número (dígito, punto decimal, o signo negativo al inicio)
   bool _isNumberChar(String char) {
-    return char == '.' || char == '-' || (char.codeUnitAt(0) >= 48 && char.codeUnitAt(0) <= 57);
+    return char == '.' ||
+        char == '-' ||
+        (char.codeUnitAt(0) >= 48 && char.codeUnitAt(0) <= 57);
   }
 
   /// Recalcula todas las operaciones numbers-operation que dependen de valores cambiados
@@ -5391,12 +4980,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Función helper para procesar un status y encontrar operations
     void processStatus(dynamic status, String location) {
-      final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+      final typeStatus =
+          getJsonField(status, r'''$.type_status''')?.toString() ?? '';
       if (typeStatus.toLowerCase() == 'numbers-operation') {
         operationsFound++;
         final statusId = getJsonField(status, r'''$.id_activity_status''');
-        final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
-        final formula = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+        final statusName =
+            getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+        final formula =
+            getJsonField(status, r'''$.default_status''')?.toString() ?? '';
 
         debugPrint('📊 Operación #$operationsFound encontrada en $location:');
         debugPrint('   ID: $statusId');
@@ -5425,16 +5017,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
 
       // Buscar recursivamente en steps_childs
-      final stepsChilds = getJsonField(status, r'''$.steps_childs''')?.toList() ?? [];
+      final stepsChilds =
+          getJsonField(status, r'''$.steps_childs''')?.toList() ?? [];
       for (var childStep in stepsChilds) {
-        final childStatusList = getJsonField(childStep, r'''$.activity_status''')?.toList() ?? [];
+        final childStatusList =
+            getJsonField(childStep, r'''$.activity_status''')?.toList() ?? [];
         for (var childStatus in childStatusList) {
           processStatus(childStatus, 'steps_childs');
         }
       }
 
       // Buscar recursivamente en status_childs
-      final statusChilds = getJsonField(status, r'''$.status_childs''')?.toList() ?? [];
+      final statusChilds =
+          getJsonField(status, r'''$.status_childs''')?.toList() ?? [];
       for (var childStatus in statusChilds) {
         processStatus(childStatus, 'status_childs');
       }
@@ -5442,9 +5037,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // 1. Buscar en ROOT STATUS (activity_status directos de la actividad)
     final rootStatusList = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_status''',
-    )?.toList() ?? [];
+          FFAppState().currentActivity,
+          r'''$.activity_status''',
+        )?.toList() ??
+        [];
 
     debugPrint('🔍 Buscando en ${rootStatusList.length} root status...');
     for (var status in rootStatusList) {
@@ -5454,7 +5050,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // 2. Recorrer todos los steps y sus status
     debugPrint('🔍 Buscando en ${activitySteps.length} activity steps...');
     for (var step in activitySteps) {
-      final statusList = getJsonField(step, r'''$.activity_status''')?.toList() ?? [];
+      final statusList =
+          getJsonField(step, r'''$.activity_status''')?.toList() ?? [];
       for (var status in statusList) {
         processStatus(status, 'step status');
       }
@@ -5471,7 +5068,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   /// Guarda el resultado de una operación en visitDetails
   void _saveOperationResult(dynamic status, double result) async {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+    final statusName =
+        getJsonField(status, r'''$.status_name''')?.toString() ?? '';
 
     debugPrint('💾 Guardando resultado de operación en visitDetails:');
     debugPrint('   Status: $statusName (ID: $statusId)');
@@ -5489,7 +5087,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Obtener el step parent del status
     int parentStepId = 0;
     try {
-      final activityStepsRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+      final activityStepsRaw =
+          getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
       if (activityStepsRaw != null) {
         final activitySteps = activityStepsRaw.toList();
         for (var step in activitySteps) {
@@ -5561,7 +5160,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final currentYear = now.year;
       final currentMonth = now.month;
 
-      debugPrint('📊 Cargando weights para ${headquarterIds.length} lotes (año: $currentYear, mes: $currentMonth)');
+      debugPrint(
+          '📊 Cargando weights para ${headquarterIds.length} lotes (año: $currentYear, mes: $currentMonth)');
 
       // Limpiar lista de lotes sin peso antes de cargar
       _headquartersWithoutWeight.clear();
@@ -5594,23 +5194,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           setState(() {
             _headquarterWeights[headquarterId] = weight;
           });
-          debugPrint('   ✅ Lote $headquarterId ($headquarterName): weight = $weight');
+          debugPrint(
+              '   ✅ Lote $headquarterId ($headquarterName): weight = $weight');
         } else {
           // Agregar a la lista de lotes sin peso
           _headquartersWithoutWeight.add({
             'headquarterId': headquarterId,
             'headquarterName': headquarterName,
           });
-          debugPrint('   ⚠️ Lote $headquarterId ($headquarterName): SIN peso promedio configurado');
+          debugPrint(
+              '   ⚠️ Lote $headquarterId ($headquarterName): SIN peso promedio configurado');
         }
       }
 
       // Log resumen
       if (_headquartersWithoutWeight.isNotEmpty) {
         debugPrint('');
-        debugPrint('⚠️ ADVERTENCIA: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio:');
+        debugPrint(
+            '⚠️ ADVERTENCIA: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio:');
         for (var hq in _headquartersWithoutWeight) {
-          debugPrint('   - ${hq['headquarterName']} (ID: ${hq['headquarterId']})');
+          debugPrint(
+              '   - ${hq['headquarterName']} (ID: ${hq['headquarterId']})');
         }
       }
     } catch (e) {
@@ -5627,24 +5231,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         return Dialog(
           backgroundColor: Colors.transparent,
           child: Container(
-            constraints: BoxConstraints(maxWidth: 400),
-            padding: EdgeInsets.all(24),
+            constraints: const BoxConstraints(maxWidth: 400),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
+              gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [Color(0xFF7F1D1D), Color(0xFF991B1B)],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Color(0xFFDC2626).withOpacity(0.5),
+                color: const Color(0xFFDC2626).withValues(alpha: 0.5),
                 width: 2,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 0.5),
                   blurRadius: 20,
-                  offset: Offset(0, 10),
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
@@ -5656,23 +5260,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   width: 70,
                   height: 70,
                   decoration: BoxDecoration(
-                    color: Color(0xFFDC2626).withOpacity(0.2),
+                    color: const Color(0xFFDC2626).withValues(alpha: 0.2),
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: Color(0xFFDC2626).withOpacity(0.5),
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.5),
                       width: 2,
                     ),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.warning_amber_rounded,
                     color: Color(0xFFFCA5A5),
                     size: 40,
                   ),
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 // Título
-                Text(
+                const Text(
                   '⚠️ Peso Promedio No Configurado',
                   textAlign: TextAlign.center,
                   style: TextStyle(
@@ -5682,7 +5286,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 // Descripción
                 Text(
@@ -5691,41 +5295,42 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     height: 1.4,
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 // Lista de lotes sin peso
                 Container(
-                  constraints: BoxConstraints(maxHeight: 150),
+                  constraints: const BoxConstraints(maxHeight: 150),
                   child: SingleChildScrollView(
                     child: Column(
                       children: _headquartersWithoutWeight.map((hq) {
                         return Container(
-                          margin: EdgeInsets.only(bottom: 8),
-                          padding: EdgeInsets.all(12),
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
-                              color: Color(0xFFDC2626).withOpacity(0.3),
+                              color: const Color(0xFFDC2626)
+                                  .withValues(alpha: 0.3),
                               width: 1,
                             ),
                           ),
                           child: Row(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.location_on,
                                 color: Color(0xFFFCA5A5),
                                 size: 20,
                               ),
-                              SizedBox(width: 10),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   '${hq['headquarterName']}',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
@@ -5738,7 +5343,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
                                   fontSize: 12,
-                                  color: Colors.white.withOpacity(0.6),
+                                  color: Colors.white.withValues(alpha: 0.6),
                                 ),
                               ),
                             ],
@@ -5748,20 +5353,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ),
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
 
                 // Advertencia
                 Container(
-                  padding: EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: Color(0xFFFFB020).withOpacity(0.5),
+                      color: const Color(0xFFFFB020).withValues(alpha: 0.5),
                       width: 1,
                     ),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(
                         Icons.info_outline,
@@ -5784,7 +5389,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ],
                   ),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // Botón cerrar
                 SizedBox(
@@ -5792,14 +5397,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(dialogContext).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFFDC2626),
+                      backgroundColor: const Color(0xFFDC2626),
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
+                    child: const Text(
                       'Entendido',
                       style: TextStyle(
                         fontFamily: 'Roboto',
@@ -5820,24 +5425,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   /// Calcula la distancia desde el origen hasta la extractora
   /// Opción 1: Usar coordenadas del TAG_READER especificado en default_status
   /// Opción 2: Si distancia > 200km, usar coordenadas de Products (línea y palma menor del lote)
-  Future<void> _calculateDistance(int statusId, dynamic status, dynamic parentStep) async {
+  Future<void> _calculateDistance(
+      int statusId, dynamic status, dynamic parentStep) async {
     try {
       debugPrint('');
       debugPrint('📏 ===== INICIO CÁLCULO DE DISTANCIA =====');
 
-      final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+      final defaultStatus =
+          getJsonField(status, r'''$.default_status''')?.toString() ?? '';
       debugPrint('🔍 default_status: "$defaultStatus"');
 
       // Variables para las coordenadas de origen
       double? originLat;
       double? originLng;
-      String originSource = '';
 
       // OPCIÓN 1: Buscar coordenadas del TAG_READER especificado
       if (defaultStatus.startsWith('=TAG_READER:')) {
-        final tagReaderName = defaultStatus.substring(12).trim(); // Quitar "=TAG_READER:"
+        final tagReaderName =
+            defaultStatus.substring(12).trim(); // Quitar "=TAG_READER:"
         debugPrint('📍 Buscando TAG_READER con nombre: "$tagReaderName"');
-        debugPrint('📋 Total TAG_READER en _tagReaderGeolocations: ${_tagReaderGeolocations.length}');
+        debugPrint(
+            '📋 Total TAG_READER en _tagReaderGeolocations: ${_tagReaderGeolocations.length}');
 
         // Buscar directamente por nombre comparando con los status name guardados
         // Primero obtener todos los status de la actividad
@@ -5858,12 +5466,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         // Buscar en root status
         for (var status in activityStatus) {
-          final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
-          final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+          final statusName =
+              getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+          final typeStatus =
+              getJsonField(status, r'''$.type_status''')?.toString() ?? '';
           if (typeStatus.toLowerCase() == 'tag-reader' &&
               statusName.toLowerCase() == tagReaderName.toLowerCase()) {
-            targetTagReaderId = getJsonField(status, r'''$.id_activity_status''');
-            debugPrint('   ✅ Encontrado en root status: "$statusName" (ID: $targetTagReaderId)');
+            targetTagReaderId =
+                getJsonField(status, r'''$.id_activity_status''');
+            debugPrint(
+                '   ✅ Encontrado en root status: "$statusName" (ID: $targetTagReaderId)');
             break;
           }
         }
@@ -5874,12 +5486,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             final statusListRaw = getJsonField(step, r'''$.activity_status''');
             final statusList = statusListRaw?.toList() ?? [];
             for (var status in statusList) {
-              final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
-              final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+              final statusName =
+                  getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+              final typeStatus =
+                  getJsonField(status, r'''$.type_status''')?.toString() ?? '';
               if (typeStatus.toLowerCase() == 'tag-reader' &&
                   statusName.toLowerCase() == tagReaderName.toLowerCase()) {
-                targetTagReaderId = getJsonField(status, r'''$.id_activity_status''');
-                debugPrint('   ✅ Encontrado en step: "$statusName" (ID: $targetTagReaderId)');
+                targetTagReaderId =
+                    getJsonField(status, r'''$.id_activity_status''');
+                debugPrint(
+                    '   ✅ Encontrado en step: "$statusName" (ID: $targetTagReaderId)');
                 break;
               }
             }
@@ -5888,7 +5504,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
 
         if (targetTagReaderId == null) {
-          debugPrint('⚠️ No se encontró status TAG_READER con nombre "$tagReaderName"');
+          debugPrint(
+              '⚠️ No se encontró status TAG_READER con nombre "$tagReaderName"');
           return;
         }
 
@@ -5897,24 +5514,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           final geolocation = _tagReaderGeolocations[targetTagReaderId]!;
           originLat = geolocation.latitude;
           originLng = geolocation.longitude;
-          originSource = 'TAG_READER: $tagReaderName';
           debugPrint('✅ Coordenadas encontradas: ($originLat, $originLng)');
         } else {
-          debugPrint('⚠️ TAG_READER "$tagReaderName" (ID: $targetTagReaderId) no tiene coordenadas en _tagReaderGeolocations');
-          debugPrint('   IDs disponibles: ${_tagReaderGeolocations.keys.toList()}');
-          return;
-        }
-
-        if (originLat == null || originLng == null) {
-          debugPrint('⚠️ No se encontró TAG_READER "$tagReaderName"');
+          debugPrint(
+              '⚠️ TAG_READER "$tagReaderName" (ID: $targetTagReaderId) no tiene coordenadas en _tagReaderGeolocations');
+          debugPrint(
+              '   IDs disponibles: ${_tagReaderGeolocations.keys.toList()}');
           return;
         }
       } else if (_lastTagReaderLocation != null) {
         // Usar última ubicación de tag-reader como fallback
         originLat = _lastTagReaderLocation!.latitude;
         originLng = _lastTagReaderLocation!.longitude;
-        originSource = 'Último TAG_READER';
-        debugPrint('📍 Usando última ubicación TAG_READER: ($originLat, $originLng)');
+        debugPrint(
+            '📍 Usando última ubicación TAG_READER: ($originLat, $originLng)');
       } else {
         debugPrint('⚠️ No hay ubicación de tag-reader disponible');
         return;
@@ -5932,15 +5545,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('   📊 Company completo: ${company.toMap()}');
 
       if (extractoraLat == 0.0 || extractoraLng == 0.0) {
-        debugPrint('⚠️ ⚠️ ⚠️ ERROR: Coordenadas de extractora no configuradas o inválidas ⚠️ ⚠️ ⚠️');
-        debugPrint('   Las coordenadas de la extractora deben venir del API de Login');
-        debugPrint('   Verifica que el API devuelva latitude_extractor y longitude_extractor');
+        debugPrint(
+            '⚠️ ⚠️ ⚠️ ERROR: Coordenadas de extractora no configuradas o inválidas ⚠️ ⚠️ ⚠️');
+        debugPrint(
+            '   Las coordenadas de la extractora deben venir del API de Login');
+        debugPrint(
+            '   Verifica que el API devuelva latitude_extractor y longitude_extractor');
 
         // Mostrar un diálogo de error al usuario
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('⚠️ No se encontraron coordenadas de la extractora.\nConfigure las coordenadas en el sistema.'),
+            const SnackBar(
+              content: Text(
+                  '⚠️ No se encontraron coordenadas de la extractora.\nConfigure las coordenadas en el sistema.'),
               backgroundColor: Colors.orange,
               duration: Duration(seconds: 5),
             ),
@@ -5950,17 +5567,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
 
       // Calcular distancia OPCIÓN 1 (desde TAG) usando fórmula de Haversine
-      double distanceFromTag = _calculateHaversineDistance(originLat, originLng, extractoraLat, extractoraLng);
+      double distanceFromTag = _calculateHaversineDistance(
+          originLat, originLng, extractoraLat, extractoraLng);
 
-      debugPrint('📐 Distancia calculada (OPCIÓN 1 - desde TAG): ${distanceFromTag.toStringAsFixed(2)} metros (${(distanceFromTag/1000).toStringAsFixed(2)} km)');
+      debugPrint(
+          '📐 Distancia calculada (OPCIÓN 1 - desde TAG): ${distanceFromTag.toStringAsFixed(2)} metros (${(distanceFromTag / 1000).toStringAsFixed(2)} km)');
 
       // OPCIÓN 2: SIEMPRE calcular distancia desde Products para CADA lote SELECCIONADO
       debugPrint('');
-      debugPrint('📦 ===== CALCULANDO OPCIÓN 2 (desde Producto por cada lote) =====');
+      debugPrint(
+          '📦 ===== CALCULANDO OPCIÓN 2 (desde Producto por cada lote) =====');
 
       // Obtener lotes SELECCIONADOS de FFAppState().headquartersSelectedList
       final selectedHeadquarters = FFAppState().headquartersSelectedList;
-      debugPrint('📋 Lotes seleccionados en headquartersSelectedList: ${selectedHeadquarters.length}');
+      debugPrint(
+          '📋 Lotes seleccionados en headquartersSelectedList: ${selectedHeadquarters.length}');
       for (var hq in selectedHeadquarters) {
         debugPrint('   - Lote ${hq.idHeadquarter}: ${hq.nameHeadquarter}');
       }
@@ -5995,7 +5616,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 : 'Lote #$loteHeadquarterId';
 
             debugPrint('');
-            debugPrint('🏢 ===== PROCESANDO LOTE $loteHeadquarterId ($loteName) =====');
+            debugPrint(
+                '🏢 ===== PROCESANDO LOTE $loteHeadquarterId ($loteName) =====');
 
             // Consultar productos del lote específico desde SQLite
             // Ordenar por Line ASC, Palm ASC para obtener la línea menor primero, y dentro de esa línea la palma menor
@@ -6004,13 +5626,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               where: 'Id_headquarter = ? AND Line > 0 AND Palm > 0',
               whereArgs: [loteHeadquarterId],
               orderBy: 'Line ASC, Palm ASC',
-              limit: 1, // Solo necesitamos el producto con línea y palma menores
+              limit:
+                  1, // Solo necesitamos el producto con línea y palma menores
             );
 
-            debugPrint('📊 Productos encontrados en SQLite para lote $loteHeadquarterId: ${productsRaw.length}');
+            debugPrint(
+                '📊 Productos encontrados en SQLite para lote $loteHeadquarterId: ${productsRaw.length}');
 
             if (productsRaw.isEmpty) {
-              debugPrint('❌ No se encontró ningún producto en lote $loteHeadquarterId');
+              debugPrint(
+                  '❌ No se encontró ningún producto en lote $loteHeadquarterId');
               continue;
             }
 
@@ -6042,18 +5667,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               }
 
               if (productLat != null && productLng != null) {
-                debugPrint('   - Coordenadas parseadas: ($productLat, $productLng)');
+                debugPrint(
+                    '   - Coordenadas parseadas: ($productLat, $productLng)');
 
                 // Calcular distancia desde producto
                 final distanceFromProduct = _calculateHaversineDistance(
-                  productLat,
-                  productLng,
-                  extractoraLat,
-                  extractoraLng
-                );
+                    productLat, productLng, extractoraLat, extractoraLng);
 
                 final distanceKm = distanceFromProduct / 1000;
-                debugPrint('📐 Distancia desde producto (OPCIÓN 2): ${distanceFromProduct.toStringAsFixed(2)} metros (${distanceKm.toStringAsFixed(2)} km)');
+                debugPrint(
+                    '📐 Distancia desde producto (OPCIÓN 2): ${distanceFromProduct.toStringAsFixed(2)} metros (${distanceKm.toStringAsFixed(2)} km)');
 
                 // Agregar a la lista de distancias
                 distancesFromProducts.add({
@@ -6064,10 +5687,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   'palm': palm ?? 0,
                 });
               } else {
-                debugPrint('⚠️ Error parseando coordenadas del location_raw: "$locationRaw"');
+                debugPrint(
+                    '⚠️ Error parseando coordenadas del location_raw: "$locationRaw"');
               }
             } else {
-              debugPrint('❌ Producto encontrado pero sin coordenadas (Location_raw vacío o null)');
+              debugPrint(
+                  '❌ Producto encontrado pero sin coordenadas (Location_raw vacío o null)');
             }
           } // fin del for de lotes seleccionados
 
@@ -6083,16 +5708,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       setState(() {
         _calculatedDistances[statusId] = distanceFromTag; // OPCIÓN 1
         if (distancesFromProducts.isNotEmpty) {
-          _calculatedDistancesFromProduct[statusId] = distancesFromProducts; // OPCIÓN 2 (lista)
+          _calculatedDistancesFromProduct[statusId] =
+              distancesFromProducts; // OPCIÓN 2 (lista)
         }
         _distanceExtractorCalculated[statusId] = true;
       });
 
-      debugPrint('✅ Distancia desde TAG (OPCIÓN 1): ${distanceFromTag.toStringAsFixed(2)} metros');
+      debugPrint(
+          '✅ Distancia desde TAG (OPCIÓN 1): ${distanceFromTag.toStringAsFixed(2)} metros');
       if (distancesFromProducts.isNotEmpty) {
-        debugPrint('✅ Distancias desde Productos (OPCIÓN 2): ${distancesFromProducts.length} lotes');
+        debugPrint(
+            '✅ Distancias desde Productos (OPCIÓN 2): ${distancesFromProducts.length} lotes');
         for (var item in distancesFromProducts) {
-          debugPrint('   - ${item['headquarterName']}: ${item['distance'].toStringAsFixed(2)} m (Línea: ${item['line']}, Palma: ${item['palm']})');
+          debugPrint(
+              '   - ${item['headquarterName']}: ${item['distance'].toStringAsFixed(2)} m (Línea: ${item['line']}, Palma: ${item['palm']})');
         }
       }
       debugPrint('📏 ===== FIN CÁLCULO DE DISTANCIA =====');
@@ -6102,13 +5731,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Distancia calculada: ${(distanceFromTag/1000).toStringAsFixed(2)} km'),
-            backgroundColor: Color(0xFF00a86b),
-            duration: Duration(seconds: 2),
+            content: Text(
+                '✅ Distancia calculada: ${(distanceFromTag / 1000).toStringAsFixed(2)} km'),
+            backgroundColor: const Color(0xFF00a86b),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
-
     } catch (e) {
       debugPrint('❌ Error calculando distancia: $e');
       debugPrint('📏 ===== FIN CÁLCULO DE DISTANCIA (CON ERROR) =====');
@@ -6120,7 +5749,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           SnackBar(
             content: Text('❌ Error calculando distancia: $e'),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -6128,86 +5757,48 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   /// Calcula la distancia entre dos puntos usando la fórmula de Haversine
-  double _calculateHaversineDistance(double lat1, double lng1, double lat2, double lng2) {
+  double _calculateHaversineDistance(
+      double lat1, double lng1, double lat2, double lng2) {
     final lat1Rad = lat1 * (math.pi / 180);
     final lat2Rad = lat2 * (math.pi / 180);
     final dLat = lat2Rad - lat1Rad;
     final dLng = (lng2 - lng1) * (math.pi / 180);
 
     final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1Rad) * math.cos(lat2Rad) *
-        math.sin(dLng / 2) * math.sin(dLng / 2);
+        math.cos(lat1Rad) *
+            math.cos(lat2Rad) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
     final c = 2 * math.asin(math.sqrt(a));
-    final earthRadius = 6371000; // Radio de la Tierra en metros
+    const earthRadius = 6371000; // Radio de la Tierra en metros
     return earthRadius * c;
-  }
-
-  /// Busca un status por su ID en toda la estructura de activity
-  dynamic _findStatusById(int statusId) {
-    final activityStepsRaw = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_steps''',
-    );
-    if (activityStepsRaw == null) return null;
-    final activitySteps = activityStepsRaw.toList();
-
-    dynamic searchInStatus(dynamic status) {
-      final currentId = getJsonField(status, r'''$.id_activity_status''');
-      if (currentId == statusId) {
-        return status;
-      }
-
-      // Buscar en steps_childs
-      final stepsChilds = getJsonField(status, r'''$.steps_childs''')?.toList() ?? [];
-      for (var childStep in stepsChilds) {
-        final childStatusList = getJsonField(childStep, r'''$.activity_status''')?.toList() ?? [];
-        for (var childStatus in childStatusList) {
-          final found = searchInStatus(childStatus);
-          if (found != null) return found;
-        }
-      }
-
-      // Buscar en status_childs
-      final statusChilds = getJsonField(status, r'''$.status_childs''')?.toList() ?? [];
-      for (var childStatus in statusChilds) {
-        final found = searchInStatus(childStatus);
-        if (found != null) return found;
-      }
-
-      return null;
-    }
-
-    for (var step in activitySteps) {
-      final statusListRaw = getJsonField(step, r'''$.activity_status''');
-      final statusList = statusListRaw?.toList() ?? [];
-      for (var status in statusList) {
-        final found = searchInStatus(status);
-        if (found != null) return found;
-      }
-    }
-
-    return null;
   }
 
   /// Busca y calcula automáticamente las distancias de todos los distance-extractor
   /// que referencian al tag-reader especificado
-  Future<void> _autoCalculateRelatedDistances(int tagReaderStatusId, String tagReaderName) async {
+  Future<void> _autoCalculateRelatedDistances(
+      int tagReaderStatusId, String tagReaderName) async {
     try {
       debugPrint('');
-      debugPrint('🔍 Buscando distance-extractor que referencien TAG_READER "$tagReaderName" (ID: $tagReaderStatusId)');
+      debugPrint(
+          '🔍 Buscando distance-extractor que referencien TAG_READER "$tagReaderName" (ID: $tagReaderStatusId)');
 
       // Obtener steps y status con manejo de nulos
       final activityStepsRaw = getJsonField(
         FFAppState().currentActivity,
         r'''$.activity_steps''',
       );
-      final activitySteps = activityStepsRaw != null ? (activityStepsRaw is List ? activityStepsRaw : []) : [];
+      final activitySteps = activityStepsRaw != null
+          ? (activityStepsRaw is List ? activityStepsRaw : [])
+          : [];
 
       final activityStatusRaw = getJsonField(
         FFAppState().currentActivity,
         r'''$.activity_status''',
       );
-      final activityStatus = activityStatusRaw != null ? (activityStatusRaw is List ? activityStatusRaw : []) : [];
+      final activityStatus = activityStatusRaw != null
+          ? (activityStatusRaw is List ? activityStatusRaw : [])
+          : [];
 
       debugPrint('📊 Activity steps encontrados: ${activitySteps.length}');
       debugPrint('📊 Activity status encontrados: ${activityStatus.length}');
@@ -6217,25 +5808,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       // Función helper para procesar un status y buscar distance-extractor
       Future<void> processStatus(dynamic status, dynamic parentStep) async {
-        final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+        final typeStatus =
+            getJsonField(status, r'''$.type_status''')?.toString() ?? '';
 
         if (typeStatus.toLowerCase() == 'distance-extractor') {
           totalDistanceExtractors++;
           final statusId = getJsonField(status, r'''$.id_activity_status''');
-          final statusName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
-          final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+          final statusName =
+              getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+          final defaultStatus =
+              getJsonField(status, r'''$.default_status''')?.toString() ?? '';
 
-          debugPrint('   📋 distance-extractor #$totalDistanceExtractors: "$statusName" (ID: $statusId)');
+          debugPrint(
+              '   📋 distance-extractor #$totalDistanceExtractors: "$statusName" (ID: $statusId)');
           debugPrint('      default_status: "$defaultStatus"');
-          debugPrint('      Comparando con: "=tag_reader:${tagReaderName.toLowerCase()}"');
+          debugPrint(
+              '      Comparando con: "=tag_reader:${tagReaderName.toLowerCase()}"');
 
           // Verificar si este distance-extractor referencia al tag-reader actual
-          final normalizedDefault = defaultStatus.trim().toLowerCase().replaceAll(' ', '');
-          final expectedPattern1 = '=tag_reader:${tagReaderName.toLowerCase()}'.replaceAll(' ', '');
-          final expectedPattern2 = '=tag_reader:${tagReaderName.toLowerCase()}'.replaceAll(' ', '');
+          final normalizedDefault =
+              defaultStatus.trim().toLowerCase().replaceAll(' ', '');
+          final expectedPattern1 =
+              '=tag_reader:${tagReaderName.toLowerCase()}'.replaceAll(' ', '');
+          final expectedPattern2 =
+              '=tag_reader:${tagReaderName.toLowerCase()}'.replaceAll(' ', '');
 
-          if (normalizedDefault == expectedPattern1 || normalizedDefault == expectedPattern2 ||
-              defaultStatus.toLowerCase().contains(tagReaderName.toLowerCase())) {
+          if (normalizedDefault == expectedPattern1 ||
+              normalizedDefault == expectedPattern2 ||
+              defaultStatus
+                  .toLowerCase()
+                  .contains(tagReaderName.toLowerCase())) {
             foundCount++;
             debugPrint('      ✅ COINCIDE! Calculando distancia...');
 
@@ -6248,10 +5850,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         // Buscar recursivamente en steps_childs
         final stepsChildsRaw = getJsonField(status, r'''$.steps_childs''');
-        final stepsChilds = stepsChildsRaw != null ? (stepsChildsRaw is List ? stepsChildsRaw : []) : [];
+        final stepsChilds = stepsChildsRaw != null
+            ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+            : [];
         for (var childStep in stepsChilds) {
-          final childStatusListRaw = getJsonField(childStep, r'''$.activity_status''');
-          final childStatusList = childStatusListRaw != null ? (childStatusListRaw is List ? childStatusListRaw : []) : [];
+          final childStatusListRaw =
+              getJsonField(childStep, r'''$.activity_status''');
+          final childStatusList = childStatusListRaw != null
+              ? (childStatusListRaw is List ? childStatusListRaw : [])
+              : [];
           for (var childStatus in childStatusList) {
             await processStatus(childStatus, childStep);
           }
@@ -6259,7 +5866,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
         // Buscar recursivamente en status_childs
         final statusChildsRaw = getJsonField(status, r'''$.status_childs''');
-        final statusChilds = statusChildsRaw != null ? (statusChildsRaw is List ? statusChildsRaw : []) : [];
+        final statusChilds = statusChildsRaw != null
+            ? (statusChildsRaw is List ? statusChildsRaw : [])
+            : [];
         for (var childStatus in statusChilds) {
           await processStatus(childStatus, parentStep);
         }
@@ -6268,7 +5877,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       // Buscar en steps
       for (var step in activitySteps) {
         final statusListRaw = getJsonField(step, r'''$.activity_status''');
-        final statusList = statusListRaw != null ? (statusListRaw is List ? statusListRaw : []) : [];
+        final statusList = statusListRaw != null
+            ? (statusListRaw is List ? statusListRaw : [])
+            : [];
         for (var status in statusList) {
           await processStatus(status, step);
         }
@@ -6281,7 +5892,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       debugPrint('');
       debugPrint('📊 Resumen búsqueda:');
-      debugPrint('   Total distance-extractor encontrados: $totalDistanceExtractors');
+      debugPrint(
+          '   Total distance-extractor encontrados: $totalDistanceExtractors');
       debugPrint('   Que referencian "$tagReaderName": $foundCount');
 
       if (foundCount == 0) {
@@ -6290,7 +5902,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         debugPrint('   ✅ Total calculados: $foundCount');
       }
       debugPrint('');
-
     } catch (e) {
       debugPrint('❌ Error en _autoCalculateRelatedDistances: $e');
       debugPrint('');
@@ -6319,7 +5930,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Intentar obtener inmediatamente
     final immediate = getLatestValidGeolocation();
     if (immediate != null) {
-      debugPrint('📍 Geolocalización disponible: ${immediate.latitude}, ${immediate.longitude}');
+      debugPrint(
+          '📍 Geolocalización disponible: ${immediate.latitude}, ${immediate.longitude}');
       return immediate;
     }
 
@@ -6336,8 +5948,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         return StatefulBuilder(
           builder: (context, setState) {
             // Verificar periódicamente si hay geolocalización válida
-            Future.delayed(Duration(milliseconds: 500), () {
-              if (!cancelled) {
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (!cancelled && dialogContext.mounted) {
                 final geo = getLatestValidGeolocation();
                 if (geo != null) {
                   result = geo;
@@ -6351,41 +5963,45 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             return Dialog(
               backgroundColor: Colors.black87,
               child: Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+                    const CircularProgressIndicator(
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
                     ),
-                    SizedBox(height: 16),
-                    Text(
+                    const SizedBox(height: 16),
+                    const Text(
                       'Esperando ubicación GPS...',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 8),
-                    Text(
+                    const SizedBox(height: 8),
+                    const Text(
                       'Por favor espere mientras se obtiene una ubicación válida',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 13,
                         color: Colors.white70,
                       ),
                       textAlign: TextAlign.center,
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     TextButton(
                       onPressed: () {
                         cancelled = true;
                         Navigator.of(dialogContext).pop();
                       },
-                      child: Text(
+                      child: const Text(
                         'Cancelar',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
                           color: Colors.redAccent,
                           fontWeight: FontWeight.w600,
                         ),
@@ -6401,12 +6017,170 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
 
     if (result != null) {
-      debugPrint('✅ Geolocalización obtenida: ${result!.latitude}, ${result!.longitude}');
+      debugPrint(
+          '✅ Geolocalización obtenida: ${result!.latitude}, ${result!.longitude}');
     } else {
       debugPrint('❌ Espera de geolocalización cancelada');
     }
 
     return result;
+  }
+
+  /// Busca el nombre de un usuario por su operID de forma robusta
+  /// Garantiza que siempre retorna algo, nunca un string vacío
+  String _getUserName(String operID) {
+    if (operID.isEmpty) {
+      debugPrint('👤 _getUserName: operID vacío, retornando vacío');
+      return '';
+    }
+
+    debugPrint('👤 _getUserName: Buscando operID="$operID"');
+    debugPrint(
+        '👤 Total usuarios en usersList: ${FFAppState().usersList.length}');
+
+    // Buscar en usersList por operID
+    final user = FFAppState().usersList.firstWhere(
+          (u) => u.operID == operID,
+          orElse: () => UsersStruct(),
+        );
+
+    if (user.nameUser.isNotEmpty) {
+      debugPrint('✅ _getUserName: Encontrado por operID: "${user.nameUser}"');
+      return user.nameUser;
+    }
+
+    debugPrint('❌ _getUserName: No encontrado por operID');
+
+    // Si no se encuentra en usersList, intentar buscar como número
+    // (podría ser que el ID sea un número directo y no un operID)
+    try {
+      final userId = int.tryParse(operID);
+      if (userId != null) {
+        debugPrint('👤 _getUserName: Intentando buscar por idUser: $userId');
+        final userById = FFAppState().usersList.firstWhere(
+              (u) => u.idUser == userId,
+              orElse: () => UsersStruct(),
+            );
+        if (userById.nameUser.isNotEmpty) {
+          debugPrint(
+              '✅ _getUserName: Encontrado por idUser: "${userById.nameUser}"');
+          return userById.nameUser;
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error buscando usuario por ID: $e');
+    }
+
+    debugPrint(
+        '❌ _getUserName: Usuario no encontrado, retornando operID original: "$operID"');
+    return operID;
+  }
+
+  /// Obtiene el nombre del cortero desde Activities_status usando su IdActivityStatus
+  /// El parámetro idActivityStatus es el OP2 que viene del NFC tag
+  String _getCorterName(String idActivityStatus) {
+    if (idActivityStatus.isEmpty) {
+      debugPrint('🔄 _getCorterName: idActivityStatus vacío, retornando vacío');
+      return '';
+    }
+
+    debugPrint('🔄 _getCorterName: Buscando idActivityStatus="$idActivityStatus"');
+
+    // Intentar parsear como número
+    final id = int.tryParse(idActivityStatus);
+    if (id == null) {
+      debugPrint('❌ _getCorterName: idActivityStatus no es un número válido');
+      return '';
+    }
+
+    // Aquí idealmente se consultaría la base de datos o un cache
+    // Por ahora, intentamos obtenerlo de visitDetails si está disponible
+    try {
+      for (var detail in FFAppState().visitDetails) {
+        if (detail.idActivityStatus == id && detail.statusResponse.isNotEmpty) {
+          debugPrint('✅ _getCorterName: Encontrado en visitDetails: "${detail.statusResponse}"');
+          return detail.statusResponse;
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error buscando en visitDetails: $e');
+    }
+
+    debugPrint('❌ _getCorterName: No encontrado el cortero para idActivityStatus=$idActivityStatus');
+    return '';
+  }
+
+  /// Limpia los datos de tags (tag-reader, tag-writer, tag-transfer) que NO deben ser recordados
+  /// Se ejecuta después de crear la visita para no mostrar contenido INLINE de tags que ya fueron guardados
+  void _cleanupTagDatasByRememberFlag() {
+    debugPrint('🧹 LIMPIEZA DE DATOS DE TAGS VISUALES');
+
+    // NOTA: Los visitDetails ya fueron limpiados por removeVisits() en LoadCoordinatesVisit
+    // Por lo tanto, los tags con rememberStatus=false ya NO están en FFAppState().visitDetails
+    // Debemos buscar en los Maps locales y eliminar los que NO estén en visitDetails (ya fueron eliminados)
+
+    final remainingVisitDetailsIds = FFAppState()
+        .visitDetails
+        .map((d) => d.idActivityStatus)
+        .toSet();
+
+    int cleanedCount = 0;
+
+    // Limpiar tag-reader data: eliminar los que ya no están en visitDetails
+    final tagReaderIdsToRemove = _tagReaderData.keys
+        .where((id) => !remainingVisitDetailsIds.contains(id))
+        .toList();
+    for (final statusId in tagReaderIdsToRemove) {
+      _tagReaderData.remove(statusId);
+      debugPrint('   ❌ Limpiado _tagReaderData[$statusId]');
+      cleanedCount++;
+    }
+
+    // Limpiar tag-reader geolocations
+    final tagReaderGeoIdsToRemove = _tagReaderGeolocations.keys
+        .where((id) => !remainingVisitDetailsIds.contains(id))
+        .toList();
+    for (final statusId in tagReaderGeoIdsToRemove) {
+      _tagReaderGeolocations.remove(statusId);
+      debugPrint('   ❌ Limpiado _tagReaderGeolocations[$statusId]');
+    }
+
+    // Limpiar tag-writer data
+    final tagWriterIdsToRemove = _tagWriterData.keys
+        .where((id) => !remainingVisitDetailsIds.contains(id))
+        .toList();
+    for (final statusId in tagWriterIdsToRemove) {
+      _tagWriterData.remove(statusId);
+      debugPrint('   ❌ Limpiado _tagWriterData[$statusId]');
+      cleanedCount++;
+    }
+
+    // Limpiar tag-transfer data
+    final tagTransferIdsToRemove = _tagTransferData.keys
+        .where((id) => !remainingVisitDetailsIds.contains(id))
+        .toList();
+    for (final statusId in tagTransferIdsToRemove) {
+      _tagTransferData.remove(statusId);
+      debugPrint('   ❌ Limpiado _tagTransferData[$statusId]');
+      cleanedCount++;
+    }
+
+    // Limpiar tag-transfer completed flag
+    final tagTransferCompletedIdsToRemove = _tagTransferCompleted.keys
+        .where((id) => !remainingVisitDetailsIds.contains(id))
+        .toList();
+    for (final statusId in tagTransferCompletedIdsToRemove) {
+      _tagTransferCompleted.remove(statusId);
+      debugPrint('   ❌ Limpiado _tagTransferCompleted[$statusId]');
+    }
+
+    if (cleanedCount == 0) {
+      debugPrint('   ℹ️ No hay tags para limpiar (todos tienen rememberStatus=true)');
+    } else {
+      // Forzar rebuild para que desaparezca el contenido visual
+      setState(() {});
+      debugPrint('✅ Limpieza de tags completada: $cleanedCount tags limpiados');
+    }
   }
 
   // ===== PROCESAR PLACEHOLDERS HTML PARA DYNAMIC-PRINTING =====
@@ -6430,7 +6204,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final placeholder = match.group(0)!; // {NombreCampo}
       final fieldName = match.group(1)!; // NombreCampo
 
-      debugPrint('🔍 [${replacedCount + 1}/${matches.length}] Procesando placeholder: "$placeholder" (campo: "$fieldName")');
+      debugPrint(
+          '🔍 [${replacedCount + 1}/${matches.length}] Procesando placeholder: "$placeholder" (campo: "$fieldName")');
 
       // Buscar el campo en currentStepStatuses
       String replacementValue = _getPlaceholderValue(fieldName);
@@ -6438,7 +6213,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       // Reemplazar el placeholder
       result = result.replaceAll(placeholder, replacementValue);
 
-      final preview = replacementValue.length > 100 ? '${replacementValue.substring(0, 100)}...' : replacementValue;
+      final preview = replacementValue.length > 100
+          ? '${replacementValue.substring(0, 100)}...'
+          : replacementValue;
       debugPrint('   ✅ Reemplazado con: "$preview"');
       debugPrint('');
 
@@ -6458,28 +6235,37 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     String? targetStatusType;
 
     // Buscar en activity_steps
-    final activityStepsRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
-    debugPrint('   Activity steps raw: ${activityStepsRaw != null ? "existe" : "null"}');
+    final activityStepsRaw =
+        getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+    debugPrint(
+        '   Activity steps raw: ${activityStepsRaw != null ? "existe" : "null"}');
 
     if (activityStepsRaw != null) {
-      final activitySteps = (activityStepsRaw is List) ? activityStepsRaw : [activityStepsRaw];
+      final activitySteps =
+          (activityStepsRaw is List) ? activityStepsRaw : [activityStepsRaw];
       debugPrint('   Buscando en ${activitySteps.length} steps');
 
       for (var step in activitySteps) {
         final statusListRaw = getJsonField(step, r'''$.activity_status''');
         if (statusListRaw != null) {
-          final statusList = (statusListRaw is List) ? statusListRaw : [statusListRaw];
+          final statusList =
+              (statusListRaw is List) ? statusListRaw : [statusListRaw];
           debugPrint('     Revisando ${statusList.length} status en step');
 
           for (var status in statusList) {
-            final statusNameField = getJsonField(status, r'''$.name_status''')?.toString() ?? '';
+            final statusNameField =
+                getJsonField(status, r'''$.name_status''')?.toString() ?? '';
             debugPrint('       - Status: "$statusNameField"');
 
             if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
               targetStatus = status;
-              targetStatusId = getJsonField(status, r'''$.id_activity_status''')?.toInt();
-              targetStatusType = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase();
-              debugPrint('       ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
+              targetStatusId =
+                  getJsonField(status, r'''$.id_activity_status''')?.toInt();
+              targetStatusType = getJsonField(status, r'''$.type_status''')
+                  ?.toString()
+                  .toLowerCase();
+              debugPrint(
+                  '       ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
               break;
             }
           }
@@ -6490,34 +6276,46 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Si no se encuentra en steps, buscar en root status (activity_status)
     if (targetStatus == null) {
-      final rootStatusListRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_status''');
-      debugPrint('   Buscando en activity_status: ${rootStatusListRaw != null ? "existe" : "null"}');
+      final rootStatusListRaw =
+          getJsonField(FFAppState().currentActivity, r'''$.activity_status''');
+      debugPrint(
+          '   Buscando en activity_status: ${rootStatusListRaw != null ? "existe" : "null"}');
 
       if (rootStatusListRaw != null) {
-        final rootStatusList = (rootStatusListRaw is List) ? rootStatusListRaw : [rootStatusListRaw];
+        final rootStatusList = (rootStatusListRaw is List)
+            ? rootStatusListRaw
+            : [rootStatusListRaw];
         debugPrint('   Buscando en ${rootStatusList.length} root status');
 
         for (var status in rootStatusList) {
-          final statusNameField = getJsonField(status, r'''$.name_status''')?.toString() ?? '';
+          final statusNameField =
+              getJsonField(status, r'''$.name_status''')?.toString() ?? '';
           debugPrint('     - Root status: "$statusNameField"');
 
           if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
             targetStatus = status;
-            targetStatusId = getJsonField(status, r'''$.id_activity_status''')?.toInt();
-            targetStatusType = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase();
-            debugPrint('     ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
+            targetStatusId =
+                getJsonField(status, r'''$.id_activity_status''')?.toInt();
+            targetStatusType = getJsonField(status, r'''$.type_status''')
+                ?.toString()
+                .toLowerCase();
+            debugPrint(
+                '     ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
             break;
           }
         }
       }
     }
 
-    if (targetStatus == null || targetStatusId == null || targetStatusType == null) {
+    if (targetStatus == null ||
+        targetStatusId == null ||
+        targetStatusType == null) {
       debugPrint('⚠️ Campo "$fieldName" NO encontrado en activity');
-      return '[${fieldName}]';
+      return '[$fieldName]';
     }
 
-    debugPrint('📌 Campo encontrado: $fieldName (id: $targetStatusId, tipo: $targetStatusType)');
+    debugPrint(
+        '📌 Campo encontrado: $fieldName (id: $targetStatusId, tipo: $targetStatusType)');
 
     // Según el tipo de status, obtener el valor apropiado
     switch (targetStatusType) {
@@ -6541,7 +6339,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       case 'label-info':
         // Para label-info, retornar el contenido de default_status
-        final defaultStatus = getJsonField(targetStatus, r'''$.default_status''')?.toString() ?? '';
+        final defaultStatus =
+            getJsonField(targetStatus, r'''$.default_status''')?.toString() ??
+                '';
         return defaultStatus.isNotEmpty ? defaultStatus : '[Sin información]';
 
       case 'text':
@@ -6550,16 +6350,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               (d) => d.idActivityStatus == targetStatusId,
               orElse: () => VisitsDetailsStruct(),
             );
-        return detail.statusResponse.isNotEmpty ? detail.statusResponse : '[${fieldName}]';
+        return detail.statusResponse.isNotEmpty
+            ? detail.statusResponse
+            : '[$fieldName]';
 
       case 'unique-list':
       case 'reference-list':
-        // Para listas, obtener la opción seleccionada
+        // Para listas, obtener la opción seleccionada desde statusResponse
         final detail = FFAppState().visitDetails.firstWhere(
               (d) => d.idActivityStatus == targetStatusId,
               orElse: () => VisitsDetailsStruct(),
             );
-        return detail.statusOption.isNotEmpty ? detail.statusOption : '[${fieldName}]';
+        // Para reference-list, statusResponse contiene el nombre seleccionado (e.g., "WISTON HERNAN QUIÑONES ORTIZ")
+        return detail.statusResponse.isNotEmpty
+            ? detail.statusResponse
+            : '[$fieldName]';
 
       default:
         // Para otros tipos, obtener de visitDetails
@@ -6567,7 +6372,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               (d) => d.statusOption.toLowerCase() == fieldName.toLowerCase(),
               orElse: () => VisitsDetailsStruct(),
             );
-        return detail.statusResponse.isNotEmpty ? detail.statusResponse : '[${fieldName}]';
+        return detail.statusResponse.isNotEmpty
+            ? detail.statusResponse
+            : '[$fieldName]';
     }
   }
 
@@ -6577,7 +6384,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           orElse: () => VisitsDetailsStruct(),
         );
 
-    if (detail.statusResponse.isEmpty || detail.statusResponse.startsWith('=')) {
+    if (detail.statusResponse.isEmpty ||
+        detail.statusResponse.startsWith('=')) {
       return '[Sin fecha]';
     }
 
@@ -6596,7 +6404,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           orElse: () => VisitsDetailsStruct(),
         );
 
-    if (detail.statusResponse.isEmpty || detail.statusResponse.startsWith('=')) {
+    if (detail.statusResponse.isEmpty ||
+        detail.statusResponse.startsWith('=')) {
       return '[Sin hora]';
     }
 
@@ -6644,14 +6453,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         final operatorId = record['operatorId'] as String? ?? 'N/A';
 
         if (!operatorGroups.containsKey(operatorId)) {
-          String operatorName = 'Operador';
-          final user = FFAppState().usersList.firstWhere(
-                (u) => u.operID == operatorId,
-                orElse: () => UsersStruct(),
-              );
-          if (user.nameUser.isNotEmpty) {
-            operatorName = user.nameUser;
-          }
+          String operatorName = _getUserName(operatorId);
 
           operatorGroups[operatorId] = {
             'operatorName': operatorName,
@@ -6678,8 +6480,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
 
       // Texto del lote
-      text.writeln('$loteName');
-      text.writeln('$totalVisits visitas - $totalResults ${_unityLabel.toLowerCase()}');
+      text.writeln(loteName);
+      text.writeln(
+          '$totalVisits visitas - $totalResults ${_unityLabel.toLowerCase()}');
 
       // Operadores con indentación
       for (var operatorGroup in operatorGroups.values) {
@@ -6687,7 +6490,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         final opVisits = operatorGroup['totalVisits'];
         final opResults = operatorGroup['totalResults'];
 
-        text.writeln('  $operatorName: $opVisits visitas, $opResults ${_unityLabel.toLowerCase()}');
+        text.writeln(
+            '  $operatorName: $opVisits visitas, $opResults ${_unityLabel.toLowerCase()}');
       }
 
       text.writeln(''); // Línea en blanco entre lotes
@@ -6747,7 +6551,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagReaderSummary({required int statusId}) {
     final tagData = _tagReaderData[statusId] ?? [];
-    if (tagData.isEmpty) return SizedBox.shrink();
+    if (tagData.isEmpty) return const SizedBox.shrink();
 
     // Agrupar por lote (headquarterId)
     final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
@@ -6760,12 +6564,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Color(0xFF1B4332), // Verde oscuro
+        color: const Color(0xFF1B4332), // Verde oscuro
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -6774,15 +6578,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.summarize_rounded,
                 color: Colors.white,
                 size: 18,
               ),
-              SizedBox(width: 6),
-              Text(
+              const SizedBox(width: 6),
+              const Text(
                 'Resumen del TAG',
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -6790,11 +6595,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
               // Mostrar geolocalización de forma sutil si está disponible
               if (_tagReaderGeolocations.containsKey(statusId)) ...[
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Row(
@@ -6802,15 +6608,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     children: [
                       Icon(
                         Icons.location_on,
-                        color: Colors.white.withOpacity(0.7),
+                        color: Colors.white.withValues(alpha: 0.7),
                         size: 12,
                       ),
-                      SizedBox(width: 3),
+                      const SizedBox(width: 3),
                       Text(
                         '${_tagReaderGeolocations[statusId]!.latitude.toStringAsFixed(5)}, ${_tagReaderGeolocations[statusId]!.longitude.toStringAsFixed(5)}',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
                           fontSize: 10,
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                         ),
                       ),
                     ],
@@ -6819,12 +6626,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ],
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           ...groupedByHeadquarter.entries.map((entry) {
             final headquarterId = entry.key;
             final records = entry.value;
             return _buildHeadquarterGroup(headquarterId, records);
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -6850,34 +6657,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final Map<String, Map<String, dynamic>> operatorGroups = {};
     for (var record in records) {
       final operatorId = record['operatorId'] as String? ?? 'N/A';
-      final operator2Id = record['operator2Id'] as String? ?? '';
+      final operator2Id = record['operator2Id'] as String? ?? ''; // OP2 = IdActivityStatus
+
+      debugPrint(
+          '🔍 TAG-READER buildHeadquarterGroup: operatorId="$operatorId", operator2Id="$operator2Id"');
 
       // Crear clave compuesta por OP y OP2
-      final operatorPairKey = operator2Id.isNotEmpty
-          ? '${operatorId}_$operator2Id'
-          : operatorId;
+      final operatorPairKey =
+          operator2Id.isNotEmpty ? '${operatorId}_$operator2Id' : operatorId;
 
       if (!operatorGroups.containsKey(operatorPairKey)) {
         // Buscar nombre del operador principal en usersList
-        String operatorName = 'Operador';
-        final user = FFAppState().usersList.firstWhere(
-              (u) => u.operID == operatorId,
-              orElse: () => UsersStruct(),
-            );
-        if (user.nameUser.isNotEmpty) {
-          operatorName = user.nameUser;
-        }
+        String operatorName = _getUserName(operatorId);
 
-        // Buscar nombre del operador cortero (OP2) en usersList
+        // Buscar nombre del cortero en Activities_status usando IdActivityStatus (OP2)
         String operator2Name = '';
         if (operator2Id.isNotEmpty) {
-          final user2 = FFAppState().usersList.firstWhere(
-                (u) => u.operID == operator2Id,
-                orElse: () => UsersStruct(),
-              );
-          if (user2.nameUser.isNotEmpty) {
-            operator2Name = user2.nameUser;
-          }
+          debugPrint('🔍 TAG-READER: Buscando cortero con IdActivityStatus="$operator2Id"');
+          // Aquí se buscará el nombre desde Activities_status usando OP2 como IdActivityStatus
+          // Por ahora usamos una búsqueda simple; idealmente esto vendría de la DB
+          operator2Name = _getCorterName(operator2Id);
+          debugPrint('🔍 TAG-READER: Cortero Name resultado="$operator2Name"');
+        } else {
+          debugPrint('🔍 TAG-READER: operator2Id está VACÍO');
         }
 
         operatorGroups[operatorPairKey] = {
@@ -6899,7 +6701,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           (operatorGroups[operatorPairKey]!['totalVisits'] as int) + visits;
       operatorGroups[operatorPairKey]!['totalResults'] =
           (operatorGroups[operatorPairKey]!['totalResults'] as int) + results;
-      (operatorGroups[operatorPairKey]!['records'] as List<Map<String, dynamic>>)
+      (operatorGroups[operatorPairKey]!['records']
+              as List<Map<String, dynamic>>)
           .add(record);
     }
 
@@ -6912,13 +6715,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color:
-            Color(0xFF2D6A4F).withOpacity(0.3), // Verde medio con transparencia
+        color: const Color(0xFF2D6A4F)
+            .withValues(alpha: 0.3), // Verde medio con transparencia
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -6931,7 +6734,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
@@ -6940,40 +6743,44 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     size: 32,
                     weight: 700,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           loteName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${operatorGroups.length}',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -6986,8 +6793,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
           if (isExpanded)
             Container(
-              padding:
-                  EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: operatorGroups.entries.map((entry) {
                   final operatorPairKey = entry.key;
@@ -7002,8 +6809,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  Widget _buildTagReaderOperatorGroup(
-      int headquarterId, String operatorPairKey, Map<String, dynamic> operatorData) {
+  Widget _buildTagReaderOperatorGroup(int headquarterId, String operatorPairKey,
+      Map<String, dynamic> operatorData) {
     final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
     final operator2Name = operatorData['operator2Name'] as String? ?? '';
@@ -7019,12 +6826,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Color(0xFF2D6A4F).withOpacity(0.3),
+        color: const Color(0xFF2D6A4F).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF52B788).withOpacity(0.4),
+          color: const Color(0xFF52B788).withValues(alpha: 0.4),
           width: 1,
         ),
       ),
@@ -7037,29 +6844,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Color(0xFF74C69D),
+                    color: const Color(0xFF74C69D),
                     size: 24,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   // Mostrar icono de dos personas si hay cortero
                   if (hasOperator2)
-                    Icon(
+                    const Icon(
                       Icons.people_outline_rounded,
                       color: Color(0xFF74C69D),
                       size: 18,
                     )
                   else
-                    Icon(
+                    const Icon(
                       Icons.person_outline_rounded,
                       color: Color(0xFF74C69D),
                       size: 18,
                     ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -7067,7 +6874,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         // Nombre del operador principal (OP)
                         Text(
                           operatorName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -7075,22 +6883,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         // Nombre del operador cortero (OP2) en línea separada
                         if (hasOperator2) ...[
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            operator2Name.isNotEmpty ? operator2Name : operator2Id,
-                            style: TextStyle(fontFamily: 'Roboto',
+                            operator2Name.isNotEmpty
+                                ? operator2Name
+                                : operator2Id,
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                               color: Color(0xFF74C69D),
                             ),
                           ),
                         ],
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -7102,7 +6914,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
           if (isExpanded)
             Container(
-              padding: EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 5),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 5),
               child: Column(
                 children: records
                     .map((record) => _buildTagReaderVisitRecord(record))
@@ -7124,14 +6937,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final formattedDate = dateFormatter.format(dateTime);
 
     return Container(
-      margin: EdgeInsets.only(top: 8),
-      padding: EdgeInsets.all(10),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Color(0xFF081C15)
-            .withOpacity(0.5), // Verde muy oscuro con transparencia
+        color: const Color(0xFF081C15)
+            .withValues(alpha: 0.5), // Verde muy oscuro con transparencia
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: Colors.white.withOpacity(0.15),
+          color: Colors.white.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
@@ -7142,24 +6955,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             children: [
               Icon(
                 Icons.calendar_today_rounded,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 size: 14,
               ),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text(
                 formattedDate,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 11,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Row(
             children: [
               _buildMetricChip('Visitas', visits.toString(), Colors.white),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               _buildMetricChip(_unityLabel, results.toString(), Colors.white),
             ],
           ),
@@ -7170,12 +6984,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildMetricChip(String label, String value, Color color) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7184,16 +6998,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         children: [
           Text(
             label,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.85),
+              color: Colors.white.withValues(alpha: 0.85),
             ),
           ),
-          SizedBox(width: 4),
+          const SizedBox(width: 4),
           Text(
             value,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.w700,
               color: color,
@@ -7208,24 +7024,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagWriterSummary({required int statusId}) {
     final headquarterData = _tagWriterData[statusId];
-    if (headquarterData == null || headquarterData.isEmpty)
-      return SizedBox.shrink();
+    if (headquarterData == null || headquarterData.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     // Calcular totales generales
     int grandTotalVisits = 0;
-    int grandTotalResults = 0;
     for (var entry in headquarterData.values) {
       grandTotalVisits += (entry['totalVisits'] as int?) ?? 0;
-      grandTotalResults += (entry['totalResults'] as int?) ?? 0;
     }
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Color(0xFF1B3A4B), // Azul oscuro para diferenciarlo del lector
+        color: const Color(
+            0xFF1B3A4B), // Azul oscuro para diferenciarlo del lector
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF2196F3).withOpacity(0.3),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7234,30 +7050,32 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.edit_note_rounded,
                 color: Color(0xFF64B5F6),
                 size: 18,
               ),
-              SizedBox(width: 6),
-              Text(
+              const SizedBox(width: 6),
+              const Text(
                 'Registros escritos en TAG',
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Color(0xFF2196F3).withOpacity(0.3),
+                  color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '$grandTotalVisits visitas',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -7266,12 +7084,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           ...headquarterData.entries.map((entry) {
             final headquarterId = entry.key;
             final data = entry.value;
             return _buildTagWriterHeadquarterGroup(headquarterId, data);
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -7301,34 +7119,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final Map<String, Map<String, dynamic>> operatorGroups = {};
     for (var record in records) {
       final operatorId = record['operatorId'] as String? ?? 'N/A';
-      final operator2Id = record['operator2Id'] as String? ?? '';
+      final operator2Id = record['operator2Id'] as String? ?? ''; // OP2 = IdActivityStatus
+
+      debugPrint(
+          '🔍 TAG-WRITER buildHeadquarterGroup: operatorId="$operatorId", operator2Id="$operator2Id"');
 
       // Crear clave compuesta por OP y OP2
-      final operatorPairKey = operator2Id.isNotEmpty
-          ? '${operatorId}_$operator2Id'
-          : operatorId;
+      final operatorPairKey =
+          operator2Id.isNotEmpty ? '${operatorId}_$operator2Id' : operatorId;
 
       if (!operatorGroups.containsKey(operatorPairKey)) {
         // Buscar nombre del operador principal en usersList
-        String operatorName = 'Operador';
-        final user = FFAppState().usersList.firstWhere(
-              (u) => u.operID == operatorId,
-              orElse: () => UsersStruct(),
-            );
-        if (user.nameUser.isNotEmpty) {
-          operatorName = user.nameUser;
-        }
+        String operatorName = _getUserName(operatorId);
 
-        // Buscar nombre del operador cortero (OP2) en usersList
+        // Buscar nombre del cortero en Activities_status usando IdActivityStatus (OP2)
         String operator2Name = '';
         if (operator2Id.isNotEmpty) {
-          final user2 = FFAppState().usersList.firstWhere(
-                (u) => u.operID == operator2Id,
-                orElse: () => UsersStruct(),
-              );
-          if (user2.nameUser.isNotEmpty) {
-            operator2Name = user2.nameUser;
-          }
+          debugPrint('🔍 TAG-WRITER: Buscando cortero con IdActivityStatus="$operator2Id"');
+          operator2Name = _getCorterName(operator2Id);
+          debugPrint('🔍 TAG-WRITER: Cortero Name resultado="$operator2Name"');
+        } else {
+          debugPrint('🔍 TAG-WRITER: operator2Id está VACÍO');
         }
 
         operatorGroups[operatorPairKey] = {
@@ -7349,7 +7160,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           (operatorGroups[operatorPairKey]!['totalVisits'] as int) + visits;
       operatorGroups[operatorPairKey]!['totalResults'] =
           (operatorGroups[operatorPairKey]!['totalResults'] as int) + results;
-      (operatorGroups[operatorPairKey]!['records'] as List<Map<String, dynamic>>)
+      (operatorGroups[operatorPairKey]!['records']
+              as List<Map<String, dynamic>>)
           .add(record);
     }
 
@@ -7362,12 +7174,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Color(0xFF2196F3).withOpacity(0.1),
+        color: const Color(0xFF2196F3).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF2196F3).withOpacity(0.3),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7380,49 +7192,53 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Color(0xFF64B5F6),
+                    color: const Color(0xFF64B5F6),
                     size: 32,
                     weight: 700,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           loteName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Color(0xFF2196F3).withOpacity(0.3),
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${operatorGroups.length}',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -7435,8 +7251,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
           if (isExpanded)
             Container(
-              padding:
-                  EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: operatorGroups.entries.map((entry) {
                   final operatorPairKey = entry.key;
@@ -7468,12 +7284,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final hasOperator2 = operator2Id.isNotEmpty;
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Color(0xFF1565C0).withOpacity(0.2),
+        color: const Color(0xFF1565C0).withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF64B5F6).withOpacity(0.3),
+          color: const Color(0xFF64B5F6).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7486,30 +7302,30 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Color(0xFF64B5F6),
+                    color: const Color(0xFF64B5F6),
                     size: 24,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   // Mostrar dos iconos si hay cortero
                   if (hasOperator2) ...[
-                    Icon(
+                    const Icon(
                       Icons.people_outline_rounded,
                       color: Color(0xFF64B5F6),
                       size: 18,
                     ),
                   ] else ...[
-                    Icon(
+                    const Icon(
                       Icons.person_outline_rounded,
                       color: Color(0xFF64B5F6),
                       size: 18,
                     ),
                   ],
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -7517,7 +7333,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         // Nombre del operador principal (OP)
                         Text(
                           operatorName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -7525,22 +7342,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                         // Nombre del operador cortero (OP2) en línea separada
                         if (hasOperator2) ...[
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
-                            operator2Name.isNotEmpty ? operator2Name : operator2Id,
-                            style: TextStyle(fontFamily: 'Roboto',
+                            operator2Name.isNotEmpty
+                                ? operator2Name
+                                : operator2Id,
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                               color: Color(0xFF64B5F6),
                             ),
                           ),
                         ],
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -7552,7 +7373,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
           if (isExpanded)
             Container(
-              padding: EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 5),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 5),
               child: Column(
                 children: records
                     .map((record) => _buildTagWriterVisitRecord(record))
@@ -7574,13 +7396,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final formattedDate = dateFormatter.format(dateTime);
 
     return Container(
-      margin: EdgeInsets.only(top: 8),
-      padding: EdgeInsets.all(10),
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Color(0xFF0D47A1).withOpacity(0.3),
+        color: const Color(0xFF0D47A1).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: Color(0xFF2196F3).withOpacity(0.3),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7591,26 +7413,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             children: [
               Icon(
                 Icons.calendar_today_rounded,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 size: 14,
               ),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text(
                 formattedDate,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 11,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Row(
             children: [
-              _buildMetricChip('Visitas', visits.toString(), Color(0xFF64B5F6)),
-              SizedBox(width: 8),
               _buildMetricChip(
-                  _unityLabel, results.toString(), Color(0xFF64B5F6)),
+                  'Visitas', visits.toString(), const Color(0xFF64B5F6)),
+              const SizedBox(width: 8),
+              _buildMetricChip(
+                  _unityLabel, results.toString(), const Color(0xFF64B5F6)),
             ],
           ),
         ],
@@ -7622,25 +7446,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagTransferSummary({required int statusId}) {
     final headquarterData = _tagTransferData[statusId];
-    if (headquarterData == null || headquarterData.isEmpty)
-      return SizedBox.shrink();
+    if (headquarterData == null || headquarterData.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     // Calcular totales generales
     int grandTotalVisits = 0;
-    int grandTotalResults = 0;
     for (var entry in headquarterData.values) {
       grandTotalVisits += (entry['totalVisits'] as int?) ?? 0;
-      grandTotalResults += (entry['totalResults'] as int?) ?? 0;
     }
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color:
-            Color(0xFF1B3A4B), // Azul oscuro igual que tag-writer
+        color: const Color(0xFF1B3A4B), // Azul oscuro igual que tag-writer
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF2196F3).withOpacity(0.3),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7649,30 +7471,32 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.swap_horiz_rounded,
                 color: Color(0xFF64B5F6),
                 size: 18,
               ),
-              SizedBox(width: 6),
-              Text(
+              const SizedBox(width: 6),
+              const Text(
                 'Tag de origen leído',
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Color(0xFF2196F3).withOpacity(0.3),
+                  color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   '$grandTotalVisits visitas',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -7681,32 +7505,32 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           ...headquarterData.entries.map((entry) {
             final headquarterId = entry.key;
             final data = entry.value;
             return _buildTagTransferHeadquarterGroup(headquarterId, data);
-          }).toList(),
+          }),
           // Botón TRANSFERIR AHORA o mensaje de éxito
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _tagTransferCompleted[statusId] == true
               ? Container(
                   width: double.infinity,
-                  padding: EdgeInsets.symmetric(vertical: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [Color(0xFF00a86b), Color(0xFF008c5a)],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0xFF00a86b).withOpacity(0.4),
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
                         blurRadius: 8,
-                        offset: Offset(0, 4),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
@@ -7717,7 +7541,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       SizedBox(width: 12),
                       Text(
                         'TRANSFERENCIA EXITOSA',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -7733,10 +7558,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     final sourceTagContent = FFAppState().nfcRead;
                     if (sourceTagContent.isEmpty) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Text(
                             'No hay contenido de origen disponible',
-                            style: TextStyle(fontFamily: 'Roboto',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -7769,7 +7595,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       });
                       HapticFeedback.heavyImpact();
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
+                        const SnackBar(
                           content: Row(
                             children: [
                               Icon(Icons.check_circle, color: Colors.white),
@@ -7777,7 +7603,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               Expanded(
                                 child: Text(
                                   'Transferencia completada exitosamente',
-                                  style: TextStyle(fontFamily: 'Roboto',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -7794,21 +7621,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   },
                   child: Container(
                     width: double.infinity,
-                    padding: EdgeInsets.symmetric(vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
                       ),
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Color(0xFF2196F3).withOpacity(0.4),
+                          color: const Color(0xFF2196F3).withValues(alpha: 0.4),
                           blurRadius: 8,
-                          offset: Offset(0, 4),
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
@@ -7819,7 +7646,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         SizedBox(width: 12),
                         Text(
                           'TRANSFERIR AHORA',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -7857,12 +7685,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final records = (data['records'] as List<Map<String, dynamic>>?) ?? [];
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Color(0xFF2196F3).withOpacity(0.1),
+        color: const Color(0xFF2196F3).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF2196F3).withOpacity(0.3),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -7875,49 +7703,53 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Color(0xFF64B5F6),
+                    color: const Color(0xFF64B5F6),
                     size: 32,
                     weight: 700,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           loteName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Color(0xFF2196F3).withOpacity(0.3),
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${records.length}',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -7930,8 +7762,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
           if (isExpanded)
             Container(
-              padding:
-                  EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: records.map((record) {
                   return _buildTagTransferRecord(record);
@@ -7950,36 +7782,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final results = record['results'] as int? ?? 0;
     final dateTime = record['dateTime'] as DateTime? ?? DateTime.now();
 
+    debugPrint(
+        '🔍 TAG-TRANSFER Record: operatorId="$operatorId", operator2Id="$operator2Id"');
+
     // Buscar el nombre del operador principal
-    String operatorName = 'Operador';
-    final user = FFAppState().usersList.firstWhere(
-          (u) => u.operID == operatorId,
-          orElse: () => UsersStruct(),
-        );
+    String operatorName = _getUserName(operatorId);
 
-    if (user.nameUser.isNotEmpty) {
-      operatorName = user.nameUser;
-    }
-
-    // Buscar el nombre del operador cortero (OP2)
+    // operator2Id ahora contiene el IdActivityStatus (ID único de Activities_status)
+    // Buscamos el nombre del cortero para display
     String operator2Name = '';
     if (operator2Id.isNotEmpty) {
-      final user2 = FFAppState().usersList.firstWhere(
-            (u) => u.operID == operator2Id,
-            orElse: () => UsersStruct(),
-          );
-      if (user2.nameUser.isNotEmpty) {
-        operator2Name = user2.nameUser;
-      }
+      debugPrint('🔍 TAG-TRANSFER: Buscando cortero con IdActivityStatus="$operator2Id"');
+      operator2Name = _getCorterName(operator2Id);
+      debugPrint('🔍 TAG-TRANSFER: Cortero nombre="$operator2Name"');
+    } else {
+      debugPrint('🔍 TAG-TRANSFER: operator2Id está VACÍO');
     }
 
     // Construir textos de display
     final hasOperator2 = operator2Id.isNotEmpty;
-    final displayName = hasOperator2
-        ? '$operatorName / $operator2Name'
-        : operatorName;
+    final displayName =
+        hasOperator2 ? '$operatorName / $operator2Name' : operatorName;
     final displayIds = hasOperator2
-        ? 'Op: $operatorId | Cortero: $operator2Id'
+        ? 'Op: $operatorId | Cortero ID: $operator2Id'
         : 'Op: $operatorId';
 
     // Formato de fecha: "Mié, 14 de Feb 2025"
@@ -7987,13 +7812,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final formattedDate = dateFormatter.format(dateTime);
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
-      padding: EdgeInsets.all(10),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Color(0xFF1565C0).withOpacity(0.3),
+        color: const Color(0xFF1565C0).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: Color(0xFF2196F3).withOpacity(0.3),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -8003,15 +7828,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           Row(
             children: [
               Icon(
-                hasOperator2 ? Icons.people_outline_rounded : Icons.person_outline_rounded,
-                color: Color(0xFF64B5F6),
+                hasOperator2
+                    ? Icons.people_outline_rounded
+                    : Icons.person_outline_rounded,
+                color: const Color(0xFF64B5F6),
                 size: 16,
               ),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Expanded(
                 child: Text(
                   displayName,
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -8021,40 +7849,43 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               Flexible(
                 child: Text(
                   displayIds,
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 10,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                   ),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: [
               Icon(
                 Icons.calendar_today_rounded,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 size: 14,
               ),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text(
                 formattedDate,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 11,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Row(
             children: [
-              _buildMetricChip('Visitas', visits.toString(), Color(0xFF64B5F6)),
-              SizedBox(width: 8),
               _buildMetricChip(
-                  _unityLabel, results.toString(), Color(0xFF64B5F6)),
+                  'Visitas', visits.toString(), const Color(0xFF64B5F6)),
+              const SizedBox(width: 8),
+              _buildMetricChip(
+                  _unityLabel, results.toString(), const Color(0xFF64B5F6)),
             ],
           ),
         ],
@@ -8069,32 +7900,34 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     required dynamic status,
   }) {
     final calculatedValue = _calculatedValues[statusId] ?? 0.0;
-    final formula = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+    final formula =
+        getJsonField(status, r'''$.default_status''')?.toString() ?? '';
     final hasBeenCalculated = _numbersOperationCalculated[statusId] ?? false;
 
     // Colores: Verde si ya fue calculado, Blanco si aún no
     final backgroundColor = hasBeenCalculated
-        ? [Color(0xFF1B4332), Color(0xFF2D6A4F)] // Verde oscuro
-        : [Color(0xFFF5F5F5), Color(0xFFFFFFFF)]; // Blanco/Gris claro
+        ? [const Color(0xFF1B4332), const Color(0xFF2D6A4F)] // Verde oscuro
+        : [
+            const Color(0xFFF5F5F5),
+            const Color(0xFFFFFFFF)
+          ]; // Blanco/Gris claro
 
     final borderColor = hasBeenCalculated
-        ? Color(0xFF40916C).withOpacity(0.5)
-        : Color(0xFFBDBDBD).withOpacity(0.5);
+        ? const Color(0xFF40916C).withValues(alpha: 0.5)
+        : const Color(0xFFBDBDBD).withValues(alpha: 0.5);
 
-    final iconColor = hasBeenCalculated
-        ? Color(0xFF52B788)
-        : Color(0xFF9E9E9E);
+    final iconColor =
+        hasBeenCalculated ? const Color(0xFF52B788) : const Color(0xFF9E9E9E);
 
     final textColor = hasBeenCalculated
-        ? Colors.white.withOpacity(0.9)
-        : Color(0xFF424242);
+        ? Colors.white.withValues(alpha: 0.9)
+        : const Color(0xFF424242);
 
-    final valueColor = hasBeenCalculated
-        ? Color(0xFF95D5B2)
-        : Color(0xFF757575);
+    final valueColor =
+        hasBeenCalculated ? const Color(0xFF95D5B2) : const Color(0xFF757575);
 
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: backgroundColor,
@@ -8115,10 +7948,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 color: iconColor,
                 size: 24,
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text(
                 'Resultado Calculado',
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: textColor,
@@ -8127,19 +7961,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           GestureDetector(
             onLongPress: () {
               setState(() {
-                _showFormulaForOperation[statusId] = !(_showFormulaForOperation[statusId] ?? false);
+                _showFormulaForOperation[statusId] =
+                    !(_showFormulaForOperation[statusId] ?? false);
               });
             },
             child: Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: hasBeenCalculated
-                    ? Colors.black.withOpacity(0.3)
-                    : Colors.grey.withOpacity(0.1),
+                    ? Colors.black.withValues(alpha: 0.3)
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -8149,7 +7984,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   Center(
                     child: Text(
                       _formatColombianNumber(calculatedValue),
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
                         color: valueColor,
@@ -8158,21 +7994,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   ),
                   // Fórmula (solo visible si se hace long press)
                   if (_showFormulaForOperation[statusId] == true) ...[
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Divider(
                       color: hasBeenCalculated
-                          ? Colors.white.withOpacity(0.2)
-                          : Colors.grey.withOpacity(0.3),
+                          ? Colors.white.withValues(alpha: 0.2)
+                          : Colors.grey.withValues(alpha: 0.3),
                       thickness: 1,
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
                       'Fórmula: $formula',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 12,
                         color: hasBeenCalculated
-                            ? Colors.white.withOpacity(0.7)
-                            : Color(0xFF757575),
+                            ? Colors.white.withValues(alpha: 0.7)
+                            : const Color(0xFF757575),
                         fontStyle: FontStyle.italic,
                       ),
                       textAlign: TextAlign.center,
@@ -8193,34 +8030,37 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     required dynamic status,
   }) {
     // Obtener el valor de default_status
-    final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-    final displayValue = defaultStatus.isNotEmpty ? defaultStatus : 'Sin información';
+    final defaultStatus =
+        getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+    final displayValue =
+        defaultStatus.isNotEmpty ? defaultStatus : 'Sin información';
 
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Color(0xFF66BB6A).withOpacity(0.3),
+          color: const Color(0xFF66BB6A).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Row(
         children: [
-          Icon(
+          const Icon(
             Icons.info_outline_rounded,
             color: Color(0xFF66BB6A),
             size: 24,
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Center(
               child: Text(
                 displayValue,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 32,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -8241,19 +8081,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final distanceFromTagKm = distanceFromTag / 1000;
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Color(0xFF1B4332), // Verde oscuro (mismo que tag-reader)
+        color: const Color(0xFF1B4332), // Verde oscuro (mismo que tag-reader)
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(
                 Icons.straighten_rounded,
@@ -8263,7 +8103,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               SizedBox(width: 6),
               Text(
                 'Distancia a Extractora',
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -8271,12 +8112,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
             ],
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           // OPCIÓN 1: Desde TAG
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
+              color: Colors.white.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
@@ -8284,15 +8125,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               children: [
                 Text(
                   'Desde TAG',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 11,
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 Text(
                   '${distanceFromTagKm.toStringAsFixed(2)} km',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -8302,18 +8145,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ),
           ),
           // OPCIÓN 2: Desde Productos (una fila por cada lote)
-          if (distancesFromProducts != null && distancesFromProducts.isNotEmpty) ...[
-            SizedBox(height: 8),
+          if (distancesFromProducts != null &&
+              distancesFromProducts.isNotEmpty) ...[
+            const SizedBox(height: 8),
             // Título de la sección
             Text(
               'Desde Productos:',
-              style: TextStyle(fontFamily: 'Roboto',
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 11,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 fontWeight: FontWeight.w600,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             // Lista de distancias por lote
             ...distancesFromProducts.map((item) {
               final loteName = item['headquarterName'] as String;
@@ -8323,11 +8168,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               final distanceKm = distance / 1000;
 
               return Padding(
-                padding: EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(bottom: 4),
                 child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
+                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
@@ -8339,9 +8185,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           children: [
                             Text(
                               loteName,
-                              style: TextStyle(fontFamily: 'Roboto',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
                                 fontSize: 10,
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 fontWeight: FontWeight.w600,
                               ),
                               maxLines: 1,
@@ -8350,18 +8197,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             if (line != null && palm != null)
                               Text(
                                 'L:$line P:$palm',
-                                style: TextStyle(fontFamily: 'Roboto',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
                                   fontSize: 9,
-                                  color: Colors.white.withOpacity(0.6),
+                                  color: Colors.white.withValues(alpha: 0.6),
                                 ),
                               ),
                           ],
                         ),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Text(
                         '${distanceKm.toStringAsFixed(2)} km',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -8371,7 +8220,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   ),
                 ),
               );
-            }).toList(),
+            }),
           ],
         ],
       ),
@@ -8396,21 +8245,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Si hay lotes sin peso, mostrar SOLO advertencia
     if (_headquartersWithoutWeight.isNotEmpty) {
       return Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             colors: [Color(0xFF7F1D1D), Color(0xFF991B1B)],
           ),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Color(0xFFDC2626).withOpacity(0.5),
+            color: const Color(0xFFDC2626).withValues(alpha: 0.5),
             width: 1,
           ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            const Row(
               children: [
                 Icon(
                   Icons.warning_amber_rounded,
@@ -8421,7 +8270,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 Expanded(
                   child: Text(
                     'Peso promedio no configurado',
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
@@ -8431,70 +8281,75 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ),
               ],
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               'Los siguientes lotes no tienen peso promedio configurado para el mes actual. No se puede realizar el cálculo.',
-              style: TextStyle(fontFamily: 'Roboto',
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 12,
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 height: 1.4,
               ),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             // Lista de lotes sin peso
             ..._headquartersWithoutWeight.map((hq) {
               return Padding(
-                padding: EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Container(
-                  padding: EdgeInsets.all(10),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Color(0xFFDC2626).withOpacity(0.3),
+                      color: const Color(0xFFDC2626).withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
                   child: Row(
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.error_outline,
                         color: Color(0xFFFCA5A5),
                         size: 20,
                       ),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               hq['headquarterName'],
-                              style: TextStyle(fontFamily: 'Roboto',
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               'ID: ${hq['headquarterId']}',
-                              style: TextStyle(fontFamily: 'Roboto',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
                                 fontSize: 11,
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
                         ),
                       ),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: Color(0xFFDC2626).withOpacity(0.3),
+                          color: const Color(0xFFDC2626).withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Text(
+                        child: const Text(
                           'Sin peso',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 11,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFFFCA5A5),
@@ -8505,28 +8360,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   ),
                 ),
               );
-            }).toList(),
-            SizedBox(height: 8),
+            }),
+            const SizedBox(height: 8),
             Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Color(0xFFDC2626).withOpacity(0.2),
+                color: const Color(0xFFDC2626).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.info_outline,
                     color: Color(0xFFFCA5A5),
                     size: 18,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'Configure el peso promedio en el sistema antes de continuar.',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontStyle: FontStyle.italic,
                       ),
                     ),
@@ -8541,14 +8397,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Si todos los lotes tienen peso, mostrar display normal
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Color(0xFF40916C).withOpacity(0.3),
+          color: const Color(0xFF40916C).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -8557,24 +8413,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         children: [
           Row(
             children: [
-              Icon(
+              const Icon(
                 Icons.analytics_rounded,
                 color: Color(0xFF52B788),
                 size: 24,
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text(
                 'Pesos de Lotes',
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   letterSpacing: 0.5,
                 ),
               ),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           // Mostrar cada headquarter weight
           ..._headquarterWeights.entries.map((entry) {
             final headquarterId = entry.key;
@@ -8596,14 +8453,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             }
 
             return Padding(
-              padding: EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: 8),
               child: Container(
-                padding: EdgeInsets.all(12),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
+                  color: Colors.black.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Color(0xFF52B788).withOpacity(0.3),
+                    color: const Color(0xFF52B788).withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -8616,34 +8473,38 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         children: [
                           Text(
                             headquarterName,
-                            style: TextStyle(fontFamily: 'Roboto',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Text(
                             'ID: $headquarterId',
-                            style: TextStyle(fontFamily: 'Roboto',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
                               fontSize: 11,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                             ),
                           ),
                         ],
                       ),
                     ),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [Color(0xFF52B788), Color(0xFF40916C)],
                         ),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
                         '${weight.toStringAsFixed(2)} kg',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -8654,7 +8515,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ),
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -8663,7 +8524,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // ===== VISUALIZACIÓN DE FECHA Y HORA EN STATUS =====
 
   /// Muestra el valor de fecha seleccionado al lado del nombre del status
-  Widget _buildDateValueDisplay(int statusId, int parentStepId, {bool hasValue = false}) {
+  Widget _buildDateValueDisplay(int statusId, int parentStepId,
+      {bool hasValue = false}) {
     // Buscar el valor en visitDetails
     String dateValue = functions.statusResponseByActivityStatusAlternative(
       statusId,
@@ -8672,12 +8534,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
 
     if (dateValue.isEmpty || dateValue == '[Fecha]') {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     // Si es una fórmula (=DATENOW, =TIMENOW, etc.), no mostrar nada
     if (dateValue.startsWith('=')) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     // Formatear la fecha
@@ -8691,19 +8553,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       // Capitalizar primera letra
       final capitalizedDay = dayName[0].toUpperCase() + dayName.substring(1);
-      final capitalizedMonth = monthName[0].toUpperCase() + monthName.substring(1);
+      final capitalizedMonth =
+          monthName[0].toUpperCase() + monthName.substring(1);
 
       final formattedDate = '$capitalizedDay $day de $capitalizedMonth $year';
 
       // Colores según si está seleccionado
-      final textColor = hasValue ? Colors.white : Color(0xFF00a86b);
-      final bgColor = hasValue ? Colors.white.withOpacity(0.2) : Color(0xFF00a86b).withOpacity(0.15);
-      final borderColor = hasValue ? Colors.white.withOpacity(0.5) : Color(0xFF00a86b).withOpacity(0.3);
+      final textColor = hasValue ? Colors.white : const Color(0xFF00a86b);
+      final bgColor = hasValue
+          ? Colors.white.withValues(alpha: 0.2)
+          : const Color(0xFF00a86b).withValues(alpha: 0.15);
+      final borderColor = hasValue
+          ? Colors.white.withValues(alpha: 0.5)
+          : const Color(0xFF00a86b).withValues(alpha: 0.3);
 
       return Padding(
-        padding: EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.only(left: 8),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(10),
@@ -8720,13 +8587,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 16,
                 color: textColor,
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   formattedDate,
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                     color: textColor,
@@ -8740,12 +8608,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     } catch (e) {
       debugPrint('Error formateando fecha: $e');
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
   }
 
   /// Muestra el valor de hora seleccionado al lado del nombre del status
-  Widget _buildTimeValueDisplay(int statusId, int parentStepId, {bool hasValue = false}) {
+  Widget _buildTimeValueDisplay(int statusId, int parentStepId,
+      {bool hasValue = false}) {
     // Buscar el valor en visitDetails
     String timeValue = functions.statusResponseByActivityStatusAlternative(
       statusId,
@@ -8754,12 +8623,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
 
     if (timeValue.isEmpty || timeValue == '[Hora]') {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     // Si es una fórmula (=TIMENOW, etc.), no mostrar nada
     if (timeValue.startsWith('=')) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     // El valor viene en formato TimeOfDay serializado, extraer horas y minutos
@@ -8790,17 +8659,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       int hour12 = hour24 % 12;
       if (hour12 == 0) hour12 = 12;
 
-      formattedTime = '${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+      formattedTime =
+          '${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
 
       // Colores según si está seleccionado
-      final textColor = hasValue ? Colors.white : Color(0xFF00a86b);
-      final bgColor = hasValue ? Colors.white.withOpacity(0.2) : Color(0xFF00a86b).withOpacity(0.15);
-      final borderColor = hasValue ? Colors.white.withOpacity(0.5) : Color(0xFF00a86b).withOpacity(0.3);
+      final textColor = hasValue ? Colors.white : const Color(0xFF00a86b);
+      final bgColor = hasValue
+          ? Colors.white.withValues(alpha: 0.2)
+          : const Color(0xFF00a86b).withValues(alpha: 0.15);
+      final borderColor = hasValue
+          ? Colors.white.withValues(alpha: 0.5)
+          : const Color(0xFF00a86b).withValues(alpha: 0.3);
 
       return Padding(
-        padding: EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.only(left: 8),
         child: Container(
-          padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             color: bgColor,
             borderRadius: BorderRadius.circular(10),
@@ -8817,10 +8691,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 16,
                 color: textColor,
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 formattedTime,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.w800,
                   color: textColor,
@@ -8833,7 +8708,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     } catch (e) {
       debugPrint('Error formateando hora: $e');
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
   }
 
@@ -8874,7 +8749,8 @@ class _FullScreenNumericKeyboardDialogState
   @override
   void initState() {
     super.initState();
-    _currentValue = widget.initialValue > 0 ? widget.initialValue.toString() : '';
+    _currentValue =
+        widget.initialValue > 0 ? widget.initialValue.toString() : '';
   }
 
   void _onNumberPressed(String number) {
@@ -8915,7 +8791,7 @@ class _FullScreenNumericKeyboardDialogState
       child: Container(
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -8931,13 +8807,14 @@ class _FullScreenNumericKeyboardDialogState
             children: [
               // Header con botón cerrar
               Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
+                    const Text(
                       'Ingresar Número',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF00ff9f),
@@ -8945,7 +8822,7 @@ class _FullScreenNumericKeyboardDialogState
                     ),
                     IconButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.close_rounded,
                         color: Colors.white,
                         size: 28,
@@ -8960,24 +8837,26 @@ class _FullScreenNumericKeyboardDialogState
                 flex: 2,
                 child: Center(
                   child: Container(
-                    margin: EdgeInsets.symmetric(horizontal: 32),
-                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+                    margin: const EdgeInsets.symmetric(horizontal: 32),
+                    padding: const EdgeInsets.symmetric(
+                        vertical: 24, horizontal: 32),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Color(0xFF1B4332).withOpacity(0.6),
-                          Color(0xFF2D6A4F).withOpacity(0.4),
+                          const Color(0xFF1B4332).withValues(alpha: 0.6),
+                          const Color(0xFF2D6A4F).withValues(alpha: 0.4),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: Color(0xFF52B788).withOpacity(0.5),
+                        color: const Color(0xFF52B788).withValues(alpha: 0.5),
                         width: 2,
                       ),
                     ),
                     child: Text(
                       _currentValue.isEmpty ? '0' : _currentValue,
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 64,
                         fontWeight: FontWeight.bold,
                         color: Color(0xFF52B788),
@@ -8993,7 +8872,7 @@ class _FullScreenNumericKeyboardDialogState
               Expanded(
                 flex: 5,
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
                       // Fila 1: 1, 2, 3
@@ -9001,40 +8880,40 @@ class _FullScreenNumericKeyboardDialogState
                         child: Row(
                           children: [
                             _buildKeyButton('1'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('2'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('3'),
                           ],
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       // Fila 2: 4, 5, 6
                       Expanded(
                         child: Row(
                           children: [
                             _buildKeyButton('4'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('5'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('6'),
                           ],
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       // Fila 3: 7, 8, 9
                       Expanded(
                         child: Row(
                           children: [
                             _buildKeyButton('7'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('8'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('9'),
                           ],
                         ),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       // Fila 4: C, 0, ⌫
                       Expanded(
                         child: Row(
@@ -9043,21 +8922,21 @@ class _FullScreenNumericKeyboardDialogState
                               'C',
                               Icons.clear_rounded,
                               _onClear,
-                              Color(0xFFFF5252),
+                              const Color(0xFFFF5252),
                             ),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildKeyButton('0'),
-                            SizedBox(width: 12),
+                            const SizedBox(width: 12),
                             _buildActionButton(
                               '⌫',
                               Icons.backspace_rounded,
                               _onBackspace,
-                              Color(0xFFFFA726),
+                              const Color(0xFFFFA726),
                             ),
                           ],
                         ),
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       // Botón CONFIRMAR
                       InkWell(
                         onTap: _onConfirm,
@@ -9065,19 +8944,20 @@ class _FullScreenNumericKeyboardDialogState
                           width: double.infinity,
                           height: 70,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               colors: [Color(0xFF00a86b), Color(0xFF00d980)],
                             ),
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF00a86b).withOpacity(0.5),
+                                color: const Color(0xFF00a86b)
+                                    .withValues(alpha: 0.5),
                                 blurRadius: 20,
-                                offset: Offset(0, 8),
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),
-                          child: Center(
+                          child: const Center(
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -9089,7 +8969,8 @@ class _FullScreenNumericKeyboardDialogState
                                 SizedBox(width: 12),
                                 Text(
                                   'CONFIRMAR',
-                                  style: TextStyle(fontFamily: 'Roboto',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
                                     color: Colors.white,
@@ -9118,7 +8999,7 @@ class _FullScreenNumericKeyboardDialogState
         onTap: () => _onNumberPressed(number),
         child: Container(
           decoration: BoxDecoration(
-            gradient: LinearGradient(
+            gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
@@ -9129,16 +9010,17 @@ class _FullScreenNumericKeyboardDialogState
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: Color(0xFF2D6A4F).withOpacity(0.5),
+                color: const Color(0xFF2D6A4F).withValues(alpha: 0.5),
                 blurRadius: 12,
-                offset: Offset(0, 6),
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: Center(
             child: Text(
               number,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 36,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -9166,15 +9048,15 @@ class _FullScreenNumericKeyboardDialogState
               end: Alignment.bottomRight,
               colors: [
                 color,
-                color.withOpacity(0.8),
+                color.withValues(alpha: 0.8),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.4),
+                color: color.withValues(alpha: 0.4),
                 blurRadius: 12,
-                offset: Offset(0, 6),
+                offset: const Offset(0, 6),
               ),
             ],
           ),

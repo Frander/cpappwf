@@ -84,7 +84,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                 // Header moderno
                 Container(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(12.0, 12.0, 12.0, 16.0),
+                      EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 10.0),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -149,7 +149,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                           SizedBox(width: 44),
                         ],
                       ),
-                      SizedBox(height: 16),
+                      SizedBox(height: 8),
                       // Título con efecto brillante
                       ShaderMask(
                         shaderCallback: (bounds) {
@@ -166,20 +166,20 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                           'Lista de lotes',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 18,
                             fontWeight: FontWeight.w900,
-                            letterSpacing: 1.2,
+                            letterSpacing: 1.0,
                             color: Colors.white,
                             shadows: [
                               Shadow(
                                 color: Color(0xFF00a86b).withOpacity(0.5),
-                                blurRadius: 12,
+                                blurRadius: 10,
                               ),
                             ],
                           ),
                         ),
                       ),
-                      SizedBox(height: 16),
+                      SizedBox(height: 8),
                       // Campo de búsqueda mejorado
                       Container(
                         decoration: BoxDecoration(
@@ -208,18 +208,18 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                             child: Padding(
                               padding: EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 4),
+                                  horizontal: 12, vertical: 2),
                               child: Row(
                                 children: [
                                   Icon(
                                     Icons.search_rounded,
                                     color: Color(0xFF00ff9f),
-                                    size: 24,
+                                    size: 20,
                                   ),
-                                  SizedBox(width: 12),
+                                  SizedBox(width: 10),
                                   Expanded(
                                     child: TextFormField(
                                       controller: _model.textController,
@@ -239,6 +239,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                               color: Color(0xFF00ff9f)
                                                   .withOpacity(0.7),
                                               letterSpacing: 0.5,
+                                              fontSize: 13,
                                             ),
                                         hintStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
@@ -254,7 +255,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         focusedErrorBorder: InputBorder.none,
                                         filled: false,
                                         contentPadding:
-                                            EdgeInsets.symmetric(vertical: 12),
+                                            EdgeInsets.symmetric(vertical: 8),
                                       ),
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
@@ -603,82 +604,77 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Padding(
-              padding: EdgeInsets.all(12),
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Icono y texto
+                  // Icono
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        colors: isSelected
+                            ? [
+                                Colors.white.withOpacity(0.3),
+                                Colors.transparent,
+                              ]
+                            : [
+                                Color(0xFF00a86b).withOpacity(0.3),
+                                Colors.transparent,
+                              ],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.grid_view_rounded,
+                      color: isSelected
+                          ? Colors.white
+                          : Color(0xFF00ff9f),
+                      size: 18,
+                    ),
+                  ),
+                  // Texto
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              colors: isSelected
-                                  ? [
-                                      Colors.white.withOpacity(0.3),
-                                      Colors.transparent,
-                                    ]
-                                  : [
-                                      Color(0xFF00a86b).withOpacity(0.3),
-                                      Colors.transparent,
-                                    ],
-                            ),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(
-                            Icons.grid_view_rounded,
-                            color: isSelected
-                                ? Colors.white
-                                : Color(0xFF00ff9f),
-                            size: 22,
-                          ),
+                    child: Center(
+                      child: Text(
+                        headquarterItem.nameHeadquarter,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontFamily: 'Roboto',
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color:
+                              isSelected ? Colors.white : Color(0xFF00ff9f),
+                          letterSpacing: 0.3,
                         ),
-                        SizedBox(height: 8),
-                        Flexible(
-                          child: Text(
-                            headquarterItem.nameHeadquarter,
-                            textAlign: TextAlign.center,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(fontFamily: 'Roboto',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color:
-                                  isSelected ? Colors.white : Color(0xFF00ff9f),
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                   // Checkbox personalizado
                   Container(
-                    width: 24,
-                    height: 24,
+                    width: 20,
+                    height: 20,
                     decoration: BoxDecoration(
                       color: isSelected
                           ? Colors.white
                           : Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(6),
+                      borderRadius: BorderRadius.circular(5),
                       border: Border.all(
                         color: isSelected
                             ? Colors.white
                             : Color(0xFF00a86b).withOpacity(0.5),
-                        width: 2,
+                        width: 1.5,
                       ),
                     ),
                     child: isSelected
                         ? Icon(
                             Icons.check_rounded,
                             color: FlutterFlowTheme.of(context).primary,
-                            size: 18,
+                            size: 14,
                           )
                         : null,
                   ),

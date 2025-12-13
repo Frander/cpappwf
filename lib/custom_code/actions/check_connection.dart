@@ -9,15 +9,20 @@ import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
+/// Instancia singleton para evitar crear nuevas instancias en cada llamada
+final InternetConnection _internetChecker = InternetConnection();
+
+/// Verifica si hay conexión a internet con timeout para evitar bloqueos
 Future<bool> checkConnection() async {
-  // Usar InternetConnectionChecker para verificar conexión
-  bool isConnected = await InternetConnectionChecker().hasConnection;
-  return isConnected;
+  try {
+    // Timeout de 5 segundos para evitar bloquear la UI
+    final result = await _internetChecker.hasInternetAccess
+        .timeout(const Duration(seconds: 5), onTimeout: () => false);
+    return result;
+  } catch (e) {
+    // En caso de error, asumir sin conexión
+    return false;
+  }
 }
-// Set your action name, define your arguments and return parameter,
-// and then add the boilerplate code using the green button on the right!

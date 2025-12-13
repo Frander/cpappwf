@@ -1,19 +1,10 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
-import 'package:flutter_internet_speed_test/flutter_internet_speed_test.dart';
 import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -59,8 +50,7 @@ Future<dynamic> checkInternetQuality() async {
   }
 
   Dio? dio;
-  FlutterInternetSpeedTest? speedTest; // NO SE USARÁ - PLUGIN PROBLEMÁTICO
-  double? downloadSpeed; // Declarar la variable aquí
+  double? downloadSpeed;
 
   try {
     print(
@@ -127,6 +117,7 @@ Future<dynamic> checkInternetQuality() async {
       final result = {
         'message': 'Sin conectividad detectada',
         'isGoodConnection': false,
+        'hasInternet': false,
       };
 
       // CACHEAR RESULTADO DE SIN CONEXIÓN (para evitar chequeos repetitivos)
@@ -169,6 +160,7 @@ Future<dynamic> checkInternetQuality() async {
       final result = {
         'message': 'Sin acceso a internet verificado',
         'isGoodConnection': false,
+        'hasInternet': false,
       };
 
       // CACHEAR RESULTADO DE SIN INTERNET (para evitar chequeos repetitivos)
@@ -198,63 +190,21 @@ Future<dynamic> checkInternetQuality() async {
       },
     ));
 
-    // 6. PING TEST INTELIGENTE CON PRIORIDAD PARA TU API
-    print('📡 Ejecutando ping test inteligente con tu API prioritaria...');
-
-    List<ServerConfig> pingServers = optimalServers
-        .where((s) => s.type == 'ping' || s.type == 'cdn' || s.type == 'api')
-        .take(8)
-        .toList();
+    // 6. PING TEST SIMPLIFICADO - SOLO 3 SERVIDORES
+    print('📡 Ejecutando ping test (API + 2 locales)...');
 
     Map<String, int> serverPings = {};
-    int? apiPing; // Ping específico a tu API
+    int? apiPing;
     String? bestLocalServer;
     int? bestLocalPing;
 
-    // PRIMERO: Medir ping a TU API (más importante)
-    ServerConfig? apiServer = optimalServers.firstWhere(
-      (s) => s.type == 'api',
-      orElse: () =>
-          ServerConfig(url: '', name: '', city: '', lat: 0, lon: 0, type: ''),
-    );
-
-    if (apiServer.name.isNotEmpty) {
-      try {
-        print('🎯 Midiendo ping prioritario a tu API (${apiServer.name})...');
-
-        List<int> apiPings = [];
-        for (int attempt = 0; attempt < 3; attempt++) {
-          final stopwatch = Stopwatch()..start();
-          final response = await dio.get(apiServer.url);
-          stopwatch.stop();
-
-          if (response.statusCode! >= 200 && response.statusCode! < 300) {
-            apiPings.add(stopwatch.elapsedMilliseconds);
-            print(
-                '✅ API ping intento ${attempt + 1}: ${stopwatch.elapsedMilliseconds}ms');
-          }
-        }
-
-        if (apiPings.isNotEmpty) {
-          apiPing =
-              (apiPings.reduce((a, b) => a + b) / apiPings.length).round();
-          serverPings[apiServer.name] = apiPing;
-          print('🏆 Ping promedio a tu API: ${apiPing}ms');
-        }
-      } catch (e) {
-        print('❌ Error midiendo API: $e');
-      }
-    }
-
-    // SEGUNDO: Medir servidores locales colombianos
-    for (var server in pingServers) {
-      if (server.type == 'api') continue; // Ya medido arriba
-
+    // Medir ping a cada servidor (solo 2 intentos por servidor)
+    for (var server in optimalServers) {
       List<int> pings = [];
       try {
-        print('📡 Probando ping a ${server.name}...');
+        print('   🔍 ${server.name}...');
 
-        for (int attempt = 0; attempt < 3; attempt++) {
+        for (int attempt = 0; attempt < 2; attempt++) {
           final stopwatch = Stopwatch()..start();
           final response = await dio.get(server.url);
           stopwatch.stop();
@@ -267,35 +217,24 @@ Future<dynamic> checkInternetQuality() async {
         if (pings.isNotEmpty) {
           int avgPing = (pings.reduce((a, b) => a + b) / pings.length).round();
           serverPings[server.name] = avgPing;
-          print('✅ ${server.name}: ${avgPing}ms promedio');
+          print('   ✅ ${server.name}: ${avgPing}ms');
 
-          // Identificar mejor servidor local (no API)
-          if (server.type != 'api' &&
-              (bestLocalPing == null || avgPing < bestLocalPing)) {
+          if (server.type == 'api') {
+            apiPing = avgPing;
+          } else if (bestLocalPing == null || avgPing < bestLocalPing) {
             bestLocalPing = avgPing;
             bestLocalServer = server.name;
           }
         }
       } catch (e) {
-        print('❌ Error ping ${server.name}: $e');
+        print('   ❌ ${server.name}: Error');
         continue;
       }
     }
 
-    // Determinar mejor ping general y mostrar resultados
-    int? bestPing;
-    String? bestServerName;
+    // Mostrar resumen
     if (serverPings.isNotEmpty) {
-      var bestEntry =
-          serverPings.entries.reduce((a, b) => a.value < b.value ? a : b);
-      bestPing = bestEntry.value;
-      bestServerName = bestEntry.key;
-      print('🏆 Mejor ping general: $bestServerName con ${bestPing}ms');
-
-      if (apiPing != null) {
-        print(
-            '📊 Comparación: API=${apiPing}ms, Mejor local=${bestLocalPing ?? 'N/A'}ms');
-      }
+      print('📊 Resumen: API=${apiPing ?? 'N/A'}ms, Local=${bestLocalPing ?? 'N/A'}ms');
     }
 
     // 7. SPEED TEST SOLO CON CDNs PÚBLICOS (SIN PLUGIN PROBLEMÁTICO)
@@ -517,6 +456,7 @@ Future<dynamic> checkInternetQuality() async {
     final result = {
       'message': finalMessage,
       'isGoodConnection': isGoodConnection,
+      'hasInternet': true,
     };
 
     // ACTUALIZAR CACHÉ
@@ -531,6 +471,7 @@ Future<dynamic> checkInternetQuality() async {
     final result = {
       'message': 'Error al verificar la conexión',
       'isGoodConnection': false,
+      'hasInternet': false,
     };
 
     // CACHEAR RESULTADO DE ERROR (para evitar chequeos repetitivos cuando hay problemas)
@@ -550,316 +491,109 @@ Future<dynamic> checkInternetQuality() async {
   }
 }
 
-// FUNCIÓN PARA SELECCIONAR SERVIDORES ÓPTIMOS SEGÚN UBICACIÓN
+// FUNCIÓN SIMPLIFICADA - SOLO 3 SERVIDORES: API EC2 + 2 LOCALES
 List<ServerConfig> _getOptimalServers(Position position) {
-  // Base de datos de servidores públicos colombianos verificados
-  List<ServerConfig> allServers = [
-    // TU API AWS OREGON - SERVIDOR PRIORITARIO PARA TU APLICACIÓN
+  // Lista reducida: Solo API + 2 servidores locales confiables
+  List<ServerConfig> servers = [
+    // TU API AWS OREGON - SERVIDOR PRIORITARIO
     ServerConfig(
       url: 'https://api.clickpalm.com/',
-      name: 'ClickPalm API Oregon',
+      name: 'ClickPalm API',
       city: 'Oregon AWS',
       lat: 45.5152,
       lon: -122.6784,
-      type: 'api', // Nuevo tipo para tu API
+      type: 'api',
     ),
 
-    // FAST.COM (NETFLIX) - SERVICIO PÚBLICO DE SPEED TEST
+    // SERVIDOR LOCAL 1 - Google (muy confiable, edge en Colombia)
     ServerConfig(
-      url: 'https://fast.com',
-      name: 'Fast.com Netflix',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'speed',
-    ),
-
-    // CDNs PÚBLICOS CON EDGE EN COLOMBIA
-    ServerConfig(
-      url:
-          'https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js',
-      name: 'Google CDN Colombia',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'speed',
-    ),
-    ServerConfig(
-      url: 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.js',
-      name: 'jsDelivr CDN',
-      city: 'Medellín',
-      lat: 6.2442,
-      lon: -75.5812,
-      type: 'speed',
-    ),
-    ServerConfig(
-      url: 'https://unpkg.com/react@18/umd/react.production.min.js',
-      name: 'unpkg CDN',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'speed',
-    ),
-
-    // UNIVERSIDADES PÚBLICAS COLOMBIANAS (RENATA)
-    ServerConfig(
-      url: 'https://www.unal.edu.co',
-      name: 'Universidad Nacional',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.udea.edu.co',
-      name: 'Universidad de Antioquia',
-      city: 'Medellín',
-      lat: 6.2442,
-      lon: -75.5812,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.univalle.edu.co',
-      name: 'Universidad del Valle',
-      city: 'Cali',
-      lat: 3.4516,
-      lon: -76.5320,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.uis.edu.co',
-      name: 'Universidad Industrial Santander',
-      city: 'Bucaramanga',
-      lat: 7.1193,
-      lon: -73.1227,
-      type: 'ping',
-    ),
-
-    // ENTIDADES PÚBLICAS COLOMBIANAS
-    ServerConfig(
-      url: 'https://www.gov.co',
-      name: 'Gobierno Nacional',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.mintic.gov.co',
-      name: 'MinTIC Colombia',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://bogota.gov.co',
-      name: 'Alcaldía de Bogotá',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.medellin.gov.co',
-      name: 'Alcaldía de Medellín',
-      city: 'Medellín',
-      lat: 6.2442,
-      lon: -75.5812,
-      type: 'ping',
-    ),
-
-    // MEDIOS DE COMUNICACIÓN COLOMBIANOS
-    ServerConfig(
-      url: 'https://www.eltiempo.com',
-      name: 'El Tiempo',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.caracol.com.co',
-      name: 'Caracol Radio',
-      city: 'Bogotá',
+      url: 'https://www.google.com',
+      name: 'Google',
+      city: 'Colombia',
       lat: 4.7110,
       lon: -74.0721,
       type: 'ping',
     ),
 
-    // CDNs GLOBALES COMO FALLBACK
+    // SERVIDOR LOCAL 2 - Cloudflare CDN (rápido y confiable)
     ServerConfig(
       url: 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js',
       name: 'Cloudflare CDN',
-      city: 'Bogotá',
+      city: 'Colombia',
       lat: 4.7110,
       lon: -74.0721,
-      type: 'cdn',
-    ),
-    ServerConfig(
-      url:
-          'https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js',
-      name: 'jsDelivr Bootstrap',
-      city: 'Global',
-      lat: 4.0,
-      lon: -74.0,
-      type: 'cdn',
-    ),
-
-    // BANCOS COLOMBIANOS (PING TEST)
-    ServerConfig(
-      url: 'https://www.bancolombia.com',
-      name: 'Bancolombia',
-      city: 'Medellín',
-      lat: 6.2442,
-      lon: -75.5812,
-      type: 'ping',
-    ),
-    ServerConfig(
-      url: 'https://www.bancodebogota.com',
-      name: 'Banco de Bogotá',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'ping',
+      type: 'speed',
     ),
   ];
 
-  // Calcular distancia y ordenar por proximidad
-  allServers.sort((a, b) {
-    double distanceA = Geolocator.distanceBetween(
-      position.latitude,
-      position.longitude,
-      a.lat,
-      a.lon,
-    );
-    double distanceB = Geolocator.distanceBetween(
-      position.latitude,
-      position.longitude,
-      b.lat,
-      b.lon,
-    );
-    return distanceA.compareTo(distanceB);
-  });
-
-  print('📍 Servidores ordenados por distancia desde ubicación actual:');
-  for (int i = 0; i < allServers.length && i < 5; i++) {
-    double distance = Geolocator.distanceBetween(
-          position.latitude,
-          position.longitude,
-          allServers[i].lat,
-          allServers[i].lon,
-        ) /
-        1000; // Convertir a kilómetros
-    print(
-        '   ${i + 1}. ${allServers[i].name} - ${distance.toStringAsFixed(0)}km');
+  print('📡 Servidores de verificación:');
+  for (var server in servers) {
+    print('   - ${server.name} (${server.type})');
   }
 
-  return allServers;
+  return servers;
 }
 
-// SPEED TEST DE RESPALDO CON CDNs PÚBLICOS VERIFICADOS
+// SPEED TEST SIMPLIFICADO - SOLO 1 CDN CON 2 INTENTOS
 Future<double?> _fallbackSpeedTestPublic(
     Dio dio, List<ServerConfig> servers) async {
-  // Seleccionar CDNs públicos y servidores de speed test como respaldo
-  List<ServerConfig> fallbackServers = servers
-      .where((s) => s.type == 'cdn' || s.type == 'speed')
-      .take(5)
-      .toList();
-
-  // Agregar servidores adicionales específicos para fallback
-  fallbackServers.addAll([
-    ServerConfig(
-      url: 'https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js',
-      name: 'Google jQuery CDN',
-      city: 'Bogotá',
+  // Usar solo Cloudflare CDN (el más confiable)
+  final speedServer = servers.firstWhere(
+    (s) => s.type == 'speed',
+    orElse: () => ServerConfig(
+      url: 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js',
+      name: 'Cloudflare CDN',
+      city: 'Colombia',
       lat: 4.7110,
       lon: -74.0721,
-      type: 'cdn',
+      type: 'speed',
     ),
-    ServerConfig(
-      url:
-          'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js',
-      name: 'Cloudflare Lodash',
-      city: 'Bogotá',
-      lat: 4.7110,
-      lon: -74.0721,
-      type: 'cdn',
-    ),
-  ]);
+  );
 
   List<double> speeds = [];
 
-  for (var server in fallbackServers) {
-    try {
-      print('📡 Probando CDN de respaldo: ${server.name}...');
+  try {
+    print('⚡ Midiendo velocidad con ${speedServer.name}...');
 
-      // Hacer 2 mediciones por servidor para mayor precisión
-      for (int attempt = 0; attempt < 2; attempt++) {
-        final stopwatch = Stopwatch()..start();
-        final response = await dio.get(
-          server.url,
-          options: Options(
-            headers: {
-              'Cache-Control': 'no-cache, no-store, must-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0',
-            },
-          ),
-        );
-        stopwatch.stop();
+    // Solo 2 intentos
+    for (int attempt = 0; attempt < 2; attempt++) {
+      final stopwatch = Stopwatch()..start();
+      final response = await dio.get(
+        speedServer.url,
+        options: Options(
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        ),
+      );
+      stopwatch.stop();
 
-        if (response.statusCode == 200 && response.data != null) {
-          int bytes = 0;
-          if (response.data is String) {
-            bytes = (response.data as String).length;
-          } else {
-            bytes = response.data.toString().length;
-          }
+      if (response.statusCode == 200 && response.data != null) {
+        int bytes = 0;
+        if (response.data is String) {
+          bytes = (response.data as String).length;
+        } else {
+          bytes = response.data.toString().length;
+        }
 
-          if (bytes > 10000) {
-            // Al menos 10KB para medición válida
-            final seconds = stopwatch.elapsedMilliseconds / 1000.0;
-            final mbps = (bytes * 8) / (1024 * 1024 * seconds);
-            double speed = double.parse(mbps.toStringAsFixed(2));
-
-            speeds.add(speed);
-            print(
-                '⚡ CDN ${server.name} (intento ${attempt + 1}): ${speed} Mbps');
-
-            // Si obtenemos una velocidad buena, salir del loop de intentos
-            if (speed > 5.0) break;
-          }
+        if (bytes > 5000) {
+          final seconds = stopwatch.elapsedMilliseconds / 1000.0;
+          final mbps = (bytes * 8) / (1024 * 1024 * seconds);
+          double speed = double.parse(mbps.toStringAsFixed(2));
+          speeds.add(speed);
+          print('   Intento ${attempt + 1}: ${speed} Mbps');
         }
       }
-
-      // Si ya tenemos suficientes mediciones buenas, parar
-      if (speeds.length >= 4) break;
-    } catch (e) {
-      print('❌ Error CDN ${server.name}: $e');
-      continue;
-    }
-  }
-
-  if (speeds.isNotEmpty) {
-    // Ordenar velocidades y tomar el promedio de las mejores
-    speeds.sort((a, b) => b.compareTo(a));
-
-    double finalSpeed;
-    if (speeds.length >= 3) {
-      // Promedio de las 3 mejores velocidades
-      finalSpeed = (speeds[0] + speeds[1] + speeds[2]) / 3;
-    } else if (speeds.length >= 2) {
-      // Promedio de las 2 mejores
-      finalSpeed = (speeds[0] + speeds[1]) / 2;
-    } else {
-      // Una sola medición
-      finalSpeed = speeds[0];
     }
 
-    print(
-        '🏆 Velocidad de respaldo promedio: ${finalSpeed.toStringAsFixed(2)} Mbps');
-    return double.parse(finalSpeed.toStringAsFixed(2));
+    if (speeds.isNotEmpty) {
+      double avgSpeed = speeds.reduce((a, b) => a + b) / speeds.length;
+      print('🏆 Velocidad promedio: ${avgSpeed.toStringAsFixed(2)} Mbps');
+      return double.parse(avgSpeed.toStringAsFixed(2));
+    }
+  } catch (e) {
+    print('❌ Error midiendo velocidad: $e');
   }
 
   return null;

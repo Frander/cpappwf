@@ -971,6 +971,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                 FFAppState()
                                                     .headquartersSelectedList
                                                     .toList()),
+                                            FFAppState().deviceDefault.imeI1,
                                           );
                                           _shouldSetState = true;
                                           if (_model.syncAddResult!) {

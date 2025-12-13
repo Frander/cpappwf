@@ -1,9 +1,7 @@
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
-import 'dart:ui';
 
 class GPSQualityIndicator extends StatefulWidget {
   const GPSQualityIndicator({super.key});
@@ -16,6 +14,7 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     with SingleTickerProviderStateMixin {
   bool? _lastStabilizedState;
   bool _isVisible = false;
+  bool _currentIsStabilized = false;
   Timer? _hideTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -27,21 +26,21 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
 
     // Configurar animaciones
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 500), // Más tiempo para ver la animación
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
 
     _fadeAnimation = CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeIn, // Fade in rápido
+      curve: Curves.easeOut,
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, -2.0),
+      begin: const Offset(0, 1.0), // Viene desde abajo
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animationController,
-      curve: Curves.easeOutBack, // Efecto bounce sutil
+      curve: Curves.easeOutCubic,
     ));
   }
 
@@ -52,36 +51,31 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     super.dispose();
   }
 
-  void _showNotification({required bool isGoodQuality}) {
+  void _showSnackBar({required bool isStabilized}) {
     if (!mounted) return;
-
-    setState(() {
-      _isVisible = true;
-    });
-
-    _animationController.forward();
 
     // Cancelar timer anterior si existe
     _hideTimer?.cancel();
 
-    // Si es buena calidad, ocultar después de 2 segundos (más rápido)
-    if (isGoodQuality) {
+    setState(() {
+      _isVisible = true;
+      _currentIsStabilized = isStabilized;
+    });
+
+    _animationController.forward();
+
+    // Solo ocultar automáticamente si está estabilizado (GPS listo)
+    if (isStabilized) {
       _hideTimer = Timer(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          _hideNotification();
-        }
-      });
-    } else {
-      // Si está estabilizando, mostrar por 4 segundos
-      _hideTimer = Timer(const Duration(milliseconds: 4000), () {
-        if (mounted) {
-          _hideNotification();
+          _hideSnackBar();
         }
       });
     }
+    // Si está estabilizando, permanece visible (sin timer)
   }
 
-  void _hideNotification() {
+  void _hideSnackBar() {
     _animationController.reverse().then((_) {
       if (mounted) {
         setState(() {
@@ -97,23 +91,34 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
       builder: (context, appState, _) {
         final currentStabilized = appState.isStabilized;
 
-        // Detectar si debemos mostrar notificación
-        bool shouldShowNotification = false;
+        // Detectar cambios de estado
+        bool shouldShow = false;
+        bool shouldUpdateState = false;
 
-        // CASO 1: Primera vez y está estabilizando (false) -> mostrar "Estabilizando GPS"
+        // CASO 1: Primera vez y está estabilizando (false) -> mostrar SnackBar
         if (_lastStabilizedState == null && !currentStabilized) {
-          shouldShowNotification = true;
+          shouldShow = true;
         }
-        // CASO 2: Cambio de estado (de false a true o viceversa)
-        else if (_lastStabilizedState != null && _lastStabilizedState != currentStabilized) {
-          shouldShowNotification = true;
+        // CASO 2: Cambio de estado de true a false (vuelve a estabilizar)
+        else if (_lastStabilizedState == true && !currentStabilized) {
+          shouldShow = true;
+        }
+        // CASO 3: Cambio de estado de false a true (ya estabilizado)
+        else if (_lastStabilizedState == false && currentStabilized) {
+          shouldUpdateState = true;
         }
 
-        if (shouldShowNotification) {
-          // Postponer la llamada a setState hasta después del build
+        if (shouldShow) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
-              _showNotification(isGoodQuality: currentStabilized);
+              _showSnackBar(isStabilized: false);
+            }
+          });
+        } else if (shouldUpdateState && _isVisible) {
+          // Actualizar el estado del SnackBar actual a "estabilizado"
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              _showSnackBar(isStabilized: true);
             }
           });
         }
@@ -124,27 +129,17 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
           return const SizedBox.shrink();
         }
 
-        final isGoodQuality = currentStabilized;
-
         return Positioned(
-          top: 8,
-          left: 0,
-          right: 0,
-          child: FadeTransition(
-            opacity: _fadeAnimation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, -2.0), // Empieza 2x altura del widget arriba
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: _animationController,
-                curve: Curves.easeOutBack, // Efecto bounce sutil al final
-              )),
-              child: SafeArea(
-                child: Align(
-                  alignment: Alignment.topCenter,
-                  child: _buildNotificationCard(isGoodQuality),
-                ),
+          bottom: 16,
+          left: 16,
+          right: 16,
+          child: SafeArea(
+            top: false,
+            child: FadeTransition(
+              opacity: _fadeAnimation,
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: _buildSnackBarContent(_currentIsStabilized),
               ),
             ),
           ),
@@ -153,128 +148,82 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     );
   }
 
-  Widget _buildNotificationCard(bool isGoodQuality) {
-    final accentColor = isGoodQuality
-        ? const Color(0xFF00D9A5) // Verde neón sutil
-        : const Color(0xFFFFB84D); // Naranja sutil
+  Widget _buildSnackBarContent(bool isStabilized) {
+    // Colores según estado
+    final backgroundColor = isStabilized
+        ? const Color(0xFF00C853) // Verde cuando estabilizado
+        : const Color(0xFF1A1A2E); // Oscuro cuando estabilizando
 
-    final iconData = isGoodQuality ? Icons.check_circle_rounded : Icons.gps_fixed;
+    final accentColor = isStabilized
+        ? Colors.white
+        : const Color(0xFFFFB84D); // Naranja mientras estabiliza
 
-    final message = isGoodQuality ? 'GPS Listo' : 'Estabilizando GPS';
+    final message = isStabilized ? 'GPS Estabilizado' : 'Estabilizando GPS...';
+    final iconData = isStabilized ? Icons.check_circle_rounded : Icons.gps_fixed;
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.75),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: accentColor.withOpacity(0.5),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: accentColor.withOpacity(0.2),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Dot indicator
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: accentColor,
-                    boxShadow: [
-                      BoxShadow(
-                        color: accentColor.withOpacity(0.6),
-                        blurRadius: 6,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 10),
-
-                // Texto del mensaje
-                Text(
-                  message,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.95),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                    height: 1.2,
-                  ),
-                  overflow: TextOverflow.visible,
-                  maxLines: 1,
-                ),
-
-                // Mini spinner solo si está estabilizando
-                if (!isGoodQuality) ...[
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        accentColor.withOpacity(0.9),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+    return Material(
+      elevation: 8,
+      borderRadius: BorderRadius.circular(12),
+      shadowColor: isStabilized
+          ? const Color(0xFF00C853).withOpacity(0.4)
+          : Colors.black.withOpacity(0.3),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isStabilized
+                ? const Color(0xFF00E676).withOpacity(0.5)
+                : accentColor.withOpacity(0.3),
+            width: 1.5,
           ),
         ),
-      ),
-    );
-  }
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icono con animación
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              child: Icon(
+                iconData,
+                key: ValueKey(isStabilized),
+                color: isStabilized ? Colors.white : accentColor,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
 
-  Widget _buildSignalIndicator() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(3, (index) {
-        return Padding(
-          padding: const EdgeInsets.only(left: 2),
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.3, end: 1.0),
-            duration: Duration(milliseconds: 600 + (index * 100)),
-            curve: Curves.easeInOut,
-            builder: (context, value, child) {
-              return Opacity(
-                opacity: value,
-                child: Container(
-                  width: 3,
-                  height: 12 - (index * 3.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
+            // Texto del mensaje
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 300),
+              style: TextStyle(
+                color: isStabilized ? Colors.white : Colors.white.withOpacity(0.95),
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.3,
+              ),
+              child: Text(message),
+            ),
+
+            // Spinner solo cuando está estabilizando
+            if (!isStabilized) ...[
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
                 ),
-              );
-            },
-            onEnd: () {
-              // Repetir la animación
-              if (mounted) {
-                setState(() {});
-              }
-            },
-          ),
-        );
-      }),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }

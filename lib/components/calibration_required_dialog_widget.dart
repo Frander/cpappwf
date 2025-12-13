@@ -83,7 +83,7 @@ class _CalibrationRequiredDialogWidgetState
         child: ClipRRect(
           borderRadius: BorderRadius.circular(32),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -333,20 +333,24 @@ class _CalibrationRequiredDialogWidgetState
                           child: Center(
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
                                   Icons.play_circle_filled_rounded,
                                   color: Colors.white,
-                                  size: 28,
+                                  size: 24,
                                 ),
-                                SizedBox(width: 12),
-                                Text(
-                                  'INICIAR CALIBRACIÓN',
-                                  style: TextStyle(fontFamily: 'Roboto',
-                                    fontSize: 17,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    letterSpacing: 1.2,
+                                SizedBox(width: 8),
+                                Flexible(
+                                  child: Text(
+                                    'INICIAR CALIBRACIÓN',
+                                    style: TextStyle(fontFamily: 'Roboto',
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                      letterSpacing: 1.0,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],

@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import 'home_page_model.dart';
 export 'home_page_model.dart';
@@ -81,12 +82,18 @@ class _HomePageWidgetState extends State<HomePageWidget>
   // Última fecha de visita
   String _lastVisitDate = 'Cargando...';
 
+  // Suscripción al servicio de background para eventos GPS
+  StreamSubscription<Map<String, dynamic>?>? _gpsServiceSubscription;
+
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => HomePageModel());
     _model.searchController ??= TextEditingController();
     _model.searchFocusNode ??= FocusNode();
+
+    // Escuchar eventos del servicio de background (GPS estabilizado)
+    _setupGpsServiceListener();
 
     // Controllers de animación
     _userBadgeController = AnimationController(
@@ -168,6 +175,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   @override
   void dispose() {
+    _gpsServiceSubscription?.cancel();
     _model.dispose();
     _userBadgeController.dispose();
     _activityBadgeController.dispose();
@@ -175,6 +183,21 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _searchCloudController.dispose();
     _carouselController.dispose();
     super.dispose();
+  }
+
+  // Configurar listener para eventos del servicio de background GPS
+  void _setupGpsServiceListener() {
+    final service = FlutterBackgroundService();
+    _gpsServiceSubscription = service.on('gpsStabilized').listen((event) {
+      if (event != null && event['stabilized'] == true) {
+        debugPrint('📡 Evento recibido: GPS estabilizado');
+        if (mounted) {
+          FFAppState().update(() {
+            FFAppState().isStabilized = true;
+          });
+        }
+      }
+    });
   }
 
   // Obtener iniciales del usuario
@@ -508,7 +531,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
       ),
       child: InkWell(
         onTap: () async {
-          // Navegar a UsersPage
           context.pushNamed('UsersPage');
         },
         splashColor: Color(0xFF00a86b).withOpacity(0.3),
@@ -542,7 +564,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
               child: Row(
                 children: [
                   // Badge circular con iniciales
@@ -861,7 +883,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(28),
                             child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                              filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                               child: Container(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
@@ -1293,7 +1315,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
         child: ClipRRect(
           borderRadius: BorderRadius.circular(16),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Row(
               children: [
                 SizedBox(width: 12),

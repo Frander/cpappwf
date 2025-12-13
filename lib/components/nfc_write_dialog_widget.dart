@@ -148,17 +148,23 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       _model.totalResults = totalResults;
 
       // 4. Obtener ID y nombre del operador desde AppState
-      _model.operatorId = FFAppState().userSelected.operID;
+      // OP field = idUser (identificador numérico del usuario)
+      _model.operatorId = FFAppState().userSelected.idUser.toString();
       _model.operatorName = FFAppState().userSelected.nameUser;
+      
+      debugPrint('👤 NFC WRITE - Operador ID (idUser): ${_model.operatorId}');
+      debugPrint('👤 NFC WRITE - Operador Nombre: ${_model.operatorName}');
+      debugPrint('👤 NFC WRITE - userSelected.operID: ${FFAppState().userSelected.operID}');
 
-      // 4.1 Buscar el operador Cortero (OP2) desde visitDetails
+      // 4.1 Obtener el ID del Cortero (OP2) desde visitDetails
       // El Cortero viene del step con name_step = "Cortero"
-      // Necesitamos buscar el id_activity_step del step "Cortero" y luego
-      // encontrar el visitDetail que corresponde a ese step
+      // OP2 debe almacenar el IdActivityStatus (ID único de Activities_status)
       String operator2Id = '';
+      String operator2Name = ''; // También guardamos el nombre para display
 
-      // Obtener los steps de la actividad actual (currentActivity ya está definido arriba)
-      final activityStepsRaw = getJsonField(currentActivity, r'''$.activity_steps''');
+      // Obtener los steps de la actividad actual
+      final activityStepsRaw =
+          getJsonField(currentActivity, r'''$.activity_steps''');
 
       if (activityStepsRaw != null) {
         final activitySteps = activityStepsRaw.toList();
@@ -166,7 +172,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         // Buscar el step con name_step = "Cortero" (case insensitive)
         int? corteroStepId;
         for (var step in activitySteps) {
-          final stepName = getJsonField(step, r'''$.name_step''')?.toString() ?? '';
+          final stepName =
+              getJsonField(step, r'''$.name_step''')?.toString() ?? '';
           if (stepName.toLowerCase() == 'cortero') {
             corteroStepId = getJsonField(step, r'''$.id_activity_step''');
             debugPrint('🔍 Step Cortero encontrado: ID=$corteroStepId');
@@ -181,9 +188,37 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             // y que tiene un status seleccionado (idActivityStatus > 0)
             if (detail.idStepParent == corteroStepId &&
                 detail.idActivityStatus > 0) {
-              // statusResponse contiene el Oper_id del cortero seleccionado
-              operator2Id = detail.statusResponse;
-              debugPrint('✅ Cortero encontrado: OP2=$operator2Id (nombre: ${detail.statusOption})');
+              debugPrint('🔍 Detail del Cortero encontrado:');
+              debugPrint('   - idActivityStatus: ${detail.idActivityStatus}');
+              debugPrint('   - statusResponse: "${detail.statusResponse}"');
+
+              // OP2 almacena el idActivityStatus (el ID del registro en Activities_status)
+              operator2Id = detail.idActivityStatus.toString();
+
+              // Obtener el Status_name desde Activities_status para display
+              if (detail.idActivityStatus > 0) {
+                try {
+                  final dbPath = FFAppState().pathDatabase;
+                  if (dbPath.isNotEmpty) {
+                    final db = await openDatabase(dbPath);
+                    
+                    final result = await db.rawQuery(
+                      'SELECT Status_name FROM Activities_status WHERE Id_activity_status = ? LIMIT 1',
+                      [detail.idActivityStatus],
+                    );
+                    
+                    if (result.isNotEmpty && result.first['Status_name'] != null) {
+                      operator2Name = result.first['Status_name'].toString();
+                      debugPrint('✅ Cortero encontrado - ID: $operator2Id, Nombre: $operator2Name');
+                    } else {
+                      debugPrint('❌ No se encontró Status_name para idActivityStatus=$operator2Id');
+                    }
+                    await db.close();
+                  }
+                } catch (e) {
+                  debugPrint('❌ Error buscando Cortero: $e');
+                }
+              }
               break;
             }
           }
@@ -191,28 +226,17 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           debugPrint('⚠️ No se encontró step "Cortero" en la actividad');
         }
       }
-      _model.operator2Id = operator2Id;
 
-      // 4.2 Buscar el nombre del Cortero en la base de datos SQLite
-      if (operator2Id.isNotEmpty) {
-        try {
-          final dbPath = FFAppState().pathDatabase;
-          if (dbPath.isNotEmpty) {
-            final db = await openDatabase(dbPath);
-            final result = await db.rawQuery(
-              'SELECT Name_user FROM Users WHERE Oper_id = ?',
-              [operator2Id],
-            );
-            if (result.isNotEmpty && result.first['Name_user'] != null) {
-              _model.operator2Name = result.first['Name_user'].toString();
-              debugPrint('✅ Nombre del Cortero: ${_model.operator2Name}');
-            }
-            await db.close();
-          }
-        } catch (e) {
-          debugPrint('⚠️ Error buscando nombre del Cortero: $e');
-        }
+      // Limpiar si es "false"
+      if (operator2Id == 'false') {
+        operator2Id = '';
       }
+      if (operator2Name == 'false') {
+        operator2Name = '';
+      }
+
+      _model.operator2Id = operator2Id;
+      _model.operator2Name = operator2Name;
 
       // 5. Calcular lote actual usando geolocalización
       final currentHeadquarter = await actions.calculateCurrentHeadquarter(
@@ -266,11 +290,31 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
   String _generateNfcData(DateTime dateTime) {
     // Formato: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204}
+    // OP = operID del operador principal (ID del usuario)
+    // OP2 = IdActivityStatus del cortero (ID único en Activities_status)
     final formattedDate =
         '${dateTime.year}_${dateTime.month.toString().padLeft(2, '0')}_${dateTime.day.toString().padLeft(2, '0')}_${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
 
-    // Incluir OP2 (Cortero) en el formato del tag
-    return '{DH:$formattedDate;OP:${_model.operatorId};OP2:${_model.operator2Id};VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
+    // Validar que el operatorId no esté vacío
+    final operatorIdValue = _model.operatorId.isEmpty 
+        ? FFAppState().userSelected.operID 
+        : _model.operatorId;
+    
+    if (operatorIdValue.isEmpty) {
+      debugPrint('❌ ERROR: OP field es vacío. No se puede escribir el tag.');
+      throw Exception('No se pudo obtener el ID del operador. Por favor seleccione un operador.');
+    }
+    
+    debugPrint('✅ NFC TAG: OP field = $operatorIdValue');
+
+    // Usar el ID del cortero (IdActivityStatus) - si está vacío o es "false", no incluirlo
+    final operator2Value =
+        (_model.operator2Id == 'false' || _model.operator2Id.isEmpty)
+            ? ''
+            : _model.operator2Id;
+
+    // Incluir OP2 (Cortero ID) en el formato del tag
+    return '{DH:$formattedDate;OP:$operatorIdValue;OP2:$operator2Value;VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
   }
 
   /// Cuenta visitas desde la base de datos SQLite agrupadas por Lote (Id_headquarter)
@@ -360,9 +404,11 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             WHERE vd.Id_visit = ?
           ''', [idVisit]);
 
-          debugPrint('   📝 Visita $idVisit tiene ${allDetails.length} detalles:');
+          debugPrint(
+              '   📝 Visita $idVisit tiene ${allDetails.length} detalles:');
           for (var d in allDetails) {
-            debugPrint('      - "${d['Status_name']}" tipo=${d['Type_status']} factor=${d['Factor']}');
+            debugPrint(
+                '      - "${d['Status_name']}" tipo=${d['Type_status']} factor=${d['Factor']}');
           }
 
           // Solo sumar factores de tipo 'unique-option' con Factor > 0
@@ -383,9 +429,12 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
           for (var detail in detailsResult) {
             final factor = detail['Factor'];
-            final factorValue = (factor is int) ? factor : (factor is double ? factor.toInt() : 0);
+            final factorValue = (factor is int)
+                ? factor
+                : (factor is double ? factor.toInt() : 0);
             hqResults += factorValue;
-            debugPrint('      ✅ SUMANDO Factor: $factorValue de "${detail['Status_name']}"');
+            debugPrint(
+                '      ✅ SUMANDO Factor: $factorValue de "${detail['Status_name']}"');
           }
         }
 
@@ -611,7 +660,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                       children: [
                         Text(
                           'ESCRIBIR TAG NFC',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -690,7 +740,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                         SizedBox(width: 12),
                         Text(
                           'Iniciar Escritura',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -718,7 +769,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           SizedBox(height: 20),
           Text(
             'Calculando datos...',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 18,
               color: Colors.white,
             ),
@@ -730,123 +782,180 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
   Widget _buildPreviewState() {
     return Padding(
-      padding: EdgeInsets.all(20),
+      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
         children: [
-          // Icono
-          ScaleTransition(
-            scale: _pulseAnimation,
-            child: Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Colors.orange, Colors.deepOrange],
-                ),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange.withOpacity(0.5),
-                    blurRadius: 30,
-                    spreadRadius: 5,
+          // Icono compacto
+          Row(
+            children: [
+              ScaleTransition(
+                scale: _pulseAnimation,
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.orange, Colors.deepOrange],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.4),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    ],
                   ),
-                ],
+                  child: Icon(Icons.edit, color: Colors.white, size: 28),
+                ),
               ),
-              child: Icon(Icons.edit, color: Colors.white, size: 48),
-            ),
+              SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Listo para escribir',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      '${_model.totalVisits} visitas · ${_model.totalResults} resultados',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        color: Colors.orange.withOpacity(0.9),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
 
-          SizedBox(height: 30),
+          SizedBox(height: 16),
 
-          // Preview de datos
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.2),
-                width: 2,
+          // Preview de datos con scroll
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              padding: EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.15),
+                  width: 1.5,
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'DATOS A ESCRIBIR',
-                  style: TextStyle(fontFamily: 'Roboto',
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.6),
-                    letterSpacing: 1.5,
-                  ),
-                ),
-                SizedBox(height: 16),
-                _buildDataRow('Fecha/Hora', _formatDateTime(_model.dateHour)),
-                _buildDataRow('Operador', _model.operatorName.isNotEmpty
-                    ? _model.operatorName
-                    : _model.operatorId),
-                if (_model.operator2Id.isNotEmpty)
-                  _buildDataRow('Cortero', _model.operator2Name.isNotEmpty
-                      ? _model.operator2Name
-                      : _model.operator2Id),
-                // Mostrar visitas y resultados discriminados por lote
-                if (_model.visitsByHeadquarter.isNotEmpty) ...[
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+              child: SingleChildScrollView(
+                physics: BouncingScrollPhysics(),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'DATOS A ESCRIBIR',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white.withOpacity(0.5),
+                        letterSpacing: 1.2,
+                      ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DETALLE POR LOTE',
-                          style: TextStyle(fontFamily: 'Roboto',
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white.withOpacity(0.5),
-                            letterSpacing: 1,
-                          ),
+                    SizedBox(height: 12),
+                    _buildDataRow(
+                        'Fecha/Hora', _formatDateTime(_model.dateHour)),
+                    _buildDataRow(
+                        'Operador',
+                        _model.operatorName.isNotEmpty
+                            ? _model.operatorName
+                            : _model.operatorId),
+                    if (_model.operator2Id.isNotEmpty)
+                      _buildDataRow(
+                          'Cortero',
+                          _model.operator2Name.isNotEmpty
+                              ? _model.operator2Name
+                              : _model.operator2Id),
+                    // Mostrar visitas y resultados discriminados por lote
+                    if (_model.visitsByHeadquarter.isNotEmpty) ...[
+                      Container(
+                        padding: EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.03),
+                          borderRadius: BorderRadius.circular(8),
+                          border:
+                              Border.all(color: Colors.white.withOpacity(0.08)),
                         ),
-                        SizedBox(height: 8),
-                        ..._model.visitsByHeadquarter.map((hqData) =>
-                          _buildHeadquarterRow(hqData)
-                        ).toList(),
-                      ],
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'DETALLE POR LOTE',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white.withOpacity(0.4),
+                                letterSpacing: 1,
+                              ),
+                            ),
+                            SizedBox(height: 6),
+                            ..._model.visitsByHeadquarter
+                                .map((hqData) => _buildHeadquarterRow(hqData))
+                                .toList(),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Divider(color: Colors.white.withOpacity(0.15), height: 1),
+                      SizedBox(height: 10),
+                    ],
+                    _buildDataRow(
+                        'Total Visitas', _model.totalVisits.toString()),
+                    _buildDataRow(
+                        'Total Resultados', _model.totalResults.toString()),
+                    _buildDataRow('Lote Destino',
+                        '${_model.headquarterName} (#${_model.headquarterId})'),
+                    SizedBox(height: 12),
+                    Divider(color: Colors.white.withOpacity(0.15)),
+                    SizedBox(height: 12),
+                    Text(
+                      'FORMATO TAG:',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 9,
+                        color: Colors.white.withOpacity(0.4),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  Divider(color: Colors.white.withOpacity(0.2), height: 1),
-                  SizedBox(height: 12),
-                ],
-                _buildDataRow('Total Visitas', _model.totalVisits.toString()),
-                _buildDataRow('Total Resultados', _model.totalResults.toString()),
-                _buildDataRow('Lote Destino',
-                    '${_model.headquarterName} (#${_model.headquarterId})'),
-                SizedBox(height: 16),
-                Divider(color: Colors.white.withOpacity(0.2)),
-                SizedBox(height: 16),
-                Text(
-                  'FORMATO TAG:',
-                  style: TextStyle(fontFamily: 'Roboto',
-                    fontSize: 10,
-                    color: Colors.white.withOpacity(0.5),
-                  ),
+                    SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF00a86b).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                            color: Color(0xFF00a86b).withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        _model.dataToWrite,
+                        style: TextStyle(
+                          fontFamily: 'Roboto Mono',
+                          fontSize: 10,
+                          color: Color(0xFF00a86b),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                SizedBox(height: 8),
-                Text(
-                  _model.dataToWrite,
-                  style: TextStyle(
-                    fontFamily: 'Roboto Mono',
-                    fontSize: 11,
-                    color: Color(0xFF00a86b),
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
@@ -862,17 +971,24 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         children: [
           Text(
             label,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.7),
             ),
           ),
-          Text(
-            value,
-            style: TextStyle(fontFamily: 'Roboto',
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.right,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -905,7 +1021,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 Expanded(
                   child: Text(
                     hqData.headquarterName,
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -928,7 +1045,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               children: [
                 Text(
                   'V:',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 10,
                     color: Color(0xFF3B82F6),
                   ),
@@ -936,7 +1054,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 SizedBox(width: 2),
                 Text(
                   '${hqData.visits}',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF3B82F6),
@@ -958,7 +1077,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               children: [
                 Text(
                   'R:',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 10,
                     color: Color(0xFF10B981),
                   ),
@@ -966,7 +1086,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 SizedBox(width: 2),
                 Text(
                   '${hqData.results}',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF10B981),
@@ -1010,7 +1131,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             needsAnotherTag
                 ? '⚠️ Acerque OTRO tag'
                 : 'Acerque el tag para escribir',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -1022,7 +1144,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 ? 'El contenido no cabe en el tag actual.\n\nEl contenido existente se conservará.\n\nAcerque un NUEVO tag para escribir.'
                 : 'Mantenga el dispositivo cerca del tag NFC',
             textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
               height: 1.5,
@@ -1047,7 +1170,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                   SizedBox(width: 8),
                   Text(
                     'Esperando nuevo tag...',
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 13,
                       color: Colors.white,
                       fontWeight: FontWeight.w500,
@@ -1081,7 +1205,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           SizedBox(height: 30),
           Text(
             '¡Tag Escrito Exitosamente!',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -1101,7 +1226,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           SizedBox(height: 20),
           Text(
             'Error',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 24,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -1113,7 +1239,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: TextStyle(
+                fontFamily: 'Roboto',
                 fontSize: 14,
                 color: Colors.white.withOpacity(0.7),
               ),
@@ -1139,7 +1266,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     ),
                     child: Text(
                       'Cancelar',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1169,7 +1297,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     icon: Icon(Icons.refresh, size: 20),
                     label: Text(
                       'Reintentar',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                       ),
@@ -1189,14 +1318,29 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
     // Nombres de días en español
     const diasSemana = [
-      'Lunes', 'Martes', 'Miércoles', 'Jueves',
-      'Viernes', 'Sábado', 'Domingo'
+      'Lunes',
+      'Martes',
+      'Miércoles',
+      'Jueves',
+      'Viernes',
+      'Sábado',
+      'Domingo'
     ];
 
     // Nombres de meses en español
     const meses = [
-      'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+      'Enero',
+      'Febrero',
+      'Marzo',
+      'Abril',
+      'Mayo',
+      'Junio',
+      'Julio',
+      'Agosto',
+      'Septiembre',
+      'Octubre',
+      'Noviembre',
+      'Diciembre'
     ];
 
     final diaSemana = diasSemana[dateTime.weekday - 1];
@@ -1205,7 +1349,9 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     final anio = dateTime.year;
 
     // Formato 12 horas con am/pm
-    final hora12 = dateTime.hour == 0 ? 12 : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
+    final hora12 = dateTime.hour == 0
+        ? 12
+        : (dateTime.hour > 12 ? dateTime.hour - 12 : dateTime.hour);
     final minuto = dateTime.minute.toString().padLeft(2, '0');
     final amPm = dateTime.hour >= 12 ? 'pm' : 'am';
 

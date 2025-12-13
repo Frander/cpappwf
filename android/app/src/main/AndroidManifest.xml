@@ -28,7 +28,7 @@
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
   <!-- Para geolocalización en segundo plano -->
-  <uses-feature android:name="android.hardware.nfc" android:required="true"/>
+  <uses-feature android:name="android.hardware.nfc" android:required="false"/>
   <uses-feature android:name="android.hardware.location.gnss" android:required="true"/>
   <uses-permission android:name="android.permission.BLUETOOTH"/>
   <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
@@ -37,6 +37,7 @@
   <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE"/>
   <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
   <application
+    android:name=".MainApplication"
     android:label="ClickPalm APP"
     tools:replace="android:label"
     android:icon="@mipmap/launcher_icon"

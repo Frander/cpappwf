@@ -72,11 +72,11 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
       backgroundColor: Colors.transparent,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: 380,
-          maxHeight: MediaQuery.of(context).size.height * 0.82,
+          maxWidth: 340,
+          maxHeight: MediaQuery.of(context).size.height * 0.55,
         ),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
               color: (isSyncMandatory
@@ -90,9 +90,9 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
+          borderRadius: BorderRadius.circular(20),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -105,7 +105,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                   ],
                   stops: [0.0, 0.5, 1.0],
                 ),
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: (isSyncMandatory
                           ? Color(0xFFFF6B6B)
@@ -120,7 +120,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                   children: [
                   // Header decorativo brillante
                   Container(
-                    height: 6,
+                    height: 4,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.centerLeft,
@@ -143,177 +143,130 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                         stops: [0.0, 0.25, 0.5, 0.75, 1.0],
                       ),
                       borderRadius: BorderRadius.vertical(
-                        top: Radius.circular(28),
+                        top: Radius.circular(20),
                       ),
                     ),
                   ),
 
-                  SizedBox(height: 24),
+                  SizedBox(height: 12),
 
-                  // Ícono principal con animación
-                  Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Círculo exterior pulsante
-                      Container(
-                        width: 120,
-                        height: 120,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: isSyncMandatory
-                                ? [
-                                    Color(0xFFFF6B6B).withOpacity(0.4),
-                                    Color(0xFFFF6B6B).withOpacity(0.15),
-                                    Colors.transparent,
-                                  ]
-                                : [
-                                    Color(0xFF00a86b).withOpacity(0.4),
-                                    Color(0xFF00a86b).withOpacity(0.15),
-                                    Colors.transparent,
-                                  ],
-                            stops: [0.0, 0.6, 1.0],
-                          ),
-                        ),
-                      ),
-                      // Círculo medio con borde brillante
-                      Container(
-                        width: 90,
-                        height: 90,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: isSyncMandatory
-                                ? [
-                                    Color(0xFFFF6B6B).withOpacity(0.35),
-                                    Color(0xFFFF6B6B).withOpacity(0.2),
-                                  ]
-                                : [
-                                    Color(0xFF00a86b).withOpacity(0.35),
-                                    Color(0xFF00a86b).withOpacity(0.2),
-                                  ],
-                          ),
-                          border: Border.all(
-                            color: (isSyncMandatory
-                                    ? Color(0xFFFF8E53)
-                                    : Color(0xFF00ff9f))
-                                .withOpacity(0.5),
-                            width: 2.5,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
+                  // Ícono y título en fila compacta
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: isSyncMandatory
+                                  ? [
+                                      Color(0xFFFF6B6B).withOpacity(0.35),
+                                      Color(0xFFFF6B6B).withOpacity(0.2),
+                                    ]
+                                  : [
+                                      Color(0xFF00a86b).withOpacity(0.35),
+                                      Color(0xFF00a86b).withOpacity(0.2),
+                                    ],
+                            ),
+                            border: Border.all(
                               color: (isSyncMandatory
                                       ? Color(0xFFFF8E53)
                                       : Color(0xFF00ff9f))
-                                  .withOpacity(0.3),
-                              blurRadius: 16,
-                              spreadRadius: 3,
+                                  .withOpacity(0.5),
+                              width: 2,
                             ),
-                          ],
+                          ),
+                          child: Icon(
+                            Icons.cloud_sync_rounded,
+                            size: 24,
+                            color: isSyncMandatory
+                                ? Color(0xFFFF8E53)
+                                : Color(0xFF00ff9f),
+                          ),
                         ),
-                        child: Icon(
-                          Icons.cloud_sync_rounded,
-                          size: 48,
-                          color: isSyncMandatory
-                              ? Color(0xFFFF8E53)
-                              : Color(0xFF00ff9f),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  SizedBox(height: 20),
-
-                  // Título principal
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 28),
-                    child: ShaderMask(
-                      shaderCallback: (bounds) {
-                        return LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: isSyncMandatory
-                              ? [Color(0xFFFF6B6B), Color(0xFFFF8E53)]
-                              : [Color(0xFF00ff9f), Color(0xFF00a86b)],
-                        ).createShader(bounds);
-                      },
-                      child: Text(
-                        isSyncMandatory
-                            ? 'Sincronización Obligatoria'
-                            : 'Sincronización Completa',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontFamily: 'Roboto',
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                          color: Colors.white,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 6),
-
-                  // Subtítulo
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 28),
-                    child: Text(
-                      isSyncMandatory
-                          ? 'Requerida por la Actividad'
-                          : 'Funciones Avanzadas',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: (isSyncMandatory
-                                ? Color(0xFFFF6B6B)
-                                : Color(0xFF00ff9f))
-                            .withOpacity(0.8),
-                        letterSpacing: 1.2,
-                        height: 1.3,
-                      ),
-                    ),
-                  ),
-
-                  SizedBox(height: 20),
-
-                  // Características incluidas
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
-                    child: Column(
-                      children: [
-                        _buildFeatureItem(
-                          icon: Icons.route_rounded,
-                          title: 'Ruta Optimizada por IA',
-                          description:
-                              'Calcula la mejor ruta para maximizar eficiencia',
-                        ),
-                        SizedBox(height: 12),
-                        _buildFeatureItem(
-                          icon: Icons.download_rounded,
-                          title: 'Descarga de Plantas Completas',
-                          description:
-                              'Productos, coordenadas y puntos virtuales del lote',
-                        ),
-                        SizedBox(height: 12),
-                        _buildFeatureItem(
-                          icon: Icons.location_on_rounded,
-                          title: 'Coordenadas de Alta Precisión',
-                          description:
-                              'Sincroniza headquarters_coordinates y types_points',
+                        SizedBox(width: 12),
+                        Flexible(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              ShaderMask(
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                    colors: isSyncMandatory
+                                        ? [Color(0xFFFF6B6B), Color(0xFFFF8E53)]
+                                        : [Color(0xFF00ff9f), Color(0xFF00a86b)],
+                                  ).createShader(bounds);
+                                },
+                                child: Text(
+                                  isSyncMandatory
+                                      ? 'Sincronización Obligatoria'
+                                      : 'Sincronización Completa',
+                                  style: TextStyle(fontFamily: 'Roboto',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.3,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                isSyncMandatory
+                                    ? 'Requerida por la Actividad'
+                                    : 'Funciones Avanzadas',
+                                style: TextStyle(fontFamily: 'Roboto',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: (isSyncMandatory
+                                          ? Color(0xFFFF6B6B)
+                                          : Color(0xFF00ff9f))
+                                      .withOpacity(0.8),
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  SizedBox(height: 20),
+                  SizedBox(height: 12),
 
-                  // Advertencia de conexión o mensaje de sincronización obligatoria
+                  // Características incluidas - compactas
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildFeatureItemCompact(
+                          icon: Icons.route_rounded,
+                          title: 'Ruta IA',
+                        ),
+                        _buildFeatureItemCompact(
+                          icon: Icons.download_rounded,
+                          title: 'Plantas',
+                        ),
+                        _buildFeatureItemCompact(
+                          icon: Icons.location_on_rounded,
+                          title: 'Coords',
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 12),
+
+                  // Advertencia compacta
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -321,107 +274,63 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                           end: Alignment.bottomRight,
                           colors: isSyncMandatory
                               ? [
-                                  Color(0xFFFF6B6B).withOpacity(0.18),
-                                  Color(0xFFFF8E53).withOpacity(0.12),
+                                  Color(0xFFFF6B6B).withOpacity(0.15),
+                                  Color(0xFFFF8E53).withOpacity(0.08),
                                 ]
                               : [
-                                  Color(0xFFFFA726).withOpacity(0.18),
-                                  Color(0xFFFF9800).withOpacity(0.12),
+                                  Color(0xFFFFA726).withOpacity(0.15),
+                                  Color(0xFFFF9800).withOpacity(0.08),
                                 ],
                         ),
-                        borderRadius: BorderRadius.circular(18),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: (isSyncMandatory
                                   ? Color(0xFFFF6B6B)
                                   : Color(0xFFFFA726))
-                              .withOpacity(0.4),
-                          width: 1.5,
+                              .withOpacity(0.3),
+                          width: 1,
                         ),
                       ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                          child: Padding(
-                            padding: EdgeInsets.all(14),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    gradient: RadialGradient(
-                                      colors: [
-                                        (isSyncMandatory
-                                                ? Color(0xFFFF6B6B)
-                                                : Color(0xFFFFA726))
-                                            .withOpacity(0.35),
-                                        Colors.transparent,
-                                      ],
-                                    ),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    isSyncMandatory
-                                        ? Icons.warning_rounded
-                                        : Icons.wifi_rounded,
-                                    color: isSyncMandatory
-                                        ? Color(0xFFFF6B6B)
-                                        : Color(0xFFFFA726),
-                                    size: 22,
-                                  ),
-                                ),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        isSyncMandatory
-                                            ? 'Sincronización Obligatoria'
-                                            : 'Conexión Requerida',
-                                        style: TextStyle(fontFamily: 'Roboto',
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.bold,
-                                          color: isSyncMandatory
-                                              ? Color(0xFFFF6B6B)
-                                              : Color(0xFFFFA726),
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                      SizedBox(height: 3),
-                                      Text(
-                                        isSyncMandatory
-                                            ? 'La actividad requiere sincronización completa antes de continuar'
-                                            : 'Se necesita internet para sincronizar',
-                                        style: TextStyle(fontFamily: 'Roboto',
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: (isSyncMandatory
-                                                  ? Color(0xFFFF6B6B)
-                                                  : Color(0xFFFFA726))
-                                              .withOpacity(0.85),
-                                          letterSpacing: 0.2,
-                                          height: 1.3,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isSyncMandatory
+                                  ? Icons.warning_rounded
+                                  : Icons.wifi_rounded,
+                              color: isSyncMandatory
+                                  ? Color(0xFFFF6B6B)
+                                  : Color(0xFFFFA726),
+                              size: 18,
                             ),
-                          ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isSyncMandatory
+                                    ? 'Requiere sincronización para continuar'
+                                    : 'Se necesita conexión a internet',
+                                style: TextStyle(fontFamily: 'Roboto',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: (isSyncMandatory
+                                          ? Color(0xFFFF6B6B)
+                                          : Color(0xFFFFA726))
+                                      .withOpacity(0.9),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                   ),
 
-                  SizedBox(height: 24),
+                  SizedBox(height: 14),
 
                   // Botones de acción
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    padding: EdgeInsets.symmetric(horizontal: 16),
                     child: Column(
                       children: [
                         // Botón SINCRONIZAR AHORA (principal)
@@ -448,7 +357,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                   }
                                 },
                           child: Container(
-                            height: 56,
+                            height: 46,
                             decoration: BoxDecoration(
                               gradient: _model.isSyncing
                                   ? LinearGradient(
@@ -467,16 +376,15 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                         Color(0xFF00a86b),
                                       ],
                                     ),
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(14),
                               boxShadow: _model.isSyncing
                                   ? []
                                   : [
                                       BoxShadow(
                                         color: Color(0xFF00a86b)
-                                            .withOpacity(0.5),
-                                        blurRadius: 20,
-                                        offset: Offset(0, 10),
-                                        spreadRadius: 2,
+                                            .withOpacity(0.4),
+                                        blurRadius: 12,
+                                        offset: Offset(0, 6),
                                       ),
                                     ],
                             ),
@@ -487,23 +395,22 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                           MainAxisAlignment.center,
                                       children: [
                                         SizedBox(
-                                          width: 20,
-                                          height: 20,
+                                          width: 18,
+                                          height: 18,
                                           child: CircularProgressIndicator(
-                                            strokeWidth: 2.5,
+                                            strokeWidth: 2,
                                             valueColor:
                                                 AlwaysStoppedAnimation<Color>(
                                                     Colors.white),
                                           ),
                                         ),
-                                        SizedBox(width: 12),
+                                        SizedBox(width: 10),
                                         Text(
                                           'Sincronizando...',
                                           style: TextStyle(fontFamily: 'Roboto',
-                                            fontSize: 17,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
-                                            letterSpacing: 0.8,
                                           ),
                                         ),
                                       ],
@@ -515,16 +422,16 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                         Icon(
                                           Icons.cloud_download_rounded,
                                           color: Colors.white,
-                                          size: 26,
+                                          size: 20,
                                         ),
-                                        SizedBox(width: 12),
+                                        SizedBox(width: 8),
                                         Text(
-                                          'SINCRONIZAR AHORA',
+                                          'SINCRONIZAR',
                                           style: TextStyle(fontFamily: 'Roboto',
-                                            fontSize: 17,
+                                            fontSize: 14,
                                             fontWeight: FontWeight.w900,
                                             color: Colors.white,
-                                            letterSpacing: 1.2,
+                                            letterSpacing: 0.8,
                                           ),
                                         ),
                                       ],
@@ -533,7 +440,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                           ),
                         ),
 
-                        SizedBox(height: 12),
+                        SizedBox(height: 8),
 
                         // Botón secundario: OMITIR o VOLVER según si es obligatorio
                         InkWell(
@@ -541,36 +448,34 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                               ? null
                               : () {
                                   if (isSyncMandatory) {
-                                    // Si es obligatorio, solo cerrar el diálogo y volver
                                     Navigator.of(context).pop(false);
                                   } else {
-                                    // Si no es obligatorio, permitir omitir
                                     widget.onSkip();
                                     Navigator.of(context).pop(false);
                                   }
                                 },
                           child: Container(
-                            height: 52,
+                            height: 40,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: isSyncMandatory
                                     ? [
-                                        Color(0xFFFF6B6B).withOpacity(0.15),
-                                        Color(0xFFFF8E53).withOpacity(0.08),
+                                        Color(0xFFFF6B6B).withOpacity(0.12),
+                                        Color(0xFFFF8E53).withOpacity(0.06),
                                       ]
                                     : [
-                                        Colors.white.withOpacity(0.15),
-                                        Colors.white.withOpacity(0.08),
+                                        Colors.white.withOpacity(0.12),
+                                        Colors.white.withOpacity(0.06),
                                       ],
                               ),
-                              borderRadius: BorderRadius.circular(18),
+                              borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSyncMandatory
-                                    ? Color(0xFFFF6B6B).withOpacity(0.4)
-                                    : Colors.white.withOpacity(0.25),
-                                width: 1.8,
+                                    ? Color(0xFFFF6B6B).withOpacity(0.3)
+                                    : Colors.white.withOpacity(0.2),
+                                width: 1,
                               ),
                             ),
                             child: Center(
@@ -582,22 +487,22 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                                       Icons.arrow_back_rounded,
                                       color: Color(0xFFFF6B6B).withOpacity(
                                           _model.isSyncing ? 0.4 : 0.9),
-                                      size: 20,
+                                      size: 16,
                                     ),
-                                  if (isSyncMandatory) SizedBox(width: 8),
+                                  if (isSyncMandatory) SizedBox(width: 6),
                                   Text(
                                     isSyncMandatory
                                         ? 'VOLVER'
-                                        : 'OMITIR ESTE PASO',
+                                        : 'OMITIR',
                                     style: TextStyle(fontFamily: 'Roboto',
-                                      fontSize: 16,
+                                      fontSize: 13,
                                       fontWeight: FontWeight.bold,
                                       color: (isSyncMandatory
                                               ? Color(0xFFFF6B6B)
                                               : Colors.white)
                                           .withOpacity(
-                                              _model.isSyncing ? 0.4 : 0.9),
-                                      letterSpacing: 1.0,
+                                              _model.isSyncing ? 0.4 : 0.85),
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                 ],
@@ -609,7 +514,7 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                     ),
                   ),
 
-                  SizedBox(height: 24),
+                  SizedBox(height: 14),
                 ],
                 ),
               ),
@@ -620,63 +525,41 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
     );
   }
 
-  Widget _buildFeatureItem({
+  Widget _buildFeatureItemCompact({
     required IconData icon,
     required String title,
-    required String description,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
       children: [
         Container(
-          width: 42,
-          height: 42,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             gradient: RadialGradient(
               colors: [
                 Color(0xFF00a86b).withOpacity(0.3),
-                Color(0xFF00a86b).withOpacity(0.15),
+                Color(0xFF00a86b).withOpacity(0.1),
               ],
             ),
             shape: BoxShape.circle,
             border: Border.all(
-              color: Color(0xFF00ff9f).withOpacity(0.4),
-              width: 1.5,
+              color: Color(0xFF00ff9f).withOpacity(0.3),
+              width: 1,
             ),
           ),
           child: Icon(
             icon,
             color: Color(0xFF00ff9f),
-            size: 20,
+            size: 18,
           ),
         ),
-        SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(fontFamily: 'Roboto',
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.3,
-                  height: 1.3,
-                ),
-              ),
-              SizedBox(height: 2),
-              Text(
-                description,
-                style: TextStyle(fontFamily: 'Roboto',
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.7),
-                  letterSpacing: 0.2,
-                  height: 1.3,
-                ),
-              ),
-            ],
+        SizedBox(height: 4),
+        Text(
+          title,
+          style: TextStyle(fontFamily: 'Roboto',
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withOpacity(0.8),
           ),
         ),
       ],

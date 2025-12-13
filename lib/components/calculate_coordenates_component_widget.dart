@@ -216,7 +216,7 @@ class _CalculateCoordenatesComponentWidgetState
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(120),
                                   child: BackdropFilter(
-                                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                    filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                                     child: Container(
                                       width: 200,
                                       height: 200,
@@ -467,7 +467,7 @@ class _CalculateCoordenatesComponentWidgetState
                       ClipRRect(
                         borderRadius: BorderRadius.circular(20),
                         child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: 30, vertical: 20),
                             margin: EdgeInsets.symmetric(horizontal: 30),
