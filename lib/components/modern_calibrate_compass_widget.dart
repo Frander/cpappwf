@@ -1,13 +1,10 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:async';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'modern_calibrate_compass_model.dart';
 export 'modern_calibrate_compass_model.dart';
 
@@ -43,7 +40,7 @@ class _ModernCalibrateCompassWidgetState
     // Animación de rotación para el ícono de brújula
     _rotationController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 3),
+      duration: const Duration(seconds: 3),
     )..repeat();
 
     _rotationAnimation = Tween<double>(begin: 0, end: 2 * 3.14159).animate(
@@ -68,7 +65,7 @@ class _ModernCalibrateCompassWidgetState
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -82,34 +79,34 @@ class _ModernCalibrateCompassWidgetState
       ),
       child: SingleChildScrollView(
         child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header con título y subtítulo
               _buildHeader(),
 
-              SizedBox(height: 36),
+              const SizedBox(height: 36),
 
               // Indicador circular de progreso con GIF
               _buildProgressIndicator(isCalibrating),
 
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
 
               // Timer grande
               _buildTimer(),
 
-              SizedBox(height: 28),
+              const SizedBox(height: 28),
 
               // Instrucciones
               _buildInstructions(isCalibrating),
 
-              SizedBox(height: 32),
+              const SizedBox(height: 32),
 
               // Botón de calibrar
               _buildCalibrateButton(isCalibrating),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // Características de calibración
               _buildFeatures(),
@@ -126,7 +123,7 @@ class _ModernCalibrateCompassWidgetState
         // Título con gradiente
         ShaderMask(
           shaderCallback: (bounds) {
-            return LinearGradient(
+            return const LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
               colors: [
@@ -135,7 +132,7 @@ class _ModernCalibrateCompassWidgetState
               ],
             ).createShader(bounds);
           },
-          child: Text(
+          child: const Text(
             'Calibración de Sensores',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
@@ -148,7 +145,7 @@ class _ModernCalibrateCompassWidgetState
           ),
         ),
 
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
 
         // Subtítulo
         Text(
@@ -157,7 +154,7 @@ class _ModernCalibrateCompassWidgetState
           style: TextStyle(fontFamily: 'Roboto',
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: Color(0xFFFFA726).withOpacity(0.8),
+            color: const Color(0xFFFFA726).withOpacity(0.8),
             letterSpacing: 1.2,
           ),
         ),
@@ -166,71 +163,65 @@ class _ModernCalibrateCompassWidgetState
   }
 
   Widget _buildProgressIndicator(bool isCalibrating) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Círculo decorativo exterior
-        Container(
-          width: 280,
-          height: 280,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              colors: [
-                Color(0xFFFFA726).withOpacity(0.3),
-                Color(0xFFFFA726).withOpacity(0.1),
-                Colors.transparent,
-              ],
-              stops: [0.0, 0.6, 1.0],
+    return RepaintBoundary(
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Círculo decorativo exterior (simplificado)
+          Container(
+            width: 280,
+            height: 280,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFFFA726).withValues(alpha: 0.15),
             ),
           ),
-        ),
 
-        // Contenedor del GIF con borde
-        Container(
-          width: 240,
-          height: 240,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.05),
-              ],
-            ),
-            border: Border.all(
-              color: Color(0xFFFFA726).withOpacity(0.4),
-              width: 3,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Color(0xFFFFA726).withOpacity(0.3),
-                blurRadius: 30,
-                spreadRadius: 5,
+          // Contenedor de la imagen con borde (optimizado)
+          Container(
+            width: 240,
+            height: 240,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withValues(alpha: 0.08),
+              border: Border.all(
+                color: const Color(0xFFFFA726).withValues(alpha: 0.4),
+                width: 3,
               ),
-            ],
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'assets/images/Calibrate_compass.gif',
-              fit: BoxFit.cover,
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFFA726).withValues(alpha: 0.2),
+                  blurRadius: 15, // Reducido de 30
+                  spreadRadius: 2, // Reducido de 5
+                ),
+              ],
+            ),
+            child: ClipOval(
+              // Usar imagen estática en lugar de GIF para mejor rendimiento
+              child: Image.asset(
+                'assets/images/Calibrate_compass.gif',
+                fit: BoxFit.cover,
+                // Reducir calidad de decodificación para dispositivos de gama baja
+                cacheWidth: 240,
+                cacheHeight: 240,
+              ),
             ),
           ),
-        ),
 
-        // Ícono de brújula rotando (cuando está calibrando)
-        if (isCalibrating)
-          RotationTransition(
-            turns: _rotationAnimation,
-            child: Icon(
-              Icons.explore_rounded,
-              size: 80,
-              color: Color(0xFFFFA726).withOpacity(0.3),
+          // Ícono de brújula rotando (solo cuando está calibrando)
+          if (isCalibrating)
+            RepaintBoundary(
+              child: RotationTransition(
+                turns: _rotationAnimation,
+                child: Icon(
+                  Icons.explore_rounded,
+                  size: 80,
+                  color: const Color(0xFFFFA726).withValues(alpha: 0.3),
+                ),
+              ),
             ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -244,7 +235,7 @@ class _ModernCalibrateCompassWidgetState
         milliSecond: false,
       ),
       controller: _model.timerController,
-      updateStateInterval: Duration(milliseconds: 1000),
+      updateStateInterval: const Duration(milliseconds: 1000),
       onChanged: (value, displayTime, shouldUpdate) {
         _model.timerMilliseconds = value;
         _model.timerValue = displayTime;
@@ -254,7 +245,7 @@ class _ModernCalibrateCompassWidgetState
         FFAppState().calibrateCompass = true;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Row(
+            content: const Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
@@ -269,11 +260,11 @@ class _ModernCalibrateCompassWidgetState
                 ),
               ],
             ),
-            duration: Duration(milliseconds: 3000),
-            backgroundColor: Color(0xFF00a86b),
+            duration: const Duration(milliseconds: 3000),
+            backgroundColor: const Color(0xFF00a86b),
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: EdgeInsets.all(16),
+            margin: const EdgeInsets.all(16),
           ),
         );
         Navigator.pop(context);
@@ -283,12 +274,12 @@ class _ModernCalibrateCompassWidgetState
         fontSize: 72,
         fontWeight: FontWeight.w900,
         color: _model.timerMilliseconds > 0 && _model.timerMilliseconds < _model.timerInitialTimeMs
-            ? Color(0xFFFFA726)
+            ? const Color(0xFFFFA726)
             : Colors.white.withOpacity(0.4),
         letterSpacing: 2.0,
         shadows: [
           Shadow(
-            color: Color(0xFFFFA726).withOpacity(0.5),
+            color: const Color(0xFFFFA726).withOpacity(0.5),
             blurRadius: 20,
           ),
         ],
@@ -298,7 +289,7 @@ class _ModernCalibrateCompassWidgetState
 
   Widget _buildInstructions(bool isCalibrating) {
     return Container(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -319,27 +310,22 @@ class _ModernCalibrateCompassWidgetState
           Row(
             children: [
               Container(
-                padding: EdgeInsets.all(10),
+                padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    colors: [
-                      Color(0xFFFFA726).withOpacity(0.3),
-                      Colors.transparent,
-                    ],
-                  ),
+                  color: const Color(0xFFFFA726).withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   isCalibrating ? Icons.settings_suggest_rounded : Icons.info_outline_rounded,
-                  color: Color(0xFFFFA726),
+                  color: const Color(0xFFFFA726),
                   size: 28,
                 ),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Text(
                   isCalibrating ? 'Calibrando sensores...' : '¿Cómo calibrar?',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(fontFamily: 'Roboto',
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -349,7 +335,7 @@ class _ModernCalibrateCompassWidgetState
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             isCalibrating
                 ? 'Mueva el dispositivo siguiendo el patrón del número 8 como se muestra en la imagen. Mantenga el movimiento continuo durante toda la calibración.'
@@ -401,11 +387,11 @@ class _ModernCalibrateCompassWidgetState
           gradient: isCalibrating
               ? LinearGradient(
                   colors: [
-                    Colors.grey.withOpacity(0.4),
-                    Colors.grey.withOpacity(0.3),
+                    Colors.grey.withValues(alpha: 0.4),
+                    Colors.grey.withValues(alpha: 0.3),
                   ],
                 )
-              : LinearGradient(
+              : const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
@@ -414,14 +400,14 @@ class _ModernCalibrateCompassWidgetState
                   ],
                 ),
           borderRadius: BorderRadius.circular(18),
+          // Sombra reducida para mejor rendimiento
           boxShadow: isCalibrating
-              ? []
+              ? null
               : [
                   BoxShadow(
-                    color: Color(0xFFFFA726).withOpacity(0.5),
-                    blurRadius: 20,
-                    offset: Offset(0, 10),
-                    spreadRadius: 2,
+                    color: const Color(0xFFFFA726).withValues(alpha: 0.3),
+                    blurRadius: 10, // Reducido de 20
+                    offset: const Offset(0, 5), // Reducido de 10
                   ),
                 ],
         ),
@@ -430,7 +416,7 @@ class _ModernCalibrateCompassWidgetState
               ? Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    SizedBox(
+                    const SizedBox(
                       width: 24,
                       height: 24,
                       child: CircularProgressIndicator(
@@ -438,7 +424,7 @@ class _ModernCalibrateCompassWidgetState
                         valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                       ),
                     ),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     Text(
                       'CALIBRANDO...',
                       style: TextStyle(fontFamily: 'Roboto',
@@ -450,7 +436,7 @@ class _ModernCalibrateCompassWidgetState
                     ),
                   ],
                 )
-              : Row(
+              : const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
@@ -477,19 +463,19 @@ class _ModernCalibrateCompassWidgetState
 
   Widget _buildFeatures() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF00a86b).withOpacity(0.1),
-            Color(0xFF00a86b).withOpacity(0.05),
+            const Color(0xFF00a86b).withOpacity(0.1),
+            const Color(0xFF00a86b).withOpacity(0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Color(0xFF00a86b).withOpacity(0.3),
+          color: const Color(0xFF00a86b).withOpacity(0.3),
           width: 1.5,
         ),
       ),
@@ -508,30 +494,25 @@ class _ModernCalibrateCompassWidgetState
     return Column(
       children: [
         Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            gradient: RadialGradient(
-              colors: [
-                Color(0xFF00a86b).withOpacity(0.3),
-                Colors.transparent,
-              ],
-            ),
+            color: const Color(0xFF00a86b).withValues(alpha: 0.2),
             shape: BoxShape.circle,
           ),
           child: Icon(
             icon,
-            color: Color(0xFF00ff9f),
+            color: const Color(0xFF00ff9f),
             size: 28,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
           label,
           textAlign: TextAlign.center,
           style: TextStyle(fontFamily: 'Roboto',
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
             letterSpacing: 0.3,
             height: 1.3,
           ),

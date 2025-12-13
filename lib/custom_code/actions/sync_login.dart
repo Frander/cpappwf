@@ -377,9 +377,14 @@ Future<bool> _syncLoginDataToSQLite(
         );
       }
 
-      // PASO 8: MERGE Headquarters + Polygons + Weights (preservar datos locales)
+      // PASO 8: MERGE Headquarters + Polygons (preservar datos locales)
       if (loginData['headquarters'] != null) {
         await _mergeHeadquarters(txn, loginData['headquarters']);
+      }
+
+      // PASO 8.1: Insertar Headquarters_weights desde objeto principal del JSON
+      if (loginData['headquarters_weights'] != null) {
+        await _insertHeadquartersWeights(txn, loginData['headquarters_weights']);
       }
 
       // PASO 9: Insertar Products + Coordinates
@@ -759,7 +764,7 @@ void _collectStatusRecursive(
   }
 }
 
-/// MERGE Headquarters + Polygons + Weights usando Batch (preserva datos locales)
+/// MERGE Headquarters + Polygons usando Batch (preserva datos locales)
 Future<void> _mergeHeadquarters(
   Transaction txn,
   List<dynamic> headquarters,
@@ -769,7 +774,6 @@ Future<void> _mergeHeadquarters(
   // Recolectar datos
   final List<Map<String, dynamic>> hqData = [];
   final List<Map<String, dynamic>> polygonsData = [];
-  final List<Map<String, dynamic>> weightsData = [];
   final Set<int> hqIdsToDeletePolygons = {};
 
   for (final hq in headquarters) {
@@ -806,22 +810,6 @@ Future<void> _mergeHeadquarters(
         }
       }
     }
-
-    // Recolectar weights
-    if (hq['headquarters_weights'] != null) {
-      for (final weight in hq['headquarters_weights']) {
-        weightsData.add({
-          'Id_headquarter_weight': weight['id_headquarter_weight'],
-          'Id_headquarter': hqId,
-          'Id_company': weight['id_company'],
-          'Date_year': weight['date_year'],
-          'Date_month': weight['date_month'],
-          'Weight': weight['weight'],
-          'Created_at': weight['created_at'],
-          'Modified_at': weight['modified_at'],
-        });
-      }
-    }
   }
 
   // Eliminar polígonos antiguos (esto debe hacerse antes del batch insert)
@@ -844,15 +832,49 @@ Future<void> _mergeHeadquarters(
     batch.insert('Headquarters_polygons', data);
   }
 
-  for (final data in weightsData) {
-    batch.insert('Headquarters_weights', data, conflictAlgorithm: ConflictAlgorithm.replace);
-  }
-
   await batch.commit(noResult: true);
 
   debugPrint('   ✅ MERGE de ${hqData.length} lotes (headquarters)');
   debugPrint('   ✅ Insertados ${polygonsData.length} polígonos de lotes');
-  debugPrint('   ✅ Insertados ${weightsData.length} pesos de lotes');
+}
+
+/// Inserta Headquarters_weights desde el objeto principal del JSON
+Future<void> _insertHeadquartersWeights(
+  Transaction txn,
+  List<dynamic> weights,
+) async {
+  debugPrint('📝 Insertando Headquarters_weights desde objeto principal...');
+
+  if (weights.isEmpty) {
+    debugPrint('   ⚠️ No hay weights para insertar');
+    return;
+  }
+
+  // Limpiar tabla antes de insertar
+  await txn.delete('Headquarters_weights');
+
+  final batch = txn.batch();
+
+  for (final weight in weights) {
+    batch.insert(
+      'Headquarters_weights',
+      {
+        'Id_headquarter_weight': weight['id_headquarter_weight'],
+        'Id_headquarter': weight['id_headquarter'],
+        'Id_company': weight['id_company'],
+        'Date_year': weight['date_year'],
+        'Date_month': weight['date_month'],
+        'Weight': weight['weight'],
+        'Created_at': weight['created_at'],
+        'Modified_at': weight['modified_at'],
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  await batch.commit(noResult: true);
+
+  debugPrint('   ✅ Insertados ${weights.length} pesos de lotes (headquarters_weights)');
 }
 
 /// Inserta Products + Coordinates usando Batch

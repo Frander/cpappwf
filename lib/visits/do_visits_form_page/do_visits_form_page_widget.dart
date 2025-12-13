@@ -1,8 +1,7 @@
 import '/backend/schema/structs/index.dart';
-import '/backend/sqlite/sqlite_manager.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
-import '/components/nfc_transfer_dialog_widget.dart';
 import '/components/nfc_transfer_write_dialog_widget.dart';
 import '/components/photo_capture_component_widget.dart';
 import '/components/date_picker_component_widget.dart';
@@ -95,6 +94,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para rastrear si una transferencia fue completada exitosamente por statusId
   final Map<int, bool> _tagTransferCompleted = {};
 
+  // Caché de nombres de corteros desde SQLite (id_activity_status -> status_name)
+  final Map<int, String> _corteroNamesCache = {};
+
   // Map para rastrear valores numéricos de status por nombre (para numbers-operation)
   // statusName -> valor numérico
   final Map<String, double> _statusValuesByName = {};
@@ -115,6 +117,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Lista de lotes que NO tienen peso promedio configurado
   // Contiene: {headquarterId, headquarterName}
   final List<Map<String, dynamic>> _headquartersWithoutWeight = [];
+
+  // Map para almacenar resultados calculados de peso por headquarter
+  // headquarterId -> {weight, totalResults, calculatedWeight}
+  final Map<int, Map<String, dynamic>> _calculatedHeadquarterWeights = {};
 
   // Map para almacenar distancias calculadas por statusId (OPCIÓN 1: desde TAG)
   final Map<int, double> _calculatedDistances = {};
@@ -148,11 +154,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Getter para obtener el texto de Unity o "Resultados" por defecto
   String get _unityLabel {
-    final unityValue = getJsonField(
+    // Intentar primero con 'unity' (minúscula) que es como viene del servidor
+    var unityValue = getJsonField(
           FFAppState().currentActivity,
-          r'''$.Unity''',
+          r'''$.unity''',
         )?.toString() ??
         '';
+
+    // Si no existe, intentar con 'Unity' (mayúscula) por compatibilidad
+    if (unityValue.isEmpty) {
+      unityValue = getJsonField(
+            FFAppState().currentActivity,
+            r'''$.Unity''',
+          )?.toString() ??
+          '';
+    }
 
     return unityValue.isNotEmpty ? unityValue : 'Resultados';
   }
@@ -632,9 +648,73 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // VALIDACIÓN DE CAMPOS OBLIGATORIOS
   // ==========================================================================
 
+  /// Verifica si existe algún status de tipo tag-writer, tag-reader o tag-transfer
+  /// en la actividad actual (busca recursivamente en todos los niveles)
+  bool _hasTagTypeStatus() {
+    final activityStepsRaw = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.activity_steps''',
+    );
+    if (activityStepsRaw == null) return false;
+    final activitySteps = activityStepsRaw.toList();
+
+    // También revisar activity_status raíz
+    final activityStatusRaw = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.activity_status''',
+    );
+    final activityStatus = activityStatusRaw?.toList() ?? [];
+
+    // Declarar las funciones como late para permitir referencias mutuas
+    late bool Function(List<dynamic>) checkStatusList;
+    late bool Function(List<dynamic>) checkStepsList;
+
+    checkStatusList = (List<dynamic> statusList) {
+      for (var status in statusList) {
+        final typeStatus = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+        if (typeStatus == 'tag-writer' || typeStatus == 'tag-reader' || typeStatus == 'tag-transfer') {
+          return true;
+        }
+        // Revisar status hijos
+        final statusChilds = getJsonField(status, r'''$.activities_status_childs''')?.toList() ?? [];
+        if (checkStatusList(statusChilds)) return true;
+
+        // Revisar steps hijos de este status
+        final stepsChilds = getJsonField(status, r'''$.activities_steps_childs''')?.toList() ?? [];
+        if (checkStepsList(stepsChilds)) return true;
+      }
+      return false;
+    };
+
+    checkStepsList = (List<dynamic> stepsList) {
+      for (var step in stepsList) {
+        final activitiesStatusRaw = getJsonField(step, r'''$.activities_status''');
+        final activitiesStatus = activitiesStatusRaw != null
+            ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+            : [];
+        if (checkStatusList(activitiesStatus)) return true;
+      }
+      return false;
+    };
+
+    // Revisar status raíz
+    if (checkStatusList(activityStatus)) return true;
+
+    // Revisar steps
+    if (checkStepsList(activitySteps)) return true;
+
+    return false;
+  }
+
   /// Valida recursivamente todos los steps requeridos en la jerarquía
   /// Retorna un mapa con los steps faltantes y su ruta para expansión
   Map<String, dynamic>? _validateRequiredStepsRecursive() {
+    // Si existe algún status de tipo tag-writer, tag-reader o tag-transfer,
+    // omitir la validación de is_required
+    if (_hasTagTypeStatus()) {
+      return null;
+    }
+
     final activityStepsRaw = getJsonField(
       FFAppState().currentActivity,
       r'''$.activity_steps''',
@@ -1246,6 +1326,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         _showWeightWarningDialog();
                       }
                     }
+
+                    // Calcular peso total: resultados x weight por cada headquarter
+                    _calculateHeadquarterWeightResults(statusId, statusName);
                   }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
@@ -1257,6 +1340,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, leer SOLO el tag de origen
             if (isTagTransferType) {
+              // Si la transferencia ya está completada, NO procesar el tap
+              // El botón TRANSFERENCIA EXITOSA no debe ser clickeable
+              if (_tagTransferCompleted[statusId] == true) {
+                debugPrint('🚫 TAG-TRANSFER: Transferencia ya completada, tap ignorado');
+                return;
+              }
+
               // Resetear estado de transferencia completada al seleccionar nuevamente
               setState(() {
                 _tagTransferCompleted[statusId] = false;
@@ -1270,11 +1360,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return const Dialog(
+                  return Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    child: NfcReadDialogWidget(autoStart: true),
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: true,
+                    ),
                   );
                 },
               );
@@ -1297,6 +1390,37 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                 debugPrint(
                     '✅ TAG-TRANSFER: Tag de origen guardado correctamente');
+
+                // Limpiar el tag de origen después de leer exitosamente
+                debugPrint('🧹 TAG-TRANSFER: Limpiando tag de origen...');
+                if (!mounted) return;
+                final clearSuccess = await actions.clearNFCTag(context);
+                if (clearSuccess) {
+                  debugPrint('✅ TAG-TRANSFER: Tag de origen limpiado exitosamente');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.cleaning_services, color: Colors.white),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Tag de origen leído y limpiado correctamente',
+                                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: Color(0xFF00a86b),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } else {
+                  debugPrint('⚠️ TAG-TRANSFER: No se pudo limpiar el tag de origen');
+                }
+
                 debugPrint(
                     '💡 TAG-TRANSFER: Ahora el usuario puede presionar "Transferir ahora"');
 
@@ -1340,14 +1464,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
-            // Si es tipo headquarter-weight, cargar weights desde SQLite
+            // Si es tipo headquarter-weight, cargar weights desde SQLite y calcular
             if (isHeadquarterWeightType) {
               // Buscar el tag-reader previo en el árbol de steps
               // Obtener todos los headquarterIds del tag-reader más reciente
               final List<int> headquarterIds = [];
+              int? tagReaderStatusId;
 
               // Buscar en _tagReaderData el status anterior
               for (var entry in _tagReaderData.entries) {
+                tagReaderStatusId = entry.key;
                 final tagData = entry.value;
                 for (var record in tagData) {
                   final hqId = record['headquarterId'] as int? ?? 0;
@@ -1360,6 +1486,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               // Cargar weights desde SQLite
               if (headquarterIds.isNotEmpty) {
                 await _loadHeadquarterWeights(headquarterIds);
+
+                // Calcular peso total: resultados x weight por cada headquarter
+                if (tagReaderStatusId != null) {
+                  _calculateHeadquarterWeightResults(
+                      tagReaderStatusId, 'tag-reader');
+                }
               }
 
               await _onStatusSelected(parentStep, status);
@@ -1583,39 +1715,40 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               children: [
                 Row(
                   children: [
-                    // Radio button visual
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: (isSelected &&
-                                  !isNumberType &&
-                                  !isTagWriterType &&
-                                  !isTagReaderType)
-                              ? Colors.white
-                              : const Color(0xFF00a86b),
-                          width: 3,
+                    // Radio button visual (no mostrar para tag-transfer)
+                    if (!isTagTransferType)
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: (isSelected &&
+                                    !isNumberType &&
+                                    !isTagWriterType &&
+                                    !isTagReaderType)
+                                ? Colors.white
+                                : const Color(0xFF00a86b),
+                            width: 3,
+                          ),
+                          color: isSelected ? Colors.white : Colors.transparent,
                         ),
-                        color: isSelected ? Colors.white : Colors.transparent,
-                      ),
-                      child: isSelected
-                          ? Center(
-                              child: Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: Color(0xFF00a86b),
+                        child: isSelected
+                            ? Center(
+                                child: Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Color(0xFF00a86b),
+                                  ),
                                 ),
-                              ),
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 12),
+                              )
+                            : null,
+                      ),
+                    if (!isTagTransferType) const SizedBox(width: 12),
                     // Icono específico para date y time, indicador de color para otros tipos
-                    if (!isTagReaderType && !isTagWriterType)
+                    if (!isTagReaderType && !isTagWriterType && !isTagTransferType)
                       Container(
                         width: 32,
                         height: 40,
@@ -1772,7 +1905,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             ),
                           // Resumen de weights de headquarters - DEBAJO
                           if (isHeadquarterWeightType &&
-                              _headquarterWeights.isNotEmpty)
+                              (_calculatedHeadquarterWeights.isNotEmpty ||
+                                  _headquartersWithoutWeight.isNotEmpty))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildHeadquarterWeightsDisplay(),
@@ -1998,6 +2132,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         _showWeightWarningDialog();
                       }
                     }
+
+                    // Calcular peso total: resultados x weight por cada headquarter
+                    _calculateHeadquarterWeightResults(statusId, statusName);
                   }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
@@ -2007,43 +2144,105 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
-            // Si es tipo tag-transfer, abrir el componente de transferencia NFC
+            // Si es tipo tag-transfer, leer SOLO el tag de origen (NO transferir aún)
             if (isTagTransferType) {
-              await showDialog<bool>(
+              // Si la transferencia ya está completada, NO procesar el tap
+              // El botón TRANSFERENCIA EXITOSA no debe ser clickeable
+              if (_tagTransferCompleted[statusId] == true) {
+                debugPrint('🚫 TAG-TRANSFER (ROOT): Transferencia ya completada, tap ignorado');
+                return;
+              }
+
+              // Resetear estado de transferencia completada al seleccionar nuevamente
+              setState(() {
+                _tagTransferCompleted[statusId] = false;
+              });
+
+              debugPrint('');
+              debugPrint('🔄 TAG-TRANSFER (ROOT): Iniciando lectura de tag de ORIGEN');
+
+              // Abrir diálogo de lectura NFC (solo leer, no transferir aún)
+              await showDialog(
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return const Dialog(
+                  return Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    child: NfcTransferDialogWidget(),
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: true,
+                    ),
                   );
                 },
               );
 
-              // readNFC cierra el diálogo automáticamente después de leer
-              // Procesar el contenido del tag desde FFAppState
-              debugPrint(
-                  '✅ TAG-TRANSFER: Diálogo cerrado, procesando contenido');
+              // Procesar el contenido del tag de origen desde FFAppState
               final nfcContent = FFAppState().nfcRead;
               debugPrint(
-                  '📄 TAG-TRANSFER: Contenido desde FFAppState: $nfcContent');
+                  '📄 TAG-TRANSFER (ROOT): Contenido del tag de origen leído: ${nfcContent.length} caracteres');
 
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Parsear el contenido del tag y agrupar por headquarterId
                 final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
                 debugPrint(
-                    '📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
+                    '📊 TAG-TRANSFER (ROOT): Datos parseados: ${parsedData.length} lotes');
+
+                // Guardar los datos del tag de origen
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
-                  debugPrint(
-                      '✅ TAG-TRANSFER: Guardado en _tagTransferData[$statusId]');
                 });
-              } else {
+
                 debugPrint(
-                    '❌ TAG-TRANSFER: Contenido vacío o con error: $nfcContent');
+                    '✅ TAG-TRANSFER (ROOT): Tag de origen guardado correctamente');
+
+                // Limpiar el tag de origen después de leer exitosamente
+                debugPrint('🧹 TAG-TRANSFER (ROOT): Limpiando tag de origen...');
+                if (!mounted) return;
+                final clearSuccess = await actions.clearNFCTag(context);
+                if (clearSuccess) {
+                  debugPrint('✅ TAG-TRANSFER (ROOT): Tag de origen limpiado exitosamente');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.cleaning_services, color: Colors.white),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Tag de origen leído y limpiado correctamente',
+                                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: Color(0xFF00a86b),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } else {
+                  debugPrint('⚠️ TAG-TRANSFER (ROOT): No se pudo limpiar el tag de origen');
+                }
+
+                debugPrint(
+                    '💡 TAG-TRANSFER (ROOT): Ahora el usuario puede presionar "Transferir ahora"');
+              } else {
+                debugPrint('❌ TAG-TRANSFER (ROOT): Error al leer tag de origen');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('❌ Error al leer el tag de origen'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
               }
+
+              setState(() {});
               return;
             }
 
@@ -2134,7 +2333,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ),
                     if (!hasChildren &&
                         typeStatus != 'tag-writer' &&
-                        typeStatus != 'tag-reader')
+                        typeStatus != 'tag-reader' &&
+                        typeStatus != 'tag-transfer')
                       Icon(
                         typeStatus == 'number'
                             ? Icons.numbers_rounded
@@ -2254,6 +2454,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                   child: _buildTagTransferButton(
                                     context: context,
                                     statusName: statusName,
+                                    statusId: statusId,
+                                    parentStep: null, // Root status no tiene step padre
+                                    status: status,
                                   ),
                                 ),
                               // Botón inline para dynamic-printing
@@ -2328,7 +2531,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             ),
                           // Resumen de weights de headquarters - DEBAJO
                           if (isHeadquarterWeightType &&
-                              _headquarterWeights.isNotEmpty)
+                              (_calculatedHeadquarterWeights.isNotEmpty ||
+                                  _headquartersWithoutWeight.isNotEmpty))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildHeadquarterWeightsDisplay(),
@@ -2583,6 +2787,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         _showWeightWarningDialog();
                       }
                     }
+
+                    // Calcular peso total: resultados x weight por cada headquarter
+                    _calculateHeadquarterWeightResults(statusId, statusName);
                   }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
@@ -2592,9 +2799,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
-            // Si es tipo tag-transfer, abrir el componente de transferencia NFC
+            // Si es tipo tag-transfer, leer SOLO el tag de origen (NO transferir aún)
             if (isTagTransferType) {
-              await showDialog<bool>(
+              // Si la transferencia ya está completada, NO procesar el tap
+              // El botón TRANSFERENCIA EXITOSA no debe ser clickeable
+              if (_tagTransferCompleted[statusId] == true) {
+                debugPrint('🚫 TAG-TRANSFER (CHILD): Transferencia ya completada, tap ignorado');
+                return;
+              }
+
+              // Resetear estado de transferencia completada al seleccionar nuevamente
+              setState(() {
+                _tagTransferCompleted[statusId] = false;
+              });
+
+              debugPrint('');
+              debugPrint('🔄 TAG-TRANSFER (CHILD): Iniciando lectura de tag de ORIGEN');
+
+              // Abrir diálogo de lectura NFC (solo leer, no transferir aún)
+              await showDialog(
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
@@ -2602,33 +2825,45 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    child: NfcTransferDialogWidget(),
+                    child: NfcReadDialogWidget(autoStart: true),
                   );
                 },
               );
 
-              // readNFC cierra el diálogo automáticamente después de leer
-              // Procesar el contenido del tag desde FFAppState
-              debugPrint(
-                  '✅ TAG-TRANSFER: Diálogo cerrado, procesando contenido');
+              // Procesar el contenido del tag de origen desde FFAppState
               final nfcContent = FFAppState().nfcRead;
               debugPrint(
-                  '📄 TAG-TRANSFER: Contenido desde FFAppState: $nfcContent');
+                  '📄 TAG-TRANSFER (CHILD): Contenido del tag de origen leído: ${nfcContent.length} caracteres');
 
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
                 // Parsear el contenido del tag y agrupar por headquarterId
                 final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
                 debugPrint(
-                    '📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
+                    '📊 TAG-TRANSFER (CHILD): Datos parseados: ${parsedData.length} lotes');
+
+                // Guardar los datos del tag de origen
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
-                  debugPrint(
-                      '✅ TAG-TRANSFER: Guardado en _tagTransferData[$statusId]');
                 });
-              } else {
+
                 debugPrint(
-                    '❌ TAG-TRANSFER: Contenido vacío o con error: $nfcContent');
+                    '✅ TAG-TRANSFER (CHILD): Tag de origen guardado correctamente');
+                debugPrint(
+                    '💡 TAG-TRANSFER (CHILD): Ahora el usuario puede presionar "Transferir ahora"');
+              } else {
+                debugPrint('❌ TAG-TRANSFER (CHILD): Error al leer tag de origen');
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('❌ Error al leer el tag de origen'),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
               }
+
+              setState(() {});
               return;
             }
 
@@ -2730,50 +2965,52 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ),
             child: Row(
               children: [
-                // Radio button visual
-                Container(
-                  width: 24,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: (isSelected &&
-                              !isNumberType &&
-                              !isTagWriterType &&
-                              !isTagReaderType)
-                          ? Colors.white
-                          : const Color(0xFF00a86b),
-                      width: 3,
-                    ),
-                    color: isSelected ? Colors.white : Colors.transparent,
-                  ),
-                  child: isSelected
-                      ? Center(
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: const BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Color(0xFF00a86b),
-                            ),
-                          ),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                // Indicador de color
-                Container(
-                  width: 32,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: color,
-                    borderRadius: BorderRadius.circular(6),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.6),
-                        blurRadius: 12,
-                        offset: const Offset(0, 3),
+                // Radio button visual (no mostrar para tag-transfer)
+                if (!isTagTransferType)
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: (isSelected &&
+                                !isNumberType &&
+                                !isTagWriterType &&
+                                !isTagReaderType)
+                            ? Colors.white
+                            : const Color(0xFF00a86b),
+                        width: 3,
                       ),
+                      color: isSelected ? Colors.white : Colors.transparent,
+                    ),
+                    child: isSelected
+                        ? Center(
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Color(0xFF00a86b),
+                              ),
+                            ),
+                          )
+                        : null,
+                  ),
+                if (!isTagTransferType) const SizedBox(width: 12),
+                // Indicador de color (no mostrar para tag-transfer)
+                if (!isTagTransferType)
+                  Container(
+                    width: 32,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color,
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: [
+                        BoxShadow(
+                          color: color.withValues(alpha: 0.6),
+                          blurRadius: 12,
+                          offset: const Offset(0, 3),
+                        ),
                     ],
                   ),
                 ),
@@ -3119,7 +3356,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   if (validationResult != null) {
                     // Hay un step requerido sin completar
                     final message = validationResult['message'] as String;
-                    final path = validationResult['path'] as List<int>;
+                    final path = (validationResult['path'] as List<dynamic>).cast<int>();
 
                     // Expandir el árbol hasta el step faltante
                     _expandTreeToStep(path);
@@ -3512,11 +3749,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       // Tomar la última (más reciente) que tenga datos válidos
       final selectedVisit = stepVisits.last;
-      final statusOption = selectedVisit.statusOption;
       final statusId = selectedVisit.idActivityStatus;
 
+      // Para reference-list, el nombre real está en statusResponse, no en statusOption
+      final typeStep = getJsonField(currentStep, r'''$.type_step''')?.toString() ?? '';
+      final displayName = typeStep.toLowerCase() == 'reference-list'
+          ? selectedVisit.statusResponse
+          : selectedVisit.statusOption;
+
       // Agregar el nombre del status seleccionado
-      breadcrumbItems.add(statusOption);
+      breadcrumbItems.add(displayName);
 
       // Buscar el status completo en el JSON para ver si tiene hijos
       final activitiesStatusRaw =
@@ -4483,31 +4725,33 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   Widget _buildTagTransferButton({
     required BuildContext context,
     required String statusName,
+    required int statusId,
+    required dynamic parentStep,
+    required dynamic status,
   }) {
-    return InkWell(
-      onTap: () {}, // El tap se maneja en el InkWell padre
-      child: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFFA500), Color(0xFFFFB74D)],
+    // Siempre mostrar el icono NFC naranja para leer tag de origen
+    // El botón "TRANSFERIR AHORA" y "TRANSFERENCIA EXITOSA" se muestran en el resumen inline
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFFFA500), Color(0xFFFFB74D)],
+        ),
+        borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFA500).withValues(alpha: 0.4),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFFFA500).withValues(alpha: 0.4),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: const Icon(
-          Icons.nfc_rounded,
-          color: Colors.white,
-          size: 20,
-        ),
+        ],
+      ),
+      child: const Icon(
+        Icons.nfc_rounded,
+        color: Colors.white,
+        size: 20,
       ),
     );
   }
@@ -4789,6 +5033,39 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // ===== EVALUADOR DE FÓRMULAS MATEMÁTICAS =====
 
+  /// Parsea los parámetros de una fórmula que vienen después del &
+  /// Ejemplo: "=TARE-DESTARE&Sufijo=Kg" retorna {"Sufijo": "Kg"}
+  Map<String, String> _parseFormulaParameters(String formula) {
+    final params = <String, String>{};
+
+    // Buscar si hay parámetros después del &
+    final ampersandIndex = formula.indexOf('&');
+    if (ampersandIndex == -1) return params;
+
+    // Obtener la parte de parámetros
+    final paramsString = formula.substring(ampersandIndex + 1);
+
+    // Parsear cada parámetro (formato: Param1=Value1&Param2=Value2)
+    final paramPairs = paramsString.split('&');
+    for (final pair in paramPairs) {
+      final keyValue = pair.split('=');
+      if (keyValue.length == 2) {
+        params[keyValue[0].trim()] = keyValue[1].trim();
+      }
+    }
+
+    debugPrint('📋 Parámetros parseados de fórmula: $params');
+    return params;
+  }
+
+  /// Extrae solo la parte de la fórmula (antes del &)
+  /// Ejemplo: "=TARE-DESTARE&Sufijo=Kg" retorna "=TARE-DESTARE"
+  String _extractFormulaOnly(String formula) {
+    final ampersandIndex = formula.indexOf('&');
+    if (ampersandIndex == -1) return formula;
+    return formula.substring(0, ampersandIndex);
+  }
+
   /// Evalúa una fórmula matemática reemplazando nombres de status por sus valores
   /// Ejemplo: "=Tare+Destare" -> 10+5 = 15
   double? _evaluateFormula(String formula) {
@@ -4806,12 +5083,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
       }
 
+      // Extraer solo la fórmula (sin parámetros después del &)
+      String expression = _extractFormulaOnly(formula).trim();
+
       // Remover el prefijo "=" si existe
-      String expression = formula.trim();
       if (expression.startsWith('=')) {
         expression = expression.substring(1);
       }
-      debugPrint('📝 Expresión después de remover "=": "$expression"');
+      debugPrint('📝 Expresión después de remover "=" y parámetros: "$expression"');
 
       // Reemplazar nombres de status por sus valores (case-insensitive)
       int replacementCount = 0;
@@ -5154,7 +5433,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   /// Carga los weights de headquarters desde SQLite para el mes/año actual
   /// También identifica los lotes que NO tienen peso promedio configurado
+  /// Usa la base de datos principal (pathDatabase) con conexión directa
   Future<void> _loadHeadquarterWeights(List<int> headquarterIds) async {
+    Database? db;
     try {
       final now = DateTime.now();
       final currentYear = now.year;
@@ -5165,6 +5446,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       // Limpiar lista de lotes sin peso antes de cargar
       _headquartersWithoutWeight.clear();
+
+      // Obtener la ruta de la base de datos desde FFAppState
+      final dbPath = FFAppState().pathDatabase;
+      if (dbPath.isEmpty) {
+        debugPrint('❌ Error: pathDatabase está vacío');
+        return;
+      }
+
+      // Abrir conexión a la base de datos (readonly para evitar bloqueos)
+      db = await openDatabase(dbPath, readOnly: true);
+      debugPrint('📂 Base de datos abierta: $dbPath');
 
       for (var headquarterId in headquarterIds) {
         // Buscar nombre del lote en AppState
@@ -5182,15 +5474,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           // Usar nombre por defecto
         }
 
-        // Consultar SQLite
-        final results = await SQLiteManager.instance.getHeadquarterWeights(
-          headquarterId: headquarterId,
-          year: currentYear,
-          month: currentMonth,
-        );
+        // Consultar SQLite directamente
+        final results = await db.rawQuery('''
+          SELECT * FROM Headquarters_weights
+          WHERE Id_headquarter = ?
+            AND Date_year = ?
+            AND Date_month = ?
+          LIMIT 1
+        ''', [headquarterId, currentYear, currentMonth]);
 
         if (results.isNotEmpty) {
-          final weight = results.first.weight;
+          final weightData = results.first['Weight'];
+          final weight = (weightData is num) ? weightData.toDouble() : 0.0;
           setState(() {
             _headquarterWeights[headquarterId] = weight;
           });
@@ -5219,7 +5514,105 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
     } catch (e) {
       debugPrint('❌ Error cargando weights: $e');
+    } finally {
+      // Cerrar la conexión para evitar bloqueos
+      if (db != null && db.isOpen) {
+        await db.close();
+        debugPrint('✅ Base de datos cerrada correctamente');
+      }
     }
+  }
+
+  /// Calcula el peso total por headquarter: totalResults * weight
+  /// Se llama después de leer el tag y cargar los weights
+  void _calculateHeadquarterWeightResults(
+      int tagReaderStatusId, String tagReaderStatusName) {
+    debugPrint('');
+    debugPrint('⚖️ ===== CÁLCULO DE PESO POR HEADQUARTER =====');
+    debugPrint('📍 Tag Reader: "$tagReaderStatusName" (ID: $tagReaderStatusId)');
+    debugPrint('📋 _tagReaderData tiene ${_tagReaderData.length} entradas');
+    debugPrint('📋 _headquarterWeights tiene ${_headquarterWeights.length} pesos');
+
+    // Obtener los datos del tag leído - buscar en TODAS las entradas de _tagReaderData
+    List<Map<String, dynamic>> allTagData = [];
+    for (var entry in _tagReaderData.entries) {
+      debugPrint('   📍 Tag Reader ID: ${entry.key} con ${entry.value.length} registros');
+      allTagData.addAll(entry.value);
+    }
+
+    if (allTagData.isEmpty) {
+      debugPrint('   ❌ No hay datos del tag para calcular');
+      return;
+    }
+
+    debugPrint('📊 Total de registros encontrados: ${allTagData.length}');
+
+    // Limpiar cálculos anteriores
+    _calculatedHeadquarterWeights.clear();
+
+    // Agrupar resultados por headquarterId
+    final Map<int, int> resultsByHeadquarter = {};
+    for (var record in allTagData) {
+      final headquarterId = record['headquarterId'] as int? ?? 0;
+      final results = record['results'] as int? ?? 0;
+      if (headquarterId > 0) {
+        resultsByHeadquarter[headquarterId] =
+            (resultsByHeadquarter[headquarterId] ?? 0) + results;
+      }
+    }
+
+    debugPrint('📊 Resultados agrupados por lote:');
+    for (var entry in resultsByHeadquarter.entries) {
+      debugPrint('   - Lote ${entry.key}: ${entry.value} resultados');
+    }
+
+    // Calcular peso para cada headquarter
+    for (var entry in resultsByHeadquarter.entries) {
+      final headquarterId = entry.key;
+      final totalResults = entry.value;
+      final weight = _headquarterWeights[headquarterId];
+
+      if (weight != null) {
+        final calculatedWeight = totalResults * weight;
+
+        // Buscar nombre del lote
+        String headquarterName = 'Lote $headquarterId';
+        try {
+          final headquarters = FFAppState().headquartersList.firstWhere(
+                (h) => h.idHeadquarter == headquarterId,
+                orElse: () => HeadquartersStruct(),
+              );
+          if (headquarters.nameHeadquarter.isNotEmpty) {
+            headquarterName = headquarters.nameHeadquarter;
+          }
+        } catch (e) {
+          // Usar nombre por defecto
+        }
+
+        _calculatedHeadquarterWeights[headquarterId] = {
+          'headquarterName': headquarterName,
+          'weight': weight,
+          'totalResults': totalResults,
+          'calculatedWeight': calculatedWeight,
+        };
+
+        debugPrint(
+            '   ✅ $headquarterName: $totalResults resultados × ${weight.toStringAsFixed(2)} kg = ${calculatedWeight.toStringAsFixed(2)} kg');
+      } else {
+        debugPrint(
+            '   ⚠️ Lote $headquarterId: Sin peso configurado, no se puede calcular');
+      }
+    }
+
+    // Calcular total general
+    double grandTotal = 0;
+    for (var data in _calculatedHeadquarterWeights.values) {
+      grandTotal += (data['calculatedWeight'] as double? ?? 0);
+    }
+    debugPrint('');
+    debugPrint('📦 PESO TOTAL CALCULADO: ${grandTotal.toStringAsFixed(2)} kg');
+    debugPrint('⚖️ ===== FIN CÁLCULO DE PESO =====');
+    debugPrint('');
   }
 
   /// Muestra un diálogo de advertencia cuando hay lotes sin peso promedio configurado
@@ -6078,6 +6471,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   /// Obtiene el nombre del cortero desde Activities_status usando su IdActivityStatus
   /// El parámetro idActivityStatus es el OP2 que viene del NFC tag
+  /// Busca primero en visitDetails (tag-writer), luego en caché, y si no está,
+  /// dispara una carga asíncrona desde SQLite
   String _getCorterName(String idActivityStatus) {
     if (idActivityStatus.isEmpty) {
       debugPrint('🔄 _getCorterName: idActivityStatus vacío, retornando vacío');
@@ -6093,8 +6488,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return '';
     }
 
-    // Aquí idealmente se consultaría la base de datos o un cache
-    // Por ahora, intentamos obtenerlo de visitDetails si está disponible
+    // 1. Primero buscar en visitDetails (funciona para tag-writer)
     try {
       for (var detail in FFAppState().visitDetails) {
         if (detail.idActivityStatus == id && detail.statusResponse.isNotEmpty) {
@@ -6106,8 +6500,48 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('❌ Error buscando en visitDetails: $e');
     }
 
-    debugPrint('❌ _getCorterName: No encontrado el cortero para idActivityStatus=$idActivityStatus');
-    return '';
+    // 2. Buscar en caché de SQLite
+    if (_corteroNamesCache.containsKey(id)) {
+      final cachedName = _corteroNamesCache[id]!;
+      debugPrint('✅ _getCorterName: Encontrado en caché: "$cachedName"');
+      return cachedName;
+    }
+
+    // 3. Si no está en caché, disparar carga asíncrona desde SQLite
+    _loadCorteroNameFromSQLite(id);
+
+    debugPrint('⏳ _getCorterName: Cargando desde SQLite para idActivityStatus=$id');
+    return ''; // Retornará vacío mientras carga, el rebuild lo actualizará
+  }
+
+  /// Carga el nombre del cortero desde SQLite y lo guarda en caché
+  Future<void> _loadCorteroNameFromSQLite(int idActivityStatus) async {
+    try {
+      final db = await GlobalDbSingleton().database;
+      final result = await db.query(
+        'Activities_status',
+        columns: ['Status_name'],
+        where: 'Id_activity_status = ?',
+        whereArgs: [idActivityStatus],
+        limit: 1,
+      );
+
+      if (result.isNotEmpty) {
+        final statusName = result.first['Status_name'] as String? ?? '';
+        if (statusName.isNotEmpty) {
+          debugPrint('✅ _loadCorteroNameFromSQLite: Encontrado "$statusName" para id=$idActivityStatus');
+          _corteroNamesCache[idActivityStatus] = statusName;
+          // Forzar rebuild para actualizar la UI
+          if (mounted) {
+            setState(() {});
+          }
+        }
+      } else {
+        debugPrint('❌ _loadCorteroNameFromSQLite: No encontrado en SQLite para id=$idActivityStatus');
+      }
+    } catch (e) {
+      debugPrint('❌ _loadCorteroNameFromSQLite: Error: $e');
+    }
   }
 
   /// Limpia los datos de tags (tag-reader, tag-writer, tag-transfer) que NO deben ser recordados
@@ -6853,46 +7287,62 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     size: 24,
                   ),
                   const SizedBox(width: 8),
-                  // Mostrar icono de dos personas si hay cortero
-                  if (hasOperator2)
-                    const Icon(
-                      Icons.people_outline_rounded,
-                      color: Color(0xFF74C69D),
-                      size: 18,
-                    )
-                  else
-                    const Icon(
-                      Icons.person_outline_rounded,
-                      color: Color(0xFF74C69D),
-                      size: 18,
-                    ),
-                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Nombre del operador principal (OP)
-                        Text(
-                          operatorName,
-                          style: const TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        // Nombre del operador principal (OP) con prefijo Recolector
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Recolector: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF74C69D),
+                                ),
+                              ),
+                              TextSpan(
+                                text: operatorName.toUpperCase(),
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        // Nombre del operador cortero (OP2) en línea separada
+                        // Nombre del operador cortero (OP2) con prefijo Cortero
                         if (hasOperator2) ...[
                           const SizedBox(height: 2),
-                          Text(
-                            operator2Name.isNotEmpty
-                                ? operator2Name
-                                : operator2Id,
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF74C69D),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: 'Cortero: ',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF74C69D),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: operator2Name.isNotEmpty
+                                      ? operator2Name.toUpperCase()
+                                      : operator2Id,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -7311,47 +7761,62 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     size: 24,
                   ),
                   const SizedBox(width: 8),
-                  // Mostrar dos iconos si hay cortero
-                  if (hasOperator2) ...[
-                    const Icon(
-                      Icons.people_outline_rounded,
-                      color: Color(0xFF64B5F6),
-                      size: 18,
-                    ),
-                  ] else ...[
-                    const Icon(
-                      Icons.person_outline_rounded,
-                      color: Color(0xFF64B5F6),
-                      size: 18,
-                    ),
-                  ],
-                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Nombre del operador principal (OP)
-                        Text(
-                          operatorName,
-                          style: const TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        // Nombre del operador principal (OP) con prefijo Recolector
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Recolector: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64B5F6),
+                                ),
+                              ),
+                              TextSpan(
+                                text: operatorName.toUpperCase(),
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        // Nombre del operador cortero (OP2) en línea separada
+                        // Nombre del operador cortero (OP2) con prefijo Cortero
                         if (hasOperator2) ...[
                           const SizedBox(height: 2),
-                          Text(
-                            operator2Name.isNotEmpty
-                                ? operator2Name
-                                : operator2Id,
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Color(0xFF64B5F6),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: 'Cortero: ',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF64B5F6),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: operator2Name.isNotEmpty
+                                      ? operator2Name.toUpperCase()
+                                      : operator2Id,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -7511,153 +7976,156 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             final data = entry.value;
             return _buildTagTransferHeadquarterGroup(headquarterId, data);
           }),
-          // Botón TRANSFERIR AHORA o mensaje de éxito
+          // Botón TRANSFERIR AHORA o TRANSFERENCIA EXITOSA
           const SizedBox(height: 16),
-          _tagTransferCompleted[statusId] == true
-              ? Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF00a86b), Color(0xFF008c5a)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
+          if (_tagTransferCompleted[statusId] == true)
+            // TRANSFERENCIA EXITOSA - No clickeable
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00a86b), Color(0xFF008c5a)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                      SizedBox(width: 12),
-                      Text(
-                        'TRANSFERENCIA EXITOSA',
+                ],
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'TRANSFERENCIA EXITOSA',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            // TRANSFERIR AHORA - Clickeable
+            InkWell(
+              onTap: () async {
+                // Obtener el contenido del tag de origen desde FFAppState
+                final sourceTagContent = FFAppState().nfcRead;
+                if (sourceTagContent.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'No hay contenido de origen disponible',
                         style: TextStyle(
                           fontFamily: 'Roboto',
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 1.2,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                    ],
-                  ),
-                )
-              : InkWell(
-                  onTap: () async {
-                    // Obtener el contenido del tag de origen desde FFAppState
-                    final sourceTagContent = FFAppState().nfcRead;
-                    if (sourceTagContent.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'No hay contenido de origen disponible',
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontWeight: FontWeight.w600,
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+
+                // Abrir diálogo de escritura en tag de destino
+                final result = await showDialog<bool>(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) {
+                    return Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: NfcTransferWriteDialogWidget(
+                        sourceTagContent: sourceTagContent,
+                      ),
+                    );
+                  },
+                );
+
+                // Si la transferencia fue exitosa, mostrar mensaje y marcar como completada
+                if (result == true && mounted) {
+                  setState(() {
+                    _tagTransferCompleted[statusId] = true;
+                  });
+                  HapticFeedback.heavyImpact();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.check_circle, color: Colors.white),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Transferencia completada exitosamente',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                      return;
-                    }
-
-                    // Abrir diálogo de escritura en tag de destino
-                    final result = await showDialog<bool>(
-                      barrierDismissible: false,
-                      context: context,
-                      builder: (dialogContext) {
-                        return Dialog(
-                          elevation: 0,
-                          insetPadding: EdgeInsets.zero,
-                          backgroundColor: Colors.transparent,
-                          child: NfcTransferWriteDialogWidget(
-                            sourceTagContent: sourceTagContent,
-                          ),
-                        );
-                      },
-                    );
-
-                    // Si la transferencia fue exitosa, mostrar mensaje y marcar como completada
-                    if (result == true && mounted) {
-                      setState(() {
-                        _tagTransferCompleted[statusId] = true;
-                      });
-                      HapticFeedback.heavyImpact();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.white),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Transferencia completada exitosamente',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          backgroundColor: Color(0xFF00a86b),
-                          duration: Duration(seconds: 3),
-                        ),
-                      );
-                    }
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                        ],
                       ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2196F3).withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
+                      backgroundColor: Color(0xFF00a86b),
+                      duration: Duration(seconds: 3),
                     ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.swap_horiz_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                        SizedBox(width: 12),
-                        Text(
-                          'TRANSFERIR AHORA',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
-                    ),
+                  );
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
                   ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
                 ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.swap_horiz_rounded,
+                      color: Colors.white,
+                      size: 24,
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      'TRANSFERIR AHORA',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -7683,6 +8151,49 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final totalVisits = (data['totalVisits'] as int?) ?? 0;
     final totalResults = (data['totalResults'] as int?) ?? 0;
     final records = (data['records'] as List<Map<String, dynamic>>?) ?? [];
+
+    // Agrupar por par de operadores (OP + OP2) - igual que tag-reader
+    final Map<String, Map<String, dynamic>> operatorGroups = {};
+    for (var record in records) {
+      final operatorId = record['operatorId'] as String? ?? 'N/A';
+      final operator2Id = record['operator2Id'] as String? ?? '';
+
+      // Crear una clave única para la pareja de operadores
+      final operatorPairKey =
+          operator2Id.isNotEmpty ? '${operatorId}_$operator2Id' : operatorId;
+
+      if (!operatorGroups.containsKey(operatorPairKey)) {
+        // Buscar nombre del operador principal en usersList
+        String operatorName = _getUserName(operatorId);
+
+        // Buscar nombre del cortero si existe
+        String operator2Name = '';
+        if (operator2Id.isNotEmpty) {
+          operator2Name = _getCorterName(operator2Id);
+        }
+
+        operatorGroups[operatorPairKey] = {
+          'operatorId': operatorId,
+          'operator2Id': operator2Id,
+          'operatorName': operatorName,
+          'operator2Name': operator2Name,
+          'totalVisits': 0,
+          'totalResults': 0,
+          'records': <Map<String, dynamic>>[],
+        };
+      }
+
+      final visits = (record['visits'] as int?) ?? 0;
+      final results = (record['results'] as int?) ?? 0;
+
+      operatorGroups[operatorPairKey]!['totalVisits'] =
+          (operatorGroups[operatorPairKey]!['totalVisits'] as int) + visits;
+      operatorGroups[operatorPairKey]!['totalResults'] =
+          (operatorGroups[operatorPairKey]!['totalResults'] as int) + results;
+      (operatorGroups[operatorPairKey]!['records']
+              as List<Map<String, dynamic>>)
+          .add(record);
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -7747,7 +8258,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${records.length}',
+                      '${operatorGroups.length}',
                       style: const TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 12,
@@ -7765,8 +8276,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               padding: const EdgeInsets.only(
                   left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
-                children: records.map((record) {
-                  return _buildTagTransferRecord(record);
+                children: operatorGroups.entries.map((entry) {
+                  final operatorPairKey = entry.key;
+                  final operatorData = entry.value;
+                  return _buildTagTransferOperatorGroup(
+                      headquarterId, operatorPairKey, operatorData);
                 }).toList(),
               ),
             ),
@@ -7775,91 +8289,163 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  Widget _buildTagTransferRecord(Map<String, dynamic> record) {
-    final operatorId = record['operatorId'] as String? ?? 'N/A';
-    final operator2Id = record['operator2Id'] as String? ?? '';
+  Widget _buildTagTransferOperatorGroup(int headquarterId, String operatorPairKey,
+      Map<String, dynamic> operatorData) {
+    final operator2Id = operatorData['operator2Id'] as String? ?? '';
+    final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
+    final operator2Name = operatorData['operator2Name'] as String? ?? '';
+    final totalVisits = operatorData['totalVisits'] as int? ?? 0;
+    final totalResults = operatorData['totalResults'] as int? ?? 0;
+    final records =
+        operatorData['records'] as List<Map<String, dynamic>>? ?? [];
+
+    // Verificar si hay operador cortero (OP2)
+    final hasOperator2 = operator2Id.isNotEmpty;
+
+    final expansionKey = 'TT_OP_${headquarterId}_$operatorPairKey';
+    final isExpanded = _tagTransferExpansionState[expansionKey] ?? false;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1565C0).withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF2196F3).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _tagTransferExpansionState[expansionKey] = !isExpanded;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  Icon(
+                    isExpanded ? Icons.expand_more : Icons.chevron_right,
+                    color: const Color(0xFF64B5F6),
+                    size: 24,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nombre del operador principal (OP) con prefijo Recolector
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Recolector: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64B5F6),
+                                ),
+                              ),
+                              TextSpan(
+                                text: operatorName.toUpperCase(),
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Nombre del operador cortero (OP2) con prefijo Cortero
+                        if (hasOperator2) ...[
+                          const SizedBox(height: 2),
+                          RichText(
+                            text: TextSpan(
+                              children: [
+                                const TextSpan(
+                                  text: 'Cortero: ',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF64B5F6),
+                                  ),
+                                ),
+                                TextSpan(
+                                  text: operator2Name.isNotEmpty
+                                      ? operator2Name.toUpperCase()
+                                      : operator2Id,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 2),
+                        Text(
+                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 11,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            Container(
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 5),
+              child: Column(
+                children: records
+                    .map((record) => _buildTagTransferVisitRecord(record))
+                    .toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTagTransferVisitRecord(Map<String, dynamic> record) {
     final visits = record['visits'] as int? ?? 0;
     final results = record['results'] as int? ?? 0;
     final dateTime = record['dateTime'] as DateTime? ?? DateTime.now();
 
-    debugPrint(
-        '🔍 TAG-TRANSFER Record: operatorId="$operatorId", operator2Id="$operator2Id"');
-
-    // Buscar el nombre del operador principal
-    String operatorName = _getUserName(operatorId);
-
-    // operator2Id ahora contiene el IdActivityStatus (ID único de Activities_status)
-    // Buscamos el nombre del cortero para display
-    String operator2Name = '';
-    if (operator2Id.isNotEmpty) {
-      debugPrint('🔍 TAG-TRANSFER: Buscando cortero con IdActivityStatus="$operator2Id"');
-      operator2Name = _getCorterName(operator2Id);
-      debugPrint('🔍 TAG-TRANSFER: Cortero nombre="$operator2Name"');
-    } else {
-      debugPrint('🔍 TAG-TRANSFER: operator2Id está VACÍO');
-    }
-
-    // Construir textos de display
-    final hasOperator2 = operator2Id.isNotEmpty;
-    final displayName =
-        hasOperator2 ? '$operatorName / $operator2Name' : operatorName;
-    final displayIds = hasOperator2
-        ? 'Op: $operatorId | Cortero ID: $operator2Id'
-        : 'Op: $operatorId';
-
-    // Formato de fecha: "Mié, 14 de Feb 2025"
+    // Formato de fecha: "Mié, 14 de Feb 2025 HH:mm"
     final dateFormatter = DateFormat('EEE, d \'de\' MMM yyyy HH:mm', 'es_ES');
     final formattedDate = dateFormatter.format(dateTime);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1565C0).withValues(alpha: 0.3),
+        color: const Color(0xFF0D47A1).withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(6),
         border: Border.all(
-          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
+          color: Colors.white.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(
-                hasOperator2
-                    ? Icons.people_outline_rounded
-                    : Icons.person_outline_rounded,
-                color: const Color(0xFF64B5F6),
-                size: 16,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  displayName,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
-              Flexible(
-                child: Text(
-                  displayIds,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 10,
-                    color: Colors.white.withValues(alpha: 0.6),
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
           Row(
             children: [
               Icon(
@@ -7904,6 +8490,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         getJsonField(status, r'''$.default_status''')?.toString() ?? '';
     final hasBeenCalculated = _numbersOperationCalculated[statusId] ?? false;
 
+    // Parsear parámetros de la fórmula (ej: Sufijo=Kg)
+    final params = _parseFormulaParameters(formula);
+    final suffix = params['Sufijo'] ?? '';
+
     // Colores: Verde si ya fue calculado, Blanco si aún no
     final backgroundColor = hasBeenCalculated
         ? [const Color(0xFF1B4332), const Color(0xFF2D6A4F)] // Verde oscuro
@@ -7925,6 +8515,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     final valueColor =
         hasBeenCalculated ? const Color(0xFF95D5B2) : const Color(0xFF757575);
+
+    // Construir el texto del valor con sufijo si existe
+    final displayValue = suffix.isNotEmpty
+        ? '${_formatColombianNumber(calculatedValue)} $suffix'
+        : _formatColombianNumber(calculatedValue);
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -7980,10 +8575,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Valor calculado (siempre visible)
+                  // Valor calculado con sufijo (siempre visible)
                   Center(
                     child: Text(
-                      _formatColombianNumber(calculatedValue),
+                      displayValue,
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 32,
@@ -8242,6 +8837,48 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // ===== VISUALIZACIÓN DE HEADQUARTER WEIGHTS =====
 
   Widget _buildHeadquarterWeightsDisplay() {
+    debugPrint('🎨 _buildHeadquarterWeightsDisplay llamado');
+    debugPrint('   _calculatedHeadquarterWeights: ${_calculatedHeadquarterWeights.length}');
+    debugPrint('   _headquartersWithoutWeight: ${_headquartersWithoutWeight.length}');
+    debugPrint('   _tagReaderData: ${_tagReaderData.length}');
+
+    // Si no hay datos del tag, mostrar mensaje para leer primero
+    if (_tagReaderData.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E3A5F), Color(0xFF2A4A6F)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF2196F3).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.info_outline,
+              color: Color(0xFF64B5F6),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Primero lea el TAG en el status "Lectura en TAG" para calcular el peso',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     // Si hay lotes sin peso, mostrar SOLO advertencia
     if (_headquartersWithoutWeight.isNotEmpty) {
       return Container(
@@ -8395,7 +9032,50 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     }
 
-    // Si todos los lotes tienen peso, mostrar display normal
+    // Si no hay cálculos aún, mostrar mensaje de espera
+    if (_calculatedHeadquarterWeights.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1E3A5F), Color(0xFF2A4A6F)],
+          ),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF2196F3).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            const Icon(
+              Icons.calculate_outlined,
+              color: Color(0xFF64B5F6),
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Calculando peso... Toque nuevamente este status para ver el resultado.',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13,
+                  color: Colors.white.withValues(alpha: 0.9),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Si todos los lotes tienen peso, mostrar display con cálculo
+    // Calcular el peso total general
+    double grandTotalWeight = 0;
+    for (var data in _calculatedHeadquarterWeights.values) {
+      grandTotalWeight += (data['calculatedWeight'] as double? ?? 0);
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -8419,38 +9099,30 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 24,
               ),
               const SizedBox(width: 12),
-              Text(
-                'Pesos de Lotes',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white.withValues(alpha: 0.9),
-                  letterSpacing: 0.5,
+              Expanded(
+                child: Text(
+                  'Peso Calculado por Lote',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          // Mostrar cada headquarter weight
-          ..._headquarterWeights.entries.map((entry) {
+          // Mostrar cada headquarter con su cálculo
+          ..._calculatedHeadquarterWeights.entries.map((entry) {
             final headquarterId = entry.key;
-            final weight = entry.value;
-
-            // Buscar el nombre del lote en FFAppState().headquartersSelectedList
-            String headquarterName = 'Lote $headquarterId';
-            try {
-              final headquarters = FFAppState().headquartersSelectedList;
-              final hq = headquarters.firstWhere(
-                (h) => h.idHeadquarter == headquarterId,
-                orElse: () => HeadquartersStruct(),
-              );
-              if (hq.nameHeadquarter.isNotEmpty) {
-                headquarterName = hq.nameHeadquarter;
-              }
-            } catch (e) {
-              // Usar nombre por defecto
-            }
+            final data = entry.value;
+            final headquarterName =
+                data['headquarterName'] as String? ?? 'Lote $headquarterId';
+            final weight = data['weight'] as double? ?? 0;
+            final totalResults = data['totalResults'] as int? ?? 0;
+            final calculatedWeight = data['calculatedWeight'] as double? ?? 0;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -8464,58 +9136,185 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     width: 1,
                   ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            headquarterName,
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'ID: $headquarterId',
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 11,
-                              color: Colors.white.withValues(alpha: 0.5),
-                            ),
-                          ),
-                        ],
+                    // Nombre del lote
+                    Text(
+                      headquarterName,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                    const SizedBox(height: 8),
+                    // Fórmula: resultados x peso = total
+                    Row(
+                      children: [
+                        // Resultados
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFF2196F3).withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '$totalResults',
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        '${weight.toStringAsFixed(2)} kg',
-                        style: const TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            '×',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                          ),
                         ),
-                      ),
+                        // Peso unitario
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color:
+                                const Color(0xFFFFA500).withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${weight.toStringAsFixed(2)} kg',
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            '=',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ),
+                        // Peso calculado
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                              ),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              '${calculatedWeight.toStringAsFixed(2)} kg',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             );
           }),
+          // Mostrar total general si hay cálculos
+          if (_calculatedHeadquarterWeights.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF00a86b).withValues(alpha: 0.3),
+                    const Color(0xFF00a86b).withValues(alpha: 0.2),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.summarize_rounded,
+                        color: Color(0xFF00a86b),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'PESO TOTAL',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white.withValues(alpha: 0.9),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF00a86b), Color(0xFF008c5a)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      '${grandTotalWeight.toStringAsFixed(2)} kg',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

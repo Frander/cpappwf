@@ -15,9 +15,12 @@ class NfcReadDialogWidget extends StatefulWidget {
   const NfcReadDialogWidget({
     super.key,
     this.autoStart = false,
+    this.isTagTransferMode = false,
   });
 
   final bool autoStart;
+  /// Modo tag-transfer: no limpia el tag automáticamente, muestra mensaje de reintentar
+  final bool isTagTransferMode;
 
   @override
   State<NfcReadDialogWidget> createState() => _NfcReadDialogWidgetState();
@@ -28,6 +31,9 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
   late NfcReadDialogModel _model;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // Estado para modo tag-transfer cuando el tag está vacío o inválido
+  bool _isTagEmptyOrInvalid = false;
 
   @override
   void setState(VoidCallback callback) {
@@ -72,51 +78,68 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       _model.isSuccess = false;
       _model.errorMessage = null;
       _model.parsedRecords = [];
+      _isTagEmptyOrInvalid = false;
     });
 
     try {
       final nfcData = await actions.readNFC(context);
 
       if (nfcData != null && nfcData.isNotEmpty) {
-        // VALIDAR CONTENIDO DEL TAG
-        final isValid = await _validateAndClearIfNeeded(nfcData);
+        // Para modo tag-transfer, validar que tenga contenido válido con visitas
+        if (widget.isTagTransferMode) {
+          final isValidForTransfer = _isValidForTagTransfer(nfcData);
 
-        if (!isValid) {
-          // El tag fue limpiado, informar al usuario
-          setState(() {
-            _model.isReading = false;
-            _model.isSuccess = false;
-          });
+          if (!isValidForTransfer) {
+            // Tag vacío o inválido - mostrar mensaje y botón reintentar
+            setState(() {
+              _model.isReading = false;
+              _model.isSuccess = false;
+              _isTagEmptyOrInvalid = true;
+            });
+            HapticFeedback.vibrate();
+            return; // No cerrar el diálogo, quedarse para reintentar
+          }
+        } else {
+          // Modo normal: VALIDAR CONTENIDO DEL TAG y limpiar si es inválido
+          final isValid = await _validateAndClearIfNeeded(nfcData);
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
-                children: [
-                  Icon(Icons.cleaning_services, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Contenido inválido detectado. TAG limpiado automáticamente',
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+          if (!isValid) {
+            // El tag fue limpiado, informar al usuario
+            setState(() {
+              _model.isReading = false;
+              _model.isSuccess = false;
+            });
+
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Row(
+                  children: [
+                    Icon(Icons.cleaning_services, color: Colors.white),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Contenido inválido detectado. TAG limpiado automáticamente',
+                        style: TextStyle(fontFamily: 'Roboto',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
+                backgroundColor: Colors.orange,
+                duration: Duration(seconds: 3),
               ),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 3),
-            ),
-          );
+            );
 
-          // Cerrar el diálogo después de mostrar el mensaje
-          await Future.delayed(Duration(seconds: 2));
-          if (mounted) {
-            Navigator.pop(context);
+            // Cerrar el diálogo después de mostrar el mensaje
+            await Future.delayed(Duration(seconds: 2));
+            if (mounted) {
+              Navigator.pop(context);
+            }
+            return;
           }
-          return;
         }
 
         // Parsear el contenido del tag
@@ -130,6 +153,14 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
         });
 
         if (records.isEmpty) {
+          // En modo tag-transfer, mostrar error y permitir reintentar
+          if (widget.isTagTransferMode) {
+            setState(() {
+              _isTagEmptyOrInvalid = true;
+            });
+            HapticFeedback.vibrate();
+            return;
+          }
           throw Exception('No se pudieron parsear los datos del tag');
         }
 
@@ -157,6 +188,26 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       });
       HapticFeedback.vibrate();
     }
+  }
+
+  /// Valida si el contenido del tag es válido para transferir (tiene visitas guardadas)
+  bool _isValidForTagTransfer(String content) {
+    // "0" significa tag vacío/limpio
+    if (content.trim() == '0') {
+      debugPrint('⚠️ TAG-TRANSFER: Tag vacío ("0")');
+      return false;
+    }
+
+    // Debe tener el formato válido con visitas
+    final validPattern =
+        RegExp(r'\{DH:[^}]+;OP:[^}]+;VISITS:[^}]+;RESULTS:[^}]+;HE:[^}]+\}');
+    if (!validPattern.hasMatch(content)) {
+      debugPrint('⚠️ TAG-TRANSFER: Formato inválido');
+      return false;
+    }
+
+    debugPrint('✅ TAG-TRANSFER: Contenido válido para transferir');
+    return true;
   }
 
   /// Valida el contenido del tag y lo limpia automáticamente si es inválido
@@ -650,9 +701,11 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                   ? _buildReadingState()
                   : _model.isSuccess
                       ? _buildTableState()
-                      : _model.errorMessage != null
-                          ? _buildErrorState()
-                          : _buildEmptyState(),
+                      : _isTagEmptyOrInvalid
+                          ? _buildTagEmptyOrInvalidState()
+                          : _model.errorMessage != null
+                              ? _buildErrorState()
+                              : _buildEmptyState(),
             ),
 
             // Botón de acción
@@ -1007,6 +1060,119 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Estado cuando el tag está vacío o tiene formato inválido (solo para tag-transfer)
+  Widget _buildTagEmptyOrInvalidState() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icono de advertencia
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.orange.withOpacity(0.3),
+                    Colors.amber.withOpacity(0.3),
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.warning_amber_rounded,
+                color: Colors.orange,
+                size: 60,
+              ),
+            ),
+            SizedBox(height: 24),
+
+            // Título
+            Text(
+              'TAG VACÍO O INVÁLIDO',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(height: 16),
+
+            // Mensaje descriptivo
+            Text(
+              'El TAG no tiene el formato correcto o está limpio',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Colors.white.withOpacity(0.9),
+              ),
+            ),
+            SizedBox(height: 8),
+
+            // Subtítulo con instrucción
+            Text(
+              'Acerque un TAG con visitas guardadas',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 14,
+                color: Colors.white.withOpacity(0.6),
+              ),
+            ),
+            SizedBox(height: 32),
+
+            // Botón de reintentar
+            InkWell(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                _startReading();
+              },
+              child: Container(
+                width: double.infinity,
+                height: 56,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.orange, Colors.amber.shade700],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.4),
+                      blurRadius: 16,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.refresh, color: Colors.white, size: 24),
+                    SizedBox(width: 12),
+                    Text(
+                      'REINTENTAR LECTURA DE TAG DE ORIGEN',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
