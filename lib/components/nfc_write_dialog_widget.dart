@@ -825,7 +825,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     ),
                     SizedBox(height: 4),
                     Text(
-                      '${_model.totalVisits} visitas · ${_model.totalResults} resultados',
+                      '${_model.totalVisits} visitas · ${_model.totalResults} ${_getUnityLabel()}',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 13,
@@ -920,7 +920,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     _buildDataRow(
                         'Total Visitas', _model.totalVisits.toString()),
                     _buildDataRow(
-                        'Total Resultados', _model.totalResults.toString()),
+                        'Total ${_getUnityLabel(capitalize: true)}', _model.totalResults.toString()),
                     _buildDataRow('Lote Destino',
                         '${_model.headquarterName} (#${_model.headquarterId})'),
                     SizedBox(height: 12),
@@ -1311,6 +1311,17 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         ],
       ),
     );
+  }
+
+  /// Obtiene el label de unidad desde activitySelected.unity
+  /// Si está vacío o no existe, retorna 'resultados' por defecto
+  String _getUnityLabel({bool capitalize = false}) {
+    final unity = FFAppState().activitySelected.unity;
+    String label = (unity.isNotEmpty) ? unity : 'resultados';
+    if (capitalize && label.isNotEmpty) {
+      label = label[0].toUpperCase() + label.substring(1);
+    }
+    return label;
   }
 
   String _formatDateTime(DateTime? dateTime) {

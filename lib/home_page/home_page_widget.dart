@@ -40,6 +40,7 @@ class _ActivityMetrics {
   final int totalResults;
   final DateTime? firstDate;
   final DateTime? lastDate;
+  final String unity;
 
   _ActivityMetrics({
     required this.activityName,
@@ -48,7 +49,11 @@ class _ActivityMetrics {
     required this.totalResults,
     this.firstDate,
     this.lastDate,
+    this.unity = '',
   });
+
+  /// Obtiene el label de unidad, retorna 'Resultados' si unity está vacío
+  String get unityLabel => unity.isNotEmpty ? unity : 'Resultados';
 }
 
 class _HomePageWidgetState extends State<HomePageWidget>
@@ -274,6 +279,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
           SELECT
             a.Id_activity,
             a.Name_activity as activity_name,
+            a.Unity as unity,
             COUNT(DISTINCT v.Id_visit) as total_visits,
             (SELECT COUNT(*) FROM Visits_details vd
              INNER JOIN Visits v2 ON vd.Id_visit = v2.Id_visit
@@ -283,7 +289,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
           FROM Activities a
           LEFT JOIN Visits v ON a.Id_activity = v.Id_activity
           WHERE v.Id_visit IS NOT NULL
-          GROUP BY a.Id_activity, a.Name_activity
+          GROUP BY a.Id_activity, a.Name_activity, a.Unity
           ORDER BY total_visits DESC
         ''');
       });
@@ -301,6 +307,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
           lastDate: activity['last_date'] != null
               ? DateTime.tryParse(activity['last_date'] as String)
               : null,
+          unity: (activity['unity'] as String?) ?? '',
         ));
       }
 
@@ -1541,7 +1548,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       ),
                       SizedBox(height: 12),
                       _buildCompactMetric(
-                        'Resultados',
+                        activity.unityLabel,
                         activity.totalResults.toString(),
                         Icons.fact_check,
                         Color(0xFF00C853),

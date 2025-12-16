@@ -154,23 +154,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Getter para obtener el texto de Unity o "Resultados" por defecto
   String get _unityLabel {
-    // Intentar primero con 'unity' (minúscula) que es como viene del servidor
-    var unityValue = getJsonField(
-          FFAppState().currentActivity,
-          r'''$.unity''',
-        )?.toString() ??
-        '';
-
-    // Si no existe, intentar con 'Unity' (mayúscula) por compatibilidad
-    if (unityValue.isEmpty) {
-      unityValue = getJsonField(
-            FFAppState().currentActivity,
-            r'''$.Unity''',
-          )?.toString() ??
-          '';
-    }
-
-    return unityValue.isNotEmpty ? unityValue : 'Resultados';
+    final unity = FFAppState().activitySelected.unity;
+    return unity.isNotEmpty ? unity : 'Resultados';
   }
 
   @override
