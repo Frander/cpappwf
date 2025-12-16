@@ -7,10 +7,10 @@ import 'package:flutter/material.dart';
 class ModernCalibrateCompassModel
     extends FlutterFlowModel<ModernCalibrateCompassWidget> {
   /// State field(s) for Timer widget.
-  final timerInitialTimeMs = 40000;
-  int timerMilliseconds = 40000;
+  final timerInitialTimeMs = 20000;
+  int timerMilliseconds = 20000;
   String timerValue = StopWatchTimer.getDisplayTime(
-    40000,
+    20000,
     hours: false,
     minute: false,
     milliSecond: false,

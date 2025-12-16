@@ -339,7 +339,7 @@ class _ModernCalibrateCompassWidgetState
           Text(
             isCalibrating
                 ? 'Mueva el dispositivo siguiendo el patrón del número 8 como se muestra en la imagen. Mantenga el movimiento continuo durante toda la calibración.'
-                : 'Presione "INICIAR CALIBRACIÓN" y luego realice movimientos en forma de número 8 con el dispositivo durante 40 segundos, tal como se muestra en la imagen.',
+                : 'Presione "INICIAR CALIBRACIÓN" y luego realice movimientos en forma de número 8 con el dispositivo durante 20 segundos, tal como se muestra en la imagen.',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 13,
@@ -484,7 +484,7 @@ class _ModernCalibrateCompassWidgetState
         children: [
           _buildFeatureItem(Icons.gps_fixed_rounded, 'GPS\nPreciso'),
           _buildFeatureItem(Icons.explore_rounded, 'Brújula\nMagnética'),
-          _buildFeatureItem(Icons.timer_rounded, '40 seg\nCalibración'),
+          _buildFeatureItem(Icons.timer_rounded, '20 seg\nCalibración'),
         ],
       ),
     );

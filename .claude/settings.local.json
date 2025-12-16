@@ -14,7 +14,8 @@
       "Bash(python:*)",
       "Bash(node -e:*)",
       "Bash(dart fix:*)",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(grep:*)"
     ],
     "deny": [],
     "ask": []

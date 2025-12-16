@@ -35,6 +35,7 @@ class ActivityMetrics {
   final List<StatusData> statusData;
   final DateTime? firstDate;
   final DateTime? lastDate;
+  final String unity;
 
   ActivityMetrics({
     required this.activityName,
@@ -45,7 +46,56 @@ class ActivityMetrics {
     required this.statusData,
     this.firstDate,
     this.lastDate,
+    this.unity = '',
   });
+
+  /// Obtiene el label de unidad, retorna 'Resultados' si unity está vacío
+  String get unityLabel => unity.isNotEmpty ? unity : 'Resultados';
+}
+
+/// Modelo para métricas de operador en el Dashboard
+class OperatorDashboardData {
+  final int operatorId;
+  final String operatorName;
+  final int totalVisits;
+  final int totalResults;
+  final List<StatusData> statusData;
+  final List<String> headquarterNames; // Lotes donde trabajó
+  final String unity;
+
+  OperatorDashboardData({
+    required this.operatorId,
+    required this.operatorName,
+    required this.totalVisits,
+    required this.totalResults,
+    required this.statusData,
+    required this.headquarterNames,
+    this.unity = '',
+  });
+
+  String get unityLabel => unity.isNotEmpty ? unity : 'Resultados';
+}
+
+/// Modelo para métricas de lote/headquarter en el Dashboard
+class HeadquarterDashboardData {
+  final int headquarterId;
+  final String headquarterName;
+  final int totalVisits;
+  final int totalResults;
+  final List<String> operatorNames; // Operadores que trabajaron en este lote
+  final String unity;
+
+  HeadquarterDashboardData({
+    required this.headquarterId,
+    required this.headquarterName,
+    required this.totalVisits,
+    required this.totalResults,
+    required this.operatorNames,
+    this.unity = '',
+  });
+
+  String get unityLabel => unity.isNotEmpty ? unity : 'Resultados';
+  int get operatorCount => operatorNames.length;
 }
 
 class OperatorMetrics {
@@ -168,7 +218,8 @@ class HistoryVisitsForm extends StatefulWidget {
 
 class _HistoryVisitsFormState extends State<HistoryVisitsForm>
     with TickerProviderStateMixin {
-  // TabController eliminado - no hay tabs internos
+  // TabController para Dashboard y Detalle
+  late TabController _tabController;
   late AnimationController _syncButtonController;
 
   // Usamos singleton global para base de datos - no necesitamos guardar path
@@ -182,26 +233,29 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
   List<Map<String, dynamic>> _downloadedData = [];
   List<VisitDetailData> _visitDetails = [];
 
+  // Datos para el nuevo Dashboard
+  List<OperatorDashboardData> _operatorDashboardData = [];
+  List<HeadquarterDashboardData> _headquarterDashboardData = [];
+  String _currentUnity = ''; // Unity de la actividad actual
+
   Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
-    // TabController eliminado - ya no hay tabs internos
+    // TabController para Dashboard y Detalle
+    _tabController = TabController(length: 2, vsync: this);
     _syncButtonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1500),
     )..repeat();
 
-    // _holographicController eliminado para mejorar rendimiento en scroll
-
     _initializeDatabase();
-    // Auto-refresh desactivado por solicitud del usuario
   }
 
   @override
   void dispose() {
-    // _tabController eliminado
+    _tabController.dispose();
     _syncButtonController.dispose();
     _refreshTimer?.cancel();
     super.dispose();
@@ -242,12 +296,17 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
     });
 
     try {
+      // Cargar unity de la actividad seleccionada
+      _currentUnity = FFAppState().activitySelected.unity;
+
       await Future.wait([
         _loadActivityMetrics(),
         _loadOperatorMetrics(),
         _loadPendingSyncData(),
         _loadDownloadedData(),
         _loadVisitDetails(),
+        _loadOperatorDashboardData(),
+        _loadHeadquarterDashboardData(),
       ]);
     } catch (e) {
       print('Error loading data: $e');
@@ -268,14 +327,38 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           SELECT
             a.Id_activity,
             a.Name_activity as activity_name,
+            a.Unity as unity,
             COUNT(DISTINCT v.Id_visit) as total_visits,
-            (SELECT COUNT(*) FROM Visits_details vd
-             INNER JOIN Visits v2 ON vd.Id_visit = v2.Id_visit
-             WHERE v2.Id_activity = a.Id_activity) as total_results
+            (
+              -- Primer Total: Status sin step parent
+              COALESCE((
+                SELECT SUM(acs.Factor)
+                FROM Activities_status acs
+                WHERE acs.Id_activity = a.Id_activity
+                  AND (acs.Id_activity_step_parent IS NULL OR acs.Id_activity_step_parent = 0)
+              ), 0)
+              +
+              -- Segundo Total: Steps con SUMAFACTORES
+              COALESCE((
+                SELECT SUM(
+                  CASE
+                    WHEN ast.Calculation = '=SUMAFACTORES' THEN
+                      COALESCE((
+                        SELECT SUM(acs2.Factor)
+                        FROM Activities_status acs2
+                        WHERE acs2.Id_activity_step_parent = ast.Id_activity_step
+                      ), 0)
+                    ELSE 0
+                  END
+                )
+                FROM Activities_steps ast
+                WHERE ast.Id_activity = a.Id_activity
+              ), 0)
+            ) as total_results
           FROM Activities a
           LEFT JOIN Visits v ON a.Id_activity = v.Id_activity
           WHERE v.Id_visit IS NOT NULL
-          GROUP BY a.Id_activity, a.Name_activity
+          GROUP BY a.Id_activity, a.Name_activity, a.Unity
           ORDER BY total_visits DESC
         ''');
       });
@@ -287,6 +370,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
       for (var activity in activities) {
         final activityId = (activity['Id_activity'] as int?) ?? 0;
         final activityName = activity['activity_name'] as String;
+        final unity = (activity['unity'] as String?) ?? '';
 
         final dailyData = await _loadDailyDataForActivity(activityName);
         final statusData = await _loadStatusDataForActivity(activityId);
@@ -304,6 +388,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           statusData: statusData,
           firstDate: dates['first'],
           lastDate: dates['last'],
+          unity: unity,
         ));
       }
 
@@ -513,6 +598,248 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
     }
   }
 
+  /// Calcula el total de resultados para una actividad (basado en Visits_details registrados)
+  /// Total = Primer Total (status sin step parent) + Segundo Total (steps con SUMAFACTORES)
+  Future<int> _calculateTotalResultsForActivity(int activityId) async {
+    try {
+      final result = await _withDatabase<List<Map<String, dynamic>>>((db) async {
+        return await db.rawQuery('''
+          SELECT
+            (
+              -- Primer Total: Factores de status sin step parent, registrados en Visits_details
+              COALESCE((
+                SELECT SUM(acs.Factor)
+                FROM Visits_details vd
+                INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
+                INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
+                WHERE v.Id_activity = ?
+                  AND (acs.Id_activity_step_parent IS NULL OR acs.Id_activity_step_parent = 0)
+              ), 0)
+              +
+              -- Segundo Total: Factores de status con step parent SUMAFACTORES, registrados en Visits_details
+              COALESCE((
+                SELECT SUM(acs.Factor)
+                FROM Visits_details vd
+                INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
+                INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
+                INNER JOIN Activities_steps ast ON acs.Id_activity_step_parent = ast.Id_activity_step
+                WHERE v.Id_activity = ?
+                  AND ast.Calculation = '=SUMAFACTORES'
+              ), 0)
+            ) as total_results
+        ''', [activityId, activityId]);
+      });
+
+      if (result != null && result.isNotEmpty) {
+        return (result[0]['total_results'] as int?) ?? 0;
+      }
+    } catch (e) {
+      print('Error calculating total results: $e');
+    }
+    return 0;
+  }
+
+  /// Carga datos de operadores para el Dashboard
+  /// Incluye: visitas, resultados, estados y lotes donde trabajó
+  Future<void> _loadOperatorDashboardData() async {
+    try {
+      // Obtener unity de la actividad seleccionada
+      final unity = FFAppState().activitySelected.unity;
+      final activityId = FFAppState().activitySelected.idActivity;
+
+      // Primero calcular el total_results para la actividad
+      final totalResultsForActivity = await _calculateTotalResultsForActivity(activityId);
+
+      final operators = await _withDatabase<List<Map<String, dynamic>>>((db) async {
+        return await db.rawQuery('''
+          SELECT
+            u.Id_user as operator_id,
+            u.Name_user as operator_name,
+            COUNT(DISTINCT v.Id_visit) as total_visits
+          FROM Users u
+          INNER JOIN Visits v ON u.Id_user = v.Id_user
+          WHERE v.Id_activity = ?
+          GROUP BY u.Id_user, u.Name_user
+          HAVING COUNT(DISTINCT v.Id_visit) > 0
+          ORDER BY total_visits DESC
+        ''', [activityId]);
+      });
+
+      if (operators == null) return;
+
+      List<OperatorDashboardData> dashboardData = [];
+
+      for (var op in operators) {
+        final operatorId = (op['operator_id'] as int?) ?? 0;
+        final operatorName = (op['operator_name'] as String?) ?? 'Sin nombre';
+        final totalVisits = (op['total_visits'] as int?) ?? 0;
+
+        // Cargar estados por operador
+        final statusData = await _loadStatusDataForOperator(operatorId, activityId);
+
+        // Cargar lotes donde trabajó el operador
+        final headquarterNames = await _loadHeadquartersForOperator(operatorId, activityId);
+
+        dashboardData.add(OperatorDashboardData(
+          operatorId: operatorId,
+          operatorName: operatorName,
+          totalVisits: totalVisits,
+          totalResults: totalResultsForActivity, // Usar el total calculado para la actividad
+          statusData: statusData,
+          headquarterNames: headquarterNames,
+          unity: unity,
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          _operatorDashboardData = dashboardData;
+        });
+      }
+    } catch (e) {
+      print('Error loading operator dashboard data: $e');
+    }
+  }
+
+  /// Carga estados por operador
+  Future<List<StatusData>> _loadStatusDataForOperator(int operatorId, int activityId) async {
+    try {
+      final data = await _withDatabase<List<Map<String, dynamic>>>((db) async {
+        return await db.rawQuery('''
+          SELECT
+            ast.Status_name as status_name,
+            COUNT(vd.Id_visit_detail) as count
+          FROM Visits v
+          INNER JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
+          INNER JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
+          WHERE v.Id_user = ? AND v.Id_activity = ?
+            AND ast.Status_name IS NOT NULL AND ast.Status_name != ''
+          GROUP BY ast.Status_name
+          HAVING count > 0
+          ORDER BY count DESC
+          LIMIT 10
+        ''', [operatorId, activityId]);
+      });
+
+      if (data == null) return [];
+
+      return data.map((row) {
+        return StatusData(
+          statusName: row['status_name'] as String,
+          count: (row['count'] as int?) ?? 0,
+        );
+      }).toList();
+    } catch (e) {
+      print('Error loading status data for operator: $e');
+      return [];
+    }
+  }
+
+  /// Carga lotes donde trabajó un operador
+  Future<List<String>> _loadHeadquartersForOperator(int operatorId, int activityId) async {
+    try {
+      final data = await _withDatabase<List<Map<String, dynamic>>>((db) async {
+        return await db.rawQuery('''
+          SELECT DISTINCT h.Name_headquarter as name
+          FROM Visits v
+          INNER JOIN Headquarters h ON v.Id_headquarter = h.Id_headquarter
+          WHERE v.Id_user = ? AND v.Id_activity = ?
+            AND h.Name_headquarter IS NOT NULL AND h.Name_headquarter != ''
+          ORDER BY h.Name_headquarter
+          LIMIT 5
+        ''', [operatorId, activityId]);
+      });
+
+      if (data == null) return [];
+
+      return data.map((row) => row['name'] as String).toList();
+    } catch (e) {
+      print('Error loading headquarters for operator: $e');
+      return [];
+    }
+  }
+
+  /// Carga datos de lotes/headquarters para el Dashboard
+  /// Incluye: visitas, resultados y operadores que intervinieron
+  Future<void> _loadHeadquarterDashboardData() async {
+    try {
+      // Obtener unity de la actividad seleccionada
+      final unity = FFAppState().activitySelected.unity;
+      final activityId = FFAppState().activitySelected.idActivity;
+
+      // Calcular el total_results para la actividad
+      final totalResultsForActivity = await _calculateTotalResultsForActivity(activityId);
+
+      final headquarters = await _withDatabase<List<Map<String, dynamic>>>((db) async {
+        return await db.rawQuery('''
+          SELECT
+            h.Id_headquarter as headquarter_id,
+            h.Name_headquarter as headquarter_name,
+            COUNT(DISTINCT v.Id_visit) as total_visits
+          FROM Headquarters h
+          INNER JOIN Visits v ON h.Id_headquarter = v.Id_headquarter
+          WHERE v.Id_activity = ?
+          GROUP BY h.Id_headquarter, h.Name_headquarter
+          HAVING COUNT(DISTINCT v.Id_visit) > 0
+          ORDER BY total_visits DESC
+        ''', [activityId]);
+      });
+
+      if (headquarters == null) return;
+
+      List<HeadquarterDashboardData> dashboardData = [];
+
+      for (var hq in headquarters) {
+        final headquarterId = (hq['headquarter_id'] as int?) ?? 0;
+        final headquarterName = (hq['headquarter_name'] as String?) ?? 'Sin nombre';
+        final totalVisits = (hq['total_visits'] as int?) ?? 0;
+
+        // Cargar operadores que trabajaron en este lote
+        final operatorNames = await _loadOperatorsForHeadquarter(headquarterId, activityId);
+
+        dashboardData.add(HeadquarterDashboardData(
+          headquarterId: headquarterId,
+          headquarterName: headquarterName,
+          totalVisits: totalVisits,
+          totalResults: totalResultsForActivity, // Usar el total calculado para la actividad
+          operatorNames: operatorNames,
+          unity: unity,
+        ));
+      }
+
+      if (mounted) {
+        setState(() {
+          _headquarterDashboardData = dashboardData;
+        });
+      }
+    } catch (e) {
+      print('Error loading headquarter dashboard data: $e');
+    }
+  }
+
+  /// Carga operadores que trabajaron en un lote
+  Future<List<String>> _loadOperatorsForHeadquarter(int headquarterId, int activityId) async {
+    try {
+      final data = await _withDatabase<List<Map<String, dynamic>>>((db) async {
+        return await db.rawQuery('''
+          SELECT DISTINCT u.Name_user as name
+          FROM Visits v
+          INNER JOIN Users u ON v.Id_user = u.Id_user
+          WHERE v.Id_headquarter = ? AND v.Id_activity = ?
+            AND u.Name_user IS NOT NULL AND u.Name_user != ''
+          ORDER BY u.Name_user
+        ''', [headquarterId, activityId]);
+      });
+
+      if (data == null) return [];
+
+      return data.map((row) => row['name'] as String).toList();
+    } catch (e) {
+      print('Error loading operators for headquarter: $e');
+      return [];
+    }
+  }
+
   Future<void> _loadPendingSyncData() async {
 
     try {
@@ -662,7 +989,80 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
         backgroundColor: const Color(0xFF0D1F17),
         body: _isLoading
             ? _buildLoadingState()
-            : _buildDashboardTab(), // Mostrar solo el Dashboard sin tabs
+            : Column(
+                children: [
+                  // Header
+                  _buildHeader(),
+                  // TabBar
+                  _buildTabBar(),
+                  // TabBarView con contenido
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildNewDashboardTab(), // Tab Dashboard
+                        _buildDetalleTab(), // Tab Detalle (Operadores)
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildTabBar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A3A2E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF00FF7F).withOpacity(0.2),
+        ),
+      ),
+      child: TabBar(
+        controller: _tabController,
+        indicator: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF00FF7F), Color(0xFF00B4D8)],
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        labelColor: Colors.black,
+        unselectedLabelColor: Colors.white70,
+        labelStyle: const TextStyle(
+          fontFamily: 'Roboto',
+          fontWeight: FontWeight.bold,
+          fontSize: 14,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: 'Roboto',
+          fontWeight: FontWeight.w500,
+          fontSize: 14,
+        ),
+        tabs: const [
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.dashboard, size: 18),
+                SizedBox(width: 8),
+                Text('Dashboard'),
+              ],
+            ),
+          ),
+          Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.people, size: 18),
+                SizedBox(width: 8),
+                Text('Detalle'),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -878,6 +1278,675 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
     );
   }
 
+  /// Tab Detalle - Muestra la jerarquía de operadores existente
+  Widget _buildDetalleTab() {
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      color: const Color(0xFF00FF7F),
+      backgroundColor: const Color(0xFF1A3A2E),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildOperatorHierarchy(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Nuevo Tab Dashboard - Resumen de visitas por operador, lote y actividad
+  Widget _buildNewDashboardTab() {
+    return RefreshIndicator(
+      onRefresh: _loadAllData,
+      color: const Color(0xFF00FF7F),
+      backgroundColor: const Color(0xFF1A3A2E),
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Sección: Resumen por Actividad
+            _buildSectionTitle('RESUMEN POR ACTIVIDAD', Icons.agriculture),
+            const SizedBox(height: 12),
+            if (_activityMetrics.isEmpty)
+              _buildEmptyState('No hay datos de actividades')
+            else
+              ..._activityMetrics.map((activity) => _buildActivityDashboardCard(activity)),
+
+            const SizedBox(height: 24),
+
+            // Sección: Resumen por Operador
+            _buildSectionTitle('RESUMEN POR OPERADOR', Icons.person),
+            const SizedBox(height: 12),
+            if (_operatorDashboardData.isEmpty)
+              _buildEmptyState('No hay datos de operadores')
+            else
+              ..._operatorDashboardData.map((op) => _buildOperatorDashboardCard(op)),
+
+            const SizedBox(height: 24),
+
+            // Sección: Resumen por Lote
+            _buildSectionTitle('RESUMEN POR LOTE', Icons.location_on),
+            const SizedBox(height: 12),
+            if (_headquarterDashboardData.isEmpty)
+              _buildEmptyState('No hay datos de lotes')
+            else
+              ..._headquarterDashboardData.map((hq) => _buildHeadquarterDashboardCard(hq)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Card de actividad para el Dashboard
+  Widget _buildActivityDashboardCard(ActivityMetrics activity) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1A3A2E).withOpacity(0.9),
+            const Color(0xFF0D1F17).withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF10B981).withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF10B981).withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header con nombre de la actividad
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF059669)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.agriculture, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  activity.activityName,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Métricas y gráfico de torta
+          Row(
+            children: [
+              // Métricas
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _buildDashboardMetricRow(
+                      'Visitas',
+                      activity.totalVisits.toString(),
+                      const Color(0xFF00B4D8),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDashboardMetricRow(
+                      activity.unityLabel,
+                      activity.totalResults.toString(),
+                      const Color(0xFF00C853),
+                    ),
+                  ],
+                ),
+              ),
+              // Gráfico de torta
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 80,
+                  child: _buildMiniPieChart(
+                    activity.totalVisits,
+                    activity.totalResults,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Rango de fechas
+          if (activity.firstDate != null && activity.lastDate != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: const Color(0xFF10B981).withOpacity(0.5),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.calendar_today, size: 12, color: Color(0xFF10B981)),
+                  const SizedBox(width: 6),
+                  Text(
+                    _formatDateRangeShort(activity.firstDate, activity.lastDate),
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 11,
+                      color: Color(0xFF10B981),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Gráfico de barras horizontal para estados
+          if (activity.statusData.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Estados',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildHorizontalStatusBars(activity.statusData),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Formatea un rango de fechas de forma corta
+  String _formatDateRangeShort(DateTime? start, DateTime? end) {
+    if (start == null || end == null) return 'Sin fechas';
+
+    final dateFormat = DateFormat('dd/MM/yy');
+    if (start.year == end.year && start.month == end.month && start.day == end.day) {
+      return dateFormat.format(start);
+    }
+    return '${dateFormat.format(start)} - ${dateFormat.format(end)}';
+  }
+
+  Widget _buildSectionTitle(String title, IconData icon) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF00FF7F), Color(0xFF00B4D8)],
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: Colors.black, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Card de operador para el Dashboard
+  Widget _buildOperatorDashboardCard(OperatorDashboardData operator) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1A3A2E).withOpacity(0.9),
+            const Color(0xFF0D1F17).withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF00FF7F).withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00FF7F).withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header con nombre del operador
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.person, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  operator.operatorName,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Métricas y gráfico de torta
+          Row(
+            children: [
+              // Métricas
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _buildDashboardMetricRow(
+                      'Visitas',
+                      operator.totalVisits.toString(),
+                      const Color(0xFF00B4D8),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDashboardMetricRow(
+                      operator.unityLabel,
+                      operator.totalResults.toString(),
+                      const Color(0xFF00C853),
+                    ),
+                  ],
+                ),
+              ),
+              // Gráfico de torta
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 80,
+                  child: _buildMiniPieChart(
+                    operator.totalVisits,
+                    operator.totalResults,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Lotes donde trabajó
+          if (operator.headquarterNames.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: operator.headquarterNames.take(2).map((name) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00B4D8).withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF00B4D8).withOpacity(0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.location_on, size: 12, color: Color(0xFF00B4D8)),
+                      const SizedBox(width: 4),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 11,
+                          color: Color(0xFF00B4D8),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+
+          // Gráfico de barras horizontal para estados
+          if (operator.statusData.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text(
+              'Estados',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildHorizontalStatusBars(operator.statusData),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Card de lote/headquarter para el Dashboard
+  Widget _buildHeadquarterDashboardCard(HeadquarterDashboardData headquarter) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1A3A2E).withOpacity(0.9),
+            const Color(0xFF0D1F17).withOpacity(0.95),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF00B4D8).withOpacity(0.3),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00B4D8).withOpacity(0.1),
+            blurRadius: 10,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header con nombre del lote
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00B4D8), Color(0xFF0077B6)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.location_on, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  headquarter.headquarterName,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Métricas y gráfico de torta
+          Row(
+            children: [
+              // Métricas
+              Expanded(
+                flex: 2,
+                child: Column(
+                  children: [
+                    _buildDashboardMetricRow(
+                      'Visitas',
+                      headquarter.totalVisits.toString(),
+                      const Color(0xFF00B4D8),
+                    ),
+                    const SizedBox(height: 8),
+                    _buildDashboardMetricRow(
+                      headquarter.unityLabel,
+                      headquarter.totalResults.toString(),
+                      const Color(0xFF00C853),
+                    ),
+                  ],
+                ),
+              ),
+              // Gráfico de torta
+              Expanded(
+                flex: 1,
+                child: SizedBox(
+                  height: 80,
+                  child: _buildMiniPieChart(
+                    headquarter.totalVisits,
+                    headquarter.totalResults,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Contador de operadores
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF8B5CF6).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: const Color(0xFF8B5CF6).withOpacity(0.5),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.people, size: 16, color: Color(0xFF8B5CF6)),
+                const SizedBox(width: 8),
+                Text(
+                  '${headquarter.operatorCount} operador${headquarter.operatorCount != 1 ? 'es' : ''}',
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8B5CF6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDashboardMetricRow(String label, String value, Color color) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 24,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 10,
+                color: Colors.white.withOpacity(0.7),
+              ),
+            ),
+            Text(
+              value,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMiniPieChart(int visits, int results) {
+    if (visits == 0 && results == 0) {
+      return Center(
+        child: Text(
+          'Sin datos',
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 10,
+            color: Colors.white.withOpacity(0.5),
+          ),
+        ),
+      );
+    }
+
+    return PieChart(
+      PieChartData(
+        sectionsSpace: 2,
+        centerSpaceRadius: 15,
+        sections: [
+          PieChartSectionData(
+            value: visits.toDouble(),
+            color: const Color(0xFF00B4D8),
+            radius: 20,
+            showTitle: false,
+          ),
+          PieChartSectionData(
+            value: results.toDouble(),
+            color: const Color(0xFF00C853),
+            radius: 20,
+            showTitle: false,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHorizontalStatusBars(List<StatusData> statusData) {
+    if (statusData.isEmpty) return const SizedBox.shrink();
+
+    final maxCount = statusData.map((s) => s.count).reduce((a, b) => a > b ? a : b);
+
+    return Column(
+      children: statusData.take(5).map((status) {
+        final percentage = maxCount > 0 ? status.count / maxCount : 0.0;
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 80,
+                child: Text(
+                  status.statusName,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 10,
+                    color: Colors.white70,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Stack(
+                  children: [
+                    Container(
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    FractionallySizedBox(
+                      widthFactor: percentage,
+                      child: Container(
+                        height: 12,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF00FF7F), Color(0xFF00B4D8)],
+                          ),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 30,
+                child: Text(
+                  '${status.count}',
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                  textAlign: TextAlign.end,
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
   Widget _buildActivityCarousel() {
     if (_activityMetrics.isEmpty) {
       return _buildEmptyState('No hay actividades registradas');
@@ -990,7 +2059,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                       ),
                       Expanded(
                         child: _buildMetricItem(
-                          'Resultados',
+                          activity.unityLabel,
                           activity.totalResults.toString(),
                           Icons.fact_check,
                           const Color(0xFF00C853),
@@ -1439,7 +2508,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               const SizedBox(width: 12),
               Expanded(
                 child: _buildMetricCard(
-                  'Resultados',
+                  _currentUnity.isNotEmpty ? _currentUnity : 'Resultados',
                   operator.completedResults.toString(),
                   Icons.check_circle_outline,
                   const Color(0xFF00C853),

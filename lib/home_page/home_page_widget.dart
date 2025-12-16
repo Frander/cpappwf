@@ -281,9 +281,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
             a.Name_activity as activity_name,
             a.Unity as unity,
             COUNT(DISTINCT v.Id_visit) as total_visits,
-            (SELECT COUNT(*) FROM Visits_details vd
-             INNER JOIN Visits v2 ON vd.Id_visit = v2.Id_visit
-             WHERE v2.Id_activity = a.Id_activity) as total_results,
             MIN(v.Created_at) as first_date,
             MAX(v.Created_at) as last_date
           FROM Activities a
@@ -296,11 +293,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
       List<_ActivityMetrics> metrics = [];
       for (var activity in activities) {
+        final activityId = (activity['Id_activity'] as int?) ?? 0;
+
+        // Calcular totalResults usando la fórmula: Primer Total + Segundo Total
+        final totalResults = await _calculateTotalResultsForActivity(activityId);
+
         metrics.add(_ActivityMetrics(
           activityName: activity['activity_name'] as String,
-          idActivity: (activity['Id_activity'] as int?) ?? 0,
+          idActivity: activityId,
           totalVisits: (activity['total_visits'] as int?) ?? 0,
-          totalResults: (activity['total_results'] as int?) ?? 0,
+          totalResults: totalResults,
           firstDate: activity['first_date'] != null
               ? DateTime.tryParse(activity['first_date'] as String)
               : null,
@@ -319,6 +321,49 @@ class _HomePageWidgetState extends State<HomePageWidget>
     } catch (e) {
       debugPrint('Error cargando métricas de actividades: $e');
     }
+  }
+
+  // Método helper para calcular el total de resultados por actividad
+  // Total Results = Primer Total + Segundo Total (basado en Visits_details registrados)
+  // Primer Total: Suma de factores de Activities_status (sin step parent) usados en Visits_details
+  // Segundo Total: Suma de factores de Activities_status (con step parent SUMAFACTORES) usados en Visits_details
+  Future<int> _calculateTotalResultsForActivity(int activityId) async {
+    try {
+      final result = await globalDb.executeOperation((db) async {
+        return await db.rawQuery('''
+          SELECT
+            (
+              -- Primer Total: Factores de status sin step parent, registrados en Visits_details
+              COALESCE((
+                SELECT SUM(acs.Factor)
+                FROM Visits_details vd
+                INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
+                INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
+                WHERE v.Id_activity = ?
+                  AND (acs.Id_activity_step_parent IS NULL OR acs.Id_activity_step_parent = 0)
+              ), 0)
+              +
+              -- Segundo Total: Factores de status con step parent SUMAFACTORES, registrados en Visits_details
+              COALESCE((
+                SELECT SUM(acs.Factor)
+                FROM Visits_details vd
+                INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
+                INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
+                INNER JOIN Activities_steps ast ON acs.Id_activity_step_parent = ast.Id_activity_step
+                WHERE v.Id_activity = ?
+                  AND ast.Calculation = '=SUMAFACTORES'
+              ), 0)
+            ) as total_results
+        ''', [activityId, activityId]);
+      });
+
+      if (result.isNotEmpty) {
+        return (result[0]['total_results'] as int?) ?? 0;
+      }
+    } catch (e) {
+      debugPrint('Error calculating total results for activity $activityId: $e');
+    }
+    return 0;
   }
 
   // Búsqueda en tiempo real
