@@ -1464,19 +1464,10 @@ List<VisitsDetailsStruct> removeVisits(List<VisitsDetailsStruct> visitsList) {
     return [];
   }
 
-  // Tipos de status que siempre deben ser limpiados (operaciones NFC puntuales)
-  const nfcOperationTypes = {'tag-reader', 'tag-writer', 'tag-transfer'};
-
   // Filtra manteniendo solo los elementos con rememberStatus = true
-  // EXCEPTO los tipos tag-reader, tag-writer y tag-transfer que siempre se limpian
+  // Esto aplica para TODOS los tipos, incluyendo tag-reader, tag-writer y tag-transfer
   return visitsList.where((visit) {
-    // Si es un tipo de operación NFC, siempre excluirlo (no recordar)
-    final typeStatus = visit.typeStatus.toLowerCase();
-    if (nfcOperationTypes.contains(typeStatus)) {
-      return false;
-    }
-
-    // Para otros tipos, mantener solo si rememberStatus = true
+    // Mantener solo si rememberStatus = true
     return visit.hasRememberStatus() && visit.rememberStatus == true;
   }).toList();
 }

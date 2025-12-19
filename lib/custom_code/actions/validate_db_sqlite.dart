@@ -192,10 +192,24 @@ Future<void> _createTables(Database db) async {
         Is_sync INTEGER DEFAULT 0,
         Tracking_headquarter INTEGER DEFAULT 1,
         Is_sync_full INTEGER DEFAULT 0,
+        Read_default TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
         FOREIGN KEY (Id_activity_parent) REFERENCES Activities(Id_activity)
     );
   ''');
+
+  // Migración: Agregar columna Read_default si no existe (para bases de datos existentes)
+  try {
+    final tableInfo = await db.rawQuery("PRAGMA table_info(Activities)");
+    final hasReadDefaultColumn = tableInfo.any((col) => col['name'] == 'Read_default');
+    if (!hasReadDefaultColumn) {
+      await db.execute('ALTER TABLE Activities ADD COLUMN Read_default TEXT');
+      debugPrint('✅ Columna Read_default agregada a tabla Activities');
+    }
+  } catch (e) {
+    debugPrint('⚠️ Error verificando/agregando columna Read_default: $e');
+  }
+
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Activities_company ON Activities(Id_company);');
   await db.execute(
@@ -368,6 +382,7 @@ Future<void> _createTables(Database db) async {
         Error_horizontal REAL NOT NULL DEFAULT 0,
         Id_virtual_point INTEGER,
         Status INTEGER NOT NULL DEFAULT 0,
+        Rfid TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
         FOREIGN KEY (Id_activity) REFERENCES Activities(Id_activity),
         FOREIGN KEY (Id_product) REFERENCES Products(Id_product),
@@ -378,6 +393,18 @@ Future<void> _createTables(Database db) async {
         FOREIGN KEY (Id_virtual_point) REFERENCES Virtual_points(Id_virtual_point)
     );
   ''');
+
+  // Migración: Agregar columna Rfid si no existe (para bases de datos existentes)
+  try {
+    final tableInfo = await db.rawQuery("PRAGMA table_info(Visits)");
+    final hasRfidColumn = tableInfo.any((col) => col['name'] == 'Rfid');
+    if (!hasRfidColumn) {
+      await db.execute('ALTER TABLE Visits ADD COLUMN Rfid TEXT');
+      debugPrint('✅ Columna Rfid agregada a tabla Visits');
+    }
+  } catch (e) {
+    debugPrint('⚠️ Error verificando/agregando columna Rfid: $e');
+  }
 
   // Índices para optimizar consultas en Visits
   await db.execute(
@@ -390,6 +417,8 @@ Future<void> _createTables(Database db) async {
       'CREATE INDEX IF NOT EXISTS IX_Visits_Id_product ON Visits(Id_product);');
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Visits_Status ON Visits(Status);');
+  await db.execute(
+      'CREATE INDEX IF NOT EXISTS IX_Visits_Rfid ON Visits(Rfid);');
 
   // Tabla Visits_details
   await db.execute('''
@@ -614,6 +643,7 @@ Future<void> _createTables(Database db) async {
       'CREATE INDEX IF NOT EXISTS IX_Exclusion_zones_history_Modified_at ON Exclusion_zones_history(Modified_at);');
 
   // Tabla Products
+  // Sync_status: 'synced' = sincronizado, 'new' = nuevo por insertar, 'updated' = modificado por actualizar
   await db.execute('''
     CREATE TABLE IF NOT EXISTS Products (
         Id_product INTEGER PRIMARY KEY,
@@ -630,10 +660,18 @@ Future<void> _createTables(Database db) async {
         Location_raw TEXT,
         Line INTEGER,
         Palm INTEGER,
+        Sync_status TEXT DEFAULT 'synced',
         FOREIGN KEY (Id_headquarter) REFERENCES Headquarters(Id_headquarter),
         FOREIGN KEY (Id_type) REFERENCES Types_points(Id_type_point)
     );
   ''');
+
+  // Migrar columna Sync_status si no existe (para bases de datos existentes)
+  try {
+    await db.execute('ALTER TABLE Products ADD COLUMN Sync_status TEXT DEFAULT \'synced\';');
+  } catch (e) {
+    // La columna ya existe, ignorar error
+  }
 
   // Índices para Products
   await db.execute(
@@ -1541,6 +1579,7 @@ Future<void> _upgradeDatabase(
             Description_activity TEXT,
             Created_at TEXT,
             Is_default INTEGER DEFAULT 0,
+            Read_default TEXT,
             FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
             FOREIGN KEY (Id_activity_parent) REFERENCES Activities(Id_activity)
         );

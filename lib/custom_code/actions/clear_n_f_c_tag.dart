@@ -138,12 +138,13 @@ Future<bool> clearNFCTag(BuildContext context) async {
             // Crear un bloque de 16 bytes con ceros
             final emptyBlock = Uint8List(16);
 
-            // Limpiar sectores 0-15 (todo el TAG Mifare Classic 1K)
+            // OPTIMIZACIÓN: Solo limpiar sectores 0-3 donde típicamente se almacenan datos NDEF
+            // Los sectores 4-15 raramente se usan para datos de usuario
             // Sector 0: bloques 1-2 (NO tocar bloque 0 que es de fabricante)
-            // Sectores 1-15: bloques 0-2 de cada sector (NO tocar bloque 3 que es de autenticación)
+            // Sectores 1-3: bloques 0-2 de cada sector (NO tocar bloque 3 que es de autenticación)
 
             int blocksCleared = 0;
-            int currentSector = -1;
+            bool tagLost = false;
 
             // Sector 0: limpiar bloques 1 y 2
             try {
@@ -151,7 +152,6 @@ Future<bool> clearNFCTag(BuildContext context) async {
                 sectorIndex: 0,
                 key: key,
               );
-              currentSector = 0;
               debugPrint('Sector 0 autenticado');
 
               // Limpiar bloques 1 y 2 del sector 0
@@ -163,83 +163,107 @@ Future<bool> clearNFCTag(BuildContext context) async {
                   );
                   blocksCleared++;
                 } catch (e) {
+                  if (e.toString().contains('TagLostException')) {
+                    debugPrint('⚠️ TAG perdido durante escritura');
+                    tagLost = true;
+                    break;
+                  }
                   debugPrint('⚠️ Error al limpiar bloque $blockInSector: $e');
                 }
               }
             } catch (e) {
-              debugPrint('⚠️ Error al autenticar sector 0: $e');
+              if (e.toString().contains('TagLostException')) {
+                debugPrint('⚠️ TAG perdido durante autenticación sector 0');
+                tagLost = true;
+              } else {
+                debugPrint('⚠️ Error al autenticar sector 0: $e');
+              }
             }
 
-            // Sectores 1-15: limpiar bloques 0, 1, 2 de cada sector
-            for (var sector = 1; sector <= 15; sector++) {
-              // Autenticar sector
-              if (sector != currentSector) {
+            // Sectores 1-3: limpiar bloques 0, 1, 2 de cada sector (solo si el TAG sigue conectado)
+            // NOTA: Reducido de 1-15 a 1-3 para evitar TagLostException
+            if (!tagLost) {
+              for (var sector = 1; sector <= 3 && !tagLost; sector++) {
+                // Autenticar sector
                 try {
                   await mifareClassic.authenticateSectorWithKeyA(
                     sectorIndex: sector,
                     key: key,
                   );
-                  currentSector = sector;
                   debugPrint('Sector $sector autenticado');
                 } catch (authError) {
-                  debugPrint(
-                      '⚠️ Error al autenticar sector $sector con KeyA: $authError');
+                  if (authError.toString().contains('TagLostException')) {
+                    debugPrint('⚠️ TAG perdido - deteniendo limpieza');
+                    tagLost = true;
+                    break;
+                  }
+                  debugPrint('! Error al autenticar sector $sector con KeyA: $authError');
                   // Intentar con KeyB
                   try {
                     await mifareClassic.authenticateSectorWithKeyB(
                       sectorIndex: sector,
                       key: key,
                     );
-                    currentSector = sector;
                     debugPrint('Sector $sector autenticado con KeyB');
                   } catch (authErrorB) {
-                    debugPrint(
-                        '⚠️ Error al autenticar sector $sector con KeyB: $authErrorB');
+                    if (authErrorB.toString().contains('TagLostException')) {
+                      debugPrint('⚠️ TAG perdido - deteniendo limpieza');
+                      tagLost = true;
+                      break;
+                    }
+                    debugPrint('! Error al autenticar sector $sector con KeyB: $authErrorB');
                     continue; // Saltar este sector
                   }
                 }
-              }
 
-              // Limpiar bloques 0, 1, 2 del sector (NO tocar bloque 3 que es de autenticación)
-              for (var blockInSector = 0; blockInSector <= 2; blockInSector++) {
-                final blockIndex = (sector * 4) + blockInSector;
-                try {
-                  await mifareClassic.writeBlock(
-                    blockIndex: blockIndex,
-                    data: emptyBlock,
-                  );
-                  blocksCleared++;
-                } catch (e) {
-                  debugPrint('⚠️ Error al limpiar bloque $blockIndex: $e');
+                // Limpiar bloques 0, 1, 2 del sector (NO tocar bloque 3 que es de autenticación)
+                for (var blockInSector = 0; blockInSector <= 2 && !tagLost; blockInSector++) {
+                  final blockIndex = (sector * 4) + blockInSector;
+                  try {
+                    await mifareClassic.writeBlock(
+                      blockIndex: blockIndex,
+                      data: emptyBlock,
+                    );
+                    blocksCleared++;
+                  } catch (e) {
+                    if (e.toString().contains('TagLostException')) {
+                      debugPrint('⚠️ TAG perdido durante escritura bloque $blockIndex');
+                      tagLost = true;
+                      break;
+                    }
+                    debugPrint('⚠️ Error al limpiar bloque $blockIndex: $e');
+                  }
                 }
               }
             }
 
             debugPrint(
-                '✅ TAG Mifare Classic limpiado: $blocksCleared bloques borrados');
+                '✅ TAG Mifare Classic limpiado: $blocksCleared bloques borrados${tagLost ? " (TAG perdido)" : ""}');
 
-            // CRÍTICO: Después de limpiar los bloques, reformatear con contenido mínimo
-            // para marcar el TAG como limpio y eliminar metadatos NDEF previos
-            try {
-              debugPrint('🔄 Reformateando TAG con contenido mínimo...');
-              final ndefFormatableAfterClear = NdefFormatableAndroid.from(tag);
-              if (ndefFormatableAfterClear != null) {
-                final minimalMessage = _createMinimalNdefMessage();
-                await ndefFormatableAfterClear.format(minimalMessage);
-                debugPrint('✅ TAG reformateado exitosamente (contenido: "0")');
-              } else {
-                debugPrint(
-                    '⚠️ TAG no soporta reformateo NDEF, pero bloques limpiados');
+            // Solo intentar reformatear si el TAG sigue conectado
+            if (!tagLost && blocksCleared > 0) {
+              try {
+                debugPrint('🔄 Reformateando TAG con contenido mínimo...');
+                final ndefFormatableAfterClear = NdefFormatableAndroid.from(tag);
+                if (ndefFormatableAfterClear != null) {
+                  final minimalMessage = _createMinimalNdefMessage();
+                  await ndefFormatableAfterClear.format(minimalMessage);
+                  debugPrint('✅ TAG reformateado exitosamente (contenido: "0")');
+                } else {
+                  debugPrint(
+                      '⚠️ TAG no soporta reformateo NDEF, pero bloques limpiados');
+                }
+              } catch (reformatError) {
+                debugPrint('⚠️ No se pudo reformatear como NDEF: $reformatError');
+                debugPrint('   (Los bloques fueron limpiados exitosamente)');
               }
-            } catch (reformatError) {
-              debugPrint('⚠️ No se pudo reformatear como NDEF: $reformatError');
-              debugPrint('   (Los bloques fueron limpiados exitosamente)');
             }
 
             // Detener sesión
             await NfcManager.instance.stopSession();
 
-            completer.complete(true);
+            // Si se limpió al menos un bloque, considerar éxito
+            completer.complete(blocksCleared > 0);
             return;
           } catch (e) {
             debugPrint('❌ Error al limpiar Mifare Classic: $e');

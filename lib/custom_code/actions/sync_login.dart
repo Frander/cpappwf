@@ -657,6 +657,7 @@ Future<void> _insertActivities(
       'Description_activity': activity['description_activity'],
       'Created_at': activity['created_at'],
       'Is_default': isDefault ? 1 : 0,
+      'Read_default': activity['read_default'],
     });
 
     // Recolectar steps de la actividad
@@ -797,8 +798,12 @@ Future<void> _mergeHeadquarters(
     hqIdsToDeletePolygons.add(hqId);
 
     // Recolectar polígonos válidos
-    if (hq['headquarters_polygons'] != null) {
-      for (final polygon in hq['headquarters_polygons']) {
+    // Fuente 1: Lista headquarters_polygons
+    final hqPolygons = hq['headquarters_polygons'] as List<dynamic>?;
+
+    if (hqPolygons != null && hqPolygons.isNotEmpty) {
+      // Usar la lista de polígonos del API
+      for (final polygon in hqPolygons) {
         if (polygon['latitude'] != null && polygon['longitude'] != null) {
           polygonsData.add({
             'Id_headquarter_polygon': polygon['id_headquarter_polygon'],
@@ -808,6 +813,33 @@ Future<void> _mergeHeadquarters(
             'Created_at': polygon['created_at'],
           });
         }
+      }
+    } else if (hq['polygon'] != null && (hq['polygon'] as String).isNotEmpty) {
+      // Fuente 2 (fallback): Parsear el campo string 'polygon'
+      // Formato: [{"LAT":1.445,"LON":-78.689},...]
+      try {
+        final polygonString = hq['polygon'] as String;
+        final List<dynamic> polygonList = jsonDecode(polygonString);
+        final now = DateTime.now().toIso8601String();
+        int tempId = hqId * 10000; // ID temporal basado en Id_headquarter
+
+        for (final point in polygonList) {
+          final lat = point['LAT'] as num?;
+          final lon = point['LON'] as num?;
+
+          if (lat != null && lon != null) {
+            polygonsData.add({
+              'Id_headquarter_polygon': tempId++,
+              'Id_headquarter': hqId,
+              'Latitude': lat.toDouble(),
+              'Longitude': lon.toDouble(),
+              'Created_at': now,
+            });
+          }
+        }
+        debugPrint('   📍 Parseados ${polygonList.length} vértices del campo polygon para HQ $hqId');
+      } catch (e) {
+        debugPrint('   ⚠️ Error parseando polygon string para HQ $hqId: $e');
       }
     }
   }
@@ -922,11 +954,11 @@ Future<void> _insertProducts(
   final batch = txn.batch();
 
   for (final data in productsData) {
-    batch.insert('Products', data);
+    batch.insert('Products', data, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   for (final data in coordinatesData) {
-    batch.insert('Products_coordinates', data);
+    batch.insert('Products_coordinates', data, conflictAlgorithm: ConflictAlgorithm.ignore);
   }
 
   await batch.commit(noResult: true);

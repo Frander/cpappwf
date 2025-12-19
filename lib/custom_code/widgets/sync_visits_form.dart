@@ -75,6 +75,38 @@ class ExclusionZoneSummary {
   });
 }
 
+class ProductSummary {
+  int idProduct;
+  int idHeadquarter;
+  int idCompany;
+  String? nameProduct;
+  String? typeProduct;
+  String? rfid;
+  String? stateProduct;
+  String? descriptionProduct;
+  int? line;
+  int? palm;
+  String syncStatus; // 'new' o 'updated'
+  String? createdAt;
+  String? modifiedAt;
+
+  ProductSummary({
+    required this.idProduct,
+    required this.idHeadquarter,
+    required this.idCompany,
+    this.nameProduct,
+    this.typeProduct,
+    this.rfid,
+    this.stateProduct,
+    this.descriptionProduct,
+    this.line,
+    this.palm,
+    required this.syncStatus,
+    this.createdAt,
+    this.modifiedAt,
+  });
+}
+
 class SyncStatistics {
   int totalVisits = 0;
   int totalExclusionZones = 0;
@@ -83,24 +115,36 @@ class SyncStatistics {
   int totalVisitDetails = 0;
   int totalVisitLocations = 0;
 
+  // Productos pendientes de sincronización
+  int totalProductsNew = 0;
+  int totalProductsUpdated = 0;
+
   bool hasInternetConnection = false;
   bool hasPendingExclusions = false;
+  bool hasPendingProducts = false;
 
   List<Map<String, dynamic>> exclusionModifications = [];
   List<VisitSummary> visitsSummary = [];
   List<ExclusionZoneSummary> exclusionsSummary = [];
   List<Map<String, dynamic>> newsAddSummary = [];
+  List<ProductSummary> productsSummary = [];
 
   SyncStatistics();
 
   // Método para obtener el total de items a sincronizar
   int getTotalItems() {
-    return totalVisits + totalExclusionZones + totalNewsAdd;
+    return totalVisits + totalExclusionZones + totalNewsAdd + totalProductsNew + totalProductsUpdated;
   }
 
   // Método para verificar si hay datos para sincronizar
   bool hasDataToSync() {
-    return totalVisits > 0 || totalExclusionZones > 0 || totalNewsAdd > 0;
+    return totalVisits > 0 || totalExclusionZones > 0 || totalNewsAdd > 0 ||
+           totalProductsNew > 0 || totalProductsUpdated > 0;
+  }
+
+  // Total de productos pendientes
+  int getTotalPendingProducts() {
+    return totalProductsNew + totalProductsUpdated;
   }
 }
 
@@ -114,6 +158,7 @@ enum SyncStep {
   collectingData,
   analyzingExclusions,
   sendingExclusions,
+  sendingProducts,
   sendingVisits,
   completed,
   error,
@@ -177,6 +222,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       // Cargar datos inmediatamente al abrir la vista
       await _collectSyncData();
       await _analyzeExclusionZones();
+      await _collectProductsData();
 
       if (mounted) {
         setState(() {
@@ -259,10 +305,25 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           _currentStep = SyncStep.sendingExclusions;
           _currentMessage =
               'Enviando ${_stats.totalExclusionZones} zonas de exclusión';
-          _progress = 0.6;
+          _progress = 0.5;
         });
 
         await _syncExclusionZones();
+        await Future.delayed(Duration(milliseconds: 800));
+      }
+
+      // 4.5. Recolectar y sincronizar productos pendientes
+      await _collectProductsData();
+
+      if (_stats.hasPendingProducts) {
+        setState(() {
+          _currentStep = SyncStep.sendingProducts;
+          _currentMessage =
+              'Enviando ${_stats.getTotalPendingProducts()} productos (${_stats.totalProductsNew} nuevos, ${_stats.totalProductsUpdated} actualizados)';
+          _progress = 0.65;
+        });
+
+        await _syncProducts();
         await Future.delayed(Duration(milliseconds: 800));
       }
 
@@ -270,7 +331,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       setState(() {
         _currentStep = SyncStep.sendingVisits;
         _currentMessage = 'Enviando ${_stats.totalVisits} visitas';
-        _progress = 0.8;
+        _progress = 0.85;
       });
 
       bool success = await _syncVisits();
@@ -362,65 +423,67 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
                     ),
                   ],
                 ),
-                content: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      message,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                content: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        message,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'El envío de información requiere una conexión estable. Puedes:',
-                      style: TextStyle(fontSize: 14),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildAdviceItem(
-                      '• Conectarte a una red WiFi',
-                      Icons.wifi,
-                    ),
-                    _buildAdviceItem(
-                      '• Acercarte a una zona con mejor señal',
-                      Icons.signal_cellular_alt,
-                    ),
-                    _buildAdviceItem(
-                      '• Intentar más tarde',
-                      Icons.schedule,
-                    ),
-                    const SizedBox(height: 16),
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: FlutterFlowTheme.of(context)
-                            .warning
-                            .withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'El envío de información requiere una conexión estable. Puedes:',
+                        style: TextStyle(fontSize: 14),
                       ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.info_outline,
-                            color: FlutterFlowTheme.of(context).warning,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Puedes continuar bajo tu responsabilidad, pero puede fallar.',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
+                      const SizedBox(height: 12),
+                      _buildAdviceItem(
+                        '• Conectarte a una red WiFi',
+                        Icons.wifi,
+                      ),
+                      _buildAdviceItem(
+                        '• Acercarte a una zona con mejor señal',
+                        Icons.signal_cellular_alt,
+                      ),
+                      _buildAdviceItem(
+                        '• Intentar más tarde',
+                        Icons.schedule,
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: FlutterFlowTheme.of(context)
+                              .warning
+                              .withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              color: FlutterFlowTheme.of(context).warning,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Puedes continuar bajo tu responsabilidad, pero puede fallar.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
                 actions: [
                   TextButton(
@@ -752,6 +815,94 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
     }
   }
 
+  /// Recolecta productos pendientes de sincronización (nuevos y actualizados)
+  Future<void> _collectProductsData() async {
+    try {
+      final String dbPath = await _getDatabasePath();
+      final Database db = await openDatabase(dbPath);
+
+      debugPrint('🔍 Obteniendo productos pendientes de sincronización...');
+
+      // Obtener productos con Sync_status = 'new' o 'updated'
+      final List<Map<String, dynamic>> productsRaw = await db.rawQuery('''
+        SELECT
+          Id_product,
+          Id_headquarter,
+          Id_company,
+          Id_type,
+          Created_at,
+          Modified_at,
+          Type_product,
+          Name_product,
+          Rfid,
+          State_product,
+          Description_product,
+          Location_raw,
+          Line,
+          Palm,
+          Sync_status
+        FROM Products
+        WHERE Sync_status IN ('new', 'updated')
+        ORDER BY Modified_at DESC
+      ''');
+
+      await db.close();
+
+      // Procesar resultados
+      int newCount = 0;
+      int updatedCount = 0;
+
+      _stats.productsSummary = productsRaw.map((row) {
+        final syncStatus = row['Sync_status'] as String? ?? 'new';
+        if (syncStatus == 'new') {
+          newCount++;
+        } else if (syncStatus == 'updated') {
+          updatedCount++;
+        }
+
+        return ProductSummary(
+          idProduct: row['Id_product'] as int,
+          idHeadquarter: row['Id_headquarter'] as int,
+          idCompany: row['Id_company'] as int,
+          nameProduct: row['Name_product'] as String?,
+          typeProduct: row['Type_product'] as String?,
+          rfid: row['Rfid'] as String?,
+          stateProduct: row['State_product'] as String?,
+          descriptionProduct: row['Description_product'] as String?,
+          line: row['Line'] as int?,
+          palm: row['Palm'] as int?,
+          syncStatus: syncStatus,
+          createdAt: row['Created_at'] as String?,
+          modifiedAt: row['Modified_at'] as String?,
+        );
+      }).toList();
+
+      _stats.totalProductsNew = newCount;
+      _stats.totalProductsUpdated = updatedCount;
+      _stats.hasPendingProducts = productsRaw.isNotEmpty;
+
+      debugPrint('✅ Productos pendientes recolectados:');
+      debugPrint('   📦 Nuevos (POST): $_stats.totalProductsNew');
+      debugPrint('   🔄 Actualizados (PUT): $_stats.totalProductsUpdated');
+      debugPrint('   📊 Total: ${_stats.getTotalPendingProducts()}');
+
+      if (_stats.productsSummary.isNotEmpty) {
+        debugPrint('   📋 Ejemplos de productos:');
+        for (int i = 0; i < _stats.productsSummary.length && i < 3; i++) {
+          final product = _stats.productsSummary[i];
+          debugPrint('      [$i] ${product.nameProduct ?? "Sin nombre"} '
+              '(RFID: ${product.rfid ?? "N/A"}, Status: ${product.syncStatus})');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error recolectando productos: $e');
+      // No relanzamos el error para no interrumpir el flujo principal
+      _stats.totalProductsNew = 0;
+      _stats.totalProductsUpdated = 0;
+      _stats.hasPendingProducts = false;
+    }
+  }
+
   Future<void> _syncExclusionZones() async {
     try {
       debugPrint('🔄 Sincronizando zonas de exclusión...');
@@ -870,6 +1021,137 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       await db.close();
     } catch (e) {
       debugPrint('⚠️ Error limpiando historial de exclusiones: $e');
+    }
+  }
+
+  /// Sincroniza productos pendientes al API
+  /// - Productos con Sync_status='new' -> POST /Products (crear)
+  /// - Productos con Sync_status='updated' -> PUT /Products/{id} (actualizar)
+  Future<bool> _syncProducts() async {
+    if (!_stats.hasPendingProducts) {
+      debugPrint('ℹ️ No hay productos pendientes de sincronización');
+      return true;
+    }
+
+    try {
+      debugPrint('🔄 Sincronizando productos...');
+      debugPrint('   📦 Nuevos: ${_stats.totalProductsNew}');
+      debugPrint('   🔄 Actualizados: ${_stats.totalProductsUpdated}');
+
+      int successCount = 0;
+      int errorCount = 0;
+      List<int> syncedProductIds = [];
+
+      for (final product in _stats.productsSummary) {
+        try {
+          // Preparar el payload según ProductsInputDTO del API
+          final Map<String, dynamic> productPayload = {
+            'id_product': product.idProduct,
+            'id_headquarter': product.idHeadquarter,
+            'id_company': product.idCompany,
+            'name_product': product.nameProduct ?? '',
+            'type_product': product.typeProduct ?? '',
+            'rfid': product.rfid ?? '',
+            'created_at': product.createdAt ?? DateTime.now().toUtc().toIso8601String(),
+            'modified_at': product.modifiedAt ?? DateTime.now().toUtc().toIso8601String(),
+            'state_product': product.stateProduct ?? 'Activo',
+            'description_product': product.descriptionProduct ?? '',
+            'locations_add': <String>[], // Por ahora vacío, se puede agregar coordenadas si las tiene
+            'line': product.line ?? 0,
+            'palm': product.palm ?? 0,
+          };
+
+          final String jsonBody = jsonEncode(productPayload);
+          http.Response response;
+
+          if (product.syncStatus == 'new') {
+            // POST - Crear nuevo producto
+            const String url = 'https://api.clickpalm.com/Products';
+
+            debugPrint('');
+            debugPrint('📤 POST /Products - Nuevo producto ID: ${product.idProduct}');
+            debugPrint('   RFID: ${product.rfid}');
+            debugPrint('   Nombre: ${product.nameProduct}');
+
+            response = await http.post(
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ${widget.authToken}',
+              },
+              body: jsonBody,
+            );
+          } else {
+            // PUT - Actualizar producto existente
+            final String url = 'https://api.clickpalm.com/Products/${product.idProduct}';
+
+            debugPrint('');
+            debugPrint('📤 PUT /Products/${product.idProduct} - Actualizar producto');
+            debugPrint('   RFID: ${product.rfid}');
+            debugPrint('   Nombre: ${product.nameProduct}');
+
+            response = await http.put(
+              Uri.parse(url),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ${widget.authToken}',
+              },
+              body: jsonBody,
+            );
+          }
+
+          debugPrint('   📥 Response Status: ${response.statusCode}');
+
+          if (response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 202) {
+            successCount++;
+            syncedProductIds.add(product.idProduct);
+            debugPrint('   ✅ Producto sincronizado exitosamente');
+          } else {
+            errorCount++;
+            debugPrint('   ❌ Error: ${response.statusCode} - ${response.body}');
+          }
+        } catch (e) {
+          errorCount++;
+          debugPrint('   ❌ Excepción sincronizando producto ${product.idProduct}: $e');
+        }
+      }
+
+      debugPrint('');
+      debugPrint('📊 Resumen de sincronización de productos:');
+      debugPrint('   ✅ Exitosos: $successCount');
+      debugPrint('   ❌ Errores: $errorCount');
+
+      // Actualizar Sync_status a 'synced' para productos sincronizados exitosamente
+      if (syncedProductIds.isNotEmpty) {
+        await _updateProductsSyncStatus(syncedProductIds);
+      }
+
+      // Retornar true si al menos un producto fue sincronizado, o si hubo errores pero algunos fueron exitosos
+      return successCount > 0 || errorCount == 0;
+    } catch (e) {
+      debugPrint('❌ Error general sincronizando productos: $e');
+      return false;
+    }
+  }
+
+  /// Actualiza el Sync_status de productos sincronizados a 'synced'
+  Future<void> _updateProductsSyncStatus(List<int> productIds) async {
+    try {
+      final String dbPath = await _getDatabasePath();
+      final Database db = await openDatabase(dbPath);
+
+      final String placeholders = productIds.map((_) => '?').join(',');
+      final int updated = await db.rawUpdate('''
+        UPDATE Products
+        SET Sync_status = 'synced'
+        WHERE Id_product IN ($placeholders)
+      ''', productIds);
+
+      await db.close();
+
+      debugPrint('✅ Actualizados $updated productos a Sync_status = "synced"');
+    } catch (e) {
+      debugPrint('⚠️ Error actualizando Sync_status de productos: $e');
     }
   }
 
@@ -1763,6 +2045,16 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
               value: '${_stats.totalNewsAdd}',
               color: const Color(0xFFEC4899), // Pink
             ),
+            const SizedBox(height: 8),
+
+            // PRODUCTS (Nuevos y Actualizados)
+            if (_stats.getTotalPendingProducts() > 0)
+              _buildStatRow(
+                icon: Icons.local_offer,
+                label: 'Productos TAG',
+                value: '${_stats.getTotalPendingProducts()} (${_stats.totalProductsNew} new, ${_stats.totalProductsUpdated} upd)',
+                color: const Color(0xFF8B5CF6), // Purple
+              ),
             const SizedBox(height: 16),
 
             // Detalles adicionales
@@ -1845,6 +2137,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
               Text(
                 label,
@@ -1854,12 +2147,14 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
                   color: FlutterFlowTheme.of(context).secondaryText,
                   letterSpacing: 0.2,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 2),
               Text(
                 value,
                 style: TextStyle(
-                  fontSize: 15,
+                  fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: FlutterFlowTheme.of(context).primaryText,
                   letterSpacing: -0.2,
@@ -1886,15 +2181,19 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: FlutterFlowTheme.of(context).secondaryText,
-            height: 1.5,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: FlutterFlowTheme.of(context).secondaryText,
+              height: 1.5,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
@@ -2087,6 +2386,9 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       case SyncStep.sendingExclusions:
         icon = Icons.map;
         break;
+      case SyncStep.sendingProducts:
+        icon = Icons.local_offer;
+        break;
       case SyncStep.sendingVisits:
         icon = Icons.cloud_upload;
         break;
@@ -2186,7 +2488,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           ),
           const SizedBox(height: 12),
 
-          // Fila 3: NewsAdd y Total
+          // Fila 3: NewsAdd y Productos
           Row(
             children: [
               Expanded(
@@ -2197,6 +2499,21 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
                 ),
               ),
               const SizedBox(width: 12),
+              Expanded(
+                child: _buildStatCard(
+                  icon: Icons.local_offer,
+                  value: '${_stats.getTotalPendingProducts()}',
+                  label: 'Productos',
+                  subtitle: '${_stats.totalProductsNew} nuevos',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Fila 4: Total
+          Row(
+            children: [
               Expanded(
                 child: _buildStatCard(
                   icon: Icons.layers,
@@ -2293,6 +2610,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
             : null,
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
             icon,
@@ -2307,6 +2625,8 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
               fontWeight: FontWeight.bold,
               color: FlutterFlowTheme.of(context).info,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           Text(
             label,
@@ -2315,6 +2635,8 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
               fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
               color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.7),
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 4),
@@ -2324,6 +2646,8 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
                 fontSize: 10,
                 color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.6),
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ],

@@ -409,20 +409,20 @@ class _DeviceSelectionGridWidgetState
                       Icon(
                         Icons.add_circle_outline,
                         color: Colors.white,
-                        size: 24,
+                        size: 22,
                       ),
-                      SizedBox(width: 12),
-                      Expanded(
+                      SizedBox(width: 10),
+                      Flexible(
                         child: Text(
-                          'NO ENCUENTRO MI DISPOSITIVO - AGREGA UNO NUEVO',
+                          'NO ENCUENTRO MI DISPOSITIVO',
                           style: TextStyle(
-                            fontSize: 14,
+                            fontSize: 13,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            letterSpacing: 0.5,
+                            letterSpacing: 0.3,
                           ),
                           textAlign: TextAlign.center,
-                          maxLines: 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
@@ -547,38 +547,41 @@ class _DeviceSelectionGridWidgetState
                   ],
                 ),
 
-                SizedBox(height: 12),
+                SizedBox(height: 8),
 
                 // Información del dispositivo
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        deviceName,
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                  child: SingleChildScrollView(
+                    physics: NeverScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          deviceName,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      SizedBox(height: 8),
-                      _buildInfoRow(Icons.tag, 'Serial:', serialId),
-                      SizedBox(height: 4),
-                      _buildInfoRow(Icons.smartphone, 'Modelo:', model),
-                      if (imei1.isNotEmpty) ...[
-                        SizedBox(height: 4),
-                        _buildInfoRow(Icons.numbers, 'IMEI:', imei1,
-                            maxLength: 15),
+                        SizedBox(height: 6),
+                        _buildInfoRow(Icons.tag, 'Serial:', serialId),
+                        SizedBox(height: 3),
+                        _buildInfoRow(Icons.smartphone, 'Modelo:', model),
+                        if (imei1.isNotEmpty) ...[
+                          SizedBox(height: 3),
+                          _buildInfoRow(Icons.numbers, 'IMEI:', imei1,
+                              maxLength: 15),
+                        ],
                       ],
-                    ],
+                    ),
                   ),
                 ),
 
-                SizedBox(height: 12),
+                SizedBox(height: 8),
 
                 // Botón de selección
                 Container(

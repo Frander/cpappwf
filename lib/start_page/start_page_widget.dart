@@ -8,6 +8,7 @@ import '/components/sync_loading_widget.dart';
 import '/components/device_registration_loading_widget.dart';
 import '/components/device_registration_form_widget.dart';
 import '/components/supervisor_code_keyboard_widget.dart';
+import '/components/connection_retry_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -100,16 +101,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           debugPrint('🔵 No hay device default pero existe UUID (${_model.identifierCTR}), haciendo login directo...');
         }
 
-        // Paso 2: Verificando conexión a internet
+        // Paso 2: Verificando conexión a internet con reintentos
         _updateProgress(2, 'Verificando conexión a internet...');
         await Future.delayed(Duration(milliseconds: 400));
 
-        _model.connectionJSON = await actions.checkInternetQuality();
-        if (functions.jsonDynamicToBool(getJsonField(
-              _model.connectionJSON,
-              r'''$.hasInternet''',
-            )) ==
-            true) {
+        // Verificar conexión con reintentos automáticos durante 5 minutos
+        final hasConnection = await _checkConnectionWithRetry();
+        if (hasConnection) {
           // Paso 3: Iniciando sesión
           _updateProgress(3, 'Iniciando sesión de forma segura...');
           await Future.delayed(Duration(milliseconds: 400));
@@ -1926,6 +1924,54 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         _model.stepMessage = message;
       });
     }
+  }
+
+  /// Verifica la conexión a internet con reintentos automáticos durante 5 minutos.
+  /// Retorna true si se logró conectar, false si el usuario decidió cerrar la app.
+  Future<bool> _checkConnectionWithRetry() async {
+    final completer = Completer<bool>();
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return PopScope(
+          canPop: false,
+          child: Dialog(
+            elevation: 0,
+            insetPadding: EdgeInsets.zero,
+            backgroundColor: Colors.transparent,
+            child: ConnectionRetryDialogWidget(
+              maxRetryDuration: const Duration(minutes: 5),
+              retryInterval: const Duration(seconds: 10),
+              checkConnectionCallback: () async {
+                try {
+                  final connectionResult = await actions.checkInternetQuality();
+                  final hasInternet = functions.jsonDynamicToBool(
+                    getJsonField(connectionResult, r'''$.hasInternet'''),
+                  );
+                  return hasInternet == true;
+                } catch (e) {
+                  debugPrint('❌ Error verificando conexión: $e');
+                  return false;
+                }
+              },
+              onConnectionSuccess: () {
+                Navigator.of(dialogContext).pop();
+                completer.complete(true);
+              },
+            ),
+          ),
+        );
+      },
+    );
+
+    // Si el completer no se completó, significa que el usuario cerró la app
+    if (!completer.isCompleted) {
+      completer.complete(false);
+    }
+
+    return completer.future;
   }
 
   @override

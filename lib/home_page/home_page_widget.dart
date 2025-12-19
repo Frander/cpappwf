@@ -324,36 +324,35 @@ class _HomePageWidgetState extends State<HomePageWidget>
   }
 
   // Método helper para calcular el total de resultados por actividad
-  // Total Results = Primer Total + Segundo Total (basado en Visits_details registrados)
-  // Primer Total: Suma de factores de Activities_status (sin step parent) usados en Visits_details
-  // Segundo Total: Suma de factores de Activities_status (con step parent SUMAFACTORES) usados en Visits_details
+  // Total Results = Total1 + Total2 (basado en Visits_details registrados)
+  // Total1: Suma de factores de status SIN step parent (ligados directamente a la actividad)
+  // Total2: Suma de factores de status CON step parent donde Calculation = '=SUMAFACTORES'
+  // Los status con step parent donde Calculation != '=SUMAFACTORES' (ej: =NINGUNO) NO se suman
   Future<int> _calculateTotalResultsForActivity(int activityId) async {
     try {
       final result = await globalDb.executeOperation((db) async {
         return await db.rawQuery('''
-          SELECT
-            (
-              -- Primer Total: Factores de status sin step parent, registrados en Visits_details
-              COALESCE((
-                SELECT SUM(acs.Factor)
-                FROM Visits_details vd
-                INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
-                INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
-                WHERE v.Id_activity = ?
-                  AND (acs.Id_activity_step_parent IS NULL OR acs.Id_activity_step_parent = 0)
-              ), 0)
-              +
-              -- Segundo Total: Factores de status con step parent SUMAFACTORES, registrados en Visits_details
-              COALESCE((
-                SELECT SUM(acs.Factor)
-                FROM Visits_details vd
-                INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
-                INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
-                INNER JOIN Activities_steps ast ON acs.Id_activity_step_parent = ast.Id_activity_step
-                WHERE v.Id_activity = ?
-                  AND ast.Calculation = '=SUMAFACTORES'
-              ), 0)
-            ) as total_results
+          SELECT COALESCE(SUM(factor_value), 0) as total_results
+          FROM (
+            -- Total1: Status sin step parent (ligados directamente a la actividad)
+            SELECT acs.Factor as factor_value
+            FROM Visits_details vd
+            INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
+            INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
+            WHERE v.Id_activity = ?
+              AND (acs.Id_activity_step_parent IS NULL OR acs.Id_activity_step_parent = 0)
+
+            UNION ALL
+
+            -- Total2: Status con step parent donde Calculation = '=SUMAFACTORES'
+            SELECT acs.Factor as factor_value
+            FROM Visits_details vd
+            INNER JOIN Visits v ON vd.Id_visit = v.Id_visit
+            INNER JOIN Activities_status acs ON vd.Id_activity_status = acs.Id_activity_status
+            INNER JOIN Activities_steps ast ON acs.Id_activity_step_parent = ast.Id_activity_step
+            WHERE v.Id_activity = ?
+              AND ast.Calculation = '=SUMAFACTORES'
+          )
         ''', [activityId, activityId]);
       });
 

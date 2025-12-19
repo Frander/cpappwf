@@ -377,7 +377,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               ),
                               SizedBox(width: 8),
                               Text(
-                                '$selectedCount seleccionado${selectedCount != 1 ? 's' : ''}',
+                                '1 seleccionado',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -554,16 +554,15 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
       highlightColor: Colors.transparent,
       onTap: () {
         setState(() {
+          // Solo permitir UN lote seleccionado (comportamiento de radio button)
           if (isSelected) {
-            FFAppState()
-                .removeFromHeadquartersSelectedList(headquarterItem);
-            _model.checkboxValueMap[headquarterItem] = false;
+            // Si ya está seleccionado, lo deseleccionamos
+            FFAppState().headquartersSelectedList = [];
+            _model.checkboxValueMap.clear();
           } else {
-            if (!FFAppState()
-                .headquartersSelectedList
-                .contains(headquarterItem)) {
-              FFAppState().addToHeadquartersSelectedList(headquarterItem);
-            }
+            // Limpiar selección anterior y seleccionar el nuevo
+            FFAppState().headquartersSelectedList = [headquarterItem];
+            _model.checkboxValueMap.clear();
             _model.checkboxValueMap[headquarterItem] = true;
           }
         });
@@ -654,7 +653,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       ),
                     ),
                   ),
-                  // Checkbox personalizado
+                  // Radio button personalizado (solo un lote seleccionable)
                   Container(
                     width: 20,
                     height: 20,
@@ -662,7 +661,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       color: isSelected
                           ? Colors.white
                           : Colors.white.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(5),
+                      shape: BoxShape.circle,
                       border: Border.all(
                         color: isSelected
                             ? Colors.white
@@ -671,10 +670,15 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       ),
                     ),
                     child: isSelected
-                        ? Icon(
-                            Icons.check_rounded,
-                            color: FlutterFlowTheme.of(context).primary,
-                            size: 14,
+                        ? Center(
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: FlutterFlowTheme.of(context).primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
                           )
                         : null,
                   ),

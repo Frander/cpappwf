@@ -355,6 +355,14 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
         );
       }
 
+      // Enviar progreso de GPS al hilo principal (accuracy actual)
+      if (!isStabilized) {
+        service.invoke('gpsProgress', {
+          'accuracy': position.accuracy,
+          'elapsed': elapsed,
+        });
+      }
+
       // Validación inicial
       if (!PositionValidator.isValidPosition(
           position, ukf, movementDetector, utmCache, lastGPSUpdate)) {

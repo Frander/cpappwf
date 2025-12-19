@@ -58,11 +58,16 @@ class _InformationFormState extends State<InformationForm>
   // Estado de carga
   bool _isLoadingData = true;
 
+  // Estado colapsable del panel de dispositivo
+  bool _isDeviceInfoExpanded = false;
+
   // Datos pendientes por sincronizar
   int _pendingVisits = 0;
   int _pendingLocationTracking = 0;
   int _pendingExclusionZones = 0;
   int _pendingNewsAdd = 0;
+  int _pendingTagsNew = 0;      // Productos TAG nuevos (Sync_status = 'new')
+  int _pendingTagsUpdated = 0;  // Productos TAG actualizados (Sync_status = 'updated')
 
   // Datos descargados (conteo de registros por tabla)
   Map<String, int> _downloadedDataCounts = {};
@@ -142,6 +147,22 @@ class _InformationFormState extends State<InformationForm>
       // NewsAdd viene del AppState
       _pendingNewsAdd = widget.newsAdd.length;
 
+      // Contar productos TAG pendientes de sincronización (nuevos y actualizados)
+      try {
+        final tagsNewResult = await db.rawQuery(
+            "SELECT COUNT(*) as count FROM Products WHERE Sync_status = 'new'");
+        _pendingTagsNew = tagsNewResult.first['count'] as int? ?? 0;
+
+        final tagsUpdatedResult = await db.rawQuery(
+            "SELECT COUNT(*) as count FROM Products WHERE Sync_status = 'updated'");
+        _pendingTagsUpdated = tagsUpdatedResult.first['count'] as int? ?? 0;
+      } catch (e) {
+        // Si la columna Sync_status no existe, establecer en 0
+        debugPrint('⚠️ No se pudo contar productos TAG: $e');
+        _pendingTagsNew = 0;
+        _pendingTagsUpdated = 0;
+      }
+
       await db.close();
 
       debugPrint('✅ Datos pendientes cargados:');
@@ -149,6 +170,8 @@ class _InformationFormState extends State<InformationForm>
       debugPrint('   Location_tracking: $_pendingLocationTracking');
       debugPrint('   Exclusion_zones_history: $_pendingExclusionZones');
       debugPrint('   NewsAdd: $_pendingNewsAdd');
+      debugPrint('   Tags (new): $_pendingTagsNew');
+      debugPrint('   Tags (updated): $_pendingTagsUpdated');
     } catch (e) {
       debugPrint('❌ Error cargando datos pendientes: $e');
       rethrow;
@@ -211,7 +234,13 @@ class _InformationFormState extends State<InformationForm>
     return _pendingVisits +
         _pendingLocationTracking +
         _pendingExclusionZones +
-        _pendingNewsAdd;
+        _pendingNewsAdd +
+        _pendingTagsNew +
+        _pendingTagsUpdated;
+  }
+
+  int get _totalPendingTags {
+    return _pendingTagsNew + _pendingTagsUpdated;
   }
 
   int get _totalDownloadedItems {
@@ -319,13 +348,13 @@ class _InformationFormState extends State<InformationForm>
     return Container(
       width: widget.width,
       height: widget.height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF1B4332), // Verde oscuro
-            const Color(0xFF081C15), // Verde muy oscuro
+            Color(0xFF1B4332), // Verde oscuro
+            Color(0xFF081C15), // Verde muy oscuro
           ],
         ),
       ),
@@ -345,14 +374,14 @@ class _InformationFormState extends State<InformationForm>
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF1B4332), // Verde oscuro
-            const Color(0xFF2D6A4F), // Verde medio
+            Color(0xFF1B4332),
+            Color(0xFF2D6A4F),
           ],
         ),
         boxShadow: [
@@ -365,57 +394,44 @@ class _InformationFormState extends State<InformationForm>
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withValues(alpha: 0.2), // Naranja brillante
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(
-              Icons.info_outline,
-              color: Color(0xFFFF6B35), // Naranja brillante
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Información del Sistema',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Datos pendientes y descargados',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Botón de actualizar
-          IconButton(
-            onPressed: _loadAllData,
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            tooltip: 'Actualizar información',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-          ),
-          // Botón de cerrar
+          // Botón de regresar (izquierda)
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close, color: Colors.white),
-            tooltip: 'Cerrar',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 22),
+            tooltip: 'Regresar',
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          ),
+
+          // Título centrado
+          Expanded(
+            child: Text(
+              'Información del Sistema',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+
+          // Botón de actualizar (derecha)
+          IconButton(
+            onPressed: _isLoadingData ? null : _loadAllData,
+            icon: _isLoadingData
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  )
+                : const Icon(Icons.refresh, color: Colors.white, size: 24),
+            tooltip: 'Actualizar',
+            padding: const EdgeInsets.all(8),
+            constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           ),
         ],
       ),
@@ -436,7 +452,7 @@ class _InformationFormState extends State<InformationForm>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    const Color(0xFFFF6B35).withValues(alpha: 0.3), // Naranja brillante
+                    const Color(0xFFFF6B35).withValues(alpha: 0.3),
                     const Color(0xFFFF8C42).withValues(alpha: 0.3),
                   ],
                 ),
@@ -464,93 +480,111 @@ class _InformationFormState extends State<InformationForm>
 
   Widget _buildInfoScreen() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Resumen de totales
-          _buildTotalsSummary(),
-          const SizedBox(height: 16),
-
-          // Información del dispositivo CTR
-          _buildDeviceInfoPanel(),
-          const SizedBox(height: 24),
-
-          // Sección: Pendientes por Sincronizar (Colapsable)
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              initiallyExpanded: false,
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(top: 12),
-              iconColor: Colors.white,
-              collapsedIconColor: Colors.white70,
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF6B35).withValues(alpha: 0.2), // Naranja brillante
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.cloud_upload,
-                    color: Color(0xFFFF6B35), size: 20), // Naranja brillante
-              ),
-              title: const Text(
-                'Pendientes por Sincronizar',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              children: [
-                _buildPendingSyncCard(),
-              ],
-            ),
+          // Grid de Pendientes por Sincronizar
+          _buildSectionHeader(
+            icon: Icons.cloud_upload_outlined,
+            title: 'Pendientes por Sincronizar',
+            color: const Color(0xFFFF6B35),
+            badgeCount: _totalPendingItems,
           ),
+          const SizedBox(height: 12),
+          _buildPendingSyncGrid(),
           const SizedBox(height: 24),
 
-          // Sección: Datos Descargados (Colapsable)
-          Theme(
-            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-            child: ExpansionTile(
-              initiallyExpanded: false,
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(top: 12),
-              iconColor: Colors.white,
-              collapsedIconColor: Colors.white70,
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF52B788).withValues(alpha: 0.3), // Verde claro
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(Icons.cloud_download,
-                    color: Color(0xFF52B788), size: 20), // Verde claro
-              ),
-              title: const Text(
-                'Datos Descargados',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              children: [
-                _buildDownloadedDataCard(),
-              ],
-            ),
+          // Información del dispositivo (colapsable)
+          _buildDeviceInfoCollapsible(),
+          const SizedBox(height: 24),
+
+          // Grid de Datos Descargados
+          _buildSectionHeader(
+            icon: Icons.cloud_download_outlined,
+            title: 'Datos Descargados',
+            color: const Color(0xFF52B788),
+            badgeCount: _totalDownloadedItems,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          _buildDownloadedDataGrid(),
+          const SizedBox(height: 32),
 
-          // Botones de acción
-          _buildActionButtons(),
+          // Botones de acción modernos
+          _buildModernActionButtons(),
           const SizedBox(height: 20),
         ],
       ),
     );
   }
 
-  Widget _buildTotalsSummary() {
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required String title,
+    required Color color,
+    int? badgeCount,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                color.withValues(alpha: 0.3),
+                color.withValues(alpha: 0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withValues(alpha: 0.5), width: 1),
+          ),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        if (badgeCount != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withValues(alpha: 0.7)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.4),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              badgeCount.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildPendingSyncGrid() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -558,207 +592,299 @@ class _InformationFormState extends State<InformationForm>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF2D6A4F).withValues(alpha: 0.4), // Verde medio
-            const Color(0xFF1B4332).withValues(alpha: 0.6), // Verde oscuro
+            const Color(0xFF1B4332).withValues(alpha: 0.6),
+            const Color(0xFF081C15).withValues(alpha: 0.8),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 2,
+          color: const Color(0xFFFF6B35).withValues(alpha: 0.3),
+          width: 1,
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
-            child: _buildTotalCard(
-              icon: Icons.cloud_upload,
-              title: 'Pendientes',
-              value: _totalPendingItems.toString(),
-              color: const Color(0xFFFF6B35), // Naranja brillante
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            width: 2,
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withValues(alpha: 0.0),
-                  Colors.white.withValues(alpha: 0.3),
-                  Colors.white.withValues(alpha: 0.0),
-                ],
+          // Primera fila: 3 elementos
+          Row(
+            children: [
+              Expanded(
+                child: _buildGridItem(
+                  icon: Icons.event_note_outlined,
+                  label: 'Visitas',
+                  value: _pendingVisits,
+                  color: const Color(0xFFFF6B35),
+                ),
               ),
-            ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildGridItem(
+                  icon: Icons.my_location_outlined,
+                  label: 'Geolocalizaciones',
+                  value: _pendingLocationTracking,
+                  color: const Color(0xFF52B788),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildGridItem(
+                  icon: Icons.edit_location_alt_outlined,
+                  label: 'Mod. Zonas',
+                  value: _pendingExclusionZones,
+                  color: const Color(0xFFFFAA00),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildTotalCard(
-              icon: Icons.cloud_done,
-              title: 'Descargados',
-              value: _totalDownloadedItems.toString(),
-              color: const Color(0xFF52B788), // Verde claro
-            ),
+          const SizedBox(height: 12),
+          // Segunda fila: 2 elementos
+          Row(
+            children: [
+              Expanded(
+                child: _buildGridItem(
+                  icon: Icons.new_releases_outlined,
+                  label: 'Novedades',
+                  value: _pendingNewsAdd,
+                  color: const Color(0xFFFF8C42),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildGridItemWithSubtitle(
+                  icon: Icons.local_offer_outlined,
+                  label: 'Tags',
+                  value: _totalPendingTags,
+                  subtitle: '$_pendingTagsNew new, $_pendingTagsUpdated upd',
+                  color: const Color(0xFF8B5CF6),
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildTotalCard({
+  Widget _buildGridItem({
     required IconData icon,
-    required String title,
-    required String value,
+    required String label,
+    required int value,
     required Color color,
   }) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 22,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          title,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDeviceInfoPanel() {
-    final device = FFAppState().deviceDefault;
-
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF0077B6).withValues(alpha: 0.4), // Azul medio
-            const Color(0xFF023E8A).withValues(alpha: 0.6), // Azul oscuro
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.05),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Header del panel
           Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF0096C7).withValues(alpha: 0.3),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.phone_android,
-                  color: Color(0xFF0096C7),
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'Información del Dispositivo',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  value.toString(),
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-
-          // Información del dispositivo
-          _buildDeviceInfoRow(
-            icon: Icons.label,
-            label: 'Nombre',
-            value: device.deviceName.isNotEmpty ? device.deviceName : 'N/A',
-          ),
-          const SizedBox(height: 10),
-
-          if (device.cellPhone.isNotEmpty) ...[
-            _buildDeviceInfoRow(
-              icon: Icons.phone,
-              label: 'Teléfono',
-              value: device.cellPhone,
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
             ),
-            const SizedBox(height: 10),
-          ],
-
-          _buildDeviceInfoRow(
-            icon: Icons.tag,
-            label: 'Serial',
-            value: device.serialId.isNotEmpty ? device.serialId : 'N/A',
-          ),
-          const SizedBox(height: 10),
-
-          if (device.imeI1.isNotEmpty) ...[
-            _buildDeviceInfoRow(
-              icon: Icons.smartphone,
-              label: 'IMEI 1',
-              value: device.imeI1,
-            ),
-            const SizedBox(height: 10),
-          ],
-
-          if (device.imeI2.isNotEmpty && device.imeI2 != device.imeI1) ...[
-            _buildDeviceInfoRow(
-              icon: Icons.smartphone,
-              label: 'IMEI 2',
-              value: device.imeI2,
-            ),
-            const SizedBox(height: 10),
-          ],
-
-          _buildDeviceInfoRow(
-            icon: Icons.devices,
-            label: 'Modelo',
-            value: device.model.isNotEmpty ? device.model : 'N/A',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildGridItemWithSubtitle({
+    required IconData icon,
+    required String label,
+    required int value,
+    required String subtitle,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.15),
+            color.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: color, size: 20),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  value.toString(),
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (value > 0) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: color.withValues(alpha: 0.8),
+                fontSize: 9,
+                fontWeight: FontWeight.w400,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeviceInfoCollapsible() {
+    final device = FFAppState().deviceDefault;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF0077B6).withValues(alpha: 0.3),
+            const Color(0xFF023E8A).withValues(alpha: 0.4),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF0096C7).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          initiallyExpanded: _isDeviceInfoExpanded,
+          onExpansionChanged: (expanded) {
+            setState(() {
+              _isDeviceInfoExpanded = expanded;
+            });
+          },
+          tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          iconColor: Colors.white,
+          collapsedIconColor: Colors.white70,
+          leading: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0096C7).withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(
+              Icons.phone_android,
+              color: Color(0xFF0096C7),
+              size: 22,
+            ),
+          ),
+          title: const Text(
+            'Información del Dispositivo',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          children: [
+            _buildDeviceInfoRow(
+              icon: Icons.label_outline,
+              label: 'Nombre',
+              value: device.deviceName.isNotEmpty ? device.deviceName : 'N/A',
+            ),
+            if (device.cellPhone.isNotEmpty)
+              _buildDeviceInfoRow(
+                icon: Icons.phone_outlined,
+                label: 'Teléfono',
+                value: device.cellPhone,
+              ),
+            _buildDeviceInfoRow(
+              icon: Icons.tag,
+              label: 'Serial',
+              value: device.serialId.isNotEmpty ? device.serialId : 'N/A',
+            ),
+            if (device.imeI1.isNotEmpty)
+              _buildDeviceInfoRow(
+                icon: Icons.smartphone_outlined,
+                label: 'IMEI 1',
+                value: device.imeI1,
+              ),
+            if (device.imeI2.isNotEmpty && device.imeI2 != device.imeI1)
+              _buildDeviceInfoRow(
+                icon: Icons.smartphone_outlined,
+                label: 'IMEI 2',
+                value: device.imeI2,
+              ),
+            _buildDeviceInfoRow(
+              icon: Icons.devices_outlined,
+              label: 'Modelo',
+              value: device.model.isNotEmpty ? device.model : 'N/A',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -768,123 +894,47 @@ class _InformationFormState extends State<InformationForm>
     required String label,
     required String value,
   }) {
-    return Row(
-      children: [
-        Icon(
-          icon,
-          color: const Color(0xFF0096C7).withValues(alpha: 0.8),
-          size: 18,
-        ),
-        const SizedBox(width: 10),
-        Text(
-          '$label:',
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSectionTitle({
-    required IconData icon,
-    required String title,
-    required Color color,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: TextStyle(
-            color: FlutterFlowTheme.of(context).primaryText,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPendingSyncCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B4332).withValues(alpha: 0.5), // Verde oscuro semi-transparente
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
         children: [
-          _buildDataRow(
-            icon: Icons.event_note,
-            label: 'Visitas',
-            value: _pendingVisits.toString(),
-            color: const Color(0xFFFF6B35), // Naranja brillante
+          Icon(
+            icon,
+            color: const Color(0xFF0096C7).withValues(alpha: 0.8),
+            size: 18,
           ),
-          const SizedBox(height: 16),
-          _buildDivider(),
-          const SizedBox(height: 16),
-          _buildDataRow(
-            icon: Icons.my_location,
-            label: 'Geolocalizaciones',
-            value: _pendingLocationTracking.toString(),
-            color: const Color(0xFF52B788), // Verde claro
+          const SizedBox(width: 10),
+          Text(
+            '$label:',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-          const SizedBox(height: 16),
-          _buildDivider(),
-          const SizedBox(height: 16),
-          _buildDataRow(
-            icon: Icons.edit_location_alt,
-            label: 'Modificaciones de Zonas',
-            value: _pendingExclusionZones.toString(),
-            color: const Color(0xFFFFAA00), // Amarillo/naranja
-          ),
-          const SizedBox(height: 16),
-          _buildDivider(),
-          const SizedBox(height: 16),
-          _buildDataRow(
-            icon: Icons.new_releases_outlined,
-            label: 'Novedades',
-            value: _pendingNewsAdd.toString(),
-            color: const Color(0xFFFF8C42), // Naranja claro
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDownloadedDataCard() {
+  Widget _buildDownloadedDataGrid() {
     if (_downloadedDataCounts.isEmpty) {
       return Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFF1B4332).withValues(alpha: 0.5), // Verde oscuro semi-transparente
+          color: const Color(0xFF1B4332).withValues(alpha: 0.5),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: Colors.white.withValues(alpha: 0.1),
@@ -903,31 +953,94 @@ class _InformationFormState extends State<InformationForm>
       );
     }
 
+    final entries = _downloadedDataCounts.entries.toList();
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B4332).withValues(alpha: 0.5), // Verde oscuro semi-transparente
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF1B4332).withValues(alpha: 0.6),
+            const Color(0xFF081C15).withValues(alpha: 0.8),
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: const Color(0xFF52B788).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
-      child: Column(
-        children: [
-          for (int i = 0; i < _downloadedDataCounts.keys.length; i++) ...[
-            if (i > 0) ...[
-              const SizedBox(height: 16),
-              _buildDivider(),
-              const SizedBox(height: 16),
-            ],
-            _buildDataRow(
-              icon: _getIconForTable(_downloadedDataCounts.keys.elementAt(i)),
-              label: _getLabelForTable(_downloadedDataCounts.keys.elementAt(i)),
-              value: _downloadedDataCounts.values.elementAt(i).toString(),
-              color: _getColorForIndex(i),
-            ),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.0,
+        ),
+        itemCount: entries.length,
+        itemBuilder: (context, index) {
+          final entry = entries[index];
+          final color = _getColorForIndex(index);
+          return _buildDownloadedGridItem(
+            icon: _getIconForTable(entry.key),
+            label: _getLabelForTable(entry.key),
+            value: entry.value,
+            color: color,
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildDownloadedGridItem({
+    required IconData icon,
+    required String label,
+    required int value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.2),
+            color.withValues(alpha: 0.05),
           ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(height: 4),
+          Text(
+            value.toString(),
+            style: TextStyle(
+              color: color,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.8),
+              fontSize: 9,
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -936,25 +1049,25 @@ class _InformationFormState extends State<InformationForm>
   IconData _getIconForTable(String tableName) {
     switch (tableName) {
       case 'Headquarters':
-        return Icons.location_city;
+        return Icons.location_city_outlined;
       case 'Headquarters_coordinates':
-        return Icons.map;
+        return Icons.map_outlined;
       case 'Virtual_points':
-        return Icons.place;
+        return Icons.place_outlined;
       case 'Optimized_routes':
-        return Icons.route;
+        return Icons.route_outlined;
       case 'Activities':
-        return Icons.work;
+        return Icons.work_outline;
       case 'Activities_status':
-        return Icons.assignment;
+        return Icons.assignment_outlined;
       case 'Products':
-        return Icons.inventory_2;
+        return Icons.inventory_2_outlined;
       case 'Companies':
-        return Icons.business;
+        return Icons.business_outlined;
       case 'Users':
-        return Icons.people;
+        return Icons.people_outline;
       default:
-        return Icons.storage;
+        return Icons.storage_outlined;
     }
   }
 
@@ -963,15 +1076,15 @@ class _InformationFormState extends State<InformationForm>
       case 'Headquarters':
         return 'Lotes';
       case 'Headquarters_coordinates':
-        return 'Coordenadas de Lotes';
+        return 'Coord. Lotes';
       case 'Virtual_points':
-        return 'Puntos Virtuales';
+        return 'Puntos Virt.';
       case 'Optimized_routes':
-        return 'Recorridos Optimizados';
+        return 'Rutas Opt.';
       case 'Activities':
         return 'Actividades';
       case 'Activities_status':
-        return 'Estados de Actividades';
+        return 'Estados';
       case 'Products':
         return 'Productos';
       case 'Companies':
@@ -985,357 +1098,133 @@ class _InformationFormState extends State<InformationForm>
 
   Color _getColorForIndex(int index) {
     final colors = [
-      const Color(0xFFFF6B35), // Naranja brillante
-      const Color(0xFF52B788), // Verde claro
-      const Color(0xFFFF8C42), // Naranja claro
-      const Color(0xFF74C69D), // Verde medio claro
-      const Color(0xFFFFAA00), // Amarillo/naranja
-      const Color(0xFF95D5B2), // Verde muy claro
-      const Color(0xFFFF9E66), // Naranja suave
-      const Color(0xFFB7E4C7), // Verde pastel
-      const Color(0xFFFFB380), // Naranja pastel
-      const Color(0xFFD8F3DC), // Verde muy suave
+      const Color(0xFFFF6B35),
+      const Color(0xFF52B788),
+      const Color(0xFFFF8C42),
+      const Color(0xFF74C69D),
+      const Color(0xFFFFAA00),
+      const Color(0xFF95D5B2),
+      const Color(0xFFFF9E66),
+      const Color(0xFFB7E4C7),
+      const Color(0xFFFFB380),
+      const Color(0xFFD8F3DC),
     ];
     return colors[index % colors.length];
   }
 
-  Widget _buildDataRow({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(icon, color: color, size: 22),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                color.withValues(alpha: 0.3),
-                color.withValues(alpha: 0.2),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: color.withValues(alpha: 0.4),
-              width: 1,
-            ),
-          ),
-          child: Text(
-            value,
-            style: TextStyle(
-              color: color,
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDivider() {
-    return Container(
-      height: 1,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            Colors.white.withValues(alpha: 0.0),
-            Colors.white.withValues(alpha: 0.2),
-            Colors.white.withValues(alpha: 0.0),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons() {
+  Widget _buildModernActionButtons() {
     return Column(
       children: [
         // Botón Historial de Visitas
-        Container(
-          width: double.infinity,
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF52B788), // Verde claro
-                Color(0xFF40916C), // Verde medio
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.3),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ElevatedButton(
-            onPressed: _navigateToHistoryVisits,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.history, color: Colors.white, size: 24),
-                SizedBox(width: 12),
-                Text(
-                  'Historial de Visitas',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildModernButton(
+          icon: Icons.history_outlined,
+          label: 'Historial de Visitas',
+          gradientColors: const [Color(0xFF52B788), Color(0xFF40916C)],
+          shadowColor: const Color(0xFF52B788),
+          onTap: _navigateToHistoryVisits,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Botón Sincronizar
-        Container(
-          width: double.infinity,
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFFFF6B35), // Naranja brillante
-                Color(0xFFFF8C42), // Naranja claro
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF6B35).withValues(alpha: 0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ElevatedButton(
-            onPressed: _navigateToSync,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: const [
-                Icon(Icons.sync, color: Colors.white, size: 24),
-                SizedBox(width: 12),
-                Text(
-                  'Sincronizar Datos',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildModernButton(
+          icon: Icons.cloud_sync_outlined,
+          label: 'Sincronizar Datos',
+          gradientColors: const [Color(0xFFFF6B35), Color(0xFFFF8C42)],
+          shadowColor: const Color(0xFFFF6B35),
+          onTap: _navigateToSync,
+          badge: _totalPendingItems > 0 ? _totalPendingItems.toString() : null,
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
 
         // Botón Configuración Avanzada
-        Container(
-          width: double.infinity,
-          height: 60,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF2D6A4F).withValues(alpha: 0.5),
-                const Color(0xFF1B4332).withValues(alpha: 0.7),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.3),
-              width: 2,
-            ),
-          ),
-          child: ElevatedButton(
-            onPressed: _navigateToAdvancedConfig,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.settings, color: Colors.grey[300], size: 24),
-                const SizedBox(width: 12),
-                Text(
-                  'Configuración Avanzada',
-                  style: TextStyle(
-                    color: Colors.grey[300],
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        _buildModernButton(
+          icon: Icons.settings_outlined,
+          label: 'Configuración Avanzada',
+          gradientColors: [
+            const Color(0xFF2D6A4F).withValues(alpha: 0.7),
+            const Color(0xFF1B4332).withValues(alpha: 0.9),
+          ],
+          shadowColor: Colors.black,
+          onTap: _navigateToAdvancedConfig,
+          isSecondary: true,
         ),
       ],
     );
   }
 
-  Widget _buildSyncDialog() {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      backgroundColor: Colors.transparent,
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1E293B),
-              Color(0xFF0F172A),
+  Widget _buildModernButton({
+    required IconData icon,
+    required String label,
+    required List<Color> gradientColors,
+    required Color shadowColor,
+    required VoidCallback onTap,
+    String? badge,
+    bool isSecondary = false,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: isSecondary
+                ? Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5)
+                : null,
+            boxShadow: [
+              BoxShadow(
+                color: shadowColor.withValues(alpha: isSecondary ? 0.2 : 0.4),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
             ],
           ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 2,
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    const Color(0xFF10B981).withValues(alpha: 0.3),
-                    const Color(0xFF059669).withValues(alpha: 0.3),
-                  ],
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                color: isSecondary ? Colors.grey[300] : Colors.white,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Text(
+                label,
+                style: TextStyle(
+                  color: isSecondary ? Colors.grey[300] : Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
                 ),
-                shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.cloud_sync,
-                color: Color(0xFF10B981),
-                size: 64,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Sincronizar Datos',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Se sincronizarán $_totalPendingItems elementos pendientes',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withValues(alpha: 0.7),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 32),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withValues(alpha: 0.1),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Cancelar',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
+              if (badge != null) ...[
                 const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      // Aquí iría la lógica de sincronización
-                      // Llamar a syncVisitsv2 o navegar a la pantalla de sincronización
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text(
-                      'Confirmar',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    badge,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1358,8 +1247,8 @@ class _InformationFormState extends State<InformationForm>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF1B4332), // Verde oscuro
-                  Color(0xFF081C15), // Verde muy oscuro
+                  Color(0xFF1B4332),
+                  Color(0xFF081C15),
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
@@ -1533,8 +1422,8 @@ class _InformationFormState extends State<InformationForm>
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFFFF6B35), // Naranja brillante
-                              Color(0xFFFF8C42), // Naranja claro
+                              Color(0xFFFF6B35),
+                              Color(0xFFFF8C42),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -1619,8 +1508,8 @@ class _InformationFormState extends State<InformationForm>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFF1B4332), // Verde oscuro
-                Color(0xFF081C15), // Verde muy oscuro
+                Color(0xFF1B4332),
+                Color(0xFF081C15),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
@@ -1701,10 +1590,9 @@ class _InformationFormState extends State<InformationForm>
                         icon: Icons.map,
                         title: 'Configuración de Mapas',
                         description: 'Gestionar recursos de mapas y tiles',
-                        color: const Color(0xFF52B788), // Verde claro
+                        color: const Color(0xFF52B788),
                         onTap: () {
                           Navigator.pop(context);
-                          // Navegar a ConfigMapsPage
                           context.pushNamed('ConfigMapsPage');
                         },
                       ),
@@ -1714,10 +1602,9 @@ class _InformationFormState extends State<InformationForm>
                         title: 'Actualización de CTR',
                         description:
                             'Descargar e instalar actualizaciones de la app',
-                        color: const Color(0xFFFF6B35), // Naranja brillante
+                        color: const Color(0xFFFF6B35),
                         onTap: () {
                           Navigator.pop(context);
-                          // Navegar a UpdatedAPPage
                           context.pushNamed('UpdatedAPPage');
                         },
                       ),
@@ -1726,10 +1613,9 @@ class _InformationFormState extends State<InformationForm>
                         icon: Icons.location_history,
                         title: 'Historial de Geolocalizaciones',
                         description: 'Ver registro de ubicaciones rastreadas',
-                        color: const Color(0xFF74C69D), // Verde medio claro
+                        color: const Color(0xFF74C69D),
                         onTap: () {
                           Navigator.pop(context);
-                          // Navegar a HistoryGeoPage
                           context.pushNamed('HistoryGeoPage');
                         },
                       ),
@@ -1738,10 +1624,9 @@ class _InformationFormState extends State<InformationForm>
                         icon: Icons.backup,
                         title: 'Copias de Seguridad',
                         description: 'Administrar backups del sistema',
-                        color: const Color(0xFFFFAA00), // Amarillo/naranja
+                        color: const Color(0xFFFFAA00),
                         onTap: () {
                           Navigator.pop(context);
-                          // Navegar a ConfigBackupsPage
                           context.pushNamed('ConfigBackupsPage');
                         },
                       ),
@@ -1750,10 +1635,9 @@ class _InformationFormState extends State<InformationForm>
                         icon: Icons.nfc,
                         title: 'Centro de Administración NFC',
                         description: 'Configurar, leer, escribir y gestionar TAGs NFC',
-                        color: const Color(0xFF3B82F6), // Azul
+                        color: const Color(0xFF3B82F6),
                         onTap: () {
                           Navigator.pop(context);
-                          // Navegar al Centro de Administración de TAGs
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -1767,10 +1651,9 @@ class _InformationFormState extends State<InformationForm>
                         icon: Icons.print,
                         title: 'Configuración de Impresoras',
                         description: 'Conectar y configurar impresoras Bluetooth térmicas',
-                        color: const Color(0xFF8B5CF6), // Púrpura
+                        color: const Color(0xFF8B5CF6),
                         onTap: () {
                           Navigator.pop(context);
-                          // Navegar a PrinterConfigurationPage
                           Navigator.push(
                             context,
                             MaterialPageRoute(

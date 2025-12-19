@@ -2,6 +2,7 @@
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/tag_admin/tag_configuration_stepper_widget.dart';
+import '/tag_admin/tag_install_stepper_widget.dart';
 import '/tag_admin/tag_test_writer_dialog_widget.dart';
 import '/tag_admin/tag_test_reader_dialog_widget.dart';
 import '/tag_admin/tag_raw_reader_dialog_widget.dart';
@@ -117,11 +118,8 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             ),
             SizedBox(height: 24),
 
-            // Main action - Configurar TAG
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: _buildMainActionCard(),
-            ),
+            // Main actions - Limpiar TAG e Instalar TAG
+            _buildMainActionCards(),
             SizedBox(height: 24),
 
             // Section title
@@ -194,65 +192,126 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
     );
   }
 
-  Widget _buildMainActionCard() {
-    return InkWell(
-      onTap: () => _showConfigurationStepper(),
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: EdgeInsets.all(24),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF3B82F6), Color(0xFF8B5CF6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Color(0xFF3B82F6).withOpacity(0.5),
-              blurRadius: 20,
-              offset: Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
+  Widget _buildMainActionCards() {
+    return Row(
+      children: [
+        // Botón Limpiar TAG
+        Expanded(
+          child: InkWell(
+            onTap: () => _showConfigurationStepper(),
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
               padding: EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                gradient: LinearGradient(
+                  colors: [Color(0xFFEF4444), Color(0xFFF97316)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0xFFEF4444).withOpacity(0.3),
+                    blurRadius: 12,
+                    offset: Offset(0, 6),
+                  ),
+                ],
               ),
-              child: Icon(Icons.settings_suggest, color: Colors.white, size: 40),
-            ),
-            SizedBox(width: 20),
-            Expanded(
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(Icons.cleaning_services, color: Colors.white, size: 28),
+                  ),
+                  SizedBox(height: 12),
                   Text(
-                    'Configurar TAG',
-                    style: TextStyle(fontFamily: 'Roboto',
-                      fontSize: 22,
+                    'Limpiar TAG',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  SizedBox(height: 4),
                   Text(
-                    'Flujo completo de verificación y limpieza',
-                    style: TextStyle(fontFamily: 'Roboto',
-                      fontSize: 14,
-                      color: Colors.white.withOpacity(0.9),
+                    'Verificar y borrar',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 11,
+                      color: Colors.white.withOpacity(0.8),
                     ),
                   ),
                 ],
               ),
             ),
-            Icon(Icons.arrow_forward_ios, color: Colors.white, size: 24),
-          ],
+          ),
         ),
-      ),
+        SizedBox(width: 16),
+        // Botón Instalar TAG
+        Expanded(
+          child: ScaleTransition(
+            scale: _pulseAnimation,
+            child: InkWell(
+              onTap: () => _showInstallStepper(),
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                padding: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF10B981), Color(0xFF3B82F6)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(0xFF10B981).withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.add_location_alt, color: Colors.white, size: 28),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Instalar TAG',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Registrar producto',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 11,
+                        color: Colors.white.withOpacity(0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -275,33 +334,38 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.all(16),
+              padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: color.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 32),
+              child: Icon(icon, color: color, size: 28),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               title,
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: 4),
+            SizedBox(height: 2),
             Text(
               subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 12,
+                fontSize: 11,
                 color: Colors.white60,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
@@ -315,6 +379,15 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => TagConfigurationStepperWidget(),
+    );
+  }
+
+  void _showInstallStepper() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => TagInstallStepperWidget(),
     );
   }
 

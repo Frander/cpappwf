@@ -132,6 +132,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   // Progreso visual
   int _elapsedSeconds = 0;
   int _validPoints = 0;
+  double _finalHorizontalError = 0.0;
+  double _currentBestError = 0.0;
 
   // Modo de rendimiento - detectado automáticamente basado en refresh rate
   late bool _isLowPerformanceMode;
@@ -345,6 +347,9 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
           setState(() {
             _validPoints = _gpsPoints.length;
+            if (_gpsPoints.isNotEmpty) {
+              _currentBestError = _gpsPoints.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b);
+            }
           });
 
           if (_gpsPoints.length >= 2) {
@@ -400,6 +405,9 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       setState(() {
         _validPoints = _gpsPoints.length;
+        if (_gpsPoints.isNotEmpty) {
+          _currentBestError = _gpsPoints.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b);
+        }
       });
 
       if (_gpsPoints.length >= 2) {
@@ -501,6 +509,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             _gpsPoints.add(gpsPoint);
             setState(() {
               _validPoints = _gpsPoints.length;
+              _currentBestError = _gpsPoints.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b);
             });
 
             if (_gpsPoints.length >= 2) {
@@ -715,6 +724,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       setState(() {
         _isProcessing = false;
         _isComplete = true;
+        _finalHorizontalError = mainGPSPoint.horizontalError;
         _statusMessage = 'ID: $visitId\nCoordenadas: ${_gpsPoints.length} puntos';
       });
 
@@ -1561,13 +1571,16 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                 children: [
                   const Icon(Icons.gps_fixed, color: _brightGreen, size: 24),
                   const SizedBox(width: 12),
-                  Text(
-                    _statusMessage,
-                    style: const TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                  Flexible(
+                    child: Text(
+                      _statusMessage,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -1581,6 +1594,10 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                     _buildInfoChip(Icons.precision_manufacturing, '≤${_maxHorizontalError}m'),
                     const SizedBox(width: 12),
                     _buildInfoChip(Icons.verified, '$_validPoints válidos'),
+                    if (_currentBestError > 0) ...[
+                      const SizedBox(width: 12),
+                      _buildInfoChip(Icons.gps_fixed, '${_currentBestError.toStringAsFixed(2)}m'),
+                    ],
                   ],
                 ),
               ),
@@ -1811,6 +1828,41 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                       ),
                     ),
                   ),
+
+                const SizedBox(height: 16),
+
+                // Margen de error
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _accentGreen.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: _accentGreen.withValues(alpha: 0.4),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.gps_fixed,
+                        color: _brightGreen,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Margen de error: ${_finalHorizontalError.toStringAsFixed(2)} m',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withValues(alpha: 0.9),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

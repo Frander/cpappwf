@@ -12,6 +12,8 @@ import 'package:flutter/services.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'package:nfc_manager/nfc_manager.dart';
+import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -948,20 +950,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             margin: EdgeInsets.only(left: level * 8.0),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                // INVERTIDO: Verde cuando completado, Naranja cuando NO completado
-                colors: hasValue
-                    ? [
-                        const Color(0xFF00a86b),
-                        const Color(0xFF00d980),
-                      ]
-                    : [
-                        const Color(0xFFF1F8F4),
-                        const Color(0xFFFAFDFB),
-                      ],
-              ),
+              // Reemplazado gradiente por color sólido para mejor rendimiento
+              color: hasValue
+                  ? const Color(0xFF00a86b)
+                  : const Color(0xFFF1F8F4),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: hasValue
@@ -969,148 +961,106 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     : const Color(0xFFE8F5E9),
                 width: 2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 12,
-                  color: hasValue
-                      ? const Color(0xFF00a86b).withValues(alpha: 0.4)
-                      : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              // BoxShadow removido para mejor rendimiento en scroll
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Row(
-                  children: [
-                    // Indicador de nivel
-                    if (level > 0)
-                      Container(
-                        width: 3,
-                        height: 24,
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0xFF00ff9f),
-                              Color(0xFF00a86b),
-                            ],
-                          ),
-                          borderRadius: BorderRadius.circular(2),
+            child: Row(
+              children: [
+                // Indicador de nivel
+                if (level > 0)
+                  Container(
+                    width: 3,
+                    height: 24,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00a86b),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                // Icono de expansión
+                if (activitiesStatus.isNotEmpty)
+                  Icon(
+                    isExpanded
+                        ? Icons.expand_more_rounded
+                        : Icons.chevron_right_rounded,
+                    color:
+                        hasValue ? Colors.white : const Color(0xFF00a86b),
+                    size: 36,
+                  ),
+                const SizedBox(width: 8),
+                // Nombre del step
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        stepName,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: hasValue
+                              ? Colors.white
+                              : const Color(0xFF00a86b),
                         ),
                       ),
-                    // Icono de expansión
-                    if (activitiesStatus.isNotEmpty)
-                      Icon(
-                        isExpanded
-                            ? Icons.expand_more_rounded
-                            : Icons.chevron_right_rounded,
-                        color:
-                            hasValue ? Colors.white : const Color(0xFF00a86b),
-                        size: 36,
-                        weight: 700,
-                      ),
-                    const SizedBox(width: 8),
-                    // Nombre del step
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            stepName,
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: hasValue
-                                  ? Colors.white
-                                  : const Color(0xFF00a86b),
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                          // Breadcrumb de selecciones
-                          _buildSelectionBreadcrumb(stepId, step),
-                        ],
+                      // Breadcrumb de selecciones
+                      _buildSelectionBreadcrumb(stepId, step),
+                    ],
+                  ),
+                ),
+                // Badge de progreso (si hay steps hijos requeridos)
+                if (totalRequired > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: totalCompleted == totalRequired
+                          ? const Color(0xFF1B5E20)
+                          : const Color(0xFFF57C00),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$totalCompleted/$totalRequired',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
                     ),
-                    // Badge de progreso (si hay steps hijos requeridos)
-                    if (totalRequired > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          // INVERTIDO: Verde cuando completado, Warning cuando incompleto
-                          color: totalCompleted == totalRequired
-                              ? const Color(0xFF00a86b).withValues(alpha: 0.3)
-                              : FlutterFlowTheme.of(context)
-                                  .warning
-                                  .withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: totalCompleted == totalRequired
-                                ? const Color(0xFF00a86b)
-                                : FlutterFlowTheme.of(context).warning,
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          '$totalCompleted/$totalRequired',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: totalCompleted == totalRequired
-                                ? const Color(0xFF00a86b)
-                                : FlutterFlowTheme.of(context).warning,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
+                  ),
+                // Badge de requerido (solo mostrar cuando NO tiene valor)
+                if (isRequired && !hasValue)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 4),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFD32F2F),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      '*',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                    // Badge de requerido (solo mostrar cuando NO tiene valor)
-                    if (isRequired && !hasValue)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          color: FlutterFlowTheme.of(context)
-                              .error
-                              .withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: FlutterFlowTheme.of(context).error,
-                            width: 1,
-                          ),
-                        ),
-                        child: Text(
-                          '*',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: FlutterFlowTheme.of(context).error,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    // Botón de búsqueda compacto (para unique-list y reference-list)
-                    // Solo visible cuando el step está expandido
-                    if ((typeStep == 'unique-list' ||
-                            typeStep == 'reference-list') &&
-                        activitiesStatus.isNotEmpty &&
-                        isExpanded)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: _buildCompactSearchButton(stepId),
-                      ),
-                  ],
-                ),
-              ),
+                    ),
+                  ),
+                // Botón de búsqueda compacto (para unique-list y reference-list)
+                // Solo visible cuando el step está expandido
+                if ((typeStep == 'unique-list' ||
+                        typeStep == 'reference-list') &&
+                    activitiesStatus.isNotEmpty &&
+                    isExpanded)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _buildCompactSearchButton(stepId),
+                  ),
+              ],
             ),
           ),
         ),
@@ -1376,35 +1326,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 debugPrint(
                     '✅ TAG-TRANSFER: Tag de origen guardado correctamente');
 
-                // Limpiar el tag de origen después de leer exitosamente
-                debugPrint('🧹 TAG-TRANSFER: Limpiando tag de origen...');
-                if (!mounted) return;
-                final clearSuccess = await actions.clearNFCTag(context);
-                if (clearSuccess) {
-                  debugPrint('✅ TAG-TRANSFER: Tag de origen limpiado exitosamente');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.cleaning_services, color: Colors.white),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Tag de origen leído y limpiado correctamente',
-                                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                        backgroundColor: Color(0xFF00a86b),
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                } else {
-                  debugPrint('⚠️ TAG-TRANSFER: No se pudo limpiar el tag de origen');
-                }
+                // TODO: Limpieza de TAG deshabilitada temporalmente por problemas de TagLostException
+                // // Limpiar el tag de origen después de leer exitosamente
+                // debugPrint('🧹 TAG-TRANSFER: Limpiando tag de origen...');
+                // if (!mounted) return;
+                // final clearSuccess = await actions.clearNFCTag(context);
+                // if (clearSuccess) {
+                //   debugPrint('✅ TAG-TRANSFER: Tag de origen limpiado exitosamente');
+                //   if (mounted) {
+                //     ScaffoldMessenger.of(context).showSnackBar(
+                //       const SnackBar(
+                //         content: Row(
+                //           children: [
+                //             Icon(Icons.cleaning_services, color: Colors.white),
+                //             SizedBox(width: 12),
+                //             Expanded(
+                //               child: Text(
+                //                 'Tag de origen leído y limpiado correctamente',
+                //                 style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
+                //               ),
+                //             ),
+                //           ],
+                //         ),
+                //         backgroundColor: Color(0xFF00a86b),
+                //         duration: Duration(seconds: 3),
+                //       ),
+                //     );
+                //   }
+                // } else {
+                //   debugPrint('⚠️ TAG-TRANSFER: No se pudo limpiar el tag de origen');
+                // }
 
                 debugPrint(
                     '💡 TAG-TRANSFER: Ahora el usuario puede presionar "Transferir ahora"');
@@ -2182,35 +2133,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 debugPrint(
                     '✅ TAG-TRANSFER (ROOT): Tag de origen guardado correctamente');
 
-                // Limpiar el tag de origen después de leer exitosamente
-                debugPrint('🧹 TAG-TRANSFER (ROOT): Limpiando tag de origen...');
-                if (!mounted) return;
-                final clearSuccess = await actions.clearNFCTag(context);
-                if (clearSuccess) {
-                  debugPrint('✅ TAG-TRANSFER (ROOT): Tag de origen limpiado exitosamente');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.cleaning_services, color: Colors.white),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Tag de origen leído y limpiado correctamente',
-                                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ],
-                        ),
-                        backgroundColor: Color(0xFF00a86b),
-                        duration: Duration(seconds: 3),
-                      ),
-                    );
-                  }
-                } else {
-                  debugPrint('⚠️ TAG-TRANSFER (ROOT): No se pudo limpiar el tag de origen');
-                }
+                // TODO: Limpieza de TAG deshabilitada temporalmente por problemas de TagLostException
+                // // Limpiar el tag de origen después de leer exitosamente
+                // debugPrint('🧹 TAG-TRANSFER (ROOT): Limpiando tag de origen...');
+                // if (!mounted) return;
+                // final clearSuccess = await actions.clearNFCTag(context);
+                // if (clearSuccess) {
+                //   debugPrint('✅ TAG-TRANSFER (ROOT): Tag de origen limpiado exitosamente');
+                //   if (mounted) {
+                //     ScaffoldMessenger.of(context).showSnackBar(
+                //       const SnackBar(
+                //         content: Row(
+                //           children: [
+                //             Icon(Icons.cleaning_services, color: Colors.white),
+                //             SizedBox(width: 12),
+                //             Expanded(
+                //               child: Text(
+                //                 'Tag de origen leído y limpiado correctamente',
+                //                 style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
+                //               ),
+                //             ),
+                //           ],
+                //         ),
+                //         backgroundColor: Color(0xFF00a86b),
+                //         duration: Duration(seconds: 3),
+                //       ),
+                //     );
+                //   }
+                // } else {
+                //   debugPrint('⚠️ TAG-TRANSFER (ROOT): No se pudo limpiar el tag de origen');
+                // }
 
                 debugPrint(
                     '💡 TAG-TRANSFER (ROOT): Ahora el usuario puede presionar "Transferir ahora"');
@@ -2262,336 +2214,246 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             margin: EdgeInsets.only(left: level * 8.0),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                // INVERTIDO: Verde oscuro si tiene valor (y no es number ni tag-writer), Naranja si NO tiene valor
-                colors: (hasValue && !isNumberType && !isTagWriterType)
-                    ? [
-                        const Color(0xFF00a86b),
-                        const Color(0xFF00d980),
-                      ]
-                    : [
-                        const Color(0xFFF1F8F4),
-                        const Color(0xFFFAFDFB),
-                      ],
-              ),
+              // Reemplazado gradiente por color sólido para mejor rendimiento
+              color: (hasValue && !isNumberType && !isTagWriterType)
+                  ? const Color(0xFF00a86b)
+                  : const Color(0xFFF1F8F4),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                // INVERTIDO: Verde oscuro si tiene valor (y no es number ni tag-writer), Naranja si NO tiene valor
                 color: (hasValue && !isNumberType && !isTagWriterType)
                     ? const Color(0xFF00a86b)
                     : const Color(0xFFE8F5E9),
                 width: 2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  blurRadius: 12,
-                  // INVERTIDO: Verde oscuro si tiene valor (y no es number, tag-writer ni tag-reader), Naranja si NO tiene valor
-                  color: (hasValue &&
-                          !isNumberType &&
-                          !isTagWriterType &&
-                          !isTagReaderType)
-                      ? const Color(0xFF00a86b).withValues(alpha: 0.4)
-                      : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
-                  offset: const Offset(0, 4),
-                ),
-              ],
+              // BoxShadow removido para mejor rendimiento
             ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Row(
-                  children: [
-                    // Icono de expansión o tipo
-                    if (hasChildren)
-                      Icon(
-                        isExpanded
-                            ? Icons.expand_more_rounded
-                            : Icons.chevron_right_rounded,
-                        color: (hasValue && !isNumberType && !isTagWriterType)
-                            ? Colors.white
-                            : const Color(0xFF00a86b),
-                        size: 36,
-                        weight: 700,
-                      ),
-                    if (!hasChildren &&
-                        typeStatus != 'tag-writer' &&
-                        typeStatus != 'tag-reader' &&
-                        typeStatus != 'tag-transfer')
-                      Icon(
-                        typeStatus == 'number'
-                            ? Icons.numbers_rounded
-                            : typeStatus == 'text'
-                                ? Icons.text_fields_rounded
-                                : typeStatus == 'date'
-                                    ? Icons.calendar_today_rounded
-                                    : typeStatus == 'time'
-                                        ? Icons.access_time_rounded
-                                        : Icons.check_circle_outline_rounded,
-                        color: (hasValue && !isNumberType && !isTagWriterType)
-                            ? Colors.white
-                            : const Color(0xFF00a86b),
-                        size: 28,
-                      ),
-                    const SizedBox(width: 8),
-                    // Nombre del status
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              children: [
+                // Icono de expansión o tipo
+                if (hasChildren)
+                  Icon(
+                    isExpanded
+                        ? Icons.expand_more_rounded
+                        : Icons.chevron_right_rounded,
+                    color: (hasValue && !isNumberType && !isTagWriterType)
+                        ? Colors.white
+                        : const Color(0xFF00a86b),
+                    size: 36,
+                  ),
+                if (!hasChildren &&
+                    typeStatus != 'tag-writer' &&
+                    typeStatus != 'tag-reader' &&
+                    typeStatus != 'tag-transfer')
+                  Icon(
+                    typeStatus == 'number'
+                        ? Icons.numbers_rounded
+                        : typeStatus == 'text'
+                            ? Icons.text_fields_rounded
+                            : typeStatus == 'date'
+                                ? Icons.calendar_today_rounded
+                                : typeStatus == 'time'
+                                    ? Icons.access_time_rounded
+                                    : Icons.check_circle_outline_rounded,
+                    color: (hasValue && !isNumberType && !isTagWriterType)
+                        ? Colors.white
+                        : const Color(0xFF00a86b),
+                    size: 28,
+                  ),
+                const SizedBox(width: 8),
+                // Nombre del status
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Fila superior: nombre + control numérico compacto
+                      Row(
                         children: [
-                          // Fila superior: nombre + control numérico compacto
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    Flexible(
-                                      child: Text(
-                                        statusName,
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontFamily: 'Roboto',
-                                          fontSize: 19,
-                                          fontWeight: FontWeight.w800,
-                                          color: (isDistanceExtractorType &&
-                                                  (_distanceExtractorCalculated[
-                                                          statusId] ??
-                                                      false))
-                                              ? const Color(
-                                                  0xFF00695C) // Verde oscuro para distance-extractor calculado
-                                              : (hasValue &&
-                                                      !isNumberType &&
-                                                      !isTagWriterType &&
-                                                      !isDistanceExtractorType)
-                                                  ? Colors.white
-                                                  : const Color(0xFF00a86b),
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                          Expanded(
+                            child: Text(
+                              statusName,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 19,
+                                fontWeight: FontWeight.w800,
+                                color: (isDistanceExtractorType &&
+                                        (_distanceExtractorCalculated[statusId] ?? false))
+                                    ? const Color(0xFF00695C)
+                                    : (hasValue && !isNumberType && !isTagWriterType && !isDistanceExtractorType)
+                                        ? Colors.white
+                                        : const Color(0xFF00a86b),
                               ),
-                              // Mostrar valor de hora (inline)
-                              if (typeStatus.toLowerCase() == 'time')
-                                _buildTimeValueDisplay(statusId, 0,
-                                    hasValue: hasValue),
-                              // Control numérico compacto inline (- [número] +) al lado del nombre
-                              if (isNumberType)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildCompactInlineNumberControl(
-                                      status: status),
-                                ),
-                              // Botón de limpieza inline para tag-writer (antes del botón de lectura)
-                              if (isTagWriterType &&
-                                  _tagWriterData.containsKey(statusId))
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildTagWriterCleanupButton(
-                                    statusId: statusId,
-                                  ),
-                                ),
-                              // Botón inline para tag-writer (NFC)
-                              if (isTagWriterType)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildTagWriterButton(
-                                    context: context,
-                                    statusName: statusName,
-                                    statusId: statusId,
-                                  ),
-                                ),
-                              // Botón de limpieza inline para tag-reader (antes del botón de lectura)
-                              if (isTagReaderType &&
-                                  _tagReaderData.containsKey(statusId))
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildTagReaderCleanupButton(
-                                    statusId: statusId,
-                                  ),
-                                ),
-                              // Botón inline para tag-reader (NFC)
-                              if (isTagReaderType)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildTagReaderButton(
-                                    context: context,
-                                    statusName: statusName,
-                                  ),
-                                ),
-                              // Botón de limpieza inline para tag-transfer (antes del botón de lectura)
-                              if (isTagTransferType &&
-                                  _tagTransferData.containsKey(statusId))
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildTagTransferCleanupButton(
-                                    statusId: statusId,
-                                  ),
-                                ),
-                              // Botón inline para tag-transfer (NFC)
-                              if (isTagTransferType)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildTagTransferButton(
-                                    context: context,
-                                    statusName: statusName,
-                                    statusId: statusId,
-                                    parentStep: null, // Root status no tiene step padre
-                                    status: status,
-                                  ),
-                                ),
-                              // Botón inline para dynamic-printing
-                              if (isDynamicPrintingType)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: _buildDynamicPrintingButton(
-                                    context: context,
-                                    statusName: statusName,
-                                    status: status,
-                                  ),
-                                ),
-                            ],
+                            ),
                           ),
-                          // Mostrar valor de fecha en fila separada DEBAJO del nombre
-                          if (typeStatus.toLowerCase() == 'date')
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildDateValueDisplay(statusId, 0,
-                                  hasValue: hasValue),
-                            ),
-                          // Resumen del tag-reader (solo para tipo tag-reader) - DEBAJO
-                          if (isTagReaderType &&
-                              _tagReaderData.containsKey(statusId))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildTagReaderSummary(statusId: statusId),
-                            ),
-                          // Resumen del tag-writer (solo para tipo tag-writer) - DEBAJO
-                          if (isTagWriterType &&
-                              _tagWriterData.containsKey(statusId))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildTagWriterSummary(statusId: statusId),
-                            ),
-                          // Resumen del tag-transfer (solo para tipo tag-transfer) - DEBAJO
-                          if (isTagTransferType &&
-                              _tagTransferData.containsKey(statusId))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child:
-                                  _buildTagTransferSummary(statusId: statusId),
-                            ),
-                          // Valor calculado de numbers-operation - DEBAJO
-                          if (isNumbersOperationType &&
-                              _calculatedValues.containsKey(statusId))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildNumbersOperationDisplay(
-                                statusId: statusId,
-                                status: status,
-                              ),
-                            ),
-                          // Display para label-info - DEBAJO
-                          if (isLabelInfoType)
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildLabelInfoDisplay(
-                                statusName: statusName,
-                                statusId: statusId,
-                                status: status,
-                              ),
-                            ),
-                          // Display para distance-extractor - DEBAJO
-                          if (isDistanceExtractorType &&
-                              _calculatedDistances.containsKey(statusId))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildDistanceExtractorDisplay(
-                                statusId: statusId,
-                              ),
-                            ),
-                          // Resumen de weights de headquarters - DEBAJO
-                          if (isHeadquarterWeightType &&
-                              (_calculatedHeadquarterWeights.isNotEmpty ||
-                                  _headquartersWithoutWeight.isNotEmpty))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildHeadquarterWeightsDisplay(),
-                            ),
-                          // Cajones numéricos del 1 al 5 (solo para tipo number) - DEBAJO
+                          // Mostrar valor de hora (inline)
+                          if (typeStatus.toLowerCase() == 'time')
+                            _buildTimeValueDisplay(statusId, 0, hasValue: hasValue),
+                          // Control numérico compacto inline
                           if (isNumberType)
                             Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildNumberBoxes(status: status),
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildCompactInlineNumberControl(status: status),
                             ),
-                          if (!isNumberType &&
-                              !isTagWriterType &&
-                              !isTagReaderType &&
-                              functions.showCurrentStatus(
-                                      FFAppState().visitDetails.toList(),
-                                      statusId) !=
-                                  'N/A')
+                          // Botón de limpieza inline para tag-writer
+                          if (isTagWriterType && _tagWriterData.containsKey(statusId))
                             Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                functions.showCurrentStatus(
-                                      FFAppState().visitDetails.toList(),
-                                      statusId,
-                                    ) ??
-                                    '',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  letterSpacing: 0.2,
-                                ),
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildTagWriterCleanupButton(statusId: statusId),
+                            ),
+                          // Botón inline para tag-writer (NFC)
+                          if (isTagWriterType)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildTagWriterButton(
+                                context: context,
+                                statusName: statusName,
+                                statusId: statusId,
+                              ),
+                            ),
+                          // Botón de limpieza inline para tag-reader
+                          if (isTagReaderType && _tagReaderData.containsKey(statusId))
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildTagReaderCleanupButton(statusId: statusId),
+                            ),
+                          // Botón inline para tag-reader (NFC)
+                          if (isTagReaderType)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildTagReaderButton(
+                                context: context,
+                                statusName: statusName,
+                              ),
+                            ),
+                          // Botón de limpieza inline para tag-transfer
+                          if (isTagTransferType && _tagTransferData.containsKey(statusId))
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildTagTransferCleanupButton(statusId: statusId),
+                            ),
+                          // Botón inline para tag-transfer (NFC)
+                          if (isTagTransferType)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildTagTransferButton(
+                                context: context,
+                                statusName: statusName,
+                                statusId: statusId,
+                                parentStep: null,
+                                status: status,
+                              ),
+                            ),
+                          // Botón inline para dynamic-printing
+                          if (isDynamicPrintingType)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildDynamicPrintingButton(
+                                context: context,
+                                statusName: statusName,
+                                status: status,
                               ),
                             ),
                         ],
                       ),
-                    ),
-                    // Badge de progreso (si hay steps hijos requeridos)
-                    if (totalRequired > 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        margin: const EdgeInsets.only(right: 8),
-                        decoration: BoxDecoration(
-                          // INVERTIDO: Verde cuando completado, Warning cuando incompleto
-                          color: totalCompleted == totalRequired
-                              ? const Color(0xFF00a86b).withValues(alpha: 0.3)
-                              : FlutterFlowTheme.of(context)
-                                  .warning
-                                  .withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: totalCompleted == totalRequired
-                                ? const Color(0xFF00a86b)
-                                : FlutterFlowTheme.of(context).warning,
-                            width: 1,
+                      // Mostrar valor de fecha
+                      if (typeStatus.toLowerCase() == 'date')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildDateValueDisplay(statusId, 0, hasValue: hasValue),
+                        ),
+                      // Resumen del tag-reader
+                      if (isTagReaderType && _tagReaderData.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildTagReaderSummary(statusId: statusId),
+                        ),
+                      // Resumen del tag-writer
+                      if (isTagWriterType && _tagWriterData.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildTagWriterSummary(statusId: statusId),
+                        ),
+                      // Resumen del tag-transfer
+                      if (isTagTransferType && _tagTransferData.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildTagTransferSummary(statusId: statusId),
+                        ),
+                      // Valor calculado de numbers-operation
+                      if (isNumbersOperationType && _calculatedValues.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildNumbersOperationDisplay(statusId: statusId, status: status),
+                        ),
+                      // Display para label-info
+                      if (isLabelInfoType)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildLabelInfoDisplay(
+                            statusName: statusName,
+                            statusId: statusId,
+                            status: status,
                           ),
                         ),
-                        child: Text(
-                          '$totalCompleted/$totalRequired',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: totalCompleted == totalRequired
-                                ? const Color(0xFF00a86b)
-                                : FlutterFlowTheme.of(context).warning,
-                            letterSpacing: 0.5,
+                      // Display para distance-extractor
+                      if (isDistanceExtractorType && _calculatedDistances.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildDistanceExtractorDisplay(statusId: statusId),
+                        ),
+                      // Resumen de weights de headquarters
+                      if (isHeadquarterWeightType &&
+                          (_calculatedHeadquarterWeights.isNotEmpty || _headquartersWithoutWeight.isNotEmpty))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildHeadquarterWeightsDisplay(),
+                        ),
+                      // Cajones numéricos del 1 al 5
+                      if (isNumberType)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildNumberBoxes(status: status),
+                        ),
+                      if (!isNumberType && !isTagWriterType && !isTagReaderType &&
+                          functions.showCurrentStatus(FFAppState().visitDetails.toList(), statusId) != 'N/A')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            functions.showCurrentStatus(FFAppState().visitDetails.toList(), statusId) ?? '',
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
+                // Badge de progreso (si hay steps hijos requeridos)
+                if (totalRequired > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: BoxDecoration(
+                      color: totalCompleted == totalRequired
+                          ? const Color(0xFF1B5E20)
+                          : const Color(0xFFF57C00),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      '$totalCompleted/$totalRequired',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -3394,33 +3256,124 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     return;
                   }
 
-                  // Si la validación pasó, mostrar diálogo con LoadCoordinatesVisit
-                  await showDialog<bool>(
-                    context: context,
-                    barrierDismissible: false,
-                    barrierColor: Colors.black.withValues(alpha: 0.85),
-                    builder: (dialogContext) {
-                      return Dialog(
-                        backgroundColor: Colors.transparent,
-                        elevation: 0,
-                        insetPadding: EdgeInsets.zero,
-                        child: SizedBox(
-                          height: MediaQuery.sizeOf(context).height * 0.75,
-                          width: MediaQuery.sizeOf(context).width * 0.95,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(32),
-                            child: custom_widgets.LoadCoordinatesVisit(
-                              width: MediaQuery.sizeOf(context).width * 0.95,
-                              height: MediaQuery.sizeOf(context).height * 0.75,
+                  // Verificar si la actividad requiere lectura de TAG NFC antes de guardar
+                  final readDefault = getJsonField(currentActivity, r'''$.read_default''')?.toString().toUpperCase() ?? '';
+
+                  if (readDefault == 'NFC') {
+                    // === MODO NFC: Leer TAG y guardar visita directamente ===
+                    final nfcTagId = await _showNfcTagIdReaderDialog();
+
+                    // Si el usuario canceló la lectura NFC, no continuar
+                    if (nfcTagId == null || nfcTagId.isEmpty) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Row(
+                              children: [
+                                Icon(Icons.nfc_rounded, color: Colors.white),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Lectura de TAG cancelada. No se guardó la visita.',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
+                            duration: const Duration(seconds: 3),
+                            backgroundColor: Colors.orange.shade700,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            margin: const EdgeInsets.all(16),
                           ),
+                        );
+                      }
+                      return;
+                    }
+
+                    // Crear visita directamente con NFC y las últimas geolocalizaciones
+                    final success = await _createVisitWithNfc(nfcTagId);
+
+                    if (success && mounted) {
+                      // Mostrar mensaje de éxito
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '¡Visita Registrada!',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      'TAG: $nfcTagId',
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          duration: const Duration(seconds: 3),
+                          backgroundColor: const Color(0xFF00a86b),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          margin: const EdgeInsets.all(16),
                         ),
                       );
-                    },
-                  );
 
-                  // NUEVO: Limpiar los datos de tags que NO deben ser recordados después de crear la visita
-                  _cleanupTagDatasByRememberFlag();
+                      // Limpiar los datos de tags que NO deben ser recordados
+                      _cleanupTagDatasByRememberFlag();
+                    }
+                  } else {
+                    // === MODO GPS (default): Usar LoadCoordinatesVisit con timer ===
+                    await showDialog<bool>(
+                      context: context,
+                      barrierDismissible: false,
+                      barrierColor: Colors.black.withValues(alpha: 0.85),
+                      builder: (dialogContext) {
+                        return Dialog(
+                          backgroundColor: Colors.transparent,
+                          elevation: 0,
+                          insetPadding: EdgeInsets.zero,
+                          child: SizedBox(
+                            height: MediaQuery.sizeOf(context).height * 0.75,
+                            width: MediaQuery.sizeOf(context).width * 0.95,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(32),
+                              child: custom_widgets.LoadCoordinatesVisit(
+                                width: MediaQuery.sizeOf(context).width * 0.95,
+                                height: MediaQuery.sizeOf(context).height * 0.75,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    );
+
+                    // Limpiar los datos de tags que NO deben ser recordados después de crear la visita
+                    _cleanupTagDatasByRememberFlag();
+                  }
 
                   // El widget LoadCoordinatesVisit se cierra automáticamente
                   // El formulario permanece abierto para permitir crear más visitas
@@ -3473,6 +3426,363 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ],
       ),
     );
+  }
+
+  /// Muestra un diálogo para leer el TAG ID (RFID) del NFC antes de guardar
+  /// Retorna el TAG ID leído o null si el usuario cancela
+  Future<String?> _showNfcTagIdReaderDialog() async {
+    String? tagId;
+    bool isReading = false;
+    bool isCancelled = false;
+
+    return await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            // Función para iniciar la lectura NFC
+            Future<void> startNfcReading() async {
+              if (isReading || isCancelled) return;
+
+              setDialogState(() => isReading = true);
+
+              try {
+                await NfcManager.instance.startSession(
+                  pollingOptions: {
+                    NfcPollingOption.iso14443,
+                    NfcPollingOption.iso15693,
+                    NfcPollingOption.iso18092,
+                  },
+                  onDiscovered: (NfcTag tag) async {
+                    try {
+                      // Obtener el ID del TAG
+                      final androidTag = NfcTagAndroid.from(tag);
+                      if (androidTag != null && androidTag.id.isNotEmpty) {
+                        tagId = androidTag.id
+                            .map((byte) => byte.toRadixString(16).toUpperCase().padLeft(2, '0'))
+                            .join('');
+                      }
+
+                      await NfcManager.instance.stopSession();
+
+                      if (!isCancelled && tagId != null && tagId!.isNotEmpty) {
+                        HapticFeedback.mediumImpact();
+                        if (Navigator.of(dialogContext).canPop()) {
+                          Navigator.of(dialogContext).pop(tagId);
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('Error leyendo TAG ID: $e');
+                      await NfcManager.instance.stopSession();
+                      setDialogState(() => isReading = false);
+                    }
+                  },
+                );
+              } catch (e) {
+                debugPrint('Error iniciando sesión NFC: $e');
+                setDialogState(() => isReading = false);
+              }
+            }
+
+            // Iniciar lectura automáticamente
+            if (!isReading && !isCancelled) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                startNfcReading();
+              });
+            }
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Container(
+                width: MediaQuery.sizeOf(context).width * 0.9,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1A1A2E),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+                    width: 2,
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Icono NFC animado
+                    Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.1),
+                        border: Border.all(
+                          color: const Color(0xFF00a86b),
+                          width: 3,
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.nfc_rounded,
+                        size: 50,
+                        color: Color(0xFF00a86b),
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Título
+                    const Text(
+                      'Lectura de TAG Requerida',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    // Instrucciones
+                    Text(
+                      isReading
+                          ? 'Acerque el TAG NFC al dispositivo...'
+                          : 'Preparando lector NFC...',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 20),
+                    // Indicador de carga
+                    if (isReading)
+                      const SizedBox(
+                        width: 40,
+                        height: 40,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 3,
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+                        ),
+                      ),
+                    const SizedBox(height: 24),
+                    // Botón cancelar
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          isCancelled = true;
+                          try {
+                            await NfcManager.instance.stopSession();
+                          } catch (_) {}
+                          if (Navigator.of(dialogContext).canPop()) {
+                            Navigator.of(dialogContext).pop(null);
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Cancelar',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Crea una visita directamente usando el TAG NFC leído y las últimas 3 geolocalizaciones del AppState
+  Future<bool> _createVisitWithNfc(String nfcTagId) async {
+    try {
+      debugPrint('📱 ===== CREANDO VISITA CON NFC =====');
+      debugPrint('🏷️  TAG ID: $nfcTagId');
+
+      // Obtener datos necesarios
+      final currentActivity = FFAppState().currentActivity;
+      final idActivity = getJsonField(currentActivity, r'''$.id_activity''');
+      final userSelected = FFAppState().userSelected;
+      final deviceDefault = FFAppState().deviceDefault;
+
+      // Obtener el Id_headquarter del lote actual
+      int idHeadquarter = 0;
+      final headquartersList = FFAppState().headquartersSelectedList;
+      if (headquartersList.isNotEmpty) {
+        idHeadquarter = headquartersList.first.idHeadquarter;
+        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+      } else {
+        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
+      }
+
+      // Obtener las últimas 3 geolocalizaciones del AppState
+      final geoLocations = FFAppState().geoLocationsList;
+      if (geoLocations.isEmpty) {
+        debugPrint('⚠️ No hay geolocalizaciones disponibles');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.location_off_rounded, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'No hay ubicación GPS disponible. Espere a que se obtenga la ubicación.',
+                      style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+        return false;
+      }
+
+      // Tomar las últimas 3 geolocalizaciones (o menos si no hay suficientes)
+      final recentGeoLocations = geoLocations.length <= 3
+          ? geoLocations.toList()
+          : geoLocations.sublist(geoLocations.length - 3);
+
+      // Usar la ubicación más reciente como la principal de la visita
+      final mainLocation = recentGeoLocations.last;
+      debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
+      debugPrint('📍 Total geolocalizaciones a guardar: ${recentGeoLocations.length}');
+
+      // Obtener visitDetails filtrados
+      final visitDetails = FFAppState().visitDetails;
+      final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
+
+      // Abrir base de datos
+      final dbPath = FFAppState().pathDatabase;
+      final database = await openDatabase(dbPath);
+
+      int visitId = 0;
+      await database.transaction((txn) async {
+        // Insertar la visita con el RFID
+        visitId = await txn.rawInsert('''
+          INSERT INTO Visits (
+            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+            Id_user, Id_device, Id_status, Created_at, Battery,
+            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', [
+          userSelected.idCompany,
+          idActivity,
+          idHeadquarter,
+          0, // Id_product
+          0, // Id_bulk
+          userSelected.idUser,
+          deviceDefault.idDevice,
+          0, // Id_status
+          DateTime.now().toUtc().toIso8601String(),
+          100, // Battery (valor por defecto)
+          mainLocation.latitude,
+          mainLocation.longitude,
+          mainLocation.altitude,
+          mainLocation.errorHorizontal,
+          null, // Id_virtual_point
+          0, // Status
+          nfcTagId, // RFID del TAG
+        ]);
+
+        debugPrint('✅ Visita NFC creada con ID: $visitId');
+
+        // Insertar detalles de la visita
+        int insertedCount = 0;
+        for (var detail in detailsToInsert) {
+          final idActivityStatus = detail.idActivityStatus;
+
+          final statusCheck = await txn.rawQuery('''
+            SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
+          ''', [idActivityStatus]);
+
+          if (statusCheck.isEmpty) continue;
+
+          await txn.rawInsert('''
+            INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
+            VALUES (?, ?, ?, ?)
+          ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
+
+          insertedCount++;
+        }
+
+        debugPrint('✅ $insertedCount detalles de visita insertados');
+
+        // Insertar las geolocalizaciones
+        for (var geoPoint in recentGeoLocations) {
+          await txn.rawInsert('''
+            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?)
+          ''', [
+            visitId,
+            geoPoint.latitude,
+            geoPoint.longitude,
+            geoPoint.altitude,
+            geoPoint.errorHorizontal,
+            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toUtc().toIso8601String(),
+          ]);
+        }
+
+        debugPrint('✅ ${recentGeoLocations.length} ubicaciones GPS insertadas');
+      });
+
+      await database.close();
+
+      // Actualizar el contador de visitas y limpiar visitDetails
+      FFAppState().update(() {
+        FFAppState().visitCount = FFAppState().visitCount + 1;
+        FFAppState().visitDetails = functions.removeVisits(FFAppState().visitDetails);
+      });
+
+      debugPrint('✅ Visita NFC completada exitosamente. ID: $visitId');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error creando visita NFC: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Error al guardar la visita: $e',
+                    style: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+      return false;
+    }
   }
 
   void _updateNumberValue(
@@ -3899,7 +4209,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('');
   }
 
-  // ===== CAJONES NUMÉRICOS DEL 1 AL 5 =====
+  // ===== CAJONES NUMÉRICOS DEL 1 AL 4 =====
 
   // Control numérico compacto para root status
   Widget _buildCompactInlineNumberControl({required dynamic status}) {
@@ -4029,7 +4339,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: List.generate(5, (index) {
+          children: List.generate(4, (index) {
             final number = index + 1;
             // Solo poner naranja si está seleccionado Y NO se usó up/down
             final isSelected = currentValue == number && !usedUpDown;
@@ -4283,7 +4593,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: List.generate(5, (index) {
+          children: List.generate(4, (index) {
             final number = index + 1;
             // Solo poner naranja si está seleccionado Y NO se usó up/down
             final isSelected = currentValue == number && !usedUpDown;

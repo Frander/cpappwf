@@ -1,6 +1,7 @@
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_background_service/flutter_background_service.dart';
 import 'dart:async';
 
 class GPSQualityIndicator extends StatefulWidget {
@@ -15,10 +16,12 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
   bool? _lastStabilizedState;
   bool _isVisible = false;
   bool _currentIsStabilized = false;
+  double _currentAccuracy = 0.0;
   Timer? _hideTimer;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
+  StreamSubscription<Map<String, dynamic>?>? _gpsProgressSubscription;
 
   @override
   void initState() {
@@ -42,10 +45,26 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
       parent: _animationController,
       curve: Curves.easeOutCubic,
     ));
+
+    // Escuchar eventos de progreso del GPS desde el servicio de background
+    _setupGpsProgressListener();
+  }
+
+  void _setupGpsProgressListener() {
+    final service = FlutterBackgroundService();
+    _gpsProgressSubscription = service.on('gpsProgress').listen((event) {
+      if (event != null && mounted) {
+        final accuracy = (event['accuracy'] as num?)?.toDouble() ?? 0.0;
+        setState(() {
+          _currentAccuracy = accuracy;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
+    _gpsProgressSubscription?.cancel();
     _hideTimer?.cancel();
     _animationController.dispose();
     super.dispose();
@@ -83,6 +102,21 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
         });
       }
     });
+  }
+
+  // Obtener color según la precisión del GPS
+  Color _getAccuracyColor(double accuracy) {
+    if (accuracy <= 5) {
+      return const Color(0xFF00C853); // Verde - Excelente
+    } else if (accuracy <= 10) {
+      return const Color(0xFF64DD17); // Verde claro - Muy bueno
+    } else if (accuracy <= 15) {
+      return const Color(0xFFFFEB3B); // Amarillo - Bueno
+    } else if (accuracy <= 25) {
+      return const Color(0xFFFF9800); // Naranja - Aceptable
+    } else {
+      return const Color(0xFFFF5722); // Rojo - Pobre
+    }
   }
 
   @override
@@ -209,20 +243,64 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
               child: Text(message),
             ),
 
+            // Badge de precisión solo cuando está estabilizando
+            if (!isStabilized && _currentAccuracy > 0) ...[
+              const SizedBox(width: 12),
+              _buildAccuracyBadge(),
+            ],
+
             // Spinner solo cuando está estabilizando
             if (!isStabilized) ...[
               const SizedBox(width: 12),
-              SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+              RepaintBoundary(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                  ),
                 ),
               ),
             ],
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildAccuracyBadge() {
+    final accuracyColor = _getAccuracyColor(_currentAccuracy);
+    final accuracyText = '±${_currentAccuracy.toStringAsFixed(1)}m';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: accuracyColor.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: accuracyColor.withOpacity(0.6),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.straighten,
+            size: 14,
+            color: accuracyColor,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            accuracyText,
+            style: TextStyle(
+              color: accuracyColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
