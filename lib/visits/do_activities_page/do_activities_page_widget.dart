@@ -68,13 +68,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
     _pulseController.repeat(reverse: true);
 
     SchedulerBinding.instance.addPostFrameCallback((_) async {
-      unawaited(
-        () async {
-          await actions.getLocationList(
-            context,
-          );
-        }(),
-      );
+      // DESACTIVADO: getLocationList - ahora solo usa background_location_service
+      // unawaited(
+      //   () async {
+      //     await actions.getLocationList(
+      //       context,
+      //     );
+      //   }(),
+      // );
       if (FFAppState().isStabilized) {
         return;
       }

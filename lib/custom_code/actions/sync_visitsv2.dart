@@ -738,8 +738,10 @@ Future<List<int>> _getLocationTrackingFromSQLiteAndCompress(
     //'Id_company,Imei,Latitude,Longitude,Altitude,HorizontalError,CreatedAt,SyncedAt,batch_id');
 
     for (final location in locations) {
+      // Formato CSV con 13 campos (incluyendo campos de depuración):
+      // Id_company,Imei,Latitude,Longitude,Altitude,HorizontalError,CreatedAt,SyncedAt,batch_id,date_start,date_finish,evaluated_radius,point_count
       csvContent.writeln(
-          '${location['Id_company']},${location['Imei']},${location['Latitude']},${location['Longitude']},${location['Altitude']},${location['HorizontalError']},${location['CreatedAt']},${location['SyncedAt']},${location['batch_id'] ?? ''}');
+          '${location['Id_company']},${location['Imei']},${location['Latitude']},${location['Longitude']},${location['Altitude']},${location['HorizontalError']},${location['CreatedAt']},${location['SyncedAt']},${location['batch_id'] ?? ''},${location['date_start'] ?? ''},${location['date_finish'] ?? ''},${location['evaluated_radius'] ?? ''},${location['point_count'] ?? 1}');
     }
 
     debugPrint('📄 CSV generado: ${csvContent.length} caracteres');

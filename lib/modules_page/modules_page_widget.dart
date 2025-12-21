@@ -88,15 +88,16 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
             return;
           }
         }),
-        Future(() async {
-          unawaited(
-            () async {
-              await actions.getLocationList(
-                context,
-              );
-            }(),
-          );
-        }),
+        // DESACTIVADO: getLocationList - ahora solo usa background_location_service
+        // Future(() async {
+        //   unawaited(
+        //     () async {
+        //       await actions.getLocationList(
+        //         context,
+        //       );
+        //     }(),
+        //   );
+        // }),
       ]);
     });
 

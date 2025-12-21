@@ -157,7 +157,11 @@ class GlobalDbSingleton {
           Battery INTEGER,
           CreatedAt TEXT,
           SyncedAt TEXT,
-          batch_id TEXT
+          batch_id TEXT,
+          date_start TEXT,
+          date_finish TEXT,
+          evaluated_radius REAL,
+          point_count INTEGER DEFAULT 1
         );
       ''');
       debugPrint('📦 GlobalDbSingleton: Tabla Location_tracking creada');

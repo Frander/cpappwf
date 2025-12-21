@@ -82,13 +82,14 @@ class _CalculateCoordenatesComponentWidgetState
     // On component load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       _scaleController.forward();
-      unawaited(
-        () async {
-          await actions.getLocationList(
-            context,
-          );
-        }(),
-      );
+      // DESACTIVADO: getLocationList - ahora solo usa background_location_service
+      // unawaited(
+      //   () async {
+      //     await actions.getLocationList(
+      //       context,
+      //     );
+      //   }(),
+      // );
       _model.timerController.onStartTimer();
     });
 

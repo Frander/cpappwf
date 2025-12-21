@@ -45,7 +45,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          17, // Incrementada a v17 para agregar campo is_sync_full a Activities
+          18, // Incrementada a v18 para agregar campos de depuración a Location_tracking
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -453,7 +453,11 @@ Future<void> _createTables(Database db) async {
         Battery INTEGER NOT NULL DEFAULT 0,
         CreatedAt DATETIME NOT NULL DEFAULT (datetime('now', 'utc')),
         SyncedAt DATETIME NOT NULL DEFAULT (datetime('now', 'utc')),
-        batch_id TEXT
+        batch_id TEXT,
+        date_start TEXT,
+        date_finish TEXT,
+        evaluated_radius REAL,
+        point_count INTEGER DEFAULT 1
     );
   ''');
 
@@ -1905,8 +1909,48 @@ Future<void> _upgradeDatabase(
       }
     }
 
+    // Migración v17 a v18: Agregar campos de depuración a Location_tracking
+    if (oldVersion < 18) {
+      debugPrint('Aplicando migración a versión 18...');
+      debugPrint('   Agregando campos de depuración a Location_tracking');
+
+      try {
+        final columns =
+            await db.rawQuery('PRAGMA table_info(Location_tracking);');
+        final columnNames =
+            columns.map((col) => col['name'] as String).toList();
+
+        if (!columnNames.contains('date_start')) {
+          await db.execute(
+              'ALTER TABLE Location_tracking ADD COLUMN date_start TEXT;');
+          debugPrint('   ✅ Campo date_start agregado');
+        }
+        if (!columnNames.contains('date_finish')) {
+          await db.execute(
+              'ALTER TABLE Location_tracking ADD COLUMN date_finish TEXT;');
+          debugPrint('   ✅ Campo date_finish agregado');
+        }
+        if (!columnNames.contains('evaluated_radius')) {
+          await db.execute(
+              'ALTER TABLE Location_tracking ADD COLUMN evaluated_radius REAL;');
+          debugPrint('   ✅ Campo evaluated_radius agregado');
+        }
+        if (!columnNames.contains('point_count')) {
+          await db.execute(
+              'ALTER TABLE Location_tracking ADD COLUMN point_count INTEGER DEFAULT 1;');
+          debugPrint('   ✅ Campo point_count agregado');
+        }
+
+        debugPrint('✅ Migración a versión 18 completada');
+        debugPrint(
+            '   Campos de depuración disponibles en Location_tracking');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 18: $e');
+      }
+    }
+
     // Futuras migraciones se agregarían aquí
-    // if (oldVersion < 18) { ... }
+    // if (oldVersion < 19) { ... }
   } catch (e) {
     debugPrint('❌ Error durante la migración de la base de datos: $e');
     rethrow;

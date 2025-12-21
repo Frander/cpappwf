@@ -49,15 +49,16 @@ class _CalculateCoordenatesInstallComponentWidgetState
     // On component load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       await Future.wait([
-        Future(() async {
-          unawaited(
-            () async {
-              await actions.getLocationList(
-                context,
-              );
-            }(),
-          );
-        }),
+        // DESACTIVADO: getLocationList - ahora solo usa background_location_service
+        // Future(() async {
+        //   unawaited(
+        //     () async {
+        //       await actions.getLocationList(
+        //         context,
+        //       );
+        //     }(),
+        //   );
+        // }),
         Future(() async {
           _model.timerController.onStartTimer();
         }),
