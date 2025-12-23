@@ -79,7 +79,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           context.pop();
         }
         context.pushNamed(
-          HomePageWidget.routeName,
+          LoginPageWidget.routeName,
           extra: <String, dynamic>{
             kTransitionInfoKey: TransitionInfo(
               hasTransition: true,
@@ -244,7 +244,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               context.pop();
             }
             context.pushNamed(
-              HomePageWidget.routeName,
+              LoginPageWidget.routeName,
               extra: <String, dynamic>{
                 kTransitionInfoKey: TransitionInfo(
                   hasTransition: true,
@@ -411,7 +411,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
                               debugPrint('✅ Login completado, navegando a HomePage');
                               context.pushNamed(
-                                HomePageWidget.routeName,
+                                LoginPageWidget.routeName,
                                 extra: <String, dynamic>{
                                   kTransitionInfoKey: TransitionInfo(
                                     hasTransition: true,
@@ -849,7 +849,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
                       debugPrint('✅ Registro completado, navegando a HomePage');
                       context.pushNamed(
-                        HomePageWidget.routeName,
+                        LoginPageWidget.routeName,
                         extra: <String, dynamic>{
                           kTransitionInfoKey: TransitionInfo(
                             hasTransition: true,
@@ -1099,7 +1099,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 context.pop();
               }
               context.pushNamed(
-                HomePageWidget.routeName,
+                LoginPageWidget.routeName,
                 extra: <String, dynamic>{
                   kTransitionInfoKey: TransitionInfo(
                     hasTransition: true,
@@ -1324,7 +1324,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               }
                               debugPrint('✅ Navegando a HomePage');
                               context.pushNamed(
-                                HomePageWidget.routeName,
+                                LoginPageWidget.routeName,
                                 extra: <String, dynamic>{
                                   kTransitionInfoKey: TransitionInfo(
                                     hasTransition: true,
@@ -1776,7 +1776,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   context.pop();
                                 }
                                 context.pushNamed(
-                                  HomePageWidget.routeName,
+                                  LoginPageWidget.routeName,
                                   extra: <String, dynamic>{
                                     kTransitionInfoKey: TransitionInfo(
                                       hasTransition: true,

@@ -738,10 +738,12 @@ Future<List<int>> _getLocationTrackingFromSQLiteAndCompress(
     //'Id_company,Imei,Latitude,Longitude,Altitude,HorizontalError,CreatedAt,SyncedAt,batch_id');
 
     for (final location in locations) {
-      // Formato CSV con 13 campos (incluyendo campos de depuración):
-      // Id_company,Imei,Latitude,Longitude,Altitude,HorizontalError,CreatedAt,SyncedAt,batch_id,date_start,date_finish,evaluated_radius,point_count
+      // Formato CSV con 15 campos (orden esperado por servidor):
+      // 1.Id_company, 2.Imei, 3.Latitude, 4.Longitude, 5.Altitude, 6.HorizontalError,
+      // 7.CreatedAt, 8.SyncedAt, 9.Batch_id, 10.Id_user(opcional), 11.Id_activity(opcional),
+      // 12.Date_start(opcional), 13.Date_finish(opcional), 14.Evaluated_radius(opcional), 15.Point_count(opcional)
       csvContent.writeln(
-          '${location['Id_company']},${location['Imei']},${location['Latitude']},${location['Longitude']},${location['Altitude']},${location['HorizontalError']},${location['CreatedAt']},${location['SyncedAt']},${location['batch_id'] ?? ''},${location['date_start'] ?? ''},${location['date_finish'] ?? ''},${location['evaluated_radius'] ?? ''},${location['point_count'] ?? 1}');
+          '${location['Id_company']},${location['Imei']},${location['Latitude']},${location['Longitude']},${location['Altitude']},${location['HorizontalError']},${location['CreatedAt']},${location['SyncedAt']},${location['batch_id'] ?? ''},${location['Id_user'] ?? ''},${location['Id_activity'] ?? ''},${location['date_start'] ?? ''},${location['date_finish'] ?? ''},${location['evaluated_radius'] ?? ''},${location['point_count'] ?? 1}');
     }
 
     debugPrint('📄 CSV generado: ${csvContent.length} caracteres');

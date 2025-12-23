@@ -88,6 +88,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => UsersPageWidget(),
         ),
         FFRoute(
+          name: LoginPageWidget.routeName,
+          path: LoginPageWidget.routePath,
+          builder: (context, params) => LoginPageWidget(),
+        ),
+        FFRoute(
           name: HeadquartersPageWidget.routeName,
           path: HeadquartersPageWidget.routePath,
           builder: (context, params) => HeadquartersPageWidget(),

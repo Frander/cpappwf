@@ -45,7 +45,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          18, // Incrementada a v18 para agregar campos de depuración a Location_tracking
+          19, // Incrementada a v19 para agregar Id_user e Id_activity a Location_tracking
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -457,7 +457,9 @@ Future<void> _createTables(Database db) async {
         date_start TEXT,
         date_finish TEXT,
         evaluated_radius REAL,
-        point_count INTEGER DEFAULT 1
+        point_count INTEGER DEFAULT 1,
+        Id_user INTEGER,
+        Id_activity INTEGER
     );
   ''');
 
@@ -1949,8 +1951,38 @@ Future<void> _upgradeDatabase(
       }
     }
 
+    // Migración v18 a v19: Agregar Id_user e Id_activity a Location_tracking
+    if (oldVersion < 19) {
+      debugPrint('Aplicando migración a versión 19...');
+      debugPrint('   Agregando Id_user e Id_activity a Location_tracking');
+
+      try {
+        final columns =
+            await db.rawQuery('PRAGMA table_info(Location_tracking);');
+        final columnNames =
+            columns.map((col) => col['name'] as String).toList();
+
+        if (!columnNames.contains('Id_user')) {
+          await db.execute(
+              'ALTER TABLE Location_tracking ADD COLUMN Id_user INTEGER;');
+          debugPrint('   ✅ Campo Id_user agregado');
+        }
+        if (!columnNames.contains('Id_activity')) {
+          await db.execute(
+              'ALTER TABLE Location_tracking ADD COLUMN Id_activity INTEGER;');
+          debugPrint('   ✅ Campo Id_activity agregado');
+        }
+
+        debugPrint('✅ Migración a versión 19 completada');
+        debugPrint(
+            '   Campos Id_user e Id_activity disponibles en Location_tracking');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 19: $e');
+      }
+    }
+
     // Futuras migraciones se agregarían aquí
-    // if (oldVersion < 19) { ... }
+    // if (oldVersion < 20) { ... }
   } catch (e) {
     debugPrint('❌ Error durante la migración de la base de datos: $e');
     rethrow;

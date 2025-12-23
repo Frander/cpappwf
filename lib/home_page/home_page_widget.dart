@@ -390,6 +390,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
       'date_finish': dateFinish.toIso8601String(),
       'evaluated_radius': maxRadius,
       'point_count': count,
+      'Id_user': FFAppState().userSelected.idUser,
+      'Id_activity': FFAppState().activitySelected.idActivity,
     };
   }
 
@@ -422,8 +424,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
             INSERT INTO Location_tracking
             (Id_company, Imei, Latitude, Longitude, Altitude, HorizontalError,
              Speed, Battery, CreatedAt, SyncedAt, batch_id,
-             date_start, date_finish, evaluated_radius, point_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             date_start, date_finish, evaluated_radius, point_count,
+             Id_user, Id_activity)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ''', [
             loc['Id_company'],
             loc['Imei'],
@@ -440,6 +443,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
             loc['date_finish'],
             loc['evaluated_radius'],
             loc['point_count'],
+            loc['Id_user'],
+            loc['Id_activity'],
           ]);
         }
 

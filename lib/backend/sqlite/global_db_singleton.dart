@@ -161,7 +161,9 @@ class GlobalDbSingleton {
           date_start TEXT,
           date_finish TEXT,
           evaluated_radius REAL,
-          point_count INTEGER DEFAULT 1
+          point_count INTEGER DEFAULT 1,
+          Id_user INTEGER,
+          Id_activity INTEGER
         );
       ''');
       debugPrint('📦 GlobalDbSingleton: Tabla Location_tracking creada');

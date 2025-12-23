@@ -4,6 +4,7 @@ export '/visits/do_visits_form_page/do_visits_form_page_widget.dart'
 export '/visits/visits_with_map_page/visits_with_map_page_widget.dart'
     show VisitsWithMapPageWidget;
 export '/users_page/users_page_widget.dart' show UsersPageWidget;
+export '/login_page/login_page_widget.dart' show LoginPageWidget;
 export '/headquarters_page/headquarters_page_widget.dart'
     show HeadquartersPageWidget;
 export '/configuration/info_page/info_page_widget.dart' show InfoPageWidget;
