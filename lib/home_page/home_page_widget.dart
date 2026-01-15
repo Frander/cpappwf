@@ -5,6 +5,7 @@ import '/components/gps_quality_indicator_widget.dart';
 import '/components/calibration_required_dialog_widget.dart';
 import '/components/modern_calibrate_compass_widget.dart';
 import '/custom_code/actions/index.dart';
+import '/backend/schema/structs/read_geo_struct.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
@@ -199,6 +200,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   // Configurar listener para eventos del servicio de background GPS
   void _setupGpsServiceListener() {
+    debugPrint('🔧 Configurando listeners del servicio de GPS...');
     final service = FlutterBackgroundService();
 
     // Listener para evento de GPS estabilizado
@@ -212,6 +214,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
         }
       }
     });
+    debugPrint('   ✅ Listener "gpsStabilized" configurado');
 
     // Listener para recibir ubicaciones del servicio de background
     _locationServiceSubscription = service.on('newLocation').listen((event) {
@@ -225,13 +228,33 @@ class _HomePageWidgetState extends State<HomePageWidget>
             dateHourRead: DateTime.tryParse(event['createdAt'] ?? ''),
           );
 
-          // Agregar a la lista en AppState (sin notificar UI cada vez)
-          FFAppState().geoLocationsList.add(geoStruct);
+          // Agregar a la lista en AppState
+          FFAppState().update(() {
+            FFAppState().geoLocationsList.add(geoStruct);
+
+            // Si están llegando ubicaciones, el GPS YA está estabilizado
+            // (el servicio solo envía ubicaciones después de estabilizar)
+            if (!FFAppState().isStabilized) {
+              FFAppState().isStabilized = true;
+              debugPrint('📡 GPS marcado como estabilizado (ubicaciones llegando)');
+            }
+          });
+
+          // Log cada 20 ubicaciones para no saturar la consola
+          if (FFAppState().geoLocationsList.length % 20 == 0) {
+            debugPrint(
+                '📍 ${FFAppState().geoLocationsList.length} puntos GPS acumulados en AppState');
+          }
         } catch (e) {
           debugPrint('❌ Error procesando ubicación recibida: $e');
         }
       }
+    }, onError: (error) {
+      debugPrint('❌ Error en listener "newLocation": $error');
+    }, onDone: () {
+      debugPrint('⚠️ Listener "newLocation" cerrado');
     });
+    debugPrint('   ✅ Listener "newLocation" configurado');
 
     // Timer para procesar y depurar ubicaciones cada 60 segundos
     _locationProcessingTimer =
@@ -244,36 +267,49 @@ class _HomePageWidgetState extends State<HomePageWidget>
   }
 
   /// Procesa las ubicaciones acumuladas, las depura y las inserta en SQLite
+  /// Estrategia de prevención de duplicados:
+  /// - Siempre mantiene al menos 1 registro en geoLocationsList
+  /// - Procesa e inserta todos los registros EXCEPTO el último
+  /// - El último registro se procesará en el siguiente ciclo de 60s
   Future<void> _processAndInsertLocations() async {
     try {
-      final locations = FFAppState().geoLocationsList;
+      // Tomar una copia atómica de la lista
+      final allLocations = List<ReadGeoStruct>.from(FFAppState().geoLocationsList);
 
-      // Si hay 5 o menos registros, no procesar (mantener para continuidad)
-      if (locations.length <= 5) {
-        debugPrint(
-            '⏭️ Solo ${locations.length} ubicaciones, esperando más datos...');
+      // Validar que hay suficientes registros para procesar
+      if (allLocations.isEmpty) {
+        debugPrint('⏭️ Sin ubicaciones para procesar');
         return;
       }
 
-      debugPrint('🔄 Procesando ${locations.length} ubicaciones...');
+      if (allLocations.length < 2) {
+        debugPrint('⏭️ Solo hay ${allLocations.length} ubicación(es), esperando más puntos para procesar...');
+        debugPrint('   Se necesitan al menos 2 registros para mantener 1 en AppState y procesar el resto');
+        return;
+      }
 
-      // Tomar todos menos los últimos 5 (para continuidad del próximo ciclo)
-      final toProcess = locations.sublist(0, locations.length - 5);
-      final toKeep = locations.sublist(locations.length - 5);
+      // Procesar todos EXCEPTO el último para evitar duplicados en el próximo ciclo
+      final locationsToProcess = allLocations.sublist(0, allLocations.length - 1);
 
-      // Depurar (agrupar puntos dentro de 2 metros)
-      final depurados = _depurarGeolocalizaciones(toProcess);
+      debugPrint('🔄 Procesando ${locationsToProcess.length} ubicaciones (guardando última para próximo ciclo)...');
+      debugPrint('   Total en AppState: ${allLocations.length} | A procesar: ${locationsToProcess.length} | Quedarán: 1');
+
+      // Depurar las ubicaciones a procesar (agrupar puntos dentro de 2 metros)
+      final depurados = _depurarGeolocalizaciones(locationsToProcess);
 
       debugPrint(
-          '📊 Depuración: ${toProcess.length} registros → ${depurados.length} grupos');
+          '📊 Depuración: ${locationsToProcess.length} registros → ${depurados.length} grupos');
 
       // Insertar a SQLite
       await _insertDepuradosToSQLite(depurados);
 
-      // Actualizar AppState con solo los últimos 5
-      FFAppState().geoLocationsList = toKeep;
+      // Limpiar solo los procesados, mantener el último
+      FFAppState().geoLocationsList = [allLocations.last];
 
-      debugPrint('✅ Procesamiento completado. Quedan ${toKeep.length} en buffer');
+      debugPrint('✅ Procesamiento completado.');
+      debugPrint('   ✓ ${locationsToProcess.length} registros procesados e insertados en SQLite');
+      debugPrint('   ✓ Último punto GPS mantenido en AppState para próximo ciclo');
+      debugPrint('   ✓ geoLocationsList ahora tiene: ${FFAppState().geoLocationsList.length} registro(s)');
     } catch (e) {
       debugPrint('❌ Error en _processAndInsertLocations: $e');
     }
@@ -375,8 +411,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
     final dateFinish = grupo.last.dateHourRead ?? DateTime.now();
 
     return {
-      'Id_company': FFAppState().companySelected.idCompany,
-      'Imei': FFAppState().imeiDevice,
+      'Id_company': FFAppState().companyDefault.idCompany,
+      'Imei': FFAppState().deviceDefault.imeI1,
       'Latitude': centroide['lat'],
       'Longitude': centroide['lon'],
       'Altitude': sumAlt / count,
@@ -415,13 +451,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
       List<Map<String, dynamic>> depurados) async {
     if (depurados.isEmpty) return;
 
+    int insertados = 0;
+
     try {
       await globalDb.executeOperation((db) async {
-        final batch = db.batch();
-
         for (final loc in depurados) {
-          batch.rawInsert('''
-            INSERT INTO Location_tracking
+          // Usar INSERT OR IGNORE para evitar errores de duplicados
+          final result = await db.rawInsert('''
+            INSERT OR IGNORE INTO Location_tracking
             (Id_company, Imei, Latitude, Longitude, Altitude, HorizontalError,
              Speed, Battery, CreatedAt, SyncedAt, batch_id,
              date_start, date_finish, evaluated_radius, point_count,
@@ -446,12 +483,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
             loc['Id_user'],
             loc['Id_activity'],
           ]);
+          if (result > 0) insertados++;
         }
-
-        await batch.commit(noResult: true);
       });
 
-      debugPrint('💾 ${depurados.length} registros depurados insertados en SQLite');
+      debugPrint('💾 $insertados/${depurados.length} registros insertados en SQLite');
     } catch (e) {
       debugPrint('❌ Error insertando en SQLite: $e');
     }

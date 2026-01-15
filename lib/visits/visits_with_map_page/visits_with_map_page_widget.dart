@@ -35,6 +35,9 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
+  // Tipo de lectura actual (GPS, NFC, QR) - se obtiene del read_default de la actividad
+  String _currentReadType = 'GPS';
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +47,18 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
       length: 2,
       initialIndex: 0,
     );
+    // Inicializar el tipo de lectura desde la actividad actual
+    _initReadType();
+  }
+
+  void _initReadType() {
+    final currentActivity = FFAppState().currentActivity;
+    final readDefault = getJsonField(currentActivity, r'''$.read_default''')?.toString().toUpperCase() ?? '';
+    if (readDefault == 'NFC' || readDefault == 'QR' || readDefault == 'GPS') {
+      _currentReadType = readDefault;
+    } else {
+      _currentReadType = 'GPS';
+    }
   }
 
   @override
@@ -133,7 +148,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF00a86b).withOpacity(0.2),
+            Color(0xFF00a86b).withValues(alpha: 0.2),
             Colors.transparent,
           ],
         ),
@@ -155,13 +170,13 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.white.withOpacity(0.2),
-                          Colors.white.withOpacity(0.1),
+                          Colors.white.withValues(alpha: 0.2),
+                          Colors.white.withValues(alpha: 0.1),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Color(0xFF00a86b).withOpacity(0.3),
+                        color: Color(0xFF00a86b).withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
@@ -190,7 +205,10 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
+                // Botón para cambiar tipo de lectura (GPS/NFC/QR)
+                _buildReadTypeSelectorButton(),
+                const SizedBox(width: 8),
                 // Botón de Novedades
                 InkWell(
                   splashColor: Colors.transparent,
@@ -216,13 +234,13 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.white.withOpacity(0.2),
-                          Colors.white.withOpacity(0.1),
+                          Colors.white.withValues(alpha: 0.2),
+                          Colors.white.withValues(alpha: 0.1),
                         ],
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Color(0xFFFF9800).withOpacity(0.5),
+                        color: Color(0xFFFF9800).withValues(alpha: 0.5),
                         width: 1,
                       ),
                     ),
@@ -244,13 +262,13 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.white.withOpacity(0.15),
-                  Colors.white.withOpacity(0.05),
+                  Colors.white.withValues(alpha: 0.15),
+                  Colors.white.withValues(alpha: 0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Color(0xFF00a86b).withOpacity(0.3),
+                color: Color(0xFF00a86b).withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -262,7 +280,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                   gradient: LinearGradient(
                     colors: [
                       FlutterFlowTheme.of(context).primary,
-                      FlutterFlowTheme.of(context).primary.withOpacity(0.8),
+                      FlutterFlowTheme.of(context).primary.withValues(alpha: 0.8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(10),
@@ -270,7 +288,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                 indicatorSize: TabBarIndicatorSize.tab,
                 indicatorPadding: EdgeInsets.all(4),
                 labelColor: Colors.white,
-                unselectedLabelColor: Color(0xFF00ff9f).withOpacity(0.6),
+                unselectedLabelColor: Color(0xFF00ff9f).withValues(alpha: 0.6),
                 labelStyle: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 13,
@@ -350,7 +368,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  Color(0xFF00a86b).withOpacity(0.3),
+                  Color(0xFF00a86b).withValues(alpha: 0.3),
                   Colors.transparent,
                 ],
               ),
@@ -359,30 +377,30 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             child: Icon(
               Icons.lock_outline_rounded,
               size: 50,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             'Mapa deshabilitado',
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               letterSpacing: 0.5,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Para habilitar el mapa, debe generar una ruta óptima desde la pantalla anterior',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 letterSpacing: 0.3,
               ),
             ),
@@ -390,5 +408,281 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
         ],
       ),
     );
+  }
+
+  /// Botón compacto para cambiar el tipo de lectura (GPS/NFC/QR)
+  Widget _buildReadTypeSelectorButton() {
+    // Determinar icono y color según el tipo actual
+    IconData icon;
+    Color color;
+    switch (_currentReadType) {
+      case 'NFC':
+        icon = Icons.nfc_rounded;
+        color = const Color(0xFF2196F3); // Azul
+        break;
+      case 'QR':
+        icon = Icons.qr_code_rounded;
+        color = const Color(0xFF9C27B0); // Púrpura
+        break;
+      default:
+        icon = Icons.gps_fixed_rounded;
+        color = const Color(0xFF00a86b); // Verde
+    }
+
+    return InkWell(
+      onTap: () => _showReadTypeSelectorDialog(),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              color.withValues(alpha: 0.3),
+              color.withValues(alpha: 0.15),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: color.withValues(alpha: 0.6),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              _currentReadType,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: color,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Muestra el diálogo para seleccionar el tipo de lectura
+  void _showReadTypeSelectorDialog() {
+    HapticFeedback.mediumImpact();
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            width: 280,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1E293B),
+                  Color(0xFF0F172A),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.4),
+                  blurRadius: 20,
+                  spreadRadius: 5,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Título
+                const Text(
+                  'TIPO DE LECTURA',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 20),
+
+                // Opciones
+                _buildReadTypeOption(
+                  dialogContext,
+                  'GPS',
+                  Icons.gps_fixed_rounded,
+                  const Color(0xFF00a86b),
+                  'Ubicación GPS',
+                ),
+                const SizedBox(height: 10),
+                _buildReadTypeOption(
+                  dialogContext,
+                  'NFC',
+                  Icons.nfc_rounded,
+                  const Color(0xFF2196F3),
+                  'Lectura TAG NFC',
+                ),
+                const SizedBox(height: 10),
+                _buildReadTypeOption(
+                  dialogContext,
+                  'QR',
+                  Icons.qr_code_rounded,
+                  const Color(0xFF9C27B0),
+                  'Escanear código QR',
+                ),
+
+                const SizedBox(height: 16),
+
+                // Botón cancelar
+                InkWell(
+                  onTap: () => Navigator.pop(dialogContext),
+                  borderRadius: BorderRadius.circular(10),
+                  child: Container(
+                    width: double.infinity,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Cancelar',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white70,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// Construye una opción del selector de tipo de lectura
+  Widget _buildReadTypeOption(
+    BuildContext dialogContext,
+    String type,
+    IconData icon,
+    Color color,
+    String description,
+  ) {
+    final isSelected = _currentReadType == type;
+
+    return InkWell(
+      onTap: () {
+        HapticFeedback.lightImpact();
+        _updateReadType(type);
+        Navigator.pop(dialogContext);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0.3),
+                    color.withValues(alpha: 0.15),
+                  ],
+                )
+              : null,
+          color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.white.withValues(alpha: 0.1),
+            width: isSelected ? 2 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    type,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? color : Colors.white,
+                    ),
+                  ),
+                  Text(
+                    description,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isSelected)
+              Icon(Icons.check_circle_rounded, color: color, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Actualiza el tipo de lectura y lo guarda en el currentActivity
+  void _updateReadType(String newType) {
+    setState(() {
+      _currentReadType = newType;
+    });
+
+    // Actualizar el read_default en el currentActivity del AppState
+    final currentActivity = FFAppState().currentActivity;
+    if (currentActivity is Map<String, dynamic>) {
+      final updatedActivity = Map<String, dynamic>.from(currentActivity);
+      updatedActivity['read_default'] = newType;
+      FFAppState().currentActivity = updatedActivity;
+    } else if (currentActivity != null) {
+      // Si es un JSON dinámico, intentar convertirlo
+      try {
+        final Map<String, dynamic> activityMap = Map<String, dynamic>.from(currentActivity as Map);
+        activityMap['read_default'] = newType;
+        FFAppState().currentActivity = activityMap;
+      } catch (e) {
+        debugPrint('⚠️ No se pudo actualizar read_default: $e');
+      }
+    }
+
+    debugPrint('✅ Tipo de lectura cambiado a: $newType');
   }
 }

@@ -450,12 +450,25 @@ class SpeechMessage {
 // SERVICIOS DE NAVEGACIÓN
 // ============================================================================
 
-/// Optimizador de búsqueda de proximidad con radio adaptativo
+/// Optimizador de búsqueda de proximidad con radio adaptativo estilo Waze
 class ProximityOptimizer {
   VirtualPoint? _lastClosestPoint;
   double _lastDistance = double.infinity;
   int _missedUpdates = 0;
   double _lastSpeed = 0;
+
+  // Historial de ubicaciones para detección de movimiento estilo Waze
+  final List<LocationData> _locationHistory = [];
+  static const int _maxHistorySize = 10;
+  double _lastBearing = 0;
+  DateTime? _lastMovementTime;
+  bool _isMoving = false;
+
+  // Getters para estado de movimiento
+  bool get isMoving => _isMoving;
+  double get lastBearing => _lastBearing;
+  VirtualPoint? get lastClosestPoint => _lastClosestPoint;
+  double get lastDistance => _lastDistance;
 
   /// Encuentra el punto virtual más cercano con búsqueda optimizada
   VirtualPoint? findClosestPoint(
@@ -611,11 +624,80 @@ class ProximityOptimizer {
 
   double _toRadians(double degrees) => degrees * math.pi / 180;
 
+  /// Actualiza el historial de ubicaciones y detecta movimiento estilo Waze
+  void updateMovementHistory(LocationData location) {
+    // Agregar al historial
+    _locationHistory.add(location);
+    if (_locationHistory.length > _maxHistorySize) {
+      _locationHistory.removeAt(0);
+    }
+
+    // Detectar si está en movimiento (velocidad > 0.5 m/s o desplazamiento significativo)
+    if (_locationHistory.length >= 2) {
+      final previous = _locationHistory[_locationHistory.length - 2];
+      final current = location;
+
+      // Calcular distancia recorrida
+      final distanceMoved = _calculateDistance(
+        previous.latitude,
+        previous.longitude,
+        current.latitude,
+        current.longitude,
+      );
+
+      // Calcular bearing (dirección de movimiento)
+      _lastBearing = _calculateBearing(
+        previous.latitude,
+        previous.longitude,
+        current.latitude,
+        current.longitude,
+      );
+
+      // Determinar si hay movimiento significativo
+      // Waze considera movimiento: velocidad > 0.5 m/s O desplazamiento > 2m en últimos 5 segundos
+      final timeDiff = current.createdAt.difference(previous.createdAt).inMilliseconds / 1000.0;
+      final effectiveSpeed = timeDiff > 0 ? distanceMoved / timeDiff : 0;
+
+      _isMoving = current.speed > 0.5 || effectiveSpeed > 0.5;
+
+      if (_isMoving) {
+        _lastMovementTime = current.createdAt;
+      }
+    }
+  }
+
+  /// Calcula el bearing (dirección) entre dos puntos en grados
+  double _calculateBearing(double lat1, double lon1, double lat2, double lon2) {
+    final dLon = _toRadians(lon2 - lon1);
+    final y = math.sin(dLon) * math.cos(_toRadians(lat2));
+    final x = math.cos(_toRadians(lat1)) * math.sin(_toRadians(lat2)) -
+        math.sin(_toRadians(lat1)) * math.cos(_toRadians(lat2)) * math.cos(dLon);
+    final bearing = math.atan2(y, x);
+    return (bearing * 180 / math.pi + 360) % 360; // Normalizar a 0-360
+  }
+
+  /// Verifica si el usuario está quieto por un tiempo determinado
+  bool isStationaryFor(Duration duration) {
+    if (_lastMovementTime == null) return true;
+    return DateTime.now().difference(_lastMovementTime!) > duration;
+  }
+
+  /// Obtiene la velocidad promedio de las últimas ubicaciones
+  double getAverageSpeed() {
+    if (_locationHistory.isEmpty) return 0;
+    final speeds = _locationHistory.map((l) => l.speed).toList();
+    return speeds.reduce((a, b) => a + b) / speeds.length;
+  }
+
   void reset() {
     _lastClosestPoint = null;
     _lastDistance = double.infinity;
     _missedUpdates = 0;
     _lastSpeed = 0;
+    _locationHistory.clear();
+    _lastBearing = 0;
+    _lastMovementTime = null;
+    _isMoving = false;
   }
 }
 
@@ -707,6 +789,21 @@ class TTSQueueManager {
     _isSpeaking = false;
   }
 
+  /// Habla inmediatamente sin verificar cooldown (para botón "¿Dónde estoy?")
+  Future<void> speakImmediately(String text) async {
+    // Cancelar cualquier mensaje en curso
+    await _tts.stop();
+    _queue.clear();
+    _isSpeaking = true;
+
+    try {
+      await _tts.speak(text);
+    } catch (e) {
+      debugPrint('❌ Error al hablar inmediatamente: $e');
+      _isSpeaking = false;
+    }
+  }
+
   Future<void> dispose() async {
     await _tts.stop();
     _queue.clear();
@@ -741,7 +838,11 @@ class OfflineMapTrackerVisits extends StatefulWidget {
 }
 
 class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+  // Mantener vivo el estado cuando se cambia de tab
+  @override
+  bool get wantKeepAlive => true;
+
   final MapController _mapController = MapController();
   bool _isFollowingUser = true;
   Timer? _updateTimer;
@@ -954,10 +1055,10 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
       debugPrint(
           '🔍 Zoom inicial: ${_currentZoom.toStringAsFixed(1)} | Marcador 40px → ${_getMarkerSize(40).toStringAsFixed(1)}px');
 
-      // Mostrar inmediatamente el popup de configuración de ruta
-      if (mounted) {
-        await _showSimulationConfigDialog();
-      }
+      // El popup de configuración de ruta ahora se abre manualmente por el usuario
+      // if (mounted) {
+      //   await _showSimulationConfigDialog();
+      // }
     });
 
     // Listener para cambios en AppState
@@ -1567,6 +1668,29 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
         throw Exception('Archivo PMTiles no encontrado: ${widget.mapFilePath}');
       }
 
+      // Verificar tamaño mínimo del archivo (header PMTiles mínimo)
+      final fileSize = await file.length();
+      if (fileSize < 127) { // Header PMTiles v3 es de al menos 127 bytes
+        debugPrint('⚠️ Archivo PMTiles demasiado pequeño: $fileSize bytes');
+        await _handleCorruptPMTiles(file, 'El archivo está incompleto o corrupto');
+        return;
+      }
+
+      // Verificar header PMTiles antes de cargar
+      final raf = await file.open(mode: FileMode.read);
+      try {
+        final header = await raf.read(7);
+        final signature = String.fromCharCodes(header);
+        if (!signature.startsWith('PMTiles')) {
+          debugPrint('⚠️ Header PMTiles inválido: $signature');
+          await raf.close();
+          await _handleCorruptPMTiles(file, 'El archivo no es un PMTiles válido');
+          return;
+        }
+      } finally {
+        await raf.close();
+      }
+
       _pmtilesArchive = await PmTilesArchive.from(widget.mapFilePath);
 
       debugPrint('✅ PMTiles cargado correctamente');
@@ -1582,12 +1706,58 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
       }
     } catch (e) {
       debugPrint('❌ Error al cargar PMTiles: $e');
+
+      // Verificar si es un error de corrupción
+      final errorStr = e.toString().toLowerCase();
+      final isCorruptError = errorStr.contains('corrupt') ||
+          errorStr.contains('header') ||
+          errorStr.contains('too short') ||
+          errorStr.contains('invalid');
+
+      if (isCorruptError) {
+        final file = File(widget.mapFilePath);
+        await _handleCorruptPMTiles(file, 'El archivo PMTiles está corrupto o incompleto');
+        return;
+      }
+
       if (mounted) {
         setState(() {
           _isLoading = false;
           _errorMessage = 'Error al cargar el mapa: $e';
         });
       }
+    }
+  }
+
+  /// Maneja archivos PMTiles corruptos eliminándolos y mostrando mensaje
+  Future<void> _handleCorruptPMTiles(File file, String reason) async {
+    try {
+      // Eliminar archivo corrupto
+      if (await file.exists()) {
+        await file.delete();
+        debugPrint('🗑️ Archivo corrupto eliminado: ${file.path}');
+      }
+
+      // También eliminar archivo parcial si existe
+      final partialFile = File('${file.path}.partial');
+      if (await partialFile.exists()) {
+        await partialFile.delete();
+        debugPrint('🗑️ Archivo parcial eliminado');
+      }
+
+      // Limpiar ruta en AppState
+      FFAppState().update(() {
+        FFAppState().pathPmtiles = '';
+      });
+    } catch (deleteError) {
+      debugPrint('⚠️ Error eliminando archivo corrupto: $deleteError');
+    }
+
+    if (mounted) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '$reason\n\nEl archivo ha sido eliminado.\nPor favor, vuelva a descargar el mapa desde Configuración.';
+      });
     }
   }
 
@@ -3607,10 +3777,14 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 
     if (_autoFollowPlayback) {
       final current = _simulatedRoute[_currentPlaybackIndex];
-      _mapController.move(
-        latlong.LatLng(current.simulatedLatitude, current.simulatedLongitude),
-        _mapController.camera.zoom,
-      );
+      try {
+        _mapController.move(
+          latlong.LatLng(current.simulatedLatitude, current.simulatedLongitude),
+          _mapController.camera.zoom,
+        );
+      } catch (e) {
+        debugPrint('⚠️ MapController no listo: $e');
+      }
     }
   }
 
@@ -3641,10 +3815,14 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     }
 
     final current = _simulatedRoute[_currentPlaybackIndex];
-    _mapController.move(
-      latlong.LatLng(current.simulatedLatitude, current.simulatedLongitude),
-      _mapController.camera.zoom,
-    );
+    try {
+      _mapController.move(
+        latlong.LatLng(current.simulatedLatitude, current.simulatedLongitude),
+        _mapController.camera.zoom,
+      );
+    } catch (e) {
+      debugPrint('⚠️ MapController no listo: $e');
+    }
   }
 
   void _nextPlaybackSpeed() {
@@ -3701,6 +3879,9 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
   }
 
   void _centerOnCurrentLocation({bool animated = true}) {
+    // Verificar que el widget esté montado
+    if (!mounted) return;
+
     final locations = FFAppState().geoLocationsList;
 
     if (locations.isEmpty) return;
@@ -3720,10 +3901,20 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     }
 
     if (animated) {
-      _mapController.move(center, _currentZoom);
+      try {
+        _mapController.move(center, _currentZoom);
+      } catch (e) {
+        debugPrint('⚠️ MapController no listo para mover: $e');
+      }
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _mapController.move(center, _currentZoom);
+        if (mounted) {
+          try {
+            _mapController.move(center, _currentZoom);
+          } catch (e) {
+            debugPrint('⚠️ MapController no listo para mover (postFrame): $e');
+          }
+        }
       });
     }
   }
@@ -3757,11 +3948,19 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     debugPrint('📍 Centrando en Virtual Points: $centerLat, $centerLng');
 
     if (animated) {
-      _mapController.move(center, 18.0);
+      try {
+        _mapController.move(center, 18.0);
+      } catch (e) {
+        debugPrint('⚠️ MapController no listo: $e');
+      }
     } else {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _mapController.move(center, 18.0);
+          try {
+            _mapController.move(center, 18.0);
+          } catch (e) {
+            debugPrint('⚠️ MapController no listo (postFrame): $e');
+          }
         }
       });
     }
@@ -3833,12 +4032,16 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
       latlong.LatLng(maxLat, maxLng),
     );
 
-    _mapController.fitCamera(
-      CameraFit.bounds(
-        bounds: bounds,
-        padding: const EdgeInsets.all(50),
-      ),
-    );
+    try {
+      _mapController.fitCamera(
+        CameraFit.bounds(
+          bounds: bounds,
+          padding: const EdgeInsets.all(50),
+        ),
+      );
+    } catch (e) {
+      debugPrint('⚠️ MapController no listo para fitCamera: $e');
+    }
   }
 
   double _calculateBearing(double lat1, double lon1, double lat2, double lon2) {
@@ -3936,6 +4139,9 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
             NavigationState.idle, null, null, 'Esperando GPS...');
         return;
       }
+
+      // Actualizar historial de movimiento estilo Waze
+      _proximityOptimizer.updateMovementHistory(locationData);
 
       // Si no hay puntos virtuales cargados, no hacer nada
       if (_virtualPoints.isEmpty) {
@@ -4304,6 +4510,52 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     });
   }
 
+  /// Anuncia la ubicación actual por voz (botón "¿Dónde estoy?")
+  Future<void> _speakCurrentLocation() async {
+    // Obtener el punto más cercano del optimizer
+    final closestPoint = _proximityOptimizer.lastClosestPoint;
+    final distance = _proximityOptimizer.lastDistance;
+
+    if (closestPoint == null) {
+      // No hay puntos virtuales cargados
+      await _ttsManager.speakImmediately(
+        'No hay puntos virtuales cargados. Configura una ruta primero.',
+      );
+      return;
+    }
+
+    // Construir mensaje de ubicación
+    String message;
+    final distanceText = distance < 1000
+        ? '${distance.toStringAsFixed(0)} metros'
+        : '${(distance / 1000).toStringAsFixed(1)} kilómetros';
+
+    if (distance <= 5) {
+      // Muy cerca o en el punto
+      message = 'Estás en Línea ${closestPoint.lineNumber}, Punto ${closestPoint.pointNumber}';
+    } else if (distance <= 20) {
+      // Cerca del punto
+      message = 'Estás a $distanceText de Línea ${closestPoint.lineNumber}, Punto ${closestPoint.pointNumber}';
+    } else if (distance <= 100) {
+      // A distancia moderada
+      message = 'El punto más cercano es Línea ${closestPoint.lineNumber}, Punto ${closestPoint.pointNumber}, a $distanceText';
+    } else {
+      // Lejos
+      message = 'Línea ${closestPoint.lineNumber}, Punto ${closestPoint.pointNumber} está a $distanceText de distancia';
+    }
+
+    // Agregar información de movimiento si está disponible
+    if (_proximityOptimizer.isMoving) {
+      final speed = _proximityOptimizer.getAverageSpeed();
+      if (speed > 1) {
+        final speedKmh = (speed * 3.6).toStringAsFixed(0);
+        message += '. Velocidad: $speedKmh kilómetros por hora';
+      }
+    }
+
+    await _ttsManager.speakImmediately(message);
+  }
+
   /// Calcula distancia en metros usando fórmula de Haversine
   double _calculateHaversineDistance(
     double lat1,
@@ -4389,6 +4641,9 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 
   @override
   Widget build(BuildContext context) {
+    // Requerido por AutomaticKeepAliveClientMixin
+    super.build(context);
+
     // Pantalla de carga
     if (_isLoading) {
       return Container(
@@ -5013,8 +5268,8 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           // Menú FAB Speed Dial moderno (inferior derecha)
           _buildModernFABMenu(),
 
-          // Botón FAB para ir a ModulesPage (inferior izquierda)
-          _buildModulesFAB(),
+          // Botón "¿Dónde estoy?" (al lado del FAB)
+          _buildWhereAmIButton(),
 
           // Panel de controles del reproductor (encima del panel de navegación)
           if (_isPlaybackActive && _simulatedRoute.isNotEmpty)
@@ -5796,10 +6051,14 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           _buildControlButton(
             icon: Icons.add,
             onTap: () {
-              _mapController.move(
-                _mapController.camera.center,
-                _currentZoom + 1,
-              );
+              try {
+                _mapController.move(
+                  _mapController.camera.center,
+                  _currentZoom + 1,
+                );
+              } catch (e) {
+                debugPrint('⚠️ MapController no listo: $e');
+              }
             },
           ),
           const SizedBox(height: 12),
@@ -5807,10 +6066,14 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           _buildControlButton(
             icon: Icons.remove,
             onTap: () {
-              _mapController.move(
-                _mapController.camera.center,
-                _currentZoom - 1,
-              );
+              try {
+                _mapController.move(
+                  _mapController.camera.center,
+                  _currentZoom - 1,
+                );
+              } catch (e) {
+                debugPrint('⚠️ MapController no listo: $e');
+              }
             },
           ),
         ],
@@ -5864,48 +6127,29 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Ondas de sonido (solo cuando está hablando)
+        // Ondas de sonido (solo cuando está hablando) - compactas
         if (isSpeaking) ...[
           // Onda exterior
           AnimatedBuilder(
             animation: _speakingAnimation,
             builder: (context, child) {
               return Container(
-                width: 60 + (20 * _speakingAnimation.value),
-                height: 60 + (20 * _speakingAnimation.value),
+                width: 36 + (10 * _speakingAnimation.value),
+                height: 36 + (10 * _speakingAnimation.value),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: Colors.white.withValues(
                       alpha: 0.3 * (1 - _speakingAnimation.value),
                     ),
-                    width: 2,
-                  ),
-                ),
-              );
-            },
-          ),
-          // Onda interior
-          AnimatedBuilder(
-            animation: _speakingAnimation,
-            builder: (context, child) {
-              return Container(
-                width: 60 + (10 * _speakingAnimation.value),
-                height: 60 + (10 * _speakingAnimation.value),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(
-                      alpha: 0.5 * (1 - _speakingAnimation.value),
-                    ),
-                    width: 2,
+                    width: 1.5,
                   ),
                 ),
               );
             },
           ),
         ],
-        // Icono principal con animación de escala
+        // Icono principal con animación de escala - compacto
         AnimatedBuilder(
           animation: _speakingAnimation,
           builder: (context, child) {
@@ -5913,8 +6157,8 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
               scale:
                   isSpeaking ? (0.9 + (0.1 * _speakingAnimation.value)) : 1.0,
               child: Container(
-                width: 60,
-                height: 60,
+                width: 36,
+                height: 36,
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
@@ -5922,7 +6166,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                 child: Icon(
                   iconData,
                   color: iconColor,
-                  size: 32,
+                  size: 20,
                 ),
               ),
             );
@@ -5948,7 +6192,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     // Calcular posición: encima del panel de navegación si está visible
     final bottomPosition = _showNavigationCard &&
             _currentNavigationEvent != null
-        ? 110.0 // Justo encima del panel de navegación (altura 105px + 5px margen)
+        ? 70.0 // Justo encima del panel de navegación compacto
         : 20.0; // Margen normal desde el bottom
 
     return Positioned(
@@ -6397,11 +6641,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
             topLeft: Radius.circular(24),
             topRight: Radius.circular(24),
           ),
-          child: IntrinsicHeight(
-            child: Container(
-              constraints: const BoxConstraints(
-                minHeight: 105,
-              ),
+          child: Container(
               decoration: BoxDecoration(
                 // SIEMPRE fondo Primary (verde) con gradiente sutil
                 gradient: LinearGradient(
@@ -6410,171 +6650,162 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
               ),
               child: Padding(
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // Icono animado cuando está hablando
+                    // Icono compacto
                     SizedBox(
-                      width: 80,
-                      height: 80,
+                      width: 44,
+                      height: 44,
                       child: _buildAnimatedSpeakingIcon(iconData, iconColor),
                     ),
-                    const SizedBox(width: 16),
-                    // Información
+                    const SizedBox(width: 10),
+                    // Información compacta
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Estado
-                          Text(
-                            event.state == NavigationState.atPoint
-                                ? 'LLEGASTE'
-                                : event.state == NavigationState.nearPoint
-                                    ? 'LLEGANDO'
-                                    : event.state == NavigationState.approaching
-                                        ? 'ACERCÁNDOSE'
-                                        : event.state ==
-                                                NavigationState.noMovement
-                                            ? 'SIN MOVIMIENTO'
-                                            : 'NAVEGANDO',
-                            style: const TextStyle(
-                              color: Colors.white, // Siempre blanco sólido
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          // Línea y Punto
-                          if (event.targetPoint != null)
-                            Text(
-                              'Línea ${event.targetPoint!.lineNumber} - Punto ${event.targetPoint!.pointNumber}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          if (event.targetPoint == null)
-                            Text(
-                              event.message,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          const SizedBox(height: 6),
-                          // Distancia, tiempo y velocidad
-                          if (event.distance != null && event.distance! <= 20)
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                // Hacer el Row scrollable horizontalmente para evitar overflow
-                                SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  physics: const BouncingScrollPhysics(),
-                                  child: Row(
-                                    children: [
-                                      // En modo reproductor: usar datos del punto simulado actual
-                                      if (_isPlaybackActive &&
-                                          _simulatedRoute.isNotEmpty &&
-                                          _currentPlaybackIndex <
-                                              _simulatedRoute.length) ...[
-                                        // Distancia al siguiente punto de la ruta
-                                        Text(
-                                          '📍 ${_simulatedRoute[_currentPlaybackIndex].distanceToNextMeters.toStringAsFixed(1)}m',
-                                          style: const TextStyle(
-                                            color:
-                                                Colors.white, // Blanco sólido
-                                            fontSize: 12, // Reducido de 13 a 12
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                            width: 8), // Reducido de 12 a 8
-                                        // Tiempo al siguiente punto con unidades
-                                        Text(
-                                          '⏱️ ${_formatDurationWithUnits(_simulatedRoute[_currentPlaybackIndex].timeToNextPoint)}',
-                                          style: const TextStyle(
-                                            color:
-                                                Colors.white, // Blanco sólido
-                                            fontSize: 12, // Reducido de 13 a 12
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                        const SizedBox(
-                                            width: 8), // Reducido de 12 a 8
-                                        // Velocidad de caminata
-                                        Text(
-                                          '🚶 ${(_simulatedRoute[_currentPlaybackIndex].walkingSpeedMps * 3.6).toStringAsFixed(1)} km/h',
-                                          style: const TextStyle(
-                                            color:
-                                                Colors.white, // Blanco sólido
-                                            fontSize: 12, // Reducido de 13 a 12
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ]
-                                      // En modo GPS normal: solo mostrar distancia al punto más cercano
-                                      else ...[
-                                        Text(
-                                          '📍 ${event.distance!.toStringAsFixed(1)}m',
-                                          style: const TextStyle(
-                                            color:
-                                                Colors.white, // Blanco sólido
-                                            fontSize: 12, // Reducido de 13 a 12
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
+                          // Línea superior: Estado + Línea/Punto
+                          Row(
+                            children: [
+                              // Estado compacto
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  event.state == NavigationState.atPoint
+                                      ? 'EN PUNTO'
+                                      : event.state == NavigationState.nearPoint
+                                          ? 'LLEGANDO'
+                                          : event.state == NavigationState.approaching
+                                              ? 'CERCA'
+                                              : event.state == NavigationState.noMovement
+                                                  ? 'QUIETO'
+                                                  : 'NAV',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.5,
                                   ),
                                 ),
+                              ),
+                              const SizedBox(width: 8),
+                              // Línea y Punto
+                              if (event.targetPoint != null)
+                                Expanded(
+                                  child: Text(
+                                    'L${event.targetPoint!.lineNumber} - P${event.targetPoint!.pointNumber}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              if (event.targetPoint == null)
+                                Expanded(
+                                  child: Text(
+                                    event.message,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          // Línea inferior: Distancia, tiempo y velocidad (compacto)
+                          if (event.distance != null && event.distance! <= 20) ...[
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                // En modo reproductor
+                                if (_isPlaybackActive &&
+                                    _simulatedRoute.isNotEmpty &&
+                                    _currentPlaybackIndex < _simulatedRoute.length) ...[
+                                  Text(
+                                    '${_simulatedRoute[_currentPlaybackIndex].distanceToNextMeters.toStringAsFixed(0)}m',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _formatDurationCompact(_simulatedRoute[_currentPlaybackIndex].timeToNextPoint),
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    '${(_simulatedRoute[_currentPlaybackIndex].walkingSpeedMps * 3.6).toStringAsFixed(1)}km/h',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ] else ...[
+                                  Text(
+                                    '${event.distance!.toStringAsFixed(0)}m',
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                                // Barra de progreso compacta
                                 if (progress != null) ...[
-                                  const SizedBox(height: 4),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: LinearProgressIndicator(
-                                      value: progress,
-                                      minHeight: 6,
-                                      backgroundColor:
-                                          Colors.white.withValues(alpha: 0.3),
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(2),
+                                      child: LinearProgressIndicator(
+                                        value: progress,
+                                        minHeight: 3,
+                                        backgroundColor: Colors.white.withValues(alpha: 0.2),
+                                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                                       ),
                                     ),
                                   ),
                                 ],
                               ],
                             ),
-                          // Indicador de zonas de exclusión cercanas
-                          if (_showExclusionButton &&
-                              _nearbyExclusionZones.isNotEmpty) ...[
-                            const SizedBox(height: 6),
+                          ],
+                          // Indicador de zonas de exclusión (compacto)
+                          if (_showExclusionButton && _nearbyExclusionZones.isNotEmpty) ...[
+                            const SizedBox(height: 3),
                             Row(
                               children: [
-                                const Icon(
-                                  Icons.warning_amber_rounded,
-                                  color: Colors.white, // Blanco sólido
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 6),
+                                const Icon(Icons.warning_amber_rounded, color: Colors.white70, size: 11),
+                                const SizedBox(width: 4),
                                 Expanded(
                                   child: Text(
-                                    '${_nearbyExclusionZones.first.namePolygonCoordinate} (${_nearbyExclusionZones.first.typePointName ?? 'Sin tipo'}) - ${_nearbyExclusionZones.first.distanceMeters.toStringAsFixed(1)}m',
+                                    '${_nearbyExclusionZones.first.typePointName ?? 'Zona'} ${_nearbyExclusionZones.first.distanceMeters.toStringAsFixed(0)}m',
                                     style: const TextStyle(
-                                      color: Colors.white, // Blanco sólido
-                                      fontSize: 11,
+                                      color: Colors.white70,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w500,
                                     ),
                                     maxLines: 1,
@@ -6596,43 +6827,43 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                           clipBehavior: Clip.none,
                           children: [
                             Container(
-                              width: 48,
-                              height: 48,
+                              width: 36,
+                              height: 36,
                               decoration: BoxDecoration(
                                 color: Colors.white.withValues(alpha: 0.25),
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.warning_amber_rounded,
                                 color: Colors.white,
-                                size: 28,
+                                size: 20,
                               ),
                             ),
                             // Badge con contador
                             if (_nearbyExclusionZones.length > 1)
                               Positioned(
-                                right: -4,
-                                top: -4,
+                                right: -2,
+                                top: -2,
                                 child: Container(
-                                  padding: const EdgeInsets.all(4),
+                                  padding: const EdgeInsets.all(3),
                                   decoration: BoxDecoration(
                                     color: FlutterFlowTheme.of(context).error,
                                     shape: BoxShape.circle,
                                     border: Border.all(
                                       color: Colors.white,
-                                      width: 2,
+                                      width: 1.5,
                                     ),
                                   ),
                                   constraints: const BoxConstraints(
-                                    minWidth: 20,
-                                    minHeight: 20,
+                                    minWidth: 16,
+                                    minHeight: 16,
                                   ),
                                   child: Center(
                                     child: Text(
                                       '${_nearbyExclusionZones.length}',
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 10,
+                                        fontSize: 8,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -6642,15 +6873,24 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                           ],
                         ),
                       ),
-                    const SizedBox(width: 16),
                   ],
                 ),
               ),
-            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Formatea duración de forma compacta (ej: "2m", "1h5m")
+  String _formatDurationCompact(Duration duration) {
+    if (duration.inHours > 0) {
+      return '${duration.inHours}h${duration.inMinutes.remainder(60)}m';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}m${duration.inSeconds.remainder(60)}s';
+    } else {
+      return '${duration.inSeconds}s';
+    }
   }
 
   /// Label que muestra el tiempo total del recorrido (colapsable)
@@ -8095,8 +8335,13 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 
   /// Menú FAB Speed Dial moderno
   Widget _buildModernFABMenu() {
+    // Calcular posición dinámica basada en si la barra de navegación está visible
+    final double bottomOffset = (_showNavigationCard && _currentNavigationEvent != null)
+        ? 100  // Altura aproximada de la barra de navegación + margen
+        : 24;  // Margen normal cuando no hay barra
+
     return Positioned(
-      bottom: 120,
+      bottom: bottomOffset,
       right: 16,
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -8222,6 +8467,57 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     );
   }
 
+  /// Botón flotante "¿Dónde estoy?" - anuncia ubicación actual por voz
+  Widget _buildWhereAmIButton() {
+    // Calcular posición dinámica basada en si la barra de navegación está visible
+    final double bottomOffset = (_showNavigationCard && _currentNavigationEvent != null)
+        ? 108  // Altura aproximada de la barra de navegación + margen (alineado con FAB)
+        : 32;  // Margen normal cuando no hay barra
+
+    // Color azul vibrante para el botón
+    const Color buttonColor = Color(0xFF2196F3);  // Material Blue 500
+
+    return Positioned(
+      bottom: bottomOffset,
+      right: 88,  // Al lado izquierdo del FAB (16 + 64 + 8)
+      child: GestureDetector(
+        onTap: () {
+          _speakCurrentLocation();
+        },
+        child: Container(
+          width: 52,
+          height: 52,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF2196F3),  // Material Blue 500
+                Color(0xFF1976D2),  // Material Blue 700
+              ],
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: buttonColor.withValues(alpha: 0.5),
+                blurRadius: 12,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.record_voice_over,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildFABOption({
     required IconData icon,
     required String label,
@@ -8295,60 +8591,6 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     );
   }
 
-  /// Botón FAB para ir a ModulesPage (inferior izquierda)
-  Widget _buildModulesFAB() {
-    // Calcular posición dinámica basada en qué elementos están visibles
-    double bottomPosition = 120.0; // Posición base
-
-    // Si el reproductor está activo, subir más
-    if (_isPlaybackActive && _simulatedRoute.isNotEmpty) {
-      bottomPosition = 180.0; // Encima del panel de reproductor
-    }
-    // Si la tarjeta de navegación está visible, ajustar
-    else if (_showNavigationCard && _currentNavigationEvent != null) {
-      bottomPosition = 120.0; // Encima de la barra de navegación
-    }
-
-    return Positioned(
-      bottom: bottomPosition,
-      left: 16,
-      child: GestureDetector(
-        onTap: () {
-          context.pushNamed('ModulesPage');
-        },
-        child: Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                FlutterFlowTheme.of(context).primary,
-                FlutterFlowTheme.of(context).secondary,
-              ],
-            ),
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color:
-                    FlutterFlowTheme.of(context).primary.withValues(alpha: 0.5),
-                blurRadius: 16,
-                spreadRadius: 2,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.arrow_back,
-            color: Colors.white,
-            size: 28,
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildGlassButton({
     required IconData icon,
     required Color color,
@@ -8396,6 +8638,12 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 class _PMTilesVectorTileProvider extends VectorTileProvider {
   final PmTilesArchive archive;
 
+  // Contador de errores para evitar spam en consola
+  static int _tileErrorCount = 0;
+  static DateTime? _lastErrorReport;
+  static const int _errorReportThreshold = 50; // Reportar cada 50 errores
+  static const Duration _errorReportInterval = Duration(seconds: 30); // O cada 30 segundos
+
   _PMTilesVectorTileProvider(this.archive);
 
   @override
@@ -8425,8 +8673,30 @@ class _PMTilesVectorTileProvider extends VectorTileProvider {
       final tileData = pmTile.bytes();
       return Uint8List.fromList(tileData);
     } catch (e) {
-      debugPrint(
-          '❌ Error cargando tile z=${tile.z} x=${tile.x} y=${tile.y}: $e');
+      // Incrementar contador de errores
+      _tileErrorCount++;
+
+      // Solo reportar si:
+      // 1. Es el primer error
+      // 2. Se alcanzó el threshold de errores
+      // 3. Han pasado más de 30 segundos desde el último reporte
+      final now = DateTime.now();
+      final shouldReport = _tileErrorCount == 1 ||
+          _tileErrorCount % _errorReportThreshold == 0 ||
+          (_lastErrorReport == null || now.difference(_lastErrorReport!) > _errorReportInterval);
+
+      if (shouldReport) {
+        if (_tileErrorCount == 1) {
+          debugPrint('⚠️ Error cargando tile del mapa (z=${tile.z} x=${tile.x} y=${tile.y}): $e');
+          debugPrint('   Los siguientes errores se agruparán para evitar spam...');
+        } else {
+          debugPrint('⚠️ Resumen de errores de tiles: $_tileErrorCount tiles fallidos');
+          debugPrint('   Último error: z=${tile.z} x=${tile.x} y=${tile.y}');
+          debugPrint('   Tipo de error: $e');
+        }
+        _lastErrorReport = now;
+      }
+
       return Uint8List(0);
     }
   }
@@ -10706,13 +10976,16 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                 children: [
                   Row(
                     children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.w600,
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       if (isPremium) ...[

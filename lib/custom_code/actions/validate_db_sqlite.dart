@@ -45,7 +45,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          19, // Incrementada a v19 para agregar Id_user e Id_activity a Location_tracking
+          20, // Incrementada a v20 para agregar Id_rfid a Products
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -661,6 +661,7 @@ Future<void> _createTables(Database db) async {
         Type_product TEXT,
         Name_product TEXT,
         Rfid TEXT,
+        Id_rfid TEXT,
         State_product TEXT,
         Description_product TEXT,
         Location_raw TEXT,
@@ -688,6 +689,8 @@ Future<void> _createTables(Database db) async {
       'CREATE INDEX IF NOT EXISTS IX_Products_Id_type ON Products(Id_type);');
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Products_Rfid ON Products(Rfid);');
+  await db.execute(
+      'CREATE INDEX IF NOT EXISTS IX_Products_Id_rfid ON Products(Id_rfid);');
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Products_State ON Products(State_product);');
   await db.execute(
@@ -1246,6 +1249,8 @@ Future<void> _upgradeDatabase(
             'CREATE INDEX IF NOT EXISTS IX_Products_Id_type ON Products(Id_type);');
         await db.execute(
             'CREATE INDEX IF NOT EXISTS IX_Products_Rfid ON Products(Rfid);');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS IX_Products_Id_rfid ON Products(Id_rfid);');
         await db.execute(
             'CREATE INDEX IF NOT EXISTS IX_Products_State ON Products(State_product);');
         await db.execute(
@@ -1969,7 +1974,7 @@ Future<void> _upgradeDatabase(
         }
         if (!columnNames.contains('Id_activity')) {
           await db.execute(
-              'ALTER TABLE Location_tracking ADD COLUMN Id_activity INTEGER;');
+                           'ALTER TABLE Location_tracking ADD COLUMN Id_activity INTEGER;');
           debugPrint('   ✅ Campo Id_activity agregado');
         }
 
@@ -1981,12 +1986,46 @@ Future<void> _upgradeDatabase(
       }
     }
 
+    // Migración v19 a v20: Agregar columna Id_rfid a Products
+    if (oldVersion < 20) {
+      debugPrint('📦 Aplicando migración a versión 20...');
+      debugPrint('   Agregando columna Id_rfid a tabla Products');
+
+      try {
+        // Verificar si la columna ya existe
+        final columns = await db.rawQuery('PRAGMA table_info(Products);');
+        final columnNames = columns.map((col) => col['name'] as String).toList();
+
+        // Agregar columna Id_rfid si no existe
+        if (!columnNames.contains('Id_rfid')) {
+          await db.execute(
+              'ALTER TABLE Products ADD COLUMN Id_rfid TEXT;');
+          debugPrint('   ✅ Campo Id_rfid agregado a tabla Products');
+
+          // Crear índice para optimizar búsquedas por RFID
+          await db.execute(
+              'CREATE INDEX IF NOT EXISTS IX_Products_Id_rfid ON Products(Id_rfid);');
+          debugPrint('   ✅ Índice IX_Products_Id_rfid creado');
+        } else {
+          debugPrint('   ℹ️ Campo Id_rfid ya existe en tabla Products');
+
+          // Verificar si el índice existe, si no, crearlo
+          await db.execute(
+              'CREATE INDEX IF NOT EXISTS IX_Products_Id_rfid ON Products(Id_rfid);');
+        }
+
+        debugPrint('✅ Migración a versión 20 completada');
+        debugPrint('   Campo Id_rfid disponible en Products para búsquedas por RFID');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 20: $e');
+        // No lanzar el error para permitir que la app continúe
+      }
+    }
+
     // Futuras migraciones se agregarían aquí
-    // if (oldVersion < 20) { ... }
+    // if (oldVersion < 21) { ... }
   } catch (e) {
     debugPrint('❌ Error durante la migración de la base de datos: $e');
     rethrow;
   }
 }
-// Set your action name, define your arguments and return parameter,
-// and then add the boilerplate code using the green button on the right!

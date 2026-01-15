@@ -7,6 +7,7 @@ import '/tag_admin/tag_test_writer_dialog_widget.dart';
 import '/tag_admin/tag_test_reader_dialog_widget.dart';
 import '/tag_admin/tag_raw_reader_dialog_widget.dart';
 import '/tag_admin/tag_history_widget.dart';
+import '/tag_admin/tag_capacity_test_widget.dart';
 import '/components/nfc_clear_dialog_widget.dart';
 import '/components/nfc_transfer_dialog_widget.dart';
 import 'package:flutter/material.dart';
@@ -183,6 +184,13 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                   subtitle: 'TAGs registrados',
                   color: Color(0xFF8B5CF6),
                   onTap: () => _showTagHistory(),
+                ),
+                _buildActionCard(
+                  icon: Icons.calculate_outlined,
+                  title: 'Test Capacidad',
+                  subtitle: 'Calcular registros',
+                  color: Color(0xFF06B6D4),
+                  onTap: () => _showCapacityTest(),
                 ),
               ],
             ),
@@ -443,6 +451,15 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       MaterialPageRoute(
         builder: (context) => const TagHistoryWidget(),
       ),
+    );
+  }
+
+  void _showCapacityTest() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => TagCapacityTestWidget(),
     );
   }
 }

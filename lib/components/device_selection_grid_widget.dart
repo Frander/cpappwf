@@ -618,14 +618,17 @@ class _DeviceSelectionGridWidgetState
                                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                                 ),
                               ),
-                              SizedBox(width: 8),
-                              Text(
-                                'SELECCIONANDO...',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                  letterSpacing: 0.5,
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'SELECCIONANDO...',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                    letterSpacing: 0.3,
+                                  ),
                                 ),
                               ),
                             ],

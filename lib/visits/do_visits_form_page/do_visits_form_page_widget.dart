@@ -3,6 +3,7 @@ import '/backend/sqlite/global_db_singleton.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
 import '/components/nfc_transfer_write_dialog_widget.dart';
+import '/components/qr_scanner_dialog_widget.dart';
 import '/components/photo_capture_component_widget.dart';
 import '/components/date_picker_component_widget.dart';
 import '/components/time_picker_component_widget.dart';
@@ -21,6 +22,7 @@ import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
+import '/tag_admin/tag_admin_center_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -43,9 +45,13 @@ class DoVisitsFormPageWidget extends StatefulWidget {
 }
 
 class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   late DoVisitsFormPageModel _model;
   late TabController _tabController;
+
+  // Mantener vivo el estado cuando se cambia de tab
+  @override
+  bool get wantKeepAlive => true;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -803,6 +809,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   @override
   Widget build(BuildContext context) {
+    // Requerido por AutomaticKeepAliveClientMixin
+    super.build(context);
+
     // LOTE 1: Usar Selector para escuchar solo cambios en visitDetails
     // en lugar de context.watch<FFAppState>() que escucha TODOS los cambios
     // ignore: unused_local_variable
@@ -2207,7 +2216,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               });
             } else {
               // Si no tiene hijos, es un status simple que se puede seleccionar
-              await _onRootStatusSelected(status);
+              await _onRootStatusSelected(status, allRootStatus: allActivityStatus);
             }
           },
           child: Container(
@@ -2714,7 +2723,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
-            await _onRootStatusSelected(childStatus);
+            // Obtener todos los status childs del parent status para manejar unique_choice
+            final parentStatusChildsRaw = getJsonField(parentStatus, r'''$.activities_status_childs''');
+            final parentStatusChildsList = parentStatusChildsRaw != null
+                ? (parentStatusChildsRaw is List ? parentStatusChildsRaw : [])
+                : [];
+
+            await _onRootStatusSelected(childStatus, allRootStatus: parentStatusChildsList);
 
             setState(() {
               if (hasChildren) {
@@ -2930,7 +2945,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  Future<void> _onRootStatusSelected(dynamic status) async {
+  Future<void> _onRootStatusSelected(dynamic status, {List<dynamic>? allRootStatus}) async {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
     final typeStatus = getJsonField(status, r'''$.type_status''').toString();
@@ -2946,6 +2961,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         typeStatus.toLowerCase() == 'tag-writer' ||
         typeStatus.toLowerCase() == 'tag-reader') {
       return;
+    }
+
+    // LÓGICA UNIQUE_CHOICE: Si el tipo es "unique_choice", eliminar otros status raíz seleccionados
+    if (typeStatus.toLowerCase() == 'unique_choice' && allRootStatus != null) {
+      // Obtener todos los IDs de status raíz que son unique_choice (excepto el actual)
+      final List<int> siblingStatusIds = [];
+      for (var sibling in allRootStatus) {
+        final siblingId = getJsonField(sibling, r'''$.id_activity_status''');
+        final siblingType = getJsonField(sibling, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+        if (siblingId != statusId && siblingType == 'unique_choice') {
+          siblingStatusIds.add(siblingId);
+        }
+      }
+
+      // Eliminar de visitDetails todos los status hermanos (unique_choice) que estén seleccionados
+      if (siblingStatusIds.isNotEmpty) {
+        List<int> indicesToRemove = [];
+        for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+          if (siblingStatusIds.contains(FFAppState().visitDetails[i].idActivityStatus)) {
+            indicesToRemove.add(i);
+          }
+        }
+        // Remover en orden inverso para no alterar los índices
+        for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+          FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+        }
+        // Limpiar cache de búsqueda porque cambiaron los visitDetails
+        _visitDetailsSearchCache.clear();
+        debugPrint('🔘 UNIQUE_CHOICE: Eliminados ${indicesToRemove.length} status hermanos');
+      }
     }
 
     // Para otros tipos, guardar valor por defecto
@@ -3020,6 +3065,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     }
 
+    // Limpiar cache de búsqueda porque cambiaron los visitDetails
+    _visitDetailsSearchCache.clear();
     setState(() {});
   }
 
@@ -3197,66 +3244,111 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             Expanded(
               child: InkWell(
                 onTap: () async {
-                  // Validar steps requeridos antes de guardar
-                  final validationResult = _validateRequiredStepsRecursive();
+                  // Obtener la actividad actual
+                  final currentActivity = FFAppState().currentActivity;
 
-                  if (validationResult != null) {
-                    // Hay un step requerido sin completar
-                    final message = validationResult['message'] as String;
-                    final path = (validationResult['path'] as List<dynamic>).cast<int>();
+                  // Verificar si la actividad tiene steps (estructura jerárquica)
+                  final hasSteps = getJsonField(currentActivity, r'''$.activities_steps''')?.toList().isNotEmpty ?? false;
 
-                    // Expandir el árbol hasta el step faltante
-                    _expandTreeToStep(path);
+                  if (hasSteps) {
+                    // VALIDACIÓN 1: Si hay steps, validar que los steps requeridos estén completos
+                    final validationResult = _validateRequiredStepsRecursive();
 
-                    // Mostrar mensaje de error específico
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Row(
-                              children: [
-                                Icon(
-                                  Icons.error_outline_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Campo Requerido',
-                                  style: TextStyle(
+                    if (validationResult != null) {
+                      // Hay un step requerido sin completar
+                      final message = validationResult['message'] as String;
+                      final path = (validationResult['path'] as List<dynamic>).cast<int>();
+
+                      // Expandir el árbol hasta el step faltante
+                      _expandTreeToStep(path);
+
+                      // Mostrar mensaje de error específico
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Row(
+                                children: [
+                                  Icon(
+                                    Icons.error_outline_rounded,
                                     color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
+                                    size: 20,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Campo Requerido',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                message,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                          duration: const Duration(milliseconds: 4000),
+                          backgroundColor: FlutterFlowTheme.of(context).error,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          margin: const EdgeInsets.all(16),
+                        ),
+                      );
+                      return;
+                    }
+                  } else {
+                    // VALIDACIÓN 2: Si NO hay steps (solo estados directos), verificar que haya al menos un estado seleccionado
+                    if (FFAppState().visitDetails.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(
+                                Icons.warning_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Debe seleccionar al menos un estado antes de guardar la visita',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
                                   ),
                                 ),
-                              ],
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              message,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w500,
-                                fontSize: 13,
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                          duration: const Duration(seconds: 4),
+                          backgroundColor: FlutterFlowTheme.of(context).warning,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          margin: const EdgeInsets.all(16),
                         ),
-                        duration: const Duration(milliseconds: 4000),
-                        backgroundColor: FlutterFlowTheme.of(context).error,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        margin: const EdgeInsets.all(16),
-                      ),
-                    );
-                    return;
+                      );
+                      return;
+                    }
                   }
 
-                  // Verificar si la actividad requiere lectura de TAG NFC antes de guardar
+                  // Verificar si la actividad requiere lectura de TAG NFC, QR o GPS antes de guardar
                   final readDefault = getJsonField(currentActivity, r'''$.read_default''')?.toString().toUpperCase() ?? '';
 
                   if (readDefault == 'NFC') {
@@ -3322,6 +3414,92 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                     ),
                                     Text(
                                       'TAG: $nfcTagId',
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          duration: const Duration(seconds: 3),
+                          backgroundColor: const Color(0xFF00a86b),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          margin: const EdgeInsets.all(16),
+                        ),
+                      );
+
+                      // Limpiar los datos de tags que NO deben ser recordados
+                      _cleanupTagDatasByRememberFlag();
+                    }
+                  } else if (readDefault == 'QR') {
+                    // === MODO QR: Escanear código QR y guardar visita directamente ===
+                    final qrCode = await _showQrScannerDialog();
+
+                    // Si el usuario canceló el escaneo QR, no continuar
+                    if (qrCode == null || qrCode.isEmpty) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Row(
+                              children: [
+                                Icon(Icons.qr_code_rounded, color: Colors.white),
+                                SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    'Escaneo de QR cancelado. No se guardó la visita.',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            duration: const Duration(seconds: 3),
+                            backgroundColor: Colors.orange.shade700,
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            margin: const EdgeInsets.all(16),
+                          ),
+                        );
+                      }
+                      return;
+                    }
+
+                    // Crear visita directamente con QR y las últimas geolocalizaciones
+                    final success = await _createVisitWithQr(qrCode);
+
+                    if (success && mounted) {
+                      // Mostrar mensaje de éxito
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Row(
+                            children: [
+                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '¡Visita Registrada!',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      'QR: ${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}',
                                       style: const TextStyle(
                                         fontFamily: 'Roboto',
                                         fontSize: 12,
@@ -3428,12 +3606,177 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
+
+  /// Calcula distancia geográfica entre dos coordenadas en metros (Haversine)
+  double _calculateGeoDistance(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000.0; // Radio de la Tierra en metros
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLon = (lon2 - lon1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) *
+            math.cos(lat2 * math.pi / 180) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return R * c;
+  }
+
+  /// Muestra información del producto con distancia
+  Future<void> _showProductInfoDialog(
+    Map<String, dynamic> product,
+    double? distance,
+    ReadGeoStruct currentGeo,
+  ) async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        // Auto-cerrar después de 4 segundos
+        Future.delayed(const Duration(seconds: 4), () {
+          if (Navigator.of(dialogContext).canPop()) {
+            Navigator.of(dialogContext).pop();
+          }
+        });
+
+        final distanceText = distance == null
+            ? 'Sin coordenadas instaladas'
+            : distance < 1000
+                ? '${distance.toStringAsFixed(1)} metros'
+                : '${(distance / 1000).toStringAsFixed(2)} km';
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A1A2E),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF00a86b), width: 2),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Icono de éxito
+                Container(
+                  width: 60,
+                  height: 60,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+                  ),
+                  child: const Icon(Icons.check_circle, color: Color(0xFF00a86b), size: 40),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Producto Encontrado',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Información del producto
+                _buildInfoRow('RFID', product['Id_rfid']?.toString() ?? 'N/A'),
+                _buildInfoRow('Código', product['Code_product']?.toString() ?? 'N/A'),
+                _buildInfoRow('Nombre', product['Name_product']?.toString() ?? 'N/A'),
+                _buildInfoRow('Lote', product['Name_headquarter']?.toString() ?? 'N/A'),
+                const Divider(color: Colors.white24, height: 24),
+                // Distancia
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: distance != null && distance < 50
+                        ? const Color(0xFF00a86b).withValues(alpha: 0.2)
+                        : Colors.orange.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        color: distance != null && distance < 50
+                            ? const Color(0xFF00a86b)
+                            : Colors.orange,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Distancia',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 12,
+                                color: Colors.white70,
+                              ),
+                            ),
+                            Text(
+                              distanceText,
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 13,
+                color: Colors.white70,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+
   /// Muestra un diálogo para leer el TAG ID (RFID) del NFC antes de guardar
   /// Retorna el TAG ID leído o null si el usuario cancela
   Future<String?> _showNfcTagIdReaderDialog() async {
     String? tagId;
     bool isReading = false;
     bool isCancelled = false;
+    String? errorMessage;
 
     return await showDialog<String?>(
       context: context,
@@ -3441,12 +3784,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       barrierColor: Colors.black.withValues(alpha: 0.85),
       builder: (dialogContext) {
         return StatefulBuilder(
-          builder: (context, setDialogState) {
+          builder: (builderContext, setDialogState) {
             // Función para iniciar la lectura NFC
             Future<void> startNfcReading() async {
               if (isReading || isCancelled) return;
 
-              setDialogState(() => isReading = true);
+              setDialogState(() {
+                isReading = true;
+                errorMessage = null;
+              });
 
               try {
                 await NfcManager.instance.startSession(
@@ -3469,20 +3815,38 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                       if (!isCancelled && tagId != null && tagId!.isNotEmpty) {
                         HapticFeedback.mediumImpact();
-                        if (Navigator.of(dialogContext).canPop()) {
-                          Navigator.of(dialogContext).pop(tagId);
+
+                        // La visita solo necesita el RFID, retornar inmediatamente
+                        debugPrint('✅ TAG RFID leído exitosamente: $tagId');
+
+                        // Cerrar el diálogo retornando el tagId
+                        if (builderContext.mounted && Navigator.of(builderContext).canPop()) {
+                          Navigator.of(builderContext).pop(tagId);
                         }
+                      } else if (!isCancelled) {
+                        // TAG alejado muy rápido o no se pudo leer
+                        debugPrint('⚠️ No se pudo leer el TAG correctamente');
+                        setDialogState(() {
+                          isReading = false;
+                          errorMessage = 'No se pudo leer el TAG.\nAcerque el TAG y manténgalo cerca hasta que se complete la lectura.';
+                        });
                       }
                     } catch (e) {
-                      debugPrint('Error leyendo TAG ID: $e');
+                      debugPrint('❌ Error leyendo TAG ID: $e');
                       await NfcManager.instance.stopSession();
-                      setDialogState(() => isReading = false);
+                      setDialogState(() {
+                        isReading = false;
+                        errorMessage = 'Error al leer el TAG.\nIntente nuevamente.';
+                      });
                     }
                   },
                 );
               } catch (e) {
-                debugPrint('Error iniciando sesión NFC: $e');
-                setDialogState(() => isReading = false);
+                debugPrint('❌ Error iniciando sesión NFC: $e');
+                setDialogState(() {
+                  isReading = false;
+                  errorMessage = 'Error al iniciar lector NFC.\nVerifique que NFC esté activado.';
+                });
               }
             }
 
@@ -3497,7 +3861,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               backgroundColor: Colors.transparent,
               elevation: 0,
               child: Container(
-                width: MediaQuery.sizeOf(context).width * 0.9,
+                width: MediaQuery.sizeOf(builderContext).width * 0.9,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   color: const Color(0xFF1A1A2E),
@@ -3541,18 +3905,45 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 12),
-                    // Instrucciones
-                    Text(
-                      isReading
-                          ? 'Acerque el TAG NFC al dispositivo...'
-                          : 'Preparando lector NFC...',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.7),
+                    // Instrucciones o mensaje de error
+                    if (errorMessage != null)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.orange.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.orange, width: 1),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.warning_amber, color: Colors.orange, size: 24),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                errorMessage!,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 13,
+                                  color: Colors.white,
+                                ),
+                                textAlign: TextAlign.left,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Text(
+                        isReading
+                            ? 'Acerque el TAG NFC al dispositivo...'
+                            : 'Preparando lector NFC...',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          color: Colors.white.withValues(alpha: 0.7),
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
                     const SizedBox(height: 20),
                     // Indicador de carga
                     if (isReading)
@@ -3565,37 +3956,98 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                       ),
                     const SizedBox(height: 24),
-                    // Botón cancelar
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          isCancelled = true;
-                          try {
-                            await NfcManager.instance.stopSession();
-                          } catch (_) {}
-                          if (Navigator.of(dialogContext).canPop()) {
-                            Navigator.of(dialogContext).pop(null);
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red.shade700,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                    // Botones
+                    if (errorMessage != null)
+                      // Mostrar botón de reintentar cuando hay error
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                isCancelled = true;
+                                try {
+                                  await NfcManager.instance.stopSession();
+                                } catch (_) {}
+                                if (builderContext.mounted && Navigator.of(dialogContext).canPop()) {
+                                  Navigator.of(dialogContext).pop(null);
+                                }
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.grey.shade700,
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Cancelar',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        child: const Text(
-                          'Cancelar',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                await startNfcReading();
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF00a86b),
+                                padding: const EdgeInsets.symmetric(vertical: 14),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: const Text(
+                                'Reintentar',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    else
+                      // Mostrar solo botón cancelar cuando está leyendo
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            isCancelled = true;
+                            try {
+                              await NfcManager.instance.stopSession();
+                            } catch (_) {}
+                            if (builderContext.mounted && Navigator.of(dialogContext).canPop()) {
+                              Navigator.of(dialogContext).pop(null);
+                            }
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: const Text(
+                            'Cancelar',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -3758,6 +4210,206 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return true;
     } catch (e) {
       debugPrint('❌ Error creando visita NFC: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Error al guardar la visita: $e',
+                    style: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+      return false;
+    }
+  }
+
+  /// Muestra el diálogo moderno para escanear un código QR
+  /// Retorna el código QR escaneado o null si el usuario cancela
+  Future<String?> _showQrScannerDialog() async {
+    return await showDialog<String?>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.9),
+      builder: (dialogContext) {
+        return const Dialog(
+          elevation: 0,
+          insetPadding: EdgeInsets.zero,
+          backgroundColor: Colors.transparent,
+          child: QrScannerDialogWidget(
+            title: 'Escanear QR',
+            subtitle: 'Alinee el código QR dentro del marco para registrar la visita',
+          ),
+        );
+      },
+    );
+  }
+
+  /// Crea una visita directamente usando el código QR escaneado y las últimas 3 geolocalizaciones del AppState
+  Future<bool> _createVisitWithQr(String qrCode) async {
+    try {
+      debugPrint('📱 ===== CREANDO VISITA CON QR =====');
+      debugPrint('📷 QR Code: $qrCode');
+
+      // Obtener datos necesarios
+      final currentActivity = FFAppState().currentActivity;
+      final idActivity = getJsonField(currentActivity, r'''$.id_activity''');
+      final userSelected = FFAppState().userSelected;
+      final deviceDefault = FFAppState().deviceDefault;
+
+      // Obtener el Id_headquarter del lote actual
+      int idHeadquarter = 0;
+      final headquartersList = FFAppState().headquartersSelectedList;
+      if (headquartersList.isNotEmpty) {
+        idHeadquarter = headquartersList.first.idHeadquarter;
+        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+      } else {
+        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
+      }
+
+      // Obtener las últimas 3 geolocalizaciones del AppState
+      final geoLocations = FFAppState().geoLocationsList;
+      if (geoLocations.isEmpty) {
+        debugPrint('⚠️ No hay geolocalizaciones disponibles');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.location_off_rounded, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'No hay ubicación GPS disponible. Espere a que se obtenga la ubicación.',
+                      style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+        return false;
+      }
+
+      // Tomar las últimas 3 geolocalizaciones (o menos si no hay suficientes)
+      final recentGeoLocations = geoLocations.length <= 3
+          ? geoLocations.toList()
+          : geoLocations.sublist(geoLocations.length - 3);
+
+      // Usar la ubicación más reciente como la principal de la visita
+      final mainLocation = recentGeoLocations.last;
+      debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
+      debugPrint('📍 Total geolocalizaciones a guardar: ${recentGeoLocations.length}');
+
+      // Obtener visitDetails filtrados
+      final visitDetails = FFAppState().visitDetails;
+      final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
+
+      // Abrir base de datos
+      final dbPath = FFAppState().pathDatabase;
+      final database = await openDatabase(dbPath);
+
+      int visitId = 0;
+      await database.transaction((txn) async {
+        // Insertar la visita con el código QR en el campo Rfid
+        visitId = await txn.rawInsert('''
+          INSERT INTO Visits (
+            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+            Id_user, Id_device, Id_status, Created_at, Battery,
+            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', [
+          userSelected.idCompany,
+          idActivity,
+          idHeadquarter,
+          0, // Id_product
+          0, // Id_bulk
+          userSelected.idUser,
+          deviceDefault.idDevice,
+          0, // Id_status
+          DateTime.now().toUtc().toIso8601String(),
+          100, // Battery (valor por defecto)
+          mainLocation.latitude,
+          mainLocation.longitude,
+          mainLocation.altitude,
+          mainLocation.errorHorizontal,
+          null, // Id_virtual_point
+          0, // Status
+          qrCode, // Código QR en el campo Rfid
+        ]);
+
+        debugPrint('✅ Visita QR creada con ID: $visitId');
+
+        // Insertar detalles de la visita
+        int insertedCount = 0;
+        for (var detail in detailsToInsert) {
+          final idActivityStatus = detail.idActivityStatus;
+
+          final statusCheck = await txn.rawQuery('''
+            SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
+          ''', [idActivityStatus]);
+
+          if (statusCheck.isEmpty) continue;
+
+          await txn.rawInsert('''
+            INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
+            VALUES (?, ?, ?, ?)
+          ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
+
+          insertedCount++;
+        }
+
+        debugPrint('✅ $insertedCount detalles de visita insertados');
+
+        // Insertar las geolocalizaciones
+        for (var geoPoint in recentGeoLocations) {
+          await txn.rawInsert('''
+            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
+            VALUES (?, ?, ?, ?, ?, ?)
+          ''', [
+            visitId,
+            geoPoint.latitude,
+            geoPoint.longitude,
+            geoPoint.altitude,
+            geoPoint.errorHorizontal,
+            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toUtc().toIso8601String(),
+          ]);
+        }
+
+        debugPrint('✅ ${recentGeoLocations.length} ubicaciones GPS insertadas');
+      });
+
+      await database.close();
+
+      // Actualizar el contador de visitas y limpiar visitDetails
+      FFAppState().update(() {
+        FFAppState().visitCount = FFAppState().visitCount + 1;
+        FFAppState().visitDetails = functions.removeVisits(FFAppState().visitDetails);
+      });
+
+      debugPrint('✅ Visita QR completada exitosamente. ID: $visitId');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error creando visita QR: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -6597,9 +7249,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   /// Espera hasta obtener una geolocalización válida de FFAppState().geoLocationsList
+  /// Si no hay en AppState, busca en SQLite como fallback
   /// Retorna la última geolocalización válida o null si se cancela la espera
   Future<ReadGeoStruct?> _waitForValidGeolocation(BuildContext context) async {
-    // Verificar si ya hay una geolocalización válida
+    // Verificar si ya hay una geolocalización válida en AppState
     ReadGeoStruct? getLatestValidGeolocation() {
       final geoList = FFAppState().geoLocationsList;
       if (geoList.isEmpty) return null;
@@ -6615,15 +7268,63 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return null;
     }
 
-    // Intentar obtener inmediatamente
+    // Fallback: Buscar en SQLite si AppState está vacío
+    Future<ReadGeoStruct?> getGeolocationFromSQLite() async {
+      try {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) return null;
+
+        final String pathStr = '${externalDir.path}/ClickPalmData';
+        final dbPath = path.join(pathStr, 'clickpalm_database.db');
+
+        final database = await openDatabase(dbPath);
+
+        // Buscar la ubicación más reciente con buena precisión (≤15m)
+        final List<Map<String, dynamic>> results = await database.rawQuery('''
+          SELECT Latitude, Longitude, Altitude, HorizontalError, CreatedAt
+          FROM Location_tracking
+          WHERE HorizontalError <= 15
+          ORDER BY CreatedAt DESC
+          LIMIT 1
+        ''');
+
+        await database.close();
+
+        if (results.isEmpty) return null;
+
+        final row = results.first;
+        debugPrint('📍 Geolocalización obtenida de SQLite: lat=${row['Latitude']}, lon=${row['Longitude']}');
+
+        return ReadGeoStruct(
+          latitude: (row['Latitude'] as num?)?.toDouble() ?? 0.0,
+          longitude: (row['Longitude'] as num?)?.toDouble() ?? 0.0,
+          altitude: (row['Altitude'] as num?)?.toDouble() ?? 0.0,
+          errorHorizontal: (row['HorizontalError'] as num?)?.toDouble() ?? 0.0,
+          dateHourRead: DateTime.tryParse(row['CreatedAt'] as String? ?? ''),
+        );
+      } catch (e) {
+        debugPrint('⚠️ Error buscando geolocalización en SQLite: $e');
+        return null;
+      }
+    }
+
+    // Intentar obtener inmediatamente de AppState
     final immediate = getLatestValidGeolocation();
     if (immediate != null) {
       debugPrint(
-          '📍 Geolocalización disponible: ${immediate.latitude}, ${immediate.longitude}');
+          '📍 Geolocalización disponible en AppState: ${immediate.latitude}, ${immediate.longitude}');
       return immediate;
     }
 
-    // Si no hay geolocalización válida, mostrar diálogo de espera
+    // Si AppState está vacío, intentar SQLite como fallback
+    debugPrint('⚠️ AppState vacío, buscando en SQLite...');
+    final fromSQLite = await getGeolocationFromSQLite();
+    if (fromSQLite != null) {
+      debugPrint('✅ Geolocalización obtenida de SQLite');
+      return fromSQLite;
+    }
+
+    // Si no hay geolocalización válida en ningún lado, mostrar diálogo de espera
     debugPrint('⏳ Esperando geolocalización válida...');
 
     ReadGeoStruct? result;

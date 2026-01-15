@@ -575,6 +575,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           v.Id_activity as id_activity,
           v.Id_headquarter as id_headquarter,
           v.Id_product as id_product,
+          p.Rfid as rfid,
           v.Id_user as id_user,
           v.Id_device as id_device,
           v.Created_at as created_at,
@@ -594,6 +595,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           vl.Altitude as location_altitude,
           vl.HorizontalError as location_horizontal_error
         FROM Visits v
+        LEFT JOIN Products p ON v.Id_product = p.Id_product
         LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
         LEFT JOIN Visits_locations vl ON v.Id_visit = vl.Id_visit
         WHERE v.Id_company = ?
@@ -1316,6 +1318,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           v.Id_activity as id_activity,
           v.Id_headquarter as id_headquarter,
           v.Id_product as id_product,
+          p.Rfid as rfid,
           v.Id_user as id_user,
           v.Id_device as id_device,
           v.Created_at as created_at,
@@ -1335,6 +1338,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           vl.Altitude as location_altitude,
           vl.HorizontalError as location_horizontal_error
         FROM Visits v
+        LEFT JOIN Products p ON v.Id_product = p.Id_product
         LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
         LEFT JOIN Visits_locations vl ON v.Id_visit = vl.Id_visit
         WHERE v.Id_company = ?
@@ -1354,6 +1358,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
             'id_activity': row['id_activity'],
             'id_headquarter': row['id_headquarter'],
             'id_product': row['id_product'],
+            'rfid': row['rfid'],
             'id_user': row['id_user'],
             'id_device': row['id_device'],
             'visits_details': <Map<String, dynamic>>[],
@@ -2320,7 +2325,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
                   _currentMessage,
                   textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 18,
+                                       fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: FlutterFlowTheme.of(context).info,
                     letterSpacing: 0.5,

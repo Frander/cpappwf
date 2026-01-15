@@ -883,6 +883,11 @@ class _InformationFormState extends State<InformationForm>
               label: 'Modelo',
               value: device.model.isNotEmpty ? device.model : 'N/A',
             ),
+            _buildDeviceInfoRow(
+              icon: Icons.info_outline,
+              label: 'Versión App',
+              value: 'v24',
+            ),
           ],
         ),
       ),

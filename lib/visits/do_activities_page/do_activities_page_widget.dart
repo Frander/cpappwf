@@ -20,8 +20,6 @@ import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
-
-import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -93,7 +91,8 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
   @override
   Widget build(BuildContext context) {
-    context.watch<FFAppState>();
+    // OPTIMIZACIÓN: No usar context.watch aquí - causa rebuilds excesivos
+    // En su lugar, usar FFAppState() directamente o context.select() para propiedades específicas
 
     return GestureDetector(
       onTap: () {

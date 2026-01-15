@@ -1,8 +1,6 @@
 import '/backend/schema/structs/index.dart';
-import '/backend/api_requests/api_calls.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/components/info_dialog_widget.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -84,129 +82,33 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     return parts[0][0].toUpperCase();
   }
 
-  // Verificar si el usuario es OPERADOR
-  Future<bool> _verifyUserIsOperador(UsersStruct user) async {
-    try {
-      final response = await APIClickPalmGroup.usersbyoperidGETCall.call(
-        operID: user.operID,
-      );
-
-      if (response.succeeded && response.jsonBody != null) {
-        List<dynamic> permissions = getJsonField(
-          response.jsonBody,
-          r'''$.users_permissions''',
-          true,
-        ) ?? [];
-
-        for (var permission in permissions) {
-          String? permissionName = getJsonField(
-            permission,
-            r'''$.name_permission''',
-          )?.toString();
-
-          if (permissionName?.toUpperCase() == 'OPERADOR') {
-            return true;
-          }
-        }
-      }
-      return false;
-    } catch (e) {
-      debugPrint('Error verificando permisos: $e');
-      return false;
-    }
-  }
-
   // Manejar selección de usuario
   Future<void> _onUserSelected(UsersStruct user) async {
     setState(() => _isLoading = true);
 
     try {
-      // Mostrar loading
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => Center(
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircularProgressIndicator(
-                  color: FlutterFlowTheme.of(context).primary,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Verificando permisos...',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    color: Colors.white,
-                    fontSize: 14,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
+      // Guardar usuario seleccionado
+      FFAppState().userSelected = user;
+      FFAppState().update(() {});
 
-      final isOperador = await _verifyUserIsOperador(user);
+      debugPrint('✅ Usuario seleccionado: ${user.nameUser}');
 
-      // Cerrar loading
+      // Navegar a HomePage
       if (Navigator.of(context).canPop()) {
-        Navigator.pop(context);
+        context.pop();
       }
-
-      if (isOperador) {
-        // Guardar usuario seleccionado
-        FFAppState().userSelected = user;
-        FFAppState().update(() {});
-
-        debugPrint('✅ Usuario OPERADOR seleccionado: ${user.nameUser}');
-
-        // Navegar a HomePage
-        if (Navigator.of(context).canPop()) {
-          context.pop();
-        }
-        context.pushNamed(
-          HomePageWidget.routeName,
-          extra: <String, dynamic>{
-            kTransitionInfoKey: TransitionInfo(
-              hasTransition: true,
-              transitionType: PageTransitionType.fade,
-              duration: Duration(milliseconds: 300),
-            ),
-          },
-        );
-      } else {
-        // Mostrar mensaje de error
-        await showDialog(
-          context: context,
-          builder: (dialogContext) {
-            return Dialog(
-              elevation: 0,
-              insetPadding: EdgeInsets.zero,
-              backgroundColor: Colors.transparent,
-              child: Container(
-                height: MediaQuery.sizeOf(context).height * 0.6,
-                width: MediaQuery.sizeOf(context).width * 0.8,
-                child: InfoDialogWidget(
-                  info: 'El usuario seleccionado no tiene permisos de OPERADOR. Por favor seleccione otro usuario.',
-                ),
-              ),
-            );
-          },
-        );
-      }
+      context.pushNamed(
+        HomePageWidget.routeName,
+        extra: <String, dynamic>{
+          kTransitionInfoKey: const TransitionInfo(
+            hasTransition: true,
+            transitionType: PageTransitionType.fade,
+            duration: Duration(milliseconds: 300),
+          ),
+        },
+      );
     } catch (e) {
       debugPrint('Error en selección de usuario: $e');
-      // Cerrar loading si está abierto
-      if (Navigator.of(context).canPop()) {
-        Navigator.pop(context);
-      }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -225,11 +127,11 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: Color(0xFF0F172A),
+        backgroundColor: const Color(0xFF0F172A),
         body: Container(
           width: double.infinity,
           height: double.infinity,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -246,7 +148,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
               children: [
                 // Header moderno
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                   child: Column(
                     children: [
                       // Fila con logo centrado
@@ -254,7 +156,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           // Logo
-                          Container(
+                          SizedBox(
                             width: 150,
                             height: 60,
                             child: ClipRRect(
@@ -268,7 +170,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         ],
                       ),
 
-                      SizedBox(height: 24),
+                      const SizedBox(height: 24),
 
                       // Titulo principal
                       Row(
@@ -288,12 +190,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
+                                const Text(
                                   'Inicio de sesion ClickPalm',
                                   style: TextStyle(
                                     fontFamily: 'Roboto',
@@ -303,14 +205,14 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                     letterSpacing: -0.5,
                                   ),
                                 ),
-                                SizedBox(height: 4),
+                                const SizedBox(height: 4),
                                 Text(
                                   'Seleccione un usuario para ingresar a la aplicacion',
                                   style: TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 13,
                                     fontWeight: FontWeight.w400,
-                                    color: Colors.white.withOpacity(0.6),
+                                    color: Colors.white.withValues(alpha: 0.6),
                                   ),
                                 ),
                               ],
@@ -319,7 +221,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         ],
                       ),
 
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
                       // Barra de busqueda
                       Container(
@@ -327,27 +229,27 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.white.withOpacity(0.1),
-                              Colors.white.withOpacity(0.05),
+                              Colors.white.withValues(alpha: 0.1),
+                              Colors.white.withValues(alpha: 0.05),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             width: 1,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(0.1),
+                              color: Colors.black.withValues(alpha: 0.1),
                               blurRadius: 20,
-                              offset: Offset(0, 4),
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
                         child: TextField(
                           controller: _model.textController,
                           focusNode: _model.textFieldFocusNode,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Roboto',
                             color: Colors.white,
                             fontSize: 15,
@@ -357,12 +259,12 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                             hintText: 'Buscar por nombre o codigo...',
                             hintStyle: TextStyle(
                               fontFamily: 'Roboto',
-                              color: Colors.white.withOpacity(0.4),
+                              color: Colors.white.withValues(alpha: 0.4),
                               fontSize: 15,
                             ),
                             prefixIcon: Icon(
                               Icons.search,
-                              color: Colors.white.withOpacity(0.5),
+                              color: Colors.white.withValues(alpha: 0.5),
                               size: 22,
                             ),
                             suffixIcon: ValueListenableBuilder<TextEditingValue>(
@@ -372,7 +274,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                     ? IconButton(
                                         icon: Icon(
                                           Icons.clear,
-                                          color: Colors.white.withOpacity(0.5),
+                                          color: Colors.white.withValues(alpha: 0.5),
                                           size: 20,
                                         ),
                                         onPressed: () {
@@ -383,7 +285,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                               },
                             ),
                             border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           ),
                         ),
                       ),
@@ -394,7 +296,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                 // Lista de usuarios
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Builder(
                       builder: (context) {
                         final userItem = _filteredUsers;
@@ -410,8 +312,8 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-                                        FlutterFlowTheme.of(context).secondary.withOpacity(0.2),
+                                        FlutterFlowTheme.of(context).primary.withValues(alpha: 0.2),
+                                        FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.2),
                                       ],
                                     ),
                                     shape: BoxShape.circle,
@@ -419,26 +321,26 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                   child: Icon(
                                     Icons.person_search,
                                     size: 60,
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: Colors.white.withValues(alpha: 0.5),
                                   ),
                                 ),
-                                SizedBox(height: 24),
+                                const SizedBox(height: 24),
                                 Text(
                                   'No se encontraron usuarios',
                                   style: TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 18,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                   ),
                                 ),
-                                SizedBox(height: 8),
+                                const SizedBox(height: 8),
                                 Text(
                                   'Intenta con otro termino de busqueda',
                                   style: TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 14,
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: Colors.white.withValues(alpha: 0.5),
                                   ),
                                 ),
                               ],
@@ -447,14 +349,14 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         }
 
                         return ListView.builder(
-                          padding: EdgeInsets.only(top: 16, bottom: 20),
+                          padding: const EdgeInsets.only(top: 16, bottom: 20),
                           itemCount: userItem.length,
                           itemBuilder: (context, index) {
                             final user = userItem[index];
                             final initials = _getInitials(user.nameUser);
 
                             return Padding(
-                              padding: EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.only(bottom: 12),
                               child: InkWell(
                                 onTap: _isLoading ? null : () => _onUserSelected(user),
                                 child: Container(
@@ -463,20 +365,20 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                       begin: Alignment.topLeft,
                                       end: Alignment.bottomRight,
                                       colors: [
-                                        Colors.white.withOpacity(0.1),
-                                        Colors.white.withOpacity(0.05),
+                                        Colors.white.withValues(alpha: 0.1),
+                                        Colors.white.withValues(alpha: 0.05),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(20),
                                     border: Border.all(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(alpha: 0.2),
                                       width: 1,
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Colors.black.withOpacity(0.2),
+                                        color: Colors.black.withValues(alpha: 0.2),
                                         blurRadius: 20,
-                                        offset: Offset(0, 8),
+                                        offset: const Offset(0, 8),
                                       ),
                                     ],
                                   ),
@@ -485,7 +387,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                     child: BackdropFilter(
                                       filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                                       child: Padding(
-                                        padding: EdgeInsets.all(16),
+                                        padding: const EdgeInsets.all(16),
                                         child: Row(
                                           children: [
                                             // Avatar con iniciales
@@ -493,7 +395,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                               width: 68,
                                               height: 68,
                                               decoration: BoxDecoration(
-                                                gradient: LinearGradient(
+                                                gradient: const LinearGradient(
                                                   begin: Alignment.topLeft,
                                                   end: Alignment.bottomRight,
                                                   colors: [
@@ -504,16 +406,16 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                 shape: BoxShape.circle,
                                                 boxShadow: [
                                                   BoxShadow(
-                                                    color: Color(0xFF004d2e).withOpacity(0.5),
+                                                    color: const Color(0xFF004d2e).withValues(alpha: 0.5),
                                                     blurRadius: 12,
-                                                    offset: Offset(0, 4),
+                                                    offset: const Offset(0, 4),
                                                   ),
                                                 ],
                                               ),
                                               child: Center(
                                                 child: Text(
                                                   initials,
-                                                  style: TextStyle(
+                                                  style: const TextStyle(
                                                     fontFamily: 'Roboto',
                                                     fontSize: 24,
                                                     fontWeight: FontWeight.bold,
@@ -523,7 +425,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                               ),
                                             ),
 
-                                            SizedBox(width: 16),
+                                            const SizedBox(width: 16),
 
                                             // Informacion del usuario
                                             Expanded(
@@ -532,7 +434,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                 children: [
                                                   Text(
                                                     user.nameUser,
-                                                    style: TextStyle(
+                                                    style: const TextStyle(
                                                       fontFamily: 'Roboto',
                                                       fontSize: 17,
                                                       fontWeight: FontWeight.w700,
@@ -542,22 +444,22 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                     maxLines: 2,
                                                     overflow: TextOverflow.ellipsis,
                                                   ),
-                                                  SizedBox(height: 6),
+                                                  const SizedBox(height: 6),
                                                   Container(
-                                                    padding: EdgeInsets.symmetric(
+                                                    padding: const EdgeInsets.symmetric(
                                                       horizontal: 10,
                                                       vertical: 4,
                                                     ),
                                                     decoration: BoxDecoration(
                                                       gradient: LinearGradient(
                                                         colors: [
-                                                          FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                                                          FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                                                          FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+                                                          FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.3),
                                                         ],
                                                       ),
                                                       borderRadius: BorderRadius.circular(8),
                                                       border: Border.all(
-                                                        color: FlutterFlowTheme.of(context).primary.withOpacity(0.5),
+                                                        color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.5),
                                                         width: 1,
                                                       ),
                                                     ),
@@ -569,14 +471,14 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                           size: 14,
                                                           color: FlutterFlowTheme.of(context).primary,
                                                         ),
-                                                        SizedBox(width: 4),
+                                                        const SizedBox(width: 4),
                                                         Text(
                                                           'Codigo: ${user.operID}',
                                                           style: TextStyle(
                                                             fontFamily: 'Roboto',
                                                             fontSize: 13,
                                                             fontWeight: FontWeight.w600,
-                                                            color: Colors.white.withOpacity(0.9),
+                                                            color: Colors.white.withValues(alpha: 0.9),
                                                           ),
                                                         ),
                                                       ],
@@ -599,7 +501,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                 ),
                                                 shape: BoxShape.circle,
                                               ),
-                                              child: Icon(
+                                              child: const Icon(
                                                 Icons.arrow_forward_ios,
                                                 color: Colors.white,
                                                 size: 18,

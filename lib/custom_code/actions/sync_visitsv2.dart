@@ -328,6 +328,7 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
         v.Longitude,
         v.Altitude,
         v.Error_horizontal,
+        v.Rfid as rfid,
 
         vd.Id_visit_detail as detail_id,
         vd.Id_activity_status as detail_activity_status,
@@ -383,6 +384,7 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
           'id_product': row['id_product'],
           'id_user': row['id_user'],
           'id_device': row['id_device'],
+          'rfid': row['rfid'], // RFID del TAG NFC o código QR
           'visits_details': <Map<String, dynamic>>[],
           'locations_add': <String>[],
           'location_default':
@@ -562,6 +564,7 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
         v.Longitude,
         v.Altitude,
         v.Error_horizontal,
+        v.Rfid as rfid,
 
         vd.Id_visit_detail as detail_id,
         vd.Id_activity_status as detail_activity_status,
@@ -614,6 +617,7 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
           'id_product': row['id_product'],
           'id_user': row['id_user'],
           'id_device': row['id_device'],
+          'rfid': row['rfid'], // RFID del TAG NFC o código QR
           'visits_details': <Map<String, dynamic>>[],
           'locations_add': <String>[],
           'location_default':

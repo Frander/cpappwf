@@ -325,17 +325,22 @@ Future<void> _insertProducts(
       // Insertar coordenadas del producto (nota el typo 'coordenates' del API)
       if (product['coordenates'] != null && product['coordenates'] is List) {
         for (var coord in product['coordenates']) {
-          await txn.insert(
-            'Products_coordinates',
-            {
-              'Id_product_coordenate': coord['id_product_coordenate'],
-              'Id_product': product['id_product'],
-              'Latitude': coord['latitude'],
-              'Longitude': coord['longitude'],
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-          coordinatesCount++;
+          // Solo insertar si latitude y longitude no son null
+          final lat = coord['latitude'];
+          final lon = coord['longitude'];
+          if (lat != null && lon != null) {
+            await txn.insert(
+              'Products_coordinates',
+              {
+                'Id_product_coordenate': coord['id_product_coordenate'],
+                'Id_product': product['id_product'],
+                'Latitude': lat,
+                'Longitude': lon,
+              },
+              conflictAlgorithm: ConflictAlgorithm.replace,
+            );
+            coordinatesCount++;
+          }
         }
       }
     }

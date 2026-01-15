@@ -55,29 +55,41 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
       _model.isReading = true;
       _model.isSuccess = false;
       _model.errorMessage = null;
+      _model.rawContent = '';
     });
 
     try {
       final nfcData = await actions.readNFC(context, autoClose: false);
 
-      if (nfcData != null && nfcData.isNotEmpty) {
-        // Extraer información técnica del tag
-        final tagInfo = _extractTagInfo(nfcData);
+      if (mounted) {
+        if (nfcData.isNotEmpty) {
+          // Extraer información técnica del tag
+          final tagInfo = _extractTagInfo(nfcData);
 
-        setState(() {
-          _model.rawContent = nfcData;
-          _model.tagInfo = tagInfo;
-          _model.isSuccess = true;
-          _model.isReading = false;
-        });
-      } else {
-        throw Exception('No se pudo leer el tag NFC');
+          setState(() {
+            _model.rawContent = nfcData;
+            _model.tagInfo = tagInfo;
+            _model.isSuccess = true;
+            _model.isReading = false;
+          });
+
+          debugPrint('✅ TAG leído exitosamente: ${nfcData.length} caracteres');
+        } else {
+          setState(() {
+            _model.isReading = false;
+            _model.errorMessage = 'El TAG está vacío o no se pudo leer el contenido';
+          });
+          debugPrint('⚠️ TAG vacío o sin contenido');
+        }
       }
     } catch (e) {
-      setState(() {
-        _model.isReading = false;
-        _model.errorMessage = e.toString();
-      });
+      debugPrint('❌ Error leyendo TAG: $e');
+      if (mounted) {
+        setState(() {
+          _model.isReading = false;
+          _model.errorMessage = e.toString();
+        });
+      }
     }
   }
 

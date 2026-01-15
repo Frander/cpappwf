@@ -352,8 +352,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             }
           });
 
-          if (_gpsPoints.length >= 2) {
-            debugPrint('✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 2)');
+          if (_gpsPoints.length >= 1) {
+            debugPrint('✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 1)');
             await _createVisit();
             return;
           }
