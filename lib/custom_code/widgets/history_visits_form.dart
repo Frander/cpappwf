@@ -3626,6 +3626,9 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
   }
 
   Widget _buildTagValue(VisitDetailItem detail) {
+    // Verificar si hay instrucción de validación de tipo de producto
+    final hasProductTypeValidation = detail.defaultStatus.contains('=TYPE_PRODUCT_DEFAULT:');
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -3641,19 +3644,89 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: Text(
-              detail.statusResponse.isNotEmpty
-                  ? detail.statusResponse
-                  : 'Tag procesado',
-              style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 13,
-                color: Colors.white,
-              ),
-            ),
+            child: hasProductTypeValidation
+                ? FutureBuilder<String>(
+                    future: _getProductNameAndRfid(detail.statusResponse, detail.defaultStatus),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return Text(
+                          detail.statusResponse.isNotEmpty
+                              ? detail.statusResponse
+                              : 'Tag procesado',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 13,
+                            color: Colors.white,
+                          ),
+                        );
+                      }
+
+                      return Text(
+                        snapshot.data ?? (detail.statusResponse.isNotEmpty
+                            ? detail.statusResponse
+                            : 'Tag procesado'),
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 13,
+                          color: Colors.white,
+                        ),
+                      );
+                    },
+                  )
+                : Text(
+                    detail.statusResponse.isNotEmpty
+                        ? detail.statusResponse
+                        : 'Tag procesado',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 13,
+                      color: Colors.white,
+                    ),
+                  ),
           ),
         ],
       ),
     );
+  }
+
+  /// Obtiene el nombre del producto y el RFID formateado para mostrar
+  Future<String> _getProductNameAndRfid(String rfid, String defaultStatus) async {
+    try {
+      // Si no hay RFID, retornar el RFID vacío
+      if (rfid.isEmpty) {
+        return 'Tag procesado';
+      }
+
+      // Buscar el producto en SQLite por RFID
+      final dbPath = FFAppState().pathDatabase;
+      if (dbPath.isEmpty) {
+        return rfid;
+      }
+
+      final database = await openDatabase(dbPath);
+
+      final productResults = await database.rawQuery('''
+        SELECT Name_product FROM Products WHERE Rfid = ? LIMIT 1
+      ''', [rfid]);
+
+      await database.close();
+
+      if (productResults.isEmpty) {
+        // Si no se encuentra el producto, solo mostrar el RFID
+        return rfid;
+      }
+
+      final productName = productResults.first['Name_product'] as String?;
+      if (productName == null || productName.isEmpty) {
+        return rfid;
+      }
+
+      // Retornar formato: "Nombre del Producto - RFID"
+      return '$productName - $rfid';
+    } catch (e) {
+      debugPrint('❌ Error obteniendo nombre del producto: $e');
+      return rfid.isNotEmpty ? rfid : 'Tag procesado';
+    }
   }
 
   Widget _buildDistanceValue(VisitDetailItem detail) {

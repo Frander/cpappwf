@@ -101,9 +101,18 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       int totalVisits = 0;
       int totalResults = 0;
 
+      // Verificar si defaultStatusJson contiene =TYPE_PRODUCT_DEFAULT=
+      bool hasTypeProductDefault = defaultStatusJson != null &&
+          defaultStatusJson.contains('=TYPE_PRODUCT_DEFAULT=');
+
       // Verificar si inputCommand contiene VISITS_STATUS=true (filtrar solo visitas no sincronizadas)
-      bool filterByStatus =
-          inputCommand != null && inputCommand.contains('VISITS_STATUS=true');
+      // SOLO aplicar filtro si NO existe =TYPE_PRODUCT_DEFAULT=
+      bool filterByStatus = !hasTypeProductDefault &&
+          inputCommand != null &&
+          inputCommand.contains('VISITS_STATUS=true');
+
+      debugPrint('📋 hasTypeProductDefault: $hasTypeProductDefault');
+      debugPrint('📋 filterByStatus: $filterByStatus');
 
       // Verificar si outputCommand contiene VISITS=COUNTER
       bool useCounter =
@@ -307,14 +316,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     
     debugPrint('✅ NFC TAG: OP field = $operatorIdValue');
 
-    // Usar el ID del cortero (IdActivityStatus) - si está vacío o es "false", no incluirlo
-    final operator2Value =
-        (_model.operator2Id == 'false' || _model.operator2Id.isEmpty)
-            ? ''
-            : _model.operator2Id;
-
-    // Incluir OP2 (Cortero ID) en el formato del tag
-    return '{DH:$formattedDate;OP:$operatorIdValue;OP2:$operator2Value;VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
+    // No incluir OP2 (Cortero ID) en el formato del tag
+    return '{DH:$formattedDate;OP:$operatorIdValue;VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
   }
 
   /// Cuenta visitas desde la base de datos SQLite agrupadas por Lote (Id_headquarter)
@@ -523,6 +526,104 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     _startNfcStatePolling();
 
     try {
+      // === VALIDACIÓN DE TIPO DE PRODUCTO PARA TAG-WRITER ===
+      // Verificar si el status tag-writer tiene validación de tipo de producto
+      final currentActivity = FFAppState().currentActivity;
+      final activityStatusList = getJsonField(currentActivity, r'''$.activity_status''') as List?;
+
+      if (activityStatusList != null) {
+        for (var statusItem in activityStatusList) {
+          final typeStatus = getJsonField(statusItem, r'''$.type_status''')?.toString() ?? '';
+          final defaultStatusStr = getJsonField(statusItem, r'''$.default_status''')?.toString() ?? '';
+
+          if (typeStatus == 'tag-writer' && defaultStatusStr.contains('=TYPE_PRODUCT_DEFAULT:')) {
+            debugPrint('🔍 Validando tipo de producto para tag-writer');
+
+            // Extraer el tipo de producto requerido
+            final regex = RegExp(r'=TYPE_PRODUCT_DEFAULT:([^;}\s]+)');
+            final match = regex.firstMatch(defaultStatusStr);
+
+            if (match != null && match.groupCount >= 1) {
+              final requiredProductType = match.group(1)!.trim();
+              debugPrint('✅ Tipo de producto requerido: $requiredProductType');
+
+              // Primero leer el tag para obtener su RFID usando el action readNFC
+              debugPrint('📱 Leyendo tag para obtener RFID...');
+
+              // Llamar al action readNFC con autoClose=false para no cerrar el diálogo
+              await actions.readNFC(context, autoClose: false);
+
+              // Obtener el RFID del tag desde el último tag leído
+              // El action readNFC guarda la información del tag en la base de datos
+              final dbPath = FFAppState().pathDatabase;
+              final database = await openDatabase(dbPath);
+
+              // Obtener el último tag leído (más reciente por Last_read)
+              final tagResults = await database.rawQuery('''
+                SELECT Tag_id FROM Nfc_tags_history
+                ORDER BY Last_read DESC
+                LIMIT 1
+              ''');
+
+              if (tagResults.isEmpty) {
+                await database.close();
+                debugPrint('❌ No se pudo obtener el RFID del tag');
+                setState(() {
+                  _model.isWriting = false;
+                  _model.errorMessage = 'No se pudo leer el RFID del tag.';
+                });
+                return;
+              }
+
+              final tagRfid = tagResults.first['Tag_id'] as String?;
+              if (tagRfid == null || tagRfid.isEmpty) {
+                await database.close();
+                setState(() {
+                  _model.isWriting = false;
+                  _model.errorMessage = 'No se pudo leer el RFID del tag.';
+                });
+                return;
+              }
+
+              debugPrint('📱 RFID del tag leído: $tagRfid');
+
+              // Buscar el producto en SQLite por RFID
+              final productResults = await database.rawQuery('''
+                SELECT Type_product FROM Products WHERE Rfid = ? LIMIT 1
+              ''', [tagRfid]);
+
+              if (productResults.isEmpty) {
+                // RFID no encontrado
+                await database.close();
+                debugPrint('❌ RFID no encontrado en Products: $tagRfid');
+
+                setState(() {
+                  _model.isWriting = false;
+                  _model.errorMessage = 'El tag no corresponde a un $requiredProductType';
+                });
+                return;
+              }
+
+              final productType = productResults.first['Type_product'] as String?;
+              await database.close();
+
+              if (productType != requiredProductType) {
+                // Tipo de producto no coincide
+                debugPrint('❌ Tipo de producto no coincide. Esperado: $requiredProductType, Encontrado: $productType');
+
+                setState(() {
+                  _model.isWriting = false;
+                  _model.errorMessage = 'El tag no corresponde a un $requiredProductType';
+                });
+                return;
+              }
+
+              debugPrint('✅ Validación de tipo de producto exitosa: $productType');
+            }
+          }
+        }
+      }
+
       // Escribir el tag NFC primero (con los datos calculados de visitas Status=0)
       final success = await actions.writeNFCTag(
         context,

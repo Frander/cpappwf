@@ -221,6 +221,30 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     _isDataCacheInitialized = true;
   }
 
+  /// Verifica si la actividad actual tiene algún status de tipo 'headquarters-weights'
+  bool _hasHeadquartersWeightsStatus() {
+    // Buscar en activity_status raíz
+    for (var status in _cachedActivityStatus) {
+      final typeStatus = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+      if (typeStatus == 'headquarters-weights') {
+        return true;
+      }
+    }
+
+    // Buscar en activity_steps -> activity_status
+    for (var step in _cachedActivitySteps) {
+      final statusList = getJsonField(step, r'''$.activity_status''')?.toList() ?? [];
+      for (var status in statusList) {
+        final typeStatus = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+        if (typeStatus == 'headquarters-weights') {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
   /// Invalida el caché de búsquedas cuando cambia visitDetails
   void _invalidateSearchCacheIfNeeded() {
     final currentLength = FFAppState().visitDetails.length;
@@ -1247,32 +1271,34 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         geolocation; // Guardar para distance-extractor
                   });
 
-                  // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
-                  final List<int> tagHeadquarterIds = [];
-                  for (var record in parsedData) {
-                    final hqId = record['headquarterId'] as int? ?? 0;
-                    if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
-                      tagHeadquarterIds.add(hqId);
-                    }
-                  }
-
-                  // Verificar si los lotes tienen peso promedio configurado
-                  if (tagHeadquarterIds.isNotEmpty) {
-                    debugPrint(
-                        '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
-                    await _loadHeadquarterWeights(tagHeadquarterIds);
-
-                    // Si hay lotes sin peso, mostrar advertencia
-                    if (_headquartersWithoutWeight.isNotEmpty) {
-                      debugPrint(
-                          '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
-                      if (mounted) {
-                        _showWeightWarningDialog();
+                  // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
+                  if (_hasHeadquartersWeightsStatus()) {
+                    final List<int> tagHeadquarterIds = [];
+                    for (var record in parsedData) {
+                      final hqId = record['headquarterId'] as int? ?? 0;
+                      if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                        tagHeadquarterIds.add(hqId);
                       }
                     }
 
-                    // Calcular peso total: resultados x weight por cada headquarter
-                    _calculateHeadquarterWeightResults(statusId, statusName);
+                    // Verificar si los lotes tienen peso promedio configurado
+                    if (tagHeadquarterIds.isNotEmpty) {
+                      debugPrint(
+                          '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                      await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                      // Si hay lotes sin peso, mostrar advertencia
+                      if (_headquartersWithoutWeight.isNotEmpty) {
+                        debugPrint(
+                            '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                        if (mounted) {
+                          _showWeightWarningDialog();
+                        }
+                      }
+
+                      // Calcular peso total: resultados x weight por cada headquarter
+                      _calculateHeadquarterWeightResults(statusId, statusName);
+                    }
                   }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
@@ -2054,32 +2080,34 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         geolocation; // Guardar para distance-extractor
                   });
 
-                  // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
-                  final List<int> tagHeadquarterIds = [];
-                  for (var record in parsedData) {
-                    final hqId = record['headquarterId'] as int? ?? 0;
-                    if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
-                      tagHeadquarterIds.add(hqId);
-                    }
-                  }
-
-                  // Verificar si los lotes tienen peso promedio configurado
-                  if (tagHeadquarterIds.isNotEmpty) {
-                    debugPrint(
-                        '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
-                    await _loadHeadquarterWeights(tagHeadquarterIds);
-
-                    // Si hay lotes sin peso, mostrar advertencia
-                    if (_headquartersWithoutWeight.isNotEmpty) {
-                      debugPrint(
-                          '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
-                      if (mounted) {
-                        _showWeightWarningDialog();
+                  // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
+                  if (_hasHeadquartersWeightsStatus()) {
+                    final List<int> tagHeadquarterIds = [];
+                    for (var record in parsedData) {
+                      final hqId = record['headquarterId'] as int? ?? 0;
+                      if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                        tagHeadquarterIds.add(hqId);
                       }
                     }
 
-                    // Calcular peso total: resultados x weight por cada headquarter
-                    _calculateHeadquarterWeightResults(statusId, statusName);
+                    // Verificar si los lotes tienen peso promedio configurado
+                    if (tagHeadquarterIds.isNotEmpty) {
+                      debugPrint(
+                          '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                      await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                      // Si hay lotes sin peso, mostrar advertencia
+                      if (_headquartersWithoutWeight.isNotEmpty) {
+                        debugPrint(
+                            '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                        if (mounted) {
+                          _showWeightWarningDialog();
+                        }
+                      }
+
+                      // Calcular peso total: resultados x weight por cada headquarter
+                      _calculateHeadquarterWeightResults(statusId, statusName);
+                    }
                   }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
@@ -2620,32 +2648,34 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         geolocation; // Guardar para distance-extractor
                   });
 
-                  // VALIDACIÓN DE PESO PROMEDIO: Extraer headquarterIds del tag y verificar pesos
-                  final List<int> tagHeadquarterIds = [];
-                  for (var record in parsedData) {
-                    final hqId = record['headquarterId'] as int? ?? 0;
-                    if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
-                      tagHeadquarterIds.add(hqId);
-                    }
-                  }
-
-                  // Verificar si los lotes tienen peso promedio configurado
-                  if (tagHeadquarterIds.isNotEmpty) {
-                    debugPrint(
-                        '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
-                    await _loadHeadquarterWeights(tagHeadquarterIds);
-
-                    // Si hay lotes sin peso, mostrar advertencia
-                    if (_headquartersWithoutWeight.isNotEmpty) {
-                      debugPrint(
-                          '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
-                      if (mounted) {
-                        _showWeightWarningDialog();
+                  // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
+                  if (_hasHeadquartersWeightsStatus()) {
+                    final List<int> tagHeadquarterIds = [];
+                    for (var record in parsedData) {
+                      final hqId = record['headquarterId'] as int? ?? 0;
+                      if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                        tagHeadquarterIds.add(hqId);
                       }
                     }
 
-                    // Calcular peso total: resultados x weight por cada headquarter
-                    _calculateHeadquarterWeightResults(statusId, statusName);
+                    // Verificar si los lotes tienen peso promedio configurado
+                    if (tagHeadquarterIds.isNotEmpty) {
+                      debugPrint(
+                          '🔍 TAG-READER: Verificando peso promedio para ${tagHeadquarterIds.length} lote(s)...');
+                      await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                      // Si hay lotes sin peso, mostrar advertencia
+                      if (_headquartersWithoutWeight.isNotEmpty) {
+                        debugPrint(
+                            '⚠️ TAG-READER: ${_headquartersWithoutWeight.length} lote(s) sin peso promedio');
+                        if (mounted) {
+                          _showWeightWarningDialog();
+                        }
+                      }
+
+                      // Calcular peso total: resultados x weight por cada headquarter
+                      _calculateHeadquarterWeightResults(statusId, statusName);
+                    }
                   }
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
@@ -3084,14 +3114,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // LÓGICA CLAVE: Por cada id_step_parent solo puede haber UN id_activity_status activo
     // Si selecciono otro status en el mismo step, ELIMINAR el anterior y AGREGAR el nuevo
+    // IMPORTANTE: Para reference-list SOLO se puede seleccionar UN elemento de la lista
+    // IMPORTANTE: Para unique-list SOLO se puede seleccionar UN elemento de la lista
+
+    debugPrint('📋 Tipo de step: $typeStep - Solo se permite UNA selección');
 
     // 1. Eliminar TODOS los status previos (idActivityStatus != 0) con el mismo id_step_parent
+    // Esto asegura que solo haya una selección activa por step
     List<int> indicesToRemove = [];
     for (int i = 0; i < FFAppState().visitDetails.length; i++) {
       if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
           FFAppState().visitDetails[i].idActivityStatus != 0) {
         indicesToRemove.add(i);
+        debugPrint('   ⚠️ Eliminando selección previa: ${FFAppState().visitDetails[i].statusOption}');
       }
+    }
+
+    if (indicesToRemove.isNotEmpty) {
+      debugPrint('   🗑️ Eliminando ${indicesToRemove.length} selección(es) previa(s) para permitir solo UNA selección');
     }
 
     // Remover en orden inverso para no alterar los índices
@@ -4069,6 +4109,115 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final idActivity = getJsonField(currentActivity, r'''$.id_activity''');
       final userSelected = FFAppState().userSelected;
       final deviceDefault = FFAppState().deviceDefault;
+
+      // === VALIDACIÓN DE TIPO DE PRODUCTO PARA TAG-READER ===
+      // Verificar si algún status es tag-reader con validación de tipo de producto
+      final activityStatusList = getJsonField(currentActivity, r'''$.activity_status''') as List?;
+      if (activityStatusList != null) {
+        for (var statusItem in activityStatusList) {
+          final typeStatus = getJsonField(statusItem, r'''$.type_status''')?.toString() ?? '';
+          final defaultStatus = getJsonField(statusItem, r'''$.default_status''')?.toString() ?? '';
+
+          if (typeStatus == 'tag-reader' && defaultStatus.contains('=TYPE_PRODUCT_DEFAULT:')) {
+            debugPrint('🔍 Validando tipo de producto para tag-reader');
+
+            // Extraer el tipo de producto requerido
+            final regex = RegExp(r'=TYPE_PRODUCT_DEFAULT:([^;}\s]+)');
+            final match = regex.firstMatch(defaultStatus);
+
+            if (match != null && match.groupCount >= 1) {
+              final requiredProductType = match.group(1)!.trim();
+              debugPrint('✅ Tipo de producto requerido: $requiredProductType');
+
+              // Buscar el producto en SQLite por RFID
+              final dbPath = FFAppState().pathDatabase;
+              final database = await openDatabase(dbPath);
+
+              final productResults = await database.rawQuery('''
+                SELECT Type_product FROM Products WHERE Rfid = ? LIMIT 1
+              ''', [nfcTagId]);
+
+              if (productResults.isEmpty) {
+                // RFID no encontrado
+                await database.close();
+                debugPrint('❌ RFID no encontrado en Products: $nfcTagId');
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.white),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'El tag no corresponde a un $requiredProductType',
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 4),
+                      backgroundColor: Colors.red.shade700,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
+                return false;
+              }
+
+              final productType = productResults.first['Type_product'] as String?;
+              await database.close();
+
+              if (productType != requiredProductType) {
+                // Tipo de producto no coincide
+                debugPrint('❌ Tipo de producto no coincide. Esperado: $requiredProductType, Encontrado: $productType');
+
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.error_outline_rounded, color: Colors.white),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'El tag no corresponde a un $requiredProductType',
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w500,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 4),
+                      backgroundColor: Colors.red.shade700,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.all(16),
+                    ),
+                  );
+                }
+                return false;
+              }
+
+              debugPrint('✅ Validación de tipo de producto exitosa: $productType');
+            }
+          }
+        }
+      }
 
       // Obtener el Id_headquarter del lote actual
       int idHeadquarter = 0;
@@ -8178,24 +8327,103 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          loteName,
-                          style: const TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Lote: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF74C69D),
+                                ),
+                              ),
+                              TextSpan(
+                                text: loteName,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_unityLabel}: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -8241,19 +8469,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagReaderOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
-    final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
-    final operator2Name = operatorData['operator2Name'] as String? ?? '';
     final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
-    final records =
-        operatorData['records'] as List<Map<String, dynamic>>? ?? [];
-
-    // Verificar si hay operador cortero (OP2)
-    final hasOperator2 = operator2Id.isNotEmpty;
-
-    final expansionKey = 'TR_OP_${headquarterId}_$operatorPairKey';
-    final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -8267,23 +8485,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       ),
       child: Column(
         children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _tagReaderExpansionState[expansionKey] = !isExpanded;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  Icon(
-                    isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: const Color(0xFF74C69D),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+          Container(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -8312,44 +8518,80 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             ],
                           ),
                         ),
-                        // Nombre del operador cortero (OP2) con prefijo Cortero
-                        if (hasOperator2) ...[
-                          const SizedBox(height: 2),
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                const TextSpan(
-                                  text: 'Cortero: ',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF74C69D),
-                                  ),
+                        // Cortero eliminado del resumen
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
                                 ),
-                                TextSpan(
-                                  text: operator2Name.isNotEmpty
-                                      ? operator2Name.toUpperCase()
-                                      : operator2Id,
-                                  style: const TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  Text(
+                                    '$totalVisits',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_unityLabel}: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -8357,110 +8599,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ],
               ),
             ),
-          ),
-          if (isExpanded)
-            Container(
-              padding: const EdgeInsets.only(
-                  left: 16, right: 10, bottom: 10, top: 5),
-              child: Column(
-                children: records
-                    .map((record) => _buildTagReaderVisitRecord(record))
-                    .toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTagReaderVisitRecord(Map<String, dynamic> record) {
-    final visits = record['visits'] as int? ?? 0;
-    final results = record['results'] as int? ?? 0;
-    final dateTime = record['dateTime'] as DateTime? ?? DateTime.now();
-
-    // Formato de fecha: "Mié, 14 de Feb 2025"
-    final dateFormatter = DateFormat('EEE, d \'de\' MMM yyyy HH:mm', 'es_ES');
-    final formattedDate = dateFormatter.format(dateTime);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF081C15)
-            .withValues(alpha: 0.5), // Verde muy oscuro con transparencia
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                formattedDate,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildMetricChip('Visitas', visits.toString(), Colors.white),
-              const SizedBox(width: 8),
-              _buildMetricChip(_unityLabel, results.toString(), Colors.white),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricChip(String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: color.withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: Colors.white.withValues(alpha: 0.85),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Text(
-            value,
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 14,
-              fontWeight: FontWeight.w700,
-              color: color,
-            ),
-          ),
         ],
       ),
     );
@@ -8652,24 +8790,103 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          loteName,
-                          style: const TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Lote: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF74C69D),
+                                ),
+                              ),
+                              TextSpan(
+                                text: loteName,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_unityLabel}: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -8715,19 +8932,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagWriterOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
-    final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
-    final operator2Name = operatorData['operator2Name'] as String? ?? '';
     final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
-    final records =
-        operatorData['records'] as List<Map<String, dynamic>>? ?? [];
-
-    final expansionKey = 'TW_OP_${headquarterId}_$operatorPairKey';
-    final isExpanded = _tagWriterExpansionState[expansionKey] ?? false;
-
-    // Verificar si hay operador cortero (OP2)
-    final hasOperator2 = operator2Id.isNotEmpty;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -8741,23 +8948,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       ),
       child: Column(
         children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _tagWriterExpansionState[expansionKey] = !isExpanded;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  Icon(
-                    isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: const Color(0xFF64B5F6),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+          Container(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -8786,44 +8981,80 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             ],
                           ),
                         ),
-                        // Nombre del operador cortero (OP2) con prefijo Cortero
-                        if (hasOperator2) ...[
-                          const SizedBox(height: 2),
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                const TextSpan(
-                                  text: 'Cortero: ',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF64B5F6),
-                                  ),
+                        // Cortero eliminado del resumen
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
                                 ),
-                                TextSpan(
-                                  text: operator2Name.isNotEmpty
-                                      ? operator2Name.toUpperCase()
-                                      : operator2Id,
-                                  style: const TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  Text(
+                                    '$totalVisits',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_unityLabel}: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -8831,73 +9062,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ],
               ),
             ),
-          ),
-          if (isExpanded)
-            Container(
-              padding: const EdgeInsets.only(
-                  left: 16, right: 10, bottom: 10, top: 5),
-              child: Column(
-                children: records
-                    .map((record) => _buildTagWriterVisitRecord(record))
-                    .toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTagWriterVisitRecord(Map<String, dynamic> record) {
-    final visits = record['visits'] as int? ?? 0;
-    final results = record['results'] as int? ?? 0;
-    final dateTime = record['dateTime'] as DateTime? ?? DateTime.now();
-
-    // Formato de fecha: "Mié, 14 de Feb 2025 HH:mm"
-    final dateFormatter = DateFormat('EEE, d \'de\' MMM yyyy HH:mm', 'es_ES');
-    final formattedDate = dateFormatter.format(dateTime);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D47A1).withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                formattedDate,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildMetricChip(
-                  'Visitas', visits.toString(), const Color(0xFF64B5F6)),
-              const SizedBox(width: 8),
-              _buildMetricChip(
-                  _unityLabel, results.toString(), const Color(0xFF64B5F6)),
-            ],
-          ),
         ],
       ),
     );
@@ -9224,24 +9388,103 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          loteName,
-                          style: const TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Lote: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF74C69D),
+                                ),
+                              ),
+                              TextSpan(
+                                text: loteName,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_unityLabel}: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -9287,19 +9530,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildTagTransferOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
-    final operator2Id = operatorData['operator2Id'] as String? ?? '';
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
-    final operator2Name = operatorData['operator2Name'] as String? ?? '';
     final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
-    final records =
-        operatorData['records'] as List<Map<String, dynamic>>? ?? [];
-
-    // Verificar si hay operador cortero (OP2)
-    final hasOperator2 = operator2Id.isNotEmpty;
-
-    final expansionKey = 'TT_OP_${headquarterId}_$operatorPairKey';
-    final isExpanded = _tagTransferExpansionState[expansionKey] ?? false;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -9313,23 +9546,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       ),
       child: Column(
         children: [
-          InkWell(
-            onTap: () {
-              setState(() {
-                _tagTransferExpansionState[expansionKey] = !isExpanded;
-              });
-            },
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  Icon(
-                    isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: const Color(0xFF64B5F6),
-                    size: 24,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
+          Container(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -9358,44 +9579,80 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             ],
                           ),
                         ),
-                        // Nombre del operador cortero (OP2) con prefijo Cortero
-                        if (hasOperator2) ...[
-                          const SizedBox(height: 2),
-                          RichText(
-                            text: TextSpan(
-                              children: [
-                                const TextSpan(
-                                  text: 'Cortero: ',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Color(0xFF64B5F6),
-                                  ),
+                        // Cortero eliminado del resumen
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
                                 ),
-                                TextSpan(
-                                  text: operator2Name.isNotEmpty
-                                      ? operator2Name.toUpperCase()
-                                      : operator2Id,
-                                  style: const TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.white,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  Text(
+                                    '$totalVisits',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '${_unityLabel}: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -9403,73 +9660,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ],
               ),
             ),
-          ),
-          if (isExpanded)
-            Container(
-              padding: const EdgeInsets.only(
-                  left: 16, right: 10, bottom: 10, top: 5),
-              child: Column(
-                children: records
-                    .map((record) => _buildTagTransferVisitRecord(record))
-                    .toList(),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTagTransferVisitRecord(Map<String, dynamic> record) {
-    final visits = record['visits'] as int? ?? 0;
-    final results = record['results'] as int? ?? 0;
-    final dateTime = record['dateTime'] as DateTime? ?? DateTime.now();
-
-    // Formato de fecha: "Mié, 14 de Feb 2025 HH:mm"
-    final dateFormatter = DateFormat('EEE, d \'de\' MMM yyyy HH:mm', 'es_ES');
-    final formattedDate = dateFormatter.format(dateTime);
-
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0D47A1).withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.15),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calendar_today_rounded,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 14,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                formattedDate,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 11,
-                  color: Colors.white.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              _buildMetricChip(
-                  'Visitas', visits.toString(), const Color(0xFF64B5F6)),
-              const SizedBox(width: 8),
-              _buildMetricChip(
-                  _unityLabel, results.toString(), const Color(0xFF64B5F6)),
-            ],
-          ),
         ],
       ),
     );

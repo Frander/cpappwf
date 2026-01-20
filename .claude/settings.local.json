@@ -15,7 +15,12 @@
       "Bash(node -e:*)",
       "Bash(dart fix:*)",
       "Bash(powershell -Command:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(flutter pub:*)",
+      "Bash(cat:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(flutter clean:*)"
     ],
     "deny": [],
     "ask": []

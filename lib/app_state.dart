@@ -1249,6 +1249,7 @@ class FFAppState extends ChangeNotifier {
   bool get isStabilized => _isStabilized;
   set isStabilized(bool value) {
     _isStabilized = value;
+    notifyListeners();
   }
 
   int _totalStepsActivity = 0;

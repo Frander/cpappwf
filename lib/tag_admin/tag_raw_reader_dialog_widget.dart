@@ -59,27 +59,49 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
     });
 
     try {
-      final nfcData = await actions.readNFC(context, autoClose: false);
+      // Usar la nueva función que devuelve información detallada
+      final result = await actions.readNfcDetailed(context);
 
       if (mounted) {
-        if (nfcData.isNotEmpty) {
-          // Extraer información técnica del tag
-          final tagInfo = _extractTagInfo(nfcData);
+        if (result['success'] == true) {
+          final String content = result['content'] ?? '';
+
+          // Construir tagInfo con toda la información del TAG
+          final tagInfo = <String, dynamic>{
+            'tagId': result['tagId'] ?? '',
+            'tagType': result['tagType'] ?? 'Desconocido',
+            'maxSize': result['maxSize'] ?? 0,
+            'currentSize': result['currentSize'] ?? 0,
+            'availableSize': result['availableSize'] ?? 0,
+            // Información adicional del contenido
+            ...(_extractTagInfo(content)),
+          };
 
           setState(() {
-            _model.rawContent = nfcData;
+            _model.rawContent = content;
             _model.tagInfo = tagInfo;
             _model.isSuccess = true;
             _model.isReading = false;
           });
 
-          debugPrint('✅ TAG leído exitosamente: ${nfcData.length} caracteres');
+          debugPrint('');
+          debugPrint('✅ ============ TAG LEÍDO EXITOSAMENTE ============');
+          debugPrint('📱 ID del TAG: ${tagInfo['tagId']}');
+          debugPrint('🏷️ Tipo de TAG: ${tagInfo['tagType']}');
+          debugPrint('💾 Capacidad Total: ${tagInfo['maxSize']} bytes');
+          debugPrint('📊 Espacio Usado: ${tagInfo['currentSize']} bytes');
+          debugPrint('📂 Espacio Disponible: ${tagInfo['availableSize']} bytes');
+          debugPrint('📝 Contenido: ${content.length} caracteres');
+          debugPrint('📋 Registros: ${tagInfo['recordCount'] ?? 0}');
+          debugPrint('🔍 tagInfo completo: $tagInfo');
+          debugPrint('================================================');
+          debugPrint('');
         } else {
           setState(() {
             _model.isReading = false;
-            _model.errorMessage = 'El TAG está vacío o no se pudo leer el contenido';
+            _model.errorMessage = result['errorMessage'] ?? 'Error desconocido al leer el TAG';
           });
-          debugPrint('⚠️ TAG vacío o sin contenido');
+          debugPrint('⚠️ Error: ${result['errorMessage']}');
         }
       }
     } catch (e) {
@@ -441,40 +463,111 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
 
   Widget _buildTagInfoSection() {
     final info = _model.tagInfo!;
+
+    debugPrint('🎨 Construyendo sección de información del TAG');
+    debugPrint('   Info recibido: $info');
+
+    // Información del TAG (ID, Tipo, Capacidad)
+    final tagId = info['tagId'] ?? 'N/A';
+    final tagType = info['tagType'] ?? 'Desconocido';
+    final maxSize = info['maxSize'] ?? 0;
+    final currentSize = info['currentSize'] ?? 0;
+    final availableSize = info['availableSize'] ?? 0;
+
+    debugPrint('   📱 ID: $tagId');
+    debugPrint('   🏷️ Tipo: $tagType');
+    debugPrint('   💾 Capacidad: $maxSize bytes');
+
+    // Información del contenido
     final recordCount = info['recordCount'] ?? 0;
     final sizeBytes = info['sizeBytes'] ?? 0;
     final sizeKB = info['sizeKB'] ?? '0.00';
     final fields = (info['fields'] as List<dynamic>?) ?? [];
 
-    return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Color(0xFF374151),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    // Calcular porcentaje de uso
+    final usagePercent = maxSize > 0 ? ((currentSize / maxSize) * 100).toStringAsFixed(1) : '0.0';
+
+    return Column(
+      children: [
+        // Información del TAG (Hardware)
+        Container(
+          padding: EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Color(0xFF3B82F6).withOpacity(0.2),
+                Color(0xFF8B5CF6).withOpacity(0.2),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Color(0xFF3B82F6).withOpacity(0.5),
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
-              SizedBox(width: 8),
-              Text(
-                'Información Técnica',
-                style: TextStyle(fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+              Row(
+                children: [
+                  Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Información del TAG',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               ),
+              SizedBox(height: 12),
+              _buildInfoRow('ID', tagId),
+              _buildInfoRow('Tipo', tagType),
+              _buildInfoRow('Capacidad Total', '$maxSize bytes'),
+              _buildInfoRow('Espacio Usado', '$currentSize bytes ($usagePercent%)'),
+              _buildInfoRow('Espacio Disponible', '$availableSize bytes'),
             ],
           ),
-          SizedBox(height: 12),
-          _buildInfoRow('Registros', '$recordCount'),
-          _buildInfoRow('Tamaño', '$sizeBytes bytes ($sizeKB KB)'),
-          _buildInfoRow('Campos detectados', fields.join(', ')),
-        ],
-      ),
+        ),
+        SizedBox(height: 12),
+
+        // Información del Contenido
+        if (recordCount > 0)
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Color(0xFF374151),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
+                    SizedBox(width: 8),
+                    Text(
+                      'Información del Contenido',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 12),
+                _buildInfoRow('Registros', '$recordCount'),
+                _buildInfoRow('Tamaño', '$sizeBytes bytes ($sizeKB KB)'),
+                if (fields.isNotEmpty) _buildInfoRow('Campos detectados', fields.join(', ')),
+              ],
+            ),
+          ),
+      ],
     );
   }
 

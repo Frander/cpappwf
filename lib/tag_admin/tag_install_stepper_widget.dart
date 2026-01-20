@@ -19,6 +19,7 @@ enum TagType {
   puntoAcopio,
   tijera,
   caja,
+  extractora,
 }
 
 extension TagTypeExtension on TagType {
@@ -32,6 +33,8 @@ extension TagTypeExtension on TagType {
         return 'Tijera';
       case TagType.caja:
         return 'Caja';
+      case TagType.extractora:
+        return 'Extractora';
     }
   }
 
@@ -45,6 +48,8 @@ extension TagTypeExtension on TagType {
         return Icons.content_cut;
       case TagType.caja:
         return Icons.inbox;
+      case TagType.extractora:
+        return Icons.agriculture;
     }
   }
 
@@ -58,6 +63,8 @@ extension TagTypeExtension on TagType {
         return Color(0xFFF59E0B);
       case TagType.caja:
         return Color(0xFF8B5CF6);
+      case TagType.extractora:
+        return Color(0xFFEC4899);
     }
   }
 }

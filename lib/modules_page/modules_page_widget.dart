@@ -505,7 +505,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                 DoActivitiesPageWidget.routeName,
                                 queryParameters: {
                                   'tittle': serializeParam(
-                                    'Módulo de sanidad',
+                                    'Módulo de CTC',
                                     ParamType.String,
                                   ),
                                 }.withoutNulls,
@@ -527,7 +527,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                 DoActivitiesPageWidget.routeName,
                                 queryParameters: {
                                   'tittle': serializeParam(
-                                    'Módulo de mantenimiento',
+                                    'Módulo de fertilización',
                                     ParamType.String,
                                   ),
                                 }.withoutNulls,
@@ -556,7 +556,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                 DoActivitiesPageWidget.routeName,
                                 queryParameters: {
                                   'tittle': serializeParam(
-                                    'Módulo de sanidad',
+                                    'Módulo de vigilancia',
                                     ParamType.String,
                                   ),
                                 }.withoutNulls,
@@ -579,7 +579,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                 DoActivitiesPageWidget.routeName,
                                 queryParameters: {
                                   'tittle': serializeParam(
-                                    'Módulo de mantenimiento',
+                                    'Módulo de otros',
                                     ParamType.String,
                                   ),
                                 }.withoutNulls,

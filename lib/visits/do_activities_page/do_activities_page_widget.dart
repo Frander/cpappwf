@@ -23,6 +23,7 @@ import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'dart:io';
 import 'do_activities_page_model.dart';
 export 'do_activities_page_model.dart';
@@ -91,8 +92,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
   @override
   Widget build(BuildContext context) {
-    // OPTIMIZACIÓN: No usar context.watch aquí - causa rebuilds excesivos
-    // En su lugar, usar FFAppState() directamente o context.select() para propiedades específicas
+    // Observar FFAppState para que el widget se reconstruya cuando isStabilized cambie
+    // Esto permite que el botón "Realizar visitas" se habilite cuando el GPS se estabiliza
+    context.watch<FFAppState>();
 
     return GestureDetector(
       onTap: () {

@@ -20,6 +20,7 @@ export 'calibrate_g_p_s.dart' show calibrateGPS;
 export 'check_calibration_needed.dart' show checkCalibrationNeeded;
 export 'mark_calibration_completed.dart' show markCalibrationCompleted;
 export 'read_n_f_c.dart' show readNFC;
+export 'read_nfc_detailed.dart' show readNfcDetailed;
 export 'read_q_r.dart' show readQR;
 export 'get_sp3_nav_file.dart' show getSp3NavFile;
 export 'upload_json_to_s3.dart' show uploadJsonToS3;

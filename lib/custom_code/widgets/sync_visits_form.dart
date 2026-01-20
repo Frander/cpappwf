@@ -89,6 +89,8 @@ class ProductSummary {
   String syncStatus; // 'new' o 'updated'
   String? createdAt;
   String? modifiedAt;
+  String? locationRaw; // Coordenada del producto en formato "lat,lon"
+  List<Map<String, dynamic>>? coordinates; // Coordenadas adicionales de Products_coordinates
 
   ProductSummary({
     required this.idProduct,
@@ -104,6 +106,8 @@ class ProductSummary {
     required this.syncStatus,
     this.createdAt,
     this.modifiedAt,
+    this.locationRaw,
+    this.coordinates,
   });
 }
 
@@ -848,13 +852,13 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
         ORDER BY Modified_at DESC
       ''');
 
-      await db.close();
-
       // Procesar resultados
       int newCount = 0;
       int updatedCount = 0;
 
-      _stats.productsSummary = productsRaw.map((row) {
+      _stats.productsSummary = [];
+
+      for (var row in productsRaw) {
         final syncStatus = row['Sync_status'] as String? ?? 'new';
         if (syncStatus == 'new') {
           newCount++;
@@ -862,8 +866,17 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           updatedCount++;
         }
 
-        return ProductSummary(
-          idProduct: row['Id_product'] as int,
+        final idProduct = row['Id_product'] as int;
+
+        // Obtener coordenadas de Products_coordinates para este producto
+        final List<Map<String, dynamic>> coordinates = await db.rawQuery('''
+          SELECT Latitude, Longitude
+          FROM Products_coordinates
+          WHERE Id_product = ?
+        ''', [idProduct]);
+
+        _stats.productsSummary.add(ProductSummary(
+          idProduct: idProduct,
           idHeadquarter: row['Id_headquarter'] as int,
           idCompany: row['Id_company'] as int,
           nameProduct: row['Name_product'] as String?,
@@ -876,8 +889,12 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           syncStatus: syncStatus,
           createdAt: row['Created_at'] as String?,
           modifiedAt: row['Modified_at'] as String?,
-        );
-      }).toList();
+          locationRaw: row['Location_raw'] as String?,
+          coordinates: coordinates,
+        ));
+      }
+
+      await db.close();
 
       _stats.totalProductsNew = newCount;
       _stats.totalProductsUpdated = updatedCount;
@@ -1046,6 +1063,30 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
 
       for (final product in _stats.productsSummary) {
         try {
+          // Construir array de locations_add con formato LAT:X,LON:Y
+          List<String> locationsAdd = [];
+
+          // 1. Agregar Location_raw si existe
+          if (product.locationRaw != null && product.locationRaw!.isNotEmpty) {
+            final parts = product.locationRaw!.split(',');
+            if (parts.length == 2) {
+              final lat = parts[0].trim();
+              final lon = parts[1].trim();
+              locationsAdd.add('LAT:$lat,LON:$lon');
+            }
+          }
+
+          // 2. Agregar coordenadas de Products_coordinates
+          if (product.coordinates != null && product.coordinates!.isNotEmpty) {
+            for (var coord in product.coordinates!) {
+              final lat = coord['Latitude'];
+              final lon = coord['Longitude'];
+              if (lat != null && lon != null) {
+                locationsAdd.add('LAT:$lat,LON:$lon');
+              }
+            }
+          }
+
           // Preparar el payload según ProductsInputDTO del API
           final Map<String, dynamic> productPayload = {
             'id_product': product.idProduct,
@@ -1058,7 +1099,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
             'modified_at': product.modifiedAt ?? DateTime.now().toUtc().toIso8601String(),
             'state_product': product.stateProduct ?? 'Activo',
             'description_product': product.descriptionProduct ?? '',
-            'locations_add': <String>[], // Por ahora vacío, se puede agregar coordenadas si las tiene
+            'locations_add': locationsAdd,
             'line': product.line ?? 0,
             'palm': product.palm ?? 0,
           };
@@ -1074,6 +1115,13 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
             debugPrint('📤 POST /Products - Nuevo producto ID: ${product.idProduct}');
             debugPrint('   RFID: ${product.rfid}');
             debugPrint('   Nombre: ${product.nameProduct}');
+            debugPrint('   Tipo: ${product.typeProduct}');
+            debugPrint('   Coordenadas: ${locationsAdd.length} ubicaciones');
+            if (locationsAdd.isNotEmpty) {
+              for (int i = 0; i < locationsAdd.length; i++) {
+                debugPrint('      [$i] ${locationsAdd[i]}');
+              }
+            }
 
             response = await http.post(
               Uri.parse(url),
@@ -1091,6 +1139,13 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
             debugPrint('📤 PUT /Products/${product.idProduct} - Actualizar producto');
             debugPrint('   RFID: ${product.rfid}');
             debugPrint('   Nombre: ${product.nameProduct}');
+            debugPrint('   Tipo: ${product.typeProduct}');
+            debugPrint('   Coordenadas: ${locationsAdd.length} ubicaciones');
+            if (locationsAdd.isNotEmpty) {
+              for (int i = 0; i < locationsAdd.length; i++) {
+                debugPrint('      [$i] ${locationsAdd[i]}');
+              }
+            }
 
             response = await http.put(
               Uri.parse(url),
