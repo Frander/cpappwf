@@ -143,12 +143,15 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         }
       }
 
-      // VALIDACIÓN: Si no hay visitas, NO permitir escritura
-      if (totalVisits <= 0) {
+      // VALIDACIÓN: Solo validar visitas si default_status contiene =VALIDATION:Visits_required
+      bool requiresVisitsValidation = defaultStatusJson != null &&
+          defaultStatusJson.contains('=VALIDATION:Visits_required');
+
+      if (requiresVisitsValidation && totalVisits <= 0) {
         setState(() {
           _model.isCalculating = false;
           _model.errorMessage =
-              'No hay visitas pendientes para escribir en el TAG.\\n\\nRealice al menos una visita antes de continuar.';
+              'No hay visitas pendientes para escribir en el TAG. Realice al menos una visita antes de continuar.';
         });
         return;
       }
@@ -298,26 +301,39 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
   }
 
   String _generateNfcData(DateTime dateTime) {
-    // Formato: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204}
-    // OP = operID del operador principal (ID del usuario)
-    // OP2 = IdActivityStatus del cortero (ID único en Activities_status)
-    final formattedDate =
-        '${dateTime.year}_${dateTime.month.toString().padLeft(2, '0')}_${dateTime.day.toString().padLeft(2, '0')}_${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
-
+    // Nuevo formato JSON para NFC tags
     // Validar que el operatorId no esté vacío
-    final operatorIdValue = _model.operatorId.isEmpty 
-        ? FFAppState().userSelected.operID 
+    final operatorIdValue = _model.operatorId.isEmpty
+        ? FFAppState().userSelected.operID
         : _model.operatorId;
-    
+
     if (operatorIdValue.isEmpty) {
       debugPrint('❌ ERROR: OP field es vacío. No se puede escribir el tag.');
       throw Exception('No se pudo obtener el ID del operador. Por favor seleccione un operador.');
     }
-    
-    debugPrint('✅ NFC TAG: OP field = $operatorIdValue');
 
-    // No incluir OP2 (Cortero ID) en el formato del tag
-    return '{DH:$formattedDate;OP:$operatorIdValue;VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
+    final operatorIdInt = int.tryParse(operatorIdValue) ?? 0;
+
+    debugPrint('✅ NFC TAG: OP field = $operatorIdInt');
+
+    // Construir JSON usando el helper de custom actions
+    final nfcJson = actions.buildInitialNfcJson(
+      idProduct: 0, // Se actualizará cuando se lea el tag
+      rfid: '', // Se actualizará cuando se lea el tag
+      nameProduct: '', // Se actualizará cuando se lea el tag
+    );
+
+    // Agregar la visita actual
+    actions.addVisitToNfcJson(
+      nfcJson,
+      operatorId: operatorIdInt,
+      visits: _model.totalVisits,
+      results: _model.totalResults,
+      headquarterId: _model.headquarterId,
+      dateTime: dateTime,
+    );
+
+    return actions.nfcJsonToString(nfcJson);
   }
 
   /// Cuenta visitas desde la base de datos SQLite agrupadas por Lote (Id_headquarter)
@@ -526,105 +542,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     _startNfcStatePolling();
 
     try {
-      // === VALIDACIÓN DE TIPO DE PRODUCTO PARA TAG-WRITER ===
-      // Verificar si el status tag-writer tiene validación de tipo de producto
-      final currentActivity = FFAppState().currentActivity;
-      final activityStatusList = getJsonField(currentActivity, r'''$.activity_status''') as List?;
-
-      if (activityStatusList != null) {
-        for (var statusItem in activityStatusList) {
-          final typeStatus = getJsonField(statusItem, r'''$.type_status''')?.toString() ?? '';
-          final defaultStatusStr = getJsonField(statusItem, r'''$.default_status''')?.toString() ?? '';
-
-          if (typeStatus == 'tag-writer' && defaultStatusStr.contains('=TYPE_PRODUCT_DEFAULT:')) {
-            debugPrint('🔍 Validando tipo de producto para tag-writer');
-
-            // Extraer el tipo de producto requerido
-            final regex = RegExp(r'=TYPE_PRODUCT_DEFAULT:([^;}\s]+)');
-            final match = regex.firstMatch(defaultStatusStr);
-
-            if (match != null && match.groupCount >= 1) {
-              final requiredProductType = match.group(1)!.trim();
-              debugPrint('✅ Tipo de producto requerido: $requiredProductType');
-
-              // Primero leer el tag para obtener su RFID usando el action readNFC
-              debugPrint('📱 Leyendo tag para obtener RFID...');
-
-              // Llamar al action readNFC con autoClose=false para no cerrar el diálogo
-              await actions.readNFC(context, autoClose: false);
-
-              // Obtener el RFID del tag desde el último tag leído
-              // El action readNFC guarda la información del tag en la base de datos
-              final dbPath = FFAppState().pathDatabase;
-              final database = await openDatabase(dbPath);
-
-              // Obtener el último tag leído (más reciente por Last_read)
-              final tagResults = await database.rawQuery('''
-                SELECT Tag_id FROM Nfc_tags_history
-                ORDER BY Last_read DESC
-                LIMIT 1
-              ''');
-
-              if (tagResults.isEmpty) {
-                await database.close();
-                debugPrint('❌ No se pudo obtener el RFID del tag');
-                setState(() {
-                  _model.isWriting = false;
-                  _model.errorMessage = 'No se pudo leer el RFID del tag.';
-                });
-                return;
-              }
-
-              final tagRfid = tagResults.first['Tag_id'] as String?;
-              if (tagRfid == null || tagRfid.isEmpty) {
-                await database.close();
-                setState(() {
-                  _model.isWriting = false;
-                  _model.errorMessage = 'No se pudo leer el RFID del tag.';
-                });
-                return;
-              }
-
-              debugPrint('📱 RFID del tag leído: $tagRfid');
-
-              // Buscar el producto en SQLite por RFID
-              final productResults = await database.rawQuery('''
-                SELECT Type_product FROM Products WHERE Rfid = ? LIMIT 1
-              ''', [tagRfid]);
-
-              if (productResults.isEmpty) {
-                // RFID no encontrado
-                await database.close();
-                debugPrint('❌ RFID no encontrado en Products: $tagRfid');
-
-                setState(() {
-                  _model.isWriting = false;
-                  _model.errorMessage = 'El tag no corresponde a un $requiredProductType';
-                });
-                return;
-              }
-
-              final productType = productResults.first['Type_product'] as String?;
-              await database.close();
-
-              if (productType != requiredProductType) {
-                // Tipo de producto no coincide
-                debugPrint('❌ Tipo de producto no coincide. Esperado: $requiredProductType, Encontrado: $productType');
-
-                setState(() {
-                  _model.isWriting = false;
-                  _model.errorMessage = 'El tag no corresponde a un $requiredProductType';
-                });
-                return;
-              }
-
-              debugPrint('✅ Validación de tipo de producto exitosa: $productType');
-            }
-          }
-        }
-      }
-
-      // Escribir el tag NFC primero (con los datos calculados de visitas Status=0)
+      // Escribir el tag NFC directamente
+      // La validación de tipo de producto se hará internamente en writeNFCTag si es necesario
       final success = await actions.writeNFCTag(
         context,
         _model.dataToWrite,
@@ -681,6 +600,22 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         if (nfcReadState == 'ERROR:ESCRITURA_FALLIDA') {
           throw Exception(
               'Error al escribir en el TAG.\n\nIntente de nuevo o utilice otro TAG.');
+        }
+
+        // Errores de validación de tipo de producto
+        if (nfcReadState.startsWith('ERROR:PRODUCTO_NO_ENCONTRADO:')) {
+          final parts = nfcReadState.split(':');
+          final requiredType = parts.length > 2 ? parts[2] : 'producto';
+          throw Exception(
+              'El TAG no está registrado en el sistema.\n\nDebe instalar primero el TAG como $requiredType en el Centro de Administración NFC.');
+        }
+
+        if (nfcReadState.startsWith('ERROR:TIPO_INCORRECTO:')) {
+          final parts = nfcReadState.split(':');
+          final requiredType = parts.length > 2 ? parts[2] : 'producto';
+          final foundType = parts.length > 3 ? parts[3] : 'desconocido';
+          throw Exception(
+              'El TAG no corresponde a un $requiredType.\n\nTipo detectado: $foundType\n\nUtilice el TAG correcto.');
         }
 
         throw Exception('No se pudo escribir el tag');
@@ -1323,27 +1258,51 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: Colors.red, size: 80),
-          SizedBox(height: 20),
+          Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: RadialGradient(
+                colors: [
+                  Colors.red.withOpacity(0.3),
+                  Colors.red.withOpacity(0.1),
+                  Colors.transparent,
+                ],
+              ),
+            ),
+            child: Icon(Icons.warning_amber_rounded, color: Colors.red, size: 80),
+          ),
+          SizedBox(height: 24),
           Text(
-            'Error',
+            'Alerta',
             style: TextStyle(
               fontFamily: 'Roboto',
-              fontSize: 24,
+              fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+          SizedBox(height: 20),
+          Container(
+            margin: EdgeInsets.symmetric(horizontal: 32),
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: Colors.red.withOpacity(0.4),
+                width: 2,
+              ),
+            ),
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+                height: 1.5,
               ),
             ),
           ),

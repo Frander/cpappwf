@@ -11,9 +11,12 @@ class NfcTransferWriteDialogWidget extends StatefulWidget {
   const NfcTransferWriteDialogWidget({
     super.key,
     required this.sourceTagContent,
+    this.destinationTitle,
   });
 
   final String sourceTagContent;
+  /// Título personalizado para el tag de destino (ej: "Escribir Tijera de destino")
+  final String? destinationTitle;
 
   @override
   State<NfcTransferWriteDialogWidget> createState() =>
@@ -83,6 +86,24 @@ class _NfcTransferWriteDialogWidgetState
       if (!mounted) return;
 
       if (!writeSuccess) {
+        // Verificar si hubo un error de validación
+        final nfcReadState = FFAppState().nfcRead;
+
+        if (nfcReadState.startsWith('ERROR:PRODUCTO_NO_ENCONTRADO:')) {
+          final parts = nfcReadState.split(':');
+          final requiredType = parts.length > 2 ? parts[2] : 'producto';
+          throw Exception(
+              'El TAG de destino no está registrado.\n\nDebe instalar primero el TAG como $requiredType en el Centro de Administración NFC.');
+        }
+
+        if (nfcReadState.startsWith('ERROR:TIPO_INCORRECTO:')) {
+          final parts = nfcReadState.split(':');
+          final requiredType = parts.length > 2 ? parts[2] : 'producto';
+          final foundType = parts.length > 3 ? parts[3] : 'desconocido';
+          throw Exception(
+              'El TAG de destino no es del tipo correcto.\n\nEsperado: $requiredType\nEncontrado: $foundType\n\nUtilice el TAG correcto.');
+        }
+
         throw Exception(
             'No se pudo escribir en el tag de destino.\n\nIntente de nuevo.');
       }
@@ -156,7 +177,7 @@ class _NfcTransferWriteDialogWidgetState
                   SizedBox(width: 16),
                   Expanded(
                     child: Text(
-                      'TRANSFERIR A TAG DE DESTINO',
+                      widget.destinationTitle ?? 'TRANSFERIR A TAG DE DESTINO',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Roboto',
                         fontSize: 18,

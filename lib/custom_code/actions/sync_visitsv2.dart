@@ -15,6 +15,7 @@ import '/flutter_flow/custom_functions.dart';
 
 import 'dart:io';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:intl/intl.dart';
@@ -32,8 +33,6 @@ Future<bool> syncVisitsv2(
   String imei,
   String authToken,
 ) async {
-  const String url =
-      'https://api.clickpalm.com/Sync_times/SyncVisitsAddMultipart';
   try {
     debugPrint('=== Iniciando sincronización de visitas v2 ===');
     debugPrint('🏢 Company ID: $idCompany');
@@ -43,36 +42,16 @@ Future<bool> syncVisitsv2(
     // 1. LIMPIAR ARCHIVOS TEMPORALES ANTIGUOS
     await _cleanupOldTempFiles();
 
-    // 2. OBTENER RUTA PARA ARCHIVOS TEMPORALES
-    final String tempFolderPath = await _getTempFolderPath();
-    debugPrint('📂 Temp folder: $tempFolderPath');
-
-    // 3. OBTENER VISITAS DESDE SQLITE Y CREAR JSON COMPRIMIDO
-    debugPrint('🔄 Obteniendo visitas desde SQLite...');
-    final List<int> visitsCompressed =
-        await _getVisitsFromSQLiteAndCompress(tempFolderPath, idCompany);
-    debugPrint('📊 Visitas comprimidas: ${visitsCompressed.length} bytes');
-
-    // 4. OBTENER GEOLOCALIZACIONES DESDE SQLITE Y CREAR CSV COMPRIMIDO
-    final String csvFolderPath = await _getCSVFolderPath();
-    debugPrint('📂 CSV folder: $csvFolderPath');
-    debugPrint('🔄 Obteniendo geolocalizaciones desde SQLite...');
-    final List<int> locationCompressed =
-        await _getLocationTrackingFromSQLiteAndCompress(csvFolderPath);
-    debugPrint('📊 Locations comprimidas: ${locationCompressed.length} bytes');
-
-    // 5. PREPARAR LISTA DE NewsAdd
+    // 2. PREPARAR LISTA DE NewsAdd
     final List<Map<String, dynamic>> newsAddJson = newsAdd.map((visitNews) {
       final map = visitNews.toMap();
 
-      // Mantener formato completo de ubicaciones (LAT:X;LON:Y;ALT:Z;ERH:W)
       List<String> locationsFormatted = [];
       final locationsRaw = map['locations_add'] ?? map['locationsAdd'] ?? [];
 
       if (locationsRaw is List) {
         for (var loc in locationsRaw) {
           if (loc is String) {
-            // Agregar directamente el string sin convertir formato
             locationsFormatted.add(loc);
           }
         }
@@ -91,200 +70,207 @@ Future<bool> syncVisitsv2(
       };
     }).toList();
 
-    // 6. OBTENER VISITS_ADD DESDE SQLITE (PARA EL JSON, NO PARA COMPRIMIR)
+    // 3. OBTENER VISITS_ADD DESDE SQLITE
     debugPrint('🔄 Obteniendo visits_add desde SQLite...');
     final List<Map<String, dynamic>> visitsAddJson =
         await _getVisitsAddFromSQLite(idCompany);
     debugPrint('📊 Visits_add obtenidas: ${visitsAddJson.length}');
 
-    // NOTA: NO convertir coordenadas - mantener formato completo LAT:X;LON:Y;ALT:Z;ERH:W
-    // El formato completo es requerido por el backend para tener toda la información
-    // de altitud y error horizontal
-    /*
-    for (var visit in visitsAddJson) {
-      if (visit['location_default'] != null &&
-          visit['location_default'] is String) {
-        visit['location_default'] =
-            _convertLocationToSimpleFormat(visit['location_default']);
-      }
-
-      if (visit['locations_add'] != null && visit['locations_add'] is List) {
-        visit['locations_add'] = (visit['locations_add'] as List)
-            .map((loc) => _convertLocationToSimpleFormat(loc.toString()))
-            .toList();
-      }
-    }
-    */
-
-    // 7. CREAR JSON PARA SyncModelJson
+    // 4. CREAR JSON PARA SYNC
     final syncData = {
       'created_at': DateTime.now().toIso8601String(),
       'ids_headquarters': idsHeadquarters,
       'imei': imei,
+      'id_user': FFAppState().userSelected.idUser, // ID del usuario seleccionado
       'news_add': newsAddJson,
       'visits_add': visitsAddJson,
     };
 
-    // 7.1. GUARDAR JSON COMPLETO (cuerpo exacto enviado al API)
-    try {
-      final String timestamp =
-          DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-      final String jsonFilePath = '$tempFolderPath/visits_$timestamp.json';
-      final String syncDataJsonString =
-          JsonEncoder.withIndent('  ').convert(syncData);
-      final File jsonFile = File(jsonFilePath);
-      await jsonFile.writeAsString(syncDataJsonString);
-      debugPrint('💾 JSON completo del API guardado en: $jsonFilePath');
-      debugPrint('   - Tamaño: ${syncDataJsonString.length} caracteres');
-    } catch (e) {
-      debugPrint('⚠️ Error guardando JSON completo: $e');
-    }
-
-    // 8. CREAR REQUEST MULTIPART
-    debugPrint('📤 Creando request multipart...');
-    var request = http.MultipartRequest('POST', Uri.parse(url));
-
-    // Agregar Authorization header
-    request.headers['Authorization'] = 'Bearer $authToken';
-
-    // Agregar campo JSON
-    final String syncModelJsonString = jsonEncode(syncData);
-    request.fields['SyncModelJson'] = syncModelJsonString;
-
-    debugPrint('📋 SyncModelJson creado:');
-    debugPrint('   - Tamaño: ${syncModelJsonString.length} caracteres');
+    debugPrint('📋 Datos preparados:');
     debugPrint('   - news_add: ${newsAddJson.length} registros');
     debugPrint('   - visits_add: ${visitsAddJson.length} registros');
 
-    // Debug: Imprimir contenido completo del SyncModelJson (sin campos comprimidos)
-    debugPrint('📤 ===== CONTENIDO ENVIADO AL API =====');
-    try {
-      final Map<String, dynamic> syncDataParsed =
-          jsonDecode(syncModelJsonString);
+    // ==========================================================================
+    // ESTRATEGIA 1: ENDPOINT JSON SIMPLE (PRINCIPAL)
+    // ==========================================================================
+    debugPrint('');
+    debugPrint('📤 Intento 1: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      // Crear una copia para debug excluyendo campos comprimidos
-      final Map<String, dynamic> debugData = Map.from(syncDataParsed);
-      debugData.remove('visits_add_compressed');
-      debugData.remove('location_tracking_compressed');
+    final bool jsonSuccess = await _syncWithSimpleJson(
+      syncData,
+      authToken,
+      newsAddJson.length,
+      visitsAddJson.length,
+    );
 
-      // Formatear con indentación para mejor legibilidad
-      final String prettyJson = JsonEncoder.withIndent('  ').convert(debugData);
-      debugPrint(prettyJson);
-
-      // Debug adicional: Verificar visits_details de la primera visita
-      if (debugData['visits_add'] != null &&
-          debugData['visits_add'] is List &&
-          debugData['visits_add'].isNotEmpty) {
-        final firstVisit = debugData['visits_add'][0];
-        debugPrint('');
-        debugPrint('🔍 VERIFICACIÓN - Primera visita en visits_add:');
-        debugPrint('   id_visit: ${firstVisit['id_visit']}');
-        debugPrint('   id_company: ${firstVisit['id_company']}');
-        if (firstVisit['visits_details'] != null &&
-            firstVisit['visits_details'] is List) {
-          debugPrint(
-              '   visits_details: ${firstVisit['visits_details'].length} detalles');
-          if (firstVisit['visits_details'].isNotEmpty) {
-            debugPrint('   Primer detalle:');
-            final firstDetail = firstVisit['visits_details'][0];
-            debugPrint(
-                '      id_visit_detail: ${firstDetail['id_visit_detail']}');
-            debugPrint('      id_visit: ${firstDetail['id_visit']}');
-            debugPrint(
-                '      id_activity_status: ${firstDetail['id_activity_status']}');
-            debugPrint('      status_option: ${firstDetail['status_option']}');
-            debugPrint(
-                '      status_response: ${firstDetail['status_response']}');
-          } else {
-            debugPrint('   ⚠️ visits_details está VACÍO');
-          }
-        } else {
-          debugPrint('   ⚠️ visits_details es NULL o no es una lista');
-        }
-      }
-
-      debugPrint('📤 ===== FIN CONTENIDO ENVIADO =====');
-    } catch (e) {
-      debugPrint('⚠️ Error al formatear JSON para debug: $e');
+    if (jsonSuccess) {
+      debugPrint('✅ Sincronización JSON exitosa');
+      await _cleanupSQLiteDataAfterSync();
+      return true;
     }
 
-    // 9. AGREGAR ARCHIVOS COMPRIMIDOS
-    int filesAdded = 0;
+    // ==========================================================================
+    // ESTRATEGIA 2: ENDPOINT MULTIPART CON ARCHIVOS COMPRIMIDOS (FALLBACK)
+    // ==========================================================================
+    debugPrint('');
+    debugPrint('! Endpoint simple JSON falló, iniciando FALLBACK multipart...');
+    debugPrint('📤 Intento 2: Usando endpoint multipart con compresión');
 
-    // Agregar archivo JSON comprimido de visitas
+    final bool multipartSuccess = await _syncWithMultipart(
+      syncData,
+      authToken,
+      idCompany,
+      newsAddJson.length,
+      visitsAddJson.length,
+    );
+
+    if (multipartSuccess) {
+      debugPrint('✅ Sincronización multipart exitosa');
+      await _cleanupSQLiteDataAfterSync();
+      return true;
+    }
+
+    debugPrint('❌ Ambas estrategias de sincronización fallaron');
+    return false;
+
+  } catch (e, stackTrace) {
+    debugPrint('⚠️ EXCEPCIÓN GENERAL en syncVisitsv2: $e');
+    debugPrint('Stack trace: $stackTrace');
+    return false;
+  }
+}
+
+/// Sincronización con endpoint JSON simple (SIN archivos comprimidos)
+Future<bool> _syncWithSimpleJson(
+  Map<String, dynamic> syncData,
+  String authToken,
+  int newsCount,
+  int visitsCount,
+) async {
+  try {
+    const String url = 'https://api.clickpalm.com/Sync_times/SyncVisitsAdd';
+
+    debugPrint('🚀 Iniciando sincronización con endpoint JSON simple...');
+
+    final String jsonBody = jsonEncode(syncData);
+
+    debugPrint('📤 ===== PAYLOAD ENVIADO AL API (JSON) =====');
+    debugPrint('   - URL: $url');
+    debugPrint('   - News: $newsCount');
+    debugPrint('   - Visits: $visitsCount');
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Authorization': 'Bearer $authToken',
+        'Content-Type': 'application/json',
+      },
+      body: jsonBody,
+    );
+
+    debugPrint('📥 ===== RESPUESTA DEL API (JSON) =====');
+    debugPrint('   - Status Code: ${response.statusCode}');
+    debugPrint('   - Body: ${response.body}');
+
+    if (response.statusCode == 200 || response.statusCode == 202) {
+      return true;
+    } else {
+      debugPrint('❌ Error en endpoint JSON:');
+      debugPrint('   Status: ${response.statusCode}');
+      debugPrint('   Response: ${response.body}');
+      return false;
+    }
+  } catch (e) {
+    debugPrint('⚠️ Excepción en _syncWithSimpleJson: $e');
+    return false;
+  }
+}
+
+/// Sincronización con endpoint multipart (CON archivos comprimidos)
+Future<bool> _syncWithMultipart(
+  Map<String, dynamic> syncData,
+  String authToken,
+  int idCompany,
+  int newsCount,
+  int visitsCount,
+) async {
+  try {
+    const String url =
+        'https://api.clickpalm.com/Sync_times/SyncVisitsAddMultipart';
+
+    debugPrint('🚀 Iniciando sincronización con endpoint multipart...');
+
+    // Obtener archivos comprimidos
+    final String tempFolderPath = await _getTempFolderPath();
+    final String csvFolderPath = await _getCSVFolderPath();
+
+    debugPrint('🔄 Generando archivos comprimidos...');
+    final List<int> visitsCompressed =
+        await _getVisitsFromSQLiteAndCompress(tempFolderPath, idCompany);
+    final List<int> locationCompressed =
+        await _getLocationTrackingFromSQLiteAndCompress(csvFolderPath);
+
+    debugPrint('📊 Archivos comprimidos generados:');
+    debugPrint('   - Visitas: ${visitsCompressed.length} bytes');
+    debugPrint('   - Locations: ${locationCompressed.length} bytes');
+
+    // Crear request multipart
+    var request = http.MultipartRequest('POST', Uri.parse(url));
+    request.headers['Authorization'] = 'Bearer $authToken';
+
+    // Agregar JSON
+    final String syncModelJsonString = jsonEncode(syncData);
+    request.fields['SyncModelJson'] = syncModelJsonString;
+
+    // Agregar archivos comprimidos
     if (visitsCompressed.isNotEmpty) {
-      final String visitsFilename =
-          'visits_${DateTime.now().millisecondsSinceEpoch}.json.gz';
-
       request.files.add(
         http.MultipartFile.fromBytes(
           'VisitsCompressed',
           visitsCompressed,
-          filename: visitsFilename,
+          filename: 'visits_${DateTime.now().millisecondsSinceEpoch}.json.gz',
           contentType: MediaType('application', 'gzip'),
         ),
       );
-
-      filesAdded++;
-      debugPrint('✅ Archivo VisitsCompressed agregado:');
-      debugPrint('   - Nombre: $visitsFilename');
-      debugPrint('   - Tamaño: ${visitsCompressed.length} bytes');
-    } else {
-      debugPrint('⚠️ NO se agregó VisitsCompressed (array vacío)');
+      debugPrint('✅ Archivo VisitsCompressed agregado');
     }
 
-    // Agregar archivo CSV comprimido de geolocalizaciones
     if (locationCompressed.isNotEmpty) {
-      final String csvFilename =
-          'locations_${DateTime.now().millisecondsSinceEpoch}.csv.gz';
-
       request.files.add(
         http.MultipartFile.fromBytes(
           'LocationsCompressed',
           locationCompressed,
-          filename: csvFilename,
+          filename: 'locations_${DateTime.now().millisecondsSinceEpoch}.csv.gz',
           contentType: MediaType('application', 'gzip'),
         ),
       );
-
-      filesAdded++;
-      debugPrint('✅ Archivo LocationsCompressed agregado:');
-      debugPrint('   - Nombre: $csvFilename');
-      debugPrint('   - Tamaño: ${locationCompressed.length} bytes');
-    } else {
-      debugPrint('⚠️ NO se agregó LocationsCompressed (array vacío)');
+      debugPrint('✅ Archivo LocationsCompressed agregado');
     }
 
-    debugPrint('📦 Total de archivos agregados: $filesAdded');
-    debugPrint('📋 Campos en request: ${request.fields.keys.join(", ")}');
-    debugPrint(
-        '📁 Archivos en request: ${request.files.map((f) => f.field).join(", ")}');
+    debugPrint('📤 ===== PAYLOAD ENVIADO AL API (MULTIPART) =====');
+    debugPrint('   - URL: $url');
+    debugPrint('   - News: $newsCount');
+    debugPrint('   - Visits: $visitsCount');
+    debugPrint('   - Archivos: ${request.files.length}');
 
-    // 10. ENVIAR REQUEST
-    debugPrint('🚀 Enviando sincronización...');
+    // Enviar request
     final response = await request.send();
     final responseBody = await response.stream.bytesToString();
 
-    debugPrint('📥 Respuesta recibida:');
+    debugPrint('📥 ===== RESPUESTA DEL API (MULTIPART) =====');
     debugPrint('   - Status Code: ${response.statusCode}');
     debugPrint('   - Body: $responseBody');
 
-    // 11. PROCESAR RESPUESTA
     if (response.statusCode == 200 || response.statusCode == 202) {
-      debugPrint('✅ Sincronización exitosa');
-
-      // Limpiar datos tras sincronización exitosa
-      await _cleanupSQLiteDataAfterSync();
       return true;
     } else {
-      debugPrint('❌ Error en sincronización');
+      debugPrint('❌ Error en endpoint multipart:');
       debugPrint('   Status: ${response.statusCode}');
       debugPrint('   Response: $responseBody');
       return false;
     }
-  } catch (e, stackTrace) {
-    debugPrint('⚠️ EXCEPCIÓN GENERAL en syncVisitsv2: $e');
-    debugPrint('Stack trace: $stackTrace');
+  } catch (e) {
+    debugPrint('⚠️ Excepción en _syncWithMultipart: $e');
     return false;
   }
 }
@@ -335,6 +321,8 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
         vd.Status_option as detail_status_option,
         vd.Status_response as detail_status_response,
 
+        ast.Type_status as detail_type_status,
+
         vl.Id as location_id,
         vl.Latitude as location_latitude,
         vl.Longitude as location_longitude,
@@ -342,6 +330,7 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
         vl.HorizontalError as location_horizontal_error
       FROM Visits v
       LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
+      LEFT JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
       LEFT JOIN Visits_locations vl ON v.Id_visit = vl.Id_visit
       WHERE v.Id_company = ?
       ORDER BY v.Created_at DESC, vd.Id_visit_detail ASC, vl.Id ASC
@@ -362,9 +351,12 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
         debugPrint(
             '      detail_activity_status: ${row['detail_activity_status']}');
         debugPrint(
-            '      detail_status_option: ${row['detail_status_option']}');
+            '      detail_type_status: ${row['detail_type_status']}');
         debugPrint(
-            '      detail_status_response: ${row['detail_status_response']}');
+            '      detail_status_option: ${row['detail_status_option']}');
+        final statusResponse = row['detail_status_response'] ?? '';
+        debugPrint(
+            '      detail_status_response: ${statusResponse.length > 100 ? statusResponse.substring(0, 100) + "..." : statusResponse}');
         debugPrint('      location_id: ${row['location_id']}');
       }
     }
@@ -400,13 +392,29 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
         final int detailId = row['detail_id'];
         if (!visit['_details_ids'].contains(detailId)) {
           visit['_details_ids'].add(detailId);
+
+          // Obtener status_response y type_status
+          String statusResponse = row['detail_status_response'] ?? '';
+          final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
+
+          // Procesar según tipo de media
+          if (statusResponse.isNotEmpty) {
+            if (typeStatus == 'photo') {
+              // Fotos: Comprimir con GZIP
+              statusResponse = _compressPhotoBase64(statusResponse);
+            } else if (typeStatus == 'video') {
+              // Videos: Leer archivo y convertir a base64 (sin comprimir)
+              statusResponse = await _convertVideoToBase64(statusResponse);
+            }
+          }
+
           visit['visits_details'].add({
             'id_visit_detail':
                 0, // Siempre 0 para que el API lo trate como nuevo
             'id_visit': 0, // Siempre 0 para que EF asigne el ID correcto
             'id_activity_status': row['detail_activity_status'],
             'status_option': row['detail_status_option'] ?? '',
-            'status_response': row['detail_status_response'] ?? '',
+            'status_response': statusResponse,
           });
         }
       }
@@ -571,6 +579,8 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
         vd.Status_option as detail_status_option,
         vd.Status_response as detail_status_response,
 
+        ast.Type_status as detail_type_status,
+
         vl.Id as location_id,
         vl.Latitude as location_latitude,
         vl.Longitude as location_longitude,
@@ -578,6 +588,7 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
         vl.HorizontalError as location_horizontal_error
       FROM Visits v
       LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
+      LEFT JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
       LEFT JOIN Visits_locations vl ON v.Id_visit = vl.Id_visit
       WHERE v.Id_company = ?
       ORDER BY v.Created_at DESC, vd.Id_visit_detail ASC, vl.Id ASC
@@ -596,9 +607,12 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
         debugPrint(
             '      detail_activity_status: ${row['detail_activity_status']}');
         debugPrint(
-            '      detail_status_option: ${row['detail_status_option']}');
+            '      detail_type_status: ${row['detail_type_status']}');
         debugPrint(
-            '      detail_status_response: ${row['detail_status_response']}');
+            '      detail_status_option: ${row['detail_status_option']}');
+        final statusResponse = row['detail_status_response'] ?? '';
+        debugPrint(
+            '      detail_status_response: ${statusResponse.length > 100 ? statusResponse.substring(0, 100) + "..." : statusResponse}');
       }
     }
 
@@ -633,13 +647,29 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
         final int detailId = row['detail_id'];
         if (!visit['_details_ids'].contains(detailId)) {
           visit['_details_ids'].add(detailId);
+
+          // Obtener status_response y type_status
+          String statusResponse = row['detail_status_response'] ?? '';
+          final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
+
+          // Procesar según tipo de media
+          if (statusResponse.isNotEmpty) {
+            if (typeStatus == 'photo') {
+              // Fotos: Comprimir con GZIP
+              statusResponse = _compressPhotoBase64(statusResponse);
+            } else if (typeStatus == 'video') {
+              // Videos: Leer archivo y convertir a base64 (sin comprimir)
+              statusResponse = await _convertVideoToBase64(statusResponse);
+            }
+          }
+
           visit['visits_details'].add({
             'id_visit_detail':
                 0, // Siempre 0 para que el API lo trate como nuevo
             'id_visit': 0, // Siempre 0 para que EF asigne el ID correcto
             'id_activity_status': row['detail_activity_status'],
             'status_option': row['detail_status_option'] ?? '',
-            'status_response': row['detail_status_response'] ?? '',
+            'status_response': statusResponse,
           });
         }
       }
@@ -941,4 +971,100 @@ String _formatLocationString(
   double horizontalError,
 ) {
   return 'LAT:${latitude.toStringAsFixed(8)};LON:${longitude.toStringAsFixed(8)};ALT:${altitude.toStringAsFixed(2)};ERH:${horizontalError.toStringAsFixed(2)}';
+}
+
+/// Comprime el contenido base64 de una foto con GZIP
+/// Proceso:
+/// 1. Decodifica base64 → bytes
+/// 2. Comprime con GZIP
+/// 3. Re-codifica a base64
+String _compressPhotoBase64(String base64Content) {
+  try {
+    if (base64Content.isEmpty) {
+      return base64Content;
+    }
+
+    debugPrint('🗜️ Comprimiendo foto...');
+
+    // Remover prefijo data URI si existe (data:image/jpeg;base64,)
+    String cleanBase64 = base64Content;
+    if (base64Content.contains(',')) {
+      final parts = base64Content.split(',');
+      if (parts.length > 1 && parts[0].contains('base64')) {
+        cleanBase64 = parts[1];
+        debugPrint('   ℹ️ Prefijo data URI removido');
+      }
+    }
+
+    // 1. Decodificar base64 a bytes
+    debugPrint('   📄 Decodificando base64: ${base64Content.length} caracteres');
+    final Uint8List originalBytes = base64.decode(cleanBase64);
+    debugPrint('   ✅ Base64 decodificado: ${originalBytes.length} bytes');
+
+    // 2. Comprimir con GZIP
+    debugPrint('   🗜️ Comprimiendo con GZIP...');
+    final List<int> compressedBytes = gzip.encode(originalBytes);
+    debugPrint('   ✅ Comprimido: ${compressedBytes.length} bytes');
+
+    // 3. Re-codificar a base64
+    final String compressedBase64 = base64.encode(compressedBytes);
+    debugPrint('   ✅ Re-codificado a base64: ${compressedBase64.length} caracteres');
+
+    // Calcular ratio de compresión
+    final double compressionRatio = (1 - compressedBytes.length / originalBytes.length) * 100;
+    debugPrint('   ✅ Compresión: ${compressionRatio.toStringAsFixed(1)}% reducción');
+    debugPrint('   📊 Original: ${originalBytes.length} bytes → Comprimido: ${compressedBytes.length} bytes');
+
+    return compressedBase64;
+  } catch (e) {
+    debugPrint('⚠️ Error comprimiendo foto: $e');
+    debugPrint('   Retornando contenido original sin comprimir');
+    return base64Content;
+  }
+}
+
+/// Convierte un video desde ruta de archivo a base64 (SIN comprimir)
+/// Los videos ya están comprimidos con codecs H.264/H.265, no requieren GZIP
+///
+/// Proceso:
+/// 1. Lee el archivo de video desde la ruta
+/// 2. Convierte bytes a base64
+/// 3. Retorna base64 del video
+Future<String> _convertVideoToBase64(String videoPath) async {
+  try {
+    // Verificar si es una ruta de archivo
+    if (!videoPath.startsWith('/') && !videoPath.contains('/data/') && !videoPath.contains('/cache/')) {
+      // No es una ruta, podría ser ya un base64 u otro formato
+      debugPrint('⚠️ Video no parece ser una ruta de archivo, retornando sin cambios');
+      return videoPath;
+    }
+
+    debugPrint('🎥 Convirtiendo video a base64...');
+    debugPrint('   📂 Ruta: ${videoPath.length > 80 ? videoPath.substring(0, 80) + "..." : videoPath}');
+
+    final File videoFile = File(videoPath);
+
+    if (!videoFile.existsSync()) {
+      debugPrint('   ⚠️ Archivo no existe: $videoPath');
+      return videoPath; // Retornar ruta original si no existe
+    }
+
+    // Leer bytes del archivo
+    final Uint8List videoBytes = await videoFile.readAsBytes();
+    debugPrint('   ✅ Archivo leído: ${videoBytes.length} bytes (${(videoBytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
+
+    // Convertir a base64 (SIN comprimir, video ya está comprimido)
+    final String videoBase64 = base64.encode(videoBytes);
+    debugPrint('   ✅ Convertido a base64: ${videoBase64.length} caracteres');
+
+    // Calcular tamaño final
+    final double sizeMB = videoBase64.length / 1024 / 1024;
+    debugPrint('   📊 Tamaño final: ${sizeMB.toStringAsFixed(2)} MB');
+
+    return videoBase64;
+  } catch (e) {
+    debugPrint('⚠️ Error convirtiendo video a base64: $e');
+    debugPrint('   Retornando ruta original: $videoPath');
+    return videoPath; // Retornar ruta original en caso de error
+  }
 }

@@ -20,7 +20,8 @@
       "Bash(cat:*)",
       "Bash(dir:*)",
       "Bash(findstr:*)",
-      "Bash(flutter clean:*)"
+      "Bash(flutter clean:*)",
+      "Bash(flutter pub get:*)"
     ],
     "deny": [],
     "ask": []

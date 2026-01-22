@@ -63,7 +63,8 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     });
 
     try {
-      final nfcData = await actions.readNFC(context, autoClose: false);
+      // Usar readNFCBasic para Centro de Administración (sin validación de tipo)
+      final nfcData = await actions.readNFCBasic(context, autoClose: false);
 
       if (nfcData != null && nfcData.isNotEmpty) {
         // Parsear el contenido del tag
@@ -93,68 +94,76 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
   List<Map<String, dynamic>> _parseNfcContent(String nfcContent) {
     final List<Map<String, dynamic>> parsedData = [];
 
-    // El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204},{DH:...}
+    try {
+      // Detectar si es formato JSON nuevo
+      if (actions.isNewJsonFormat(nfcContent)) {
+        debugPrint('📋 TAG TEST READER: Parseando formato JSON nuevo');
+        final nfcJson = actions.parseNfcJson(nfcContent);
+        if (nfcJson != null) {
+          return actions.extractVisitsFromJson(nfcJson);
+        }
+      } else if (actions.isOldFormat(nfcContent)) {
+        // Formato antiguo (retrocompatibilidad)
+        debugPrint('📋 TAG TEST READER: Parseando formato antiguo');
+        final regexRecords = RegExp(r'\{([^}]+)\}');
+        final matches = regexRecords.allMatches(nfcContent);
 
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(nfcContent);
+        for (var match in matches) {
+          final recordContent = match.group(1);
+          if (recordContent == null) continue;
 
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
+          final Map<String, dynamic> record = {};
+          final fields = recordContent.split(';');
 
-      // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {};
-      final fields = recordContent.split(';');
+          for (var field in fields) {
+            final parts = field.split(':');
+            if (parts.length >= 2) {
+              final key = parts[0].trim();
+              final value = parts.sublist(1).join(':').trim();
 
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value =
-              parts.sublist(1).join(':').trim(); // Para manejar campos con ':'
-
-          switch (key) {
-            case 'DH':
-              // Parsear fecha: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  record['dateTime'] =
-                      DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                record['dateTime'] = DateTime.now();
+              switch (key) {
+                case 'DH':
+                  try {
+                    final dateStr = value.replaceAll('_', '-');
+                    final dateParts = dateStr.split('-');
+                    if (dateParts.length >= 4) {
+                      final year = int.parse(dateParts[0]);
+                      final month = int.parse(dateParts[1]);
+                      final day = int.parse(dateParts[2]);
+                      final timeParts = dateParts[3].split(':');
+                      final hour = int.parse(timeParts[0]);
+                      final minute = int.parse(timeParts[1]);
+                      final second = int.parse(timeParts[2]);
+                      record['dateTime'] =
+                          DateTime(year, month, day, hour, minute, second);
+                    }
+                  } catch (e) {
+                    record['dateTime'] = DateTime.now();
+                  }
+                  break;
+                case 'OP':
+                  record['operatorId'] = value;
+                  break;
+                case 'VISITS':
+                  record['visits'] = int.tryParse(value) ?? 0;
+                  break;
+                case 'RESULTS':
+                  record['results'] = int.tryParse(value) ?? 0;
+                  break;
+                case 'HE':
+                  record['headquarterId'] = int.tryParse(value) ?? 0;
+                  break;
               }
-              break;
-            case 'OP':
-              record['operatorId'] = value;
-              break;
-            case 'VISITS':
-              record['visits'] = int.tryParse(value) ?? 0;
-              break;
-            case 'RESULTS':
-              record['results'] = int.tryParse(value) ?? 0;
-              break;
-            case 'HE':
-              record['headquarterId'] = int.tryParse(value) ?? 0;
-              break;
+            }
+          }
+
+          if (record.isNotEmpty) {
+            parsedData.add(record);
           }
         }
       }
-
-      if (record.isNotEmpty) {
-        parsedData.add(record);
-      }
+    } catch (e) {
+      debugPrint('❌ Error parseando contenido NFC: $e');
     }
 
     return parsedData;

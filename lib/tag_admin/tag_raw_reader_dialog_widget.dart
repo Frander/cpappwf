@@ -118,32 +118,63 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
   Map<String, dynamic> _extractTagInfo(String content) {
     final info = <String, dynamic>{};
 
-    // Contar registros
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(content);
-    info['recordCount'] = matches.length;
-
     // Tamaño en bytes (UTF-8)
     info['sizeBytes'] = content.length;
 
     // Tamaño estimado en KB
     info['sizeKB'] = (content.length / 1024).toStringAsFixed(2);
 
-    // Extraer campos únicos
-    final Set<String> fields = {};
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent != null) {
-        final parts = recordContent.split(';');
-        for (var part in parts) {
-          final keyValue = part.split(':');
-          if (keyValue.isNotEmpty) {
-            fields.add(keyValue[0].trim());
+    // Detectar formato y contar registros
+    if (actions.isNewJsonFormat(content)) {
+      // Formato JSON nuevo
+      info['format'] = 'JSON';
+      final nfcJson = actions.parseNfcJson(content);
+      if (nfcJson != null) {
+        final visits = nfcJson['Visits'] as List?;
+        info['recordCount'] = visits?.length ?? 0;
+
+        // Extraer información de Read_info
+        if (nfcJson['Read_info'] != null) {
+          final readInfo = nfcJson['Read_info'] as Map<String, dynamic>;
+          info['productId'] = readInfo['Id_product'];
+          info['rfid'] = readInfo['RFID'];
+          info['productName'] = readInfo['Name_product'];
+          info['dateCreated'] = readInfo['Date_created'];
+        }
+
+        // Campos del formato JSON
+        info['fields'] = ['DH', 'OP', 'VISITS', 'RESULTS', 'HE'];
+      } else {
+        info['recordCount'] = 0;
+        info['fields'] = [];
+      }
+    } else if (actions.isOldFormat(content)) {
+      // Formato antiguo
+      info['format'] = 'Antiguo (compatibilidad)';
+      final regexRecords = RegExp(r'\{([^}]+)\}');
+      final matches = regexRecords.allMatches(content);
+      info['recordCount'] = matches.length;
+
+      // Extraer campos únicos
+      final Set<String> fields = {};
+      for (var match in matches) {
+        final recordContent = match.group(1);
+        if (recordContent != null) {
+          final parts = recordContent.split(';');
+          for (var part in parts) {
+            final keyValue = part.split(':');
+            if (keyValue.isNotEmpty) {
+              fields.add(keyValue[0].trim());
+            }
           }
         }
       }
+      info['fields'] = fields.toList();
+    } else {
+      info['format'] = 'Desconocido';
+      info['recordCount'] = 0;
+      info['fields'] = [];
     }
-    info['fields'] = fields.toList();
 
     return info;
   }

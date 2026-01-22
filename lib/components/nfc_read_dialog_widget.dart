@@ -16,11 +16,14 @@ class NfcReadDialogWidget extends StatefulWidget {
     super.key,
     this.autoStart = false,
     this.isTagTransferMode = false,
+    this.tagTransferTitle,
   });
 
   final bool autoStart;
   /// Modo tag-transfer: no limpia el tag automáticamente, muestra mensaje de reintentar
   final bool isTagTransferMode;
+  /// Título personalizado para modo tag-transfer (ej: "Leer Punto de Acopio de origen")
+  final String? tagTransferTitle;
 
   @override
   State<NfcReadDialogWidget> createState() => _NfcReadDialogWidgetState();
@@ -198,16 +201,28 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       return false;
     }
 
-    // Debe tener el formato válido con visitas
-    final validPattern =
-        RegExp(r'\{DH:[^}]+;OP:[^}]+;VISITS:[^}]+;RESULTS:[^}]+;HE:[^}]+\}');
-    if (!validPattern.hasMatch(content)) {
-      debugPrint('⚠️ TAG-TRANSFER: Formato inválido');
+    // Verificar si es formato JSON nuevo
+    if (actions.isNewJsonFormat(content)) {
+      final nfcJson = actions.parseNfcJson(content);
+      if (nfcJson != null && nfcJson['Visits'] != null) {
+        final visits = nfcJson['Visits'] as List;
+        if (visits.isNotEmpty) {
+          debugPrint('✅ TAG-TRANSFER: Contenido JSON válido para transferir (${visits.length} visitas)');
+          return true;
+        }
+      }
+      debugPrint('⚠️ TAG-TRANSFER: JSON sin visitas');
       return false;
     }
 
-    debugPrint('✅ TAG-TRANSFER: Contenido válido para transferir');
-    return true;
+    // Validar formato antiguo (retrocompatibilidad)
+    if (actions.isOldFormat(content)) {
+      debugPrint('✅ TAG-TRANSFER: Formato antiguo válido para transferir');
+      return true;
+    }
+
+    debugPrint('⚠️ TAG-TRANSFER: Formato inválido');
+    return false;
   }
 
   /// Valida el contenido del tag y lo limpia automáticamente si es inválido
@@ -219,11 +234,15 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       return true;
     }
 
-    // Pattern 2: Formato válido {DH:...;OP:...;VISITS:...;RESULTS:...;HE:...}
-    final validPattern =
-        RegExp(r'\{DH:[^}]+;OP:[^}]+;VISITS:[^}]+;RESULTS:[^}]+;HE:[^}]+\}');
-    if (validPattern.hasMatch(content)) {
-      debugPrint('✅ Contenido del TAG válido');
+    // Pattern 2: Formato JSON nuevo (prioridad)
+    if (actions.isNewJsonFormat(content)) {
+      debugPrint('✅ Contenido del TAG válido (formato JSON)');
+      return true;
+    }
+
+    // Pattern 3: Formato antiguo (retrocompatibilidad)
+    if (actions.isOldFormat(content)) {
+      debugPrint('✅ Contenido del TAG válido (formato antiguo)');
       return true;
     }
 
@@ -477,60 +496,21 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
     List<NfcRecord> records = [];
 
     try {
-      // Los registros están separados por comas
-      // Formato: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204}
-      final recordStrings = content.split('},').where((r) => r.isNotEmpty);
+      // Detectar si es formato JSON nuevo
+      if (actions.isNewJsonFormat(content)) {
+        debugPrint('📋 Parseando formato JSON nuevo');
+        final nfcJson = actions.parseNfcJson(content);
+        if (nfcJson != null) {
+          final visits = actions.extractVisitsFromJson(nfcJson);
 
-      for (var recordStr in recordStrings) {
-        // Limpiar el string
-        recordStr = recordStr.trim();
-        if (!recordStr.startsWith('{')) {
-          recordStr = '{$recordStr';
-        }
-        if (!recordStr.endsWith('}')) {
-          recordStr = '$recordStr}';
-        }
+          for (var visit in visits) {
+            final operatorId = visit['operatorId'] as String;
+            final dateTime = visit['dateTime'] as DateTime;
+            final visitsCount = visit['visits'] as int;
+            final resultsCount = visit['results'] as int;
+            final headquarterId = visit['headquarterId'] as int;
 
-        // Extraer contenido entre llaves
-        if (recordStr.startsWith('{') && recordStr.endsWith('}')) {
-          final content = recordStr.substring(1, recordStr.length - 1);
-          final parts = content.split(';');
-
-          String? dateHour;
-          String? operatorId;
-          int? visits;
-          int? results;
-          int? headquarterId;
-
-          for (var part in parts) {
-            final keyValue = part.split(':');
-            if (keyValue.length == 2) {
-              final key = keyValue[0].trim();
-              final value = keyValue[1].trim();
-
-              switch (key) {
-                case 'DH':
-                  dateHour = value;
-                  break;
-                case 'OP':
-                  operatorId = value;
-                  break;
-                case 'VISITS':
-                  visits = int.tryParse(value);
-                  break;
-                case 'RESULTS':
-                  results = int.tryParse(value);
-                  break;
-                case 'HE':
-                  headquarterId = int.tryParse(value);
-                  break;
-              }
-            }
-          }
-
-          if (dateHour != null && operatorId != null) {
             // Buscar operador en usersList
-            // operatorId contiene el idUser (identificador numérico del usuario)
             String operatorName = 'Desconocido';
             String operatorIdentification = '';
 
@@ -556,7 +536,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
 
             // Buscar lote en headquartersList
             String loteName = 'N/A';
-            if (headquarterId != null) {
+            if (headquarterId > 0) {
               final headquarter = FFAppState().headquartersList.firstWhere(
                     (h) => h.idHeadquarter == headquarterId,
                     orElse: () => HeadquartersStruct(),
@@ -568,18 +548,112 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             }
 
             records.add(NfcRecord(
-              dateHour: _parseDateHour(dateHour),
+              dateHour: dateTime,
               operatorName: operatorName,
               operatorIdentification: operatorIdentification,
-              visits: visits ?? 0,
-              results: results ?? 0,
+              visits: visitsCount,
+              results: resultsCount,
               loteName: loteName,
             ));
           }
         }
+      } else if (actions.isOldFormat(content)) {
+        // Formato antiguo (retrocompatibilidad)
+        debugPrint('📋 Parseando formato antiguo');
+        final recordStrings = content.split('},').where((r) => r.isNotEmpty);
+
+        for (var recordStr in recordStrings) {
+          recordStr = recordStr.trim();
+          if (!recordStr.startsWith('{')) {
+            recordStr = '{$recordStr';
+          }
+          if (!recordStr.endsWith('}')) {
+            recordStr = '$recordStr}';
+          }
+
+          if (recordStr.startsWith('{') && recordStr.endsWith('}')) {
+            final content = recordStr.substring(1, recordStr.length - 1);
+            final parts = content.split(';');
+
+            String? dateHour;
+            String? operatorId;
+            int? visits;
+            int? results;
+            int? headquarterId;
+
+            for (var part in parts) {
+              final keyValue = part.split(':');
+              if (keyValue.length >= 2) {
+                final key = keyValue[0].trim();
+                final value = keyValue.sublist(1).join(':').trim();
+
+                switch (key) {
+                  case 'DH':
+                    dateHour = value;
+                    break;
+                  case 'OP':
+                    operatorId = value;
+                    break;
+                  case 'VISITS':
+                    visits = int.tryParse(value);
+                    break;
+                  case 'RESULTS':
+                    results = int.tryParse(value);
+                    break;
+                  case 'HE':
+                    headquarterId = int.tryParse(value);
+                    break;
+                }
+              }
+            }
+
+            if (dateHour != null && operatorId != null) {
+              String operatorName = 'Desconocido';
+              String operatorIdentification = '';
+
+              try {
+                final idUserFromTag = int.tryParse(operatorId);
+                if (idUserFromTag != null) {
+                  final user = FFAppState().usersList.firstWhere(
+                        (u) => u.idUser == idUserFromTag,
+                        orElse: () => UsersStruct(),
+                      );
+
+                  if (user.nameUser.isNotEmpty) {
+                    operatorName = user.nameUser;
+                    operatorIdentification = user.operID;
+                  }
+                }
+              } catch (e) {
+                debugPrint('❌ Error buscando operador: $e');
+              }
+
+              String loteName = 'N/A';
+              if (headquarterId != null) {
+                final headquarter = FFAppState().headquartersList.firstWhere(
+                      (h) => h.idHeadquarter == headquarterId,
+                      orElse: () => HeadquartersStruct(),
+                    );
+
+                if (headquarter.nameHeadquarter.isNotEmpty) {
+                  loteName = headquarter.nameHeadquarter;
+                }
+              }
+
+              records.add(NfcRecord(
+                dateHour: _parseDateHour(dateHour),
+                operatorName: operatorName,
+                operatorIdentification: operatorIdentification,
+                visits: visits ?? 0,
+                results: results ?? 0,
+                loteName: loteName,
+              ));
+            }
+          }
+        }
       }
     } catch (e) {
-      debugPrint('Error al parsear contenido NFC: $e');
+      debugPrint('❌ Error al parsear contenido NFC: $e');
     }
 
     return records;
@@ -660,9 +734,10 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                     child: Column(
                       children: [
                         Text(
-                          'LEER TAG NFC',
+                          widget.tagTransferTitle ?? 'LEER TAG NFC',
+                          textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: 'Roboto',
-                            fontSize: 20,
+                            fontSize: widget.tagTransferTitle != null ? 18 : 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),

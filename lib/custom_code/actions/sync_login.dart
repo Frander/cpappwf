@@ -33,7 +33,11 @@ Future<bool> syncLogin(
   dynamic loginResponseJson,
 ) async {
   try {
-    debugPrint('=== Iniciando sincronización de Login ===');
+    debugPrint('');
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('🚀 INICIANDO SINCRONIZACIÓN DE LOGIN (syncLogin)');
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('');
 
     Map<String, dynamic>? loginData;
     String? authToken;
@@ -80,25 +84,50 @@ Future<bool> syncLogin(
     }
     debugPrint('🔑 Token obtenido: ${authToken.substring(0, 20)}...');
 
-    // 3. Llamar al endpoint TypesPoints
+    // 3. Llamar al endpoint TypesPoints con timeout
     debugPrint('📡 Llamando a GET /TypesPoints...');
-    final typesPointsData = await _callTypesPointsAPI(authToken);
+    final typesPointsData = await _callTypesPointsAPI(authToken).timeout(
+      Duration(seconds: 30),
+      onTimeout: () {
+        debugPrint('⏱️ Timeout al obtener TypesPoints (30s)');
+        return null;
+      },
+    );
     if (typesPointsData == null) {
       debugPrint('❌ Error: No se pudo obtener TypesPoints');
       return false;
     }
     debugPrint('✅ TypesPoints obtenidos: ${typesPointsData.length} tipos');
 
-    // 4. Sincronizar en SQLite con transacción
-    debugPrint('💾 Sincronizando datos en SQLite...');
-    final syncSuccess =
-        await _syncLoginDataToSQLite(loginData, typesPointsData);
+    // 4. Sincronizar en SQLite con transacción y timeout
+    debugPrint('');
+    debugPrint('💾 ========================================');
+    debugPrint('💾 PASO 4: Sincronizando datos en SQLite');
+    debugPrint('💾 ========================================');
+    final syncSuccess = await _syncLoginDataToSQLite(loginData, typesPointsData).timeout(
+      const Duration(seconds: 60),
+      onTimeout: () {
+        debugPrint('');
+        debugPrint('⏱️ ❌ TIMEOUT al sincronizar en SQLite (60s)');
+        debugPrint('⏱️ La operación tardó más de 60 segundos');
+        debugPrint('');
+        return false;
+      },
+    );
     if (!syncSuccess) {
-      debugPrint('❌ Error en sincronización a SQLite');
+      debugPrint('');
+      debugPrint('❌ ========================================');
+      debugPrint('❌ ERROR en sincronización a SQLite');
+      debugPrint('❌ ========================================');
+      debugPrint('');
       return false;
     }
 
-    debugPrint('✅ Sincronización de Login completada exitosamente');
+    debugPrint('');
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('✅ SINCRONIZACIÓN DE LOGIN COMPLETADA EXITOSAMENTE');
+    debugPrint('═══════════════════════════════════════════════════════════');
+    debugPrint('');
     return true;
   } catch (e, stackTrace) {
     debugPrint('❌ EXCEPCIÓN en syncLogin: $e');

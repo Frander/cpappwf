@@ -90,6 +90,7 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
               final key =
                   Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
               final allBytes = <int>[];
+              bool tagLost = false;
 
               // Leer sector 0: bloques 1-2
               try {
@@ -98,45 +99,79 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
                   key: key,
                 );
 
-                for (var block = 1; block <= 2; block++) {
-                  final blockData =
-                      await mifareClassic.readBlock(blockIndex: block);
-                  allBytes.addAll(blockData);
+                for (var block = 1; block <= 2 && !tagLost; block++) {
+                  try {
+                    final blockData =
+                        await mifareClassic.readBlock(blockIndex: block);
+                    allBytes.addAll(blockData);
+                  } catch (blockError) {
+                    if (blockError.toString().contains('IOException') ||
+                        blockError.toString().contains('TagLostException')) {
+                      debugPrint('⚠️ TAG perdido durante lectura del bloque $block');
+                      tagLost = true;
+                      break;
+                    }
+                    debugPrint('Error leyendo bloque $block: $blockError');
+                  }
                 }
               } catch (e) {
-                debugPrint('Error leyendo sector 0: $e');
+                if (e.toString().contains('IOException') ||
+                    e.toString().contains('TagLostException')) {
+                  debugPrint('⚠️ TAG perdido durante autenticación del sector 0');
+                  tagLost = true;
+                } else {
+                  debugPrint('Error leyendo sector 0: $e');
+                }
               }
 
               // Leer solo sectores 1-6 (reducido para evitar timeout)
               // Esto da ~240 bytes de datos útiles, suficiente para la mayoría de casos
-              bool foundEnd = false;
-              for (var sector = 1; sector <= 6; sector++) {
-                try {
-                  await mifareClassic.authenticateSectorWithKeyA(
-                    sectorIndex: sector,
-                    key: key,
-                  );
+              if (!tagLost) {
+                bool foundEnd = false;
+                for (var sector = 1; sector <= 6 && !tagLost; sector++) {
+                  try {
+                    await mifareClassic.authenticateSectorWithKeyA(
+                      sectorIndex: sector,
+                      key: key,
+                    );
 
-                  for (var blockInSector = 0; blockInSector <= 2; blockInSector++) {
-                    final blockIndex = (sector * 4) + blockInSector;
-                    final blockData =
-                        await mifareClassic.readBlock(blockIndex: blockIndex);
-                    allBytes.addAll(blockData);
+                    for (var blockInSector = 0; blockInSector <= 2 && !tagLost; blockInSector++) {
+                      final blockIndex = (sector * 4) + blockInSector;
+                      try {
+                        final blockData =
+                            await mifareClassic.readBlock(blockIndex: blockIndex);
+                        allBytes.addAll(blockData);
 
-                    // Verificar si encontramos el fin del mensaje (múltiples 0x00)
-                    if (blockData.where((byte) => byte == 0).length > 10) {
-                      foundEnd = true;
+                        // Verificar si encontramos el fin del mensaje (múltiples 0x00)
+                        if (blockData.where((byte) => byte == 0).length > 10) {
+                          foundEnd = true;
+                          break;
+                        }
+                      } catch (blockError) {
+                        if (blockError.toString().contains('IOException') ||
+                            blockError.toString().contains('TagLostException')) {
+                          debugPrint('⚠️ TAG perdido durante lectura del bloque $blockIndex');
+                          tagLost = true;
+                          break;
+                        }
+                        debugPrint('Error leyendo bloque $blockIndex: $blockError');
+                      }
+                    }
+
+                    if (foundEnd) {
+                      debugPrint('Fin de datos detectado en sector $sector');
                       break;
                     }
+                  } catch (e) {
+                    if (e.toString().contains('IOException') ||
+                        e.toString().contains('TagLostException')) {
+                      debugPrint('⚠️ TAG perdido durante autenticación del sector $sector');
+                      tagLost = true;
+                      break;
+                    }
+                    debugPrint('Error leyendo sector $sector: $e');
+                    break; // Dejar de leer si falla un sector
                   }
-
-                  if (foundEnd) {
-                    debugPrint('Fin de datos detectado en sector $sector');
-                    break;
-                  }
-                } catch (e) {
-                  debugPrint('Error leyendo sector $sector: $e');
-                  break; // Dejar de leer si falla un sector
                 }
               }
 
@@ -213,6 +248,79 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
           _saveTagToHistory(tagId, tagType, tagData.length);
         } catch (e) {
           debugPrint('⚠️ Error capturando información del TAG: $e');
+        }
+
+        // === VALIDACIÓN PARA TAG-TRANSFER (TAG DE ORIGEN) ===
+        if (tagId.isNotEmpty && tagData.isNotEmpty) {
+          final currentActivity = FFAppState().currentActivity;
+          final activityStatusList = getJsonField(currentActivity, r'''$.activity_status''') as List?;
+
+          if (activityStatusList != null) {
+            for (var statusItem in activityStatusList) {
+              final typeStatus = getJsonField(statusItem, r'''$.type_status''')?.toString() ?? '';
+              final defaultStatusStr = getJsonField(statusItem, r'''$.default_status''')?.toString() ?? '';
+
+              if (typeStatus == 'tag-transfer' && defaultStatusStr.contains('=TYPE_PRODUCT_START:')) {
+                debugPrint('🔍 TAG-TRANSFER: Validación de tag de origen requerida');
+
+                // Extraer el tipo de producto de origen requerido
+                // Captura todo hasta ; o } (permitiendo espacios en el nombre)
+                final regex = RegExp(r'=TYPE_PRODUCT_START:([^;}]+)');
+                final match = regex.firstMatch(defaultStatusStr);
+
+                if (match != null && match.groupCount >= 1) {
+                  final requiredProductType = match.group(1)!.trim();
+                  debugPrint('   Tipo de origen requerido: $requiredProductType');
+
+                  // Buscar el producto en SQLite por RFID
+                  try {
+                    final dbPath = FFAppState().pathDatabase;
+                    if (dbPath.isNotEmpty) {
+                      final database = await openDatabase(dbPath);
+
+                      final productResults = await database.rawQuery('''
+                        SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
+                      ''', [tagId]);
+
+                      await database.close();
+
+                      if (productResults.isEmpty) {
+                        debugPrint('❌ TAG-TRANSFER: RFID de origen no encontrado: $tagId');
+                        FFAppState().update(() {
+                          FFAppState().nfcRead = 'ERROR:PRODUCTO_NO_ENCONTRADO:$requiredProductType';
+                        });
+                        completer.complete('ERROR:PRODUCTO_NO_ENCONTRADO:$requiredProductType');
+                        await NfcManager.instance.stopSession();
+                        return;
+                      }
+
+                      final productType = productResults.first['Type_product'] as String?;
+                      final productName = productResults.first['Name_product'] as String?;
+
+                      debugPrint('✅ TAG-TRANSFER: Producto origen encontrado: $productName (Tipo: $productType)');
+
+                      if (productType != requiredProductType) {
+                        debugPrint('❌ TAG-TRANSFER: Tipo de producto de origen no coincide');
+                        debugPrint('   Esperado: $requiredProductType');
+                        debugPrint('   Encontrado: $productType');
+                        FFAppState().update(() {
+                          FFAppState().nfcRead = 'ERROR:TIPO_INCORRECTO:$requiredProductType:${productType ?? "Sin tipo"}';
+                        });
+                        completer.complete('ERROR:TIPO_INCORRECTO:$requiredProductType:${productType ?? "Sin tipo"}');
+                        await NfcManager.instance.stopSession();
+                        return;
+                      }
+
+                      debugPrint('✅ TAG-TRANSFER: Validación de tipo de origen exitosa');
+                    }
+                  } catch (dbError) {
+                    debugPrint('❌ TAG-TRANSFER: Error validando producto de origen: $dbError');
+                  }
+                }
+                break;
+              }
+            }
+          }
         }
 
         // Actualizar el AppState con los datos leídos

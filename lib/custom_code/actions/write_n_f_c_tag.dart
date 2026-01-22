@@ -18,6 +18,7 @@ import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager/nfc_manager_android.dart' show IsoDepAndroid;
 import 'package:ndef_record/ndef_record.dart';
 import 'dart:typed_data';
+import 'package:sqflite/sqflite.dart';
 
 /// Escribe datos en un tag NFC
 Future<bool> writeNFCTag(
@@ -44,8 +45,158 @@ Future<bool> writeNFCTag(
     },
     onDiscovered: (NfcTag tag) async {
       try {
+        // === VALIDACIÓN DE TIPO DE PRODUCTO PARA TAG-WRITER ===
+        // Obtener el RFID del tag ANTES de cualquier escritura
+        String tagRfid = '';
+        try {
+          final androidTag = NfcTagAndroid.from(tag);
+          if (androidTag != null && androidTag.id.isNotEmpty) {
+            tagRfid = androidTag.id
+                .map((byte) => byte.toRadixString(16).toUpperCase().padLeft(2, '0'))
+                .join('');
+            debugPrint('📱 RFID del tag detectado: $tagRfid');
+          }
+        } catch (rfidError) {
+          debugPrint('⚠️ No se pudo obtener RFID: $rfidError');
+        }
+
+        // Verificar si se requiere validación de tipo de producto
+        if (tagRfid.isNotEmpty) {
+          final currentActivity = FFAppState().currentActivity;
+          final activityStatusList = getJsonField(currentActivity, r'''$.activity_status''') as List?;
+
+          if (activityStatusList != null) {
+            for (var statusItem in activityStatusList) {
+              final typeStatus = getJsonField(statusItem, r'''$.type_status''')?.toString() ?? '';
+              final defaultStatusStr = getJsonField(statusItem, r'''$.default_status''')?.toString() ?? '';
+
+              // === VALIDACIÓN PARA TAG-WRITER ===
+              if (typeStatus == 'tag-writer' && defaultStatusStr.contains('=TYPE_PRODUCT_DEFAULT:')) {
+                debugPrint('🔍 TAG-WRITER: Validación de tipo de producto requerida');
+
+                // Extraer el tipo de producto requerido
+                final regex = RegExp(r'=TYPE_PRODUCT_DEFAULT:([^;}\s]+)');
+                final match = regex.firstMatch(defaultStatusStr);
+
+                if (match != null && match.groupCount >= 1) {
+                  final requiredProductType = match.group(1)!.trim();
+                  debugPrint('   Tipo requerido: $requiredProductType');
+
+                  // Buscar el producto en SQLite por RFID
+                  try {
+                    final dbPath = FFAppState().pathDatabase;
+                    if (dbPath.isNotEmpty) {
+                      final database = await openDatabase(dbPath);
+
+                      final productResults = await database.rawQuery('''
+                        SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
+                      ''', [tagRfid]);
+
+                      await database.close();
+
+                      if (productResults.isEmpty) {
+                        debugPrint('❌ RFID no encontrado en Products: $tagRfid');
+                        FFAppState().update(() {
+                          FFAppState().nfcRead = 'ERROR:PRODUCTO_NO_ENCONTRADO:$requiredProductType';
+                        });
+                        completer.complete(false);
+                        await NfcManager.instance.stopSession();
+                        return;
+                      }
+
+                      final productType = productResults.first['Type_product'] as String?;
+                      final productName = productResults.first['Name_product'] as String?;
+
+                      debugPrint('✅ Producto encontrado: $productName (Tipo: $productType)');
+
+                      if (productType != requiredProductType) {
+                        debugPrint('❌ Tipo de producto no coincide');
+                        debugPrint('   Esperado: $requiredProductType');
+                        debugPrint('   Encontrado: $productType');
+                        FFAppState().update(() {
+                          FFAppState().nfcRead = 'ERROR:TIPO_INCORRECTO:$requiredProductType:${productType ?? "Sin tipo"}';
+                        });
+                        completer.complete(false);
+                        await NfcManager.instance.stopSession();
+                        return;
+                      }
+
+                      debugPrint('✅ TAG-WRITER: Validación de tipo exitosa');
+                    }
+                  } catch (dbError) {
+                    debugPrint('❌ Error validando producto: $dbError');
+                  }
+                }
+                break;
+              }
+
+              // === VALIDACIÓN PARA TAG-TRANSFER (TAG DE DESTINO) ===
+              if (typeStatus == 'tag-transfer' && defaultStatusStr.contains('TYPE_PRODUCT_FINISH:')) {
+                debugPrint('🔍 TAG-TRANSFER: Validación de tag de destino requerida');
+
+                // Extraer el tipo de producto de destino requerido
+                // Captura todo hasta ; o } (permitiendo espacios en el nombre)
+                final regex = RegExp(r'TYPE_PRODUCT_FINISH:([^;}]+)');
+                final match = regex.firstMatch(defaultStatusStr);
+
+                if (match != null && match.groupCount >= 1) {
+                  final requiredProductType = match.group(1)!.trim();
+                  debugPrint('   Tipo de destino requerido: $requiredProductType');
+
+                  // Buscar el producto en SQLite por RFID
+                  try {
+                    final dbPath = FFAppState().pathDatabase;
+                    if (dbPath.isNotEmpty) {
+                      final database = await openDatabase(dbPath);
+
+                      final productResults = await database.rawQuery('''
+                        SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
+                      ''', [tagRfid]);
+
+                      await database.close();
+
+                      if (productResults.isEmpty) {
+                        debugPrint('❌ TAG-TRANSFER: RFID de destino no encontrado: $tagRfid');
+                        FFAppState().update(() {
+                          FFAppState().nfcRead = 'ERROR:PRODUCTO_NO_ENCONTRADO:$requiredProductType';
+                        });
+                        completer.complete(false);
+                        await NfcManager.instance.stopSession();
+                        return;
+                      }
+
+                      final productType = productResults.first['Type_product'] as String?;
+                      final productName = productResults.first['Name_product'] as String?;
+
+                      debugPrint('✅ TAG-TRANSFER: Producto destino encontrado: $productName (Tipo: $productType)');
+
+                      if (productType != requiredProductType) {
+                        debugPrint('❌ TAG-TRANSFER: Tipo de producto de destino no coincide');
+                        debugPrint('   Esperado: $requiredProductType');
+                        debugPrint('   Encontrado: $productType');
+                        FFAppState().update(() {
+                          FFAppState().nfcRead = 'ERROR:TIPO_INCORRECTO:$requiredProductType:${productType ?? "Sin tipo"}';
+                        });
+                        completer.complete(false);
+                        await NfcManager.instance.stopSession();
+                        return;
+                      }
+
+                      debugPrint('✅ TAG-TRANSFER: Validación de tipo de destino exitosa');
+                    }
+                  } catch (dbError) {
+                    debugPrint('❌ TAG-TRANSFER: Error validando producto de destino: $dbError');
+                  }
+                }
+                break;
+              }
+            }
+          }
+        }
+
         String finalContent = dataToWrite;
         String existingContent = '';
+        Map<String, dynamic>? nfcJson;
 
         // Si ya determinamos que necesitamos otro tag, escribir solo el nuevo contenido
         if (needsAnotherTag) {
@@ -76,18 +227,12 @@ Future<bool> writeNFCTag(
                       existingContent = utf8.decode(textBytes);
 
                       if (existingContent.isNotEmpty) {
-                        // Si el contenido existente es solo "0" (tag vacío), no concatenar
+                        debugPrint('📖 Contenido existente encontrado: ${existingContent.substring(0, existingContent.length > 100 ? 100 : existingContent.length)}...');
+
+                        // Si el contenido existente es solo "0" (tag vacío), ignorarlo
                         if (existingContent.trim() == '0') {
-                          debugPrint(
-                              'Tag vacío detectado ("0"), escribiendo solo el nuevo contenido');
-                          finalContent = dataToWrite;
-                        } else {
-                          // Agregar coma separadora y el nuevo contenido
-                          finalContent = '$existingContent,$dataToWrite';
-                          debugPrint(
-                              'Contenido existente encontrado: $existingContent');
-                          debugPrint(
-                              'Intentando agregar nuevo registro al tag');
+                          debugPrint('Tag vacío detectado ("0"), creando nuevo JSON');
+                          existingContent = '';
                         }
                       }
                     }
@@ -101,6 +246,186 @@ Future<bool> writeNFCTag(
             debugPrint(
                 'No se pudo leer contenido existente (tag nuevo o vacío): $readError');
             // Si falla la lectura, continuar con solo el nuevo contenido
+          }
+
+          // === PROCESAR FORMATO JSON (NUEVO) ===
+          // Parsear el dataToWrite para extraer los campos necesarios
+          // Formato esperado: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204}
+          int? operatorId;
+          int? visits;
+          int? results;
+          int? headquarterId;
+          DateTime? dateTime;
+
+          final recordRegex = RegExp(r'\{([^}]+)\}');
+          final recordMatch = recordRegex.firstMatch(dataToWrite);
+
+          if (recordMatch != null) {
+            final recordContent = recordMatch.group(1);
+            if (recordContent != null) {
+              final fields = recordContent.split(';');
+              for (var field in fields) {
+                final parts = field.split(':');
+                if (parts.length >= 2) {
+                  final key = parts[0].trim();
+                  final value = parts.sublist(1).join(':').trim();
+
+                  switch (key) {
+                    case 'DH':
+                      try {
+                        final dateStr = value.replaceAll('_', '-');
+                        final dateParts = dateStr.split('-');
+                        if (dateParts.length >= 4) {
+                          final year = int.parse(dateParts[0]);
+                          final month = int.parse(dateParts[1]);
+                          final day = int.parse(dateParts[2]);
+                          final timeParts = dateParts[3].split(':');
+                          final hour = int.parse(timeParts[0]);
+                          final minute = int.parse(timeParts[1]);
+                          final second = int.parse(timeParts[2]);
+                          dateTime = DateTime(year, month, day, hour, minute, second);
+                        }
+                      } catch (e) {
+                        dateTime = DateTime.now();
+                      }
+                      break;
+                    case 'OP':
+                      operatorId = int.tryParse(value);
+                      break;
+                    case 'VISITS':
+                      visits = int.tryParse(value);
+                      break;
+                    case 'RESULTS':
+                      results = int.tryParse(value);
+                      break;
+                    case 'HE':
+                      headquarterId = int.tryParse(value);
+                      break;
+                  }
+                }
+              }
+            }
+          }
+
+          // Verificar si tenemos la información del producto desde la validación anterior
+          int? productId;
+          String? productName;
+          String? productRfid = tagRfid;
+
+          if (tagRfid.isNotEmpty) {
+            try {
+              final dbPath = FFAppState().pathDatabase;
+              if (dbPath.isNotEmpty) {
+                final database = await openDatabase(dbPath);
+                final productResults = await database.rawQuery('''
+                  SELECT Id_product, Name_product, Type_product FROM Products WHERE Rfid = ? LIMIT 1
+                ''', [tagRfid]);
+                await database.close();
+
+                if (productResults.isNotEmpty) {
+                  productId = productResults.first['Id_product'] as int?;
+                  productName = productResults.first['Name_product'] as String?;
+                  debugPrint('📦 Producto encontrado: $productName (ID: $productId)');
+                }
+              }
+            } catch (dbError) {
+              debugPrint('⚠️ Error obteniendo información del producto: $dbError');
+            }
+          }
+
+          // Determinar el formato del contenido existente
+          if (existingContent.isNotEmpty) {
+            if (isNewJsonFormat(existingContent)) {
+              // Formato JSON nuevo
+              debugPrint('✅ Formato JSON detectado, parseando...');
+              nfcJson = parseNfcJson(existingContent);
+
+              if (nfcJson != null) {
+                // Actualizar Read_info con nueva fecha y datos del producto
+                if (productId != null && productName != null && productRfid != null) {
+                  nfcJson = updateReadInfo(
+                    nfcJson,
+                    idProduct: productId,
+                    rfid: productRfid,
+                    nameProduct: productName,
+                  );
+                  debugPrint('📝 Read_info actualizado');
+                }
+
+                // Agregar nueva visita
+                if (operatorId != null && visits != null && results != null && headquarterId != null) {
+                  nfcJson = addVisitToNfcJson(
+                    nfcJson,
+                    operatorId: operatorId,
+                    visits: visits,
+                    results: results,
+                    headquarterId: headquarterId,
+                    dateTime: dateTime,
+                  );
+                  debugPrint('✅ Nueva visita agregada al JSON');
+                }
+
+                finalContent = nfcJsonToString(nfcJson);
+              }
+            } else if (isOldFormat(existingContent)) {
+              // Formato antiguo, migrar a JSON
+              debugPrint('🔄 Formato antiguo detectado, migrando a JSON...');
+
+              if (productId != null && productName != null && productRfid != null) {
+                nfcJson = migrateOldFormatToJson(
+                  existingContent,
+                  idProduct: productId,
+                  rfid: productRfid,
+                  nameProduct: productName,
+                );
+
+                if (nfcJson != null) {
+                  // Agregar nueva visita al JSON migrado
+                  if (operatorId != null && visits != null && results != null && headquarterId != null) {
+                    nfcJson = addVisitToNfcJson(
+                      nfcJson,
+                      operatorId: operatorId,
+                      visits: visits,
+                      results: results,
+                      headquarterId: headquarterId,
+                      dateTime: dateTime,
+                    );
+                  }
+
+                  finalContent = nfcJsonToString(nfcJson);
+                  debugPrint('✅ Migración completada, JSON generado');
+                }
+              }
+            } else {
+              debugPrint('⚠️ Formato desconocido, usando contenido como está');
+              finalContent = '$existingContent,$dataToWrite';
+            }
+          } else {
+            // Tag vacío, crear JSON inicial
+            debugPrint('🆕 Tag vacío, creando JSON inicial...');
+
+            if (productId != null && productName != null && productRfid != null) {
+              nfcJson = buildInitialNfcJson(
+                idProduct: productId,
+                rfid: productRfid,
+                nameProduct: productName,
+              );
+
+              // Agregar primera visita
+              if (operatorId != null && visits != null && results != null && headquarterId != null) {
+                nfcJson = addVisitToNfcJson(
+                  nfcJson,
+                  operatorId: operatorId,
+                  visits: visits,
+                  results: results,
+                  headquarterId: headquarterId,
+                  dateTime: dateTime,
+                );
+              }
+
+              finalContent = nfcJsonToString(nfcJson);
+              debugPrint('✅ JSON inicial creado');
+            }
           }
         }
 

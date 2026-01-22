@@ -269,6 +269,34 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => SyncPageWidget(),
         ),
         FFRoute(
+          name: ModernSyncPageWidget.routeName,
+          path: ModernSyncPageWidget.routePath,
+          builder: (context, params) => ModernSyncPageWidget(
+            newsAdd: params.getParam<VisitsNewsStruct>(
+              'newsAdd',
+              ParamType.DataStruct,
+              isList: true,
+              structBuilder: VisitsNewsStruct.fromSerializableMap,
+            ),
+            idCompany: params.getParam(
+              'idCompany',
+              ParamType.int,
+            ),
+            idsHeadquarters: params.getParam(
+              'idsHeadquarters',
+              ParamType.String,
+            ),
+            imei: params.getParam(
+              'imei',
+              ParamType.String,
+            ),
+            authToken: params.getParam(
+              'authToken',
+              ParamType.String,
+            ),
+          ),
+        ),
+        FFRoute(
           name: ConfigBackupsPageWidget.routeName,
           path: ConfigBackupsPageWidget.routePath,
           builder: (context, params) => ConfigBackupsPageWidget(),

@@ -5,14 +5,15 @@ import '/components/nfc_write_dialog_widget.dart';
 import '/components/nfc_transfer_write_dialog_widget.dart';
 import '/components/qr_scanner_dialog_widget.dart';
 import '/components/photo_capture_component_widget.dart';
+import '/components/video_capture_component_widget.dart';
 import '/components/date_picker_component_widget.dart';
 import '/components/time_picker_component_widget.dart';
-import '/components/text_input_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'package:flutter/services.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'dart:io';
+import 'dart:convert';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
@@ -26,6 +27,7 @@ import '/tag_admin/tag_admin_center_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:video_player/video_player.dart';
 import 'do_visits_form_page_model.dart';
 export 'do_visits_form_page_model.dart';
 
@@ -144,6 +146,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para almacenar la última coordenada del tag-reader
   ReadGeoStruct? _lastTagReaderLocation;
 
+  // Map para controladores de texto (tipo text)
+  final Map<int, TextEditingController> _textControllers = {};
+
+  // Map para FocusNodes de texto (tipo text)
+  final Map<int, FocusNode> _textFocusNodes = {};
+
+  // Map para cachear imágenes decodificadas (tipo photo) - evita parpadeo
+  final Map<String, Uint8List> _cachedPhotoImages = {};
+
+  // Map para controladores de búsqueda de usuarios (tipo users-list)
+  final Map<int, TextEditingController> _usersSearchControllers = {};
+
+  // Map para FocusNodes de búsqueda de usuarios (tipo users-list)
+  final Map<int, FocusNode> _usersSearchFocusNodes = {};
+
+  // Map para almacenar resultados de búsqueda de usuarios (tipo users-list)
+  final Map<int, List<UsersStruct>> _usersSearchResults = {};
+
   // Set para rastrear qué status ya se loguearon (para evitar spam en logs)
   final Set<int> _loggedStatusIds = {};
 
@@ -172,6 +192,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     _model = createModel(context, () => DoVisitsFormPageModel());
     _tabController = TabController(length: 2, vsync: this);
     _initializeDataCache(); // LOTE 1: Inicializar caché de datos
+    _migrateHtmlToCheckmark(); // Migrar HTML antiguo a checkmark
     _initializeExpansionStates();
 
     // Restaurar caché del formulario si existe
@@ -219,6 +240,51 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     _isDataCacheInitialized = true;
+  }
+
+  /// Migra datos antiguos con HTML en status_response a checkmark simple
+  /// Se ejecuta una vez en initState para limpiar datos legacy de SQLite
+  void _migrateHtmlToCheckmark() {
+    debugPrint('🔄 Migrando HTML antiguo a checkmark...');
+
+    bool hasChanges = false;
+
+    // Recorrer todos los registros de visitDetails
+    for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+      final detail = FFAppState().visitDetails[i];
+
+      // Si el statusResponse contiene HTML (empieza con "<div" o "<")
+      if (detail.statusResponse.trim().startsWith('<')) {
+        debugPrint('   🔧 Migrando registro $i: "${detail.statusResponse.substring(0, 20)}..." → "✓"');
+
+        // Actualizar el registro reemplazando HTML por checkmark
+        FFAppState().updateVisitDetailsAtIndex(
+          i,
+          (d) => VisitsDetailsStruct(
+            idVisitDetail: d.idVisitDetail,
+            idVisit: d.idVisit,
+            idActivityStatus: d.idActivityStatus,
+            statusOption: d.statusOption,
+            statusResponse: '✓', // Reemplazar HTML por checkmark
+            idStepParent: d.idStepParent,
+            rememberStatus: d.rememberStatus,
+            defaultStatus: d.defaultStatus,
+            typeStatus: d.typeStatus,
+            auxStep: d.auxStep,
+          ),
+        );
+
+        hasChanges = true;
+      }
+    }
+
+    if (hasChanges) {
+      debugPrint('✅ Migración completada. Se actualizaron registros con HTML.');
+      // Actualizar FFAppState para persistir los cambios
+      FFAppState().update(() {});
+    } else {
+      debugPrint('ℹ️ No se encontraron registros con HTML para migrar.');
+    }
   }
 
   /// Verifica si la actividad actual tiene algún status de tipo 'headquarters-weights'
@@ -1025,16 +1091,58 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        stepName,
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: hasValue
-                              ? Colors.white
-                              : const Color(0xFF00a86b),
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              stepName,
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: hasValue
+                                    ? Colors.white
+                                    : const Color(0xFF00a86b),
+                              ),
+                            ),
+                          ),
+                          // Indicador sutil cuando está completado y es requerido
+                          if (isRequired && hasValue)
+                            Container(
+                              margin: const EdgeInsets.only(left: 6),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle,
+                                    size: 12,
+                                    color: Colors.white.withValues(alpha: 0.9),
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Req.',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
                       ),
                       // Breadcrumb de selecciones
                       _buildSelectionBreadcrumb(stepId, step),
@@ -1067,31 +1175,63 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 if (isRequired && !hasValue)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 4),
+                        horizontal: 10, vertical: 5),
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFD32F2F),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Text(
-                      '*',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                      gradient: const LinearGradient(
+                        colors: [
+                          Color(0xFFFF6B6B),
+                          Color(0xFFEE5A6F),
+                        ],
                       ),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF6B6B).withValues(alpha: 0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 4,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        const Text(
+                          'Requerido',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 // Botón de búsqueda compacto (para unique-list y reference-list)
                 // Solo visible cuando el step está expandido
+                // NOTA: container-list NO tiene búsqueda, solo renderiza sus hijos
                 if ((typeStep == 'unique-list' ||
                         typeStep == 'reference-list') &&
                     activitiesStatus.isNotEmpty &&
                     isExpanded)
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: _buildCompactSearchButton(stepId),
+                    child: _buildCompactSearchButton(stepId, hasValue: hasValue),
                   ),
               ],
             ),
@@ -1099,6 +1239,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ),
 
         // Cuadro de búsqueda expandido (solo cuando está activo)
+        // NOTA: container-list NO tiene búsqueda
         if ((typeStep == 'unique-list' || typeStep == 'reference-list') &&
             (_searchBoxExpansionState[stepId] ?? false))
           _buildExpandedSearchBox(stepId),
@@ -1108,17 +1249,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           Builder(
             builder: (context) {
               debugPrint('   ✅ MOSTRANDO OPCIONES: paso la condición isExpanded=$isExpanded && activitiesStatus.isNotEmpty=${activitiesStatus.isNotEmpty}');
-              final filteredList = _filterStatusList(stepId, activitiesStatus);
-              debugPrint('   📋 Lista filtrada: ${filteredList.length} opciones de ${activitiesStatus.length}');
+
+              // Para container-list, mostrar todos los status sin filtro
+              // Para unique-list y reference-list, aplicar filtro de búsqueda
+              final displayList = typeStep == 'container-list'
+                  ? activitiesStatus
+                  : _filterStatusList(stepId, activitiesStatus);
+
+              debugPrint('   📋 Lista a mostrar: ${displayList.length} opciones de ${activitiesStatus.length} (tipo: $typeStep)');
+
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 margin: EdgeInsets.only(left: level * 8.0 + 8, top: 8),
                 child: Column(
                   children: [
-                    // Lista filtrada de status
-                    ...(_filterStatusList(stepId, activitiesStatus))
-                        .map<Widget>((status) {
+                    // Lista de status (filtrada o completa según el tipo)
+                    ...displayList.map<Widget>((status) {
                       return _buildStatusOption(step, status, level: level + 1);
                     }),
                   ],
@@ -1161,8 +1308,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Verificar si tiene algún tipo de hijos
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
 
-    // Para status de tipo "number", "tag-writer", "tag-reader", "tag-transfer", "numbers-operation", "headquarter-weight", "label-info", "distance-extractor" y "dynamic-printing", NO abrir diálogo, mostrar control inline
+    // Para status de tipo "number", "text", "tag-writer", "tag-reader", "tag-transfer", "numbers-operation", "headquarter-weight", "label-info", "distance-extractor", "dynamic-printing", "users-list" y "video", NO abrir diálogo, mostrar control inline
     final isNumberType = typeStatus.toLowerCase() == 'number';
+    final isTextType = typeStatus.toLowerCase() == 'text';
     final isTagWriterType = typeStatus.toLowerCase() == 'tag-writer';
     final isTagReaderType = typeStatus.toLowerCase() == 'tag-reader';
     final isTagTransferType = typeStatus.toLowerCase() == 'tag-transfer';
@@ -1175,6 +1323,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         typeStatus.toLowerCase() == 'distance-extractor';
     final isDynamicPrintingType =
         typeStatus.toLowerCase() == 'dynamic-printing';
+    final isPhotoType = typeStatus.toLowerCase() == 'photo';
+    final isVideoType = typeStatus.toLowerCase() == 'video';
+    final isDateType = typeStatus.toLowerCase() == 'date';
+    final isTimeType = typeStatus.toLowerCase() == 'time';
+    final isUsersListType = typeStatus.toLowerCase() == 'users-list';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -1202,10 +1355,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             debugPrint('═════════════════════════════════════════');
             debugPrint('');
 
-            // Si es tipo number, seleccionar automáticamente y mostrar control inline
+            // Si es tipo number, solo mostrar el control inline
+            // NO llamar a _onStatusSelected para evitar agregar registros duplicados al breadcrumb
+            // El valor se guardará cuando el usuario cambie el número con los controles +/- o teclado
             if (isNumberType) {
-              await _onStatusSelected(parentStep, status);
-              setState(() {});
+              return;
+            }
+
+            // Si es tipo text, NO seleccionar automáticamente al hacer tap
+            // Solo se seleccionará cuando tenga mínimo 10 caracteres escritos
+            if (isTextType) {
+              return;
+            }
+
+            // Si es tipo users-list, NO seleccionar automáticamente al hacer tap
+            // El usuario interactúa con el control de búsqueda inline
+            if (isUsersListType) {
               return;
             }
 
@@ -1234,6 +1399,55 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   setState(() {
                     _tagWriterData[statusId] = parsedData;
                   });
+
+                  // Guardar el contenido en status_response del visit detail (en memoria)
+                  // Buscar el índice existente o agregar nuevo
+                  int existingIndex = -1;
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                      existingIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+                  if (existingIndex >= 0) {
+                    FFAppState().updateVisitDetailsAtIndex(
+                      existingIndex,
+                      (detail) => VisitsDetailsStruct(
+                        idVisitDetail: detail.idVisitDetail,
+                        idVisit: detail.idVisit,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  } else {
+                    FFAppState().addToVisitDetails(
+                      VisitsDetailsStruct(
+                        idVisitDetail: 0,
+                        idVisit: 0,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  }
+                  debugPrint('💾 TAG-WRITER: Contenido guardado en status_response (en memoria)');
                 }
               }
               return;
@@ -1270,6 +1484,55 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                   });
+
+                  // Guardar el contenido en status_response del visit detail (en memoria)
+                  // Buscar el índice existente o agregar nuevo
+                  int existingIndex = -1;
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                      existingIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+                  if (existingIndex >= 0) {
+                    FFAppState().updateVisitDetailsAtIndex(
+                      existingIndex,
+                      (detail) => VisitsDetailsStruct(
+                        idVisitDetail: detail.idVisitDetail,
+                        idVisit: detail.idVisit,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  } else {
+                    FFAppState().addToVisitDetails(
+                      VisitsDetailsStruct(
+                        idVisitDetail: 0,
+                        idVisit: 0,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  }
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -1514,6 +1777,28 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
+            // Si es tipo video, abrir el componente de captura de video
+            if (typeStatus.toLowerCase() == 'video') {
+              await showDialog(
+                barrierDismissible: false,
+                context: context,
+                builder: (dialogContext) {
+                  return Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: VideoCaptureComponentWidget(
+                      idStatus: statusId,
+                      statusName: statusName,
+                      statusJSON: status,
+                      idStepParent: parentStepId,
+                    ),
+                  );
+                },
+              );
+              return;
+            }
+
             // Si es tipo date, abrir el componente selector de fechas
             if (typeStatus.toLowerCase() == 'date') {
               debugPrint(
@@ -1561,90 +1846,95 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
-            // Si es tipo text, abrir el componente de entrada de texto
-            if (typeStatus.toLowerCase() == 'text') {
-              await showDialog(
-                barrierDismissible: false,
-                context: context,
-                builder: (dialogContext) {
-                  return Dialog(
-                    elevation: 0,
-                    insetPadding: EdgeInsets.zero,
-                    backgroundColor: Colors.transparent,
-                    child: TextInputComponentWidget(
-                      idStatus: statusId,
-                      statusName: statusName,
-                      statusJSON: status,
-                      idStepParent: parentStepId,
-                    ),
-                  );
-                },
-              );
-              return;
-            }
+            // NOTA: text ahora se maneja inline, ya no abre diálogo (ver línea ~1217)
 
-            // Al seleccionar un status, guardar
-            await _onStatusSelected(parentStep, status);
+            // TOGGLE para unique-option: Si ya está seleccionado, deseleccionar
+            // Si no está seleccionado, seleccionar
+            if (isSelected) {
+              // Ya está seleccionado, DESELECCIONAR
+              debugPrint('🔄 Status ya seleccionado, DESELECCIONANDO...');
 
-            setState(() {
-              if (hasChildren) {
-                // ✅ Si el status tiene hijos (activities_status_childs o activities_steps_childs):
-                // - ALTERNAR (toggle) el estado de expansión del status
-                final currentExpansion =
-                    _statusExpansionState[expansionKey] ?? false;
+              // Eliminar de visitDetails
+              List<int> indicesToRemove = [];
+              for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                if (FFAppState().visitDetails[i].idActivityStatus == statusId &&
+                    FFAppState().visitDetails[i].idStepParent == parentStepId) {
+                  indicesToRemove.add(i);
+                }
+              }
 
-                // COLAPSAR todos los status hermanos (del mismo step padre) antes de expandir
-                if (!currentExpansion) {
-                  // Obtener todos los status del step padre
+              for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+                FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+              }
+
+              debugPrint('✅ Status deseleccionado correctamente');
+
+              // Solo hacer setState si DESELECCIONAMOS
+              // (cuando seleccionamos, _onStatusSelected ya hace setState)
+              setState(() {
+                if (hasChildren) {
+                  // ✅ Si el status tiene hijos (activities_status_childs o activities_steps_childs):
+                  // - ALTERNAR (toggle) el estado de expansión del status
+                  final currentExpansion =
+                      _statusExpansionState[expansionKey] ?? false;
+
+                  // COLAPSAR todos los status hermanos (del mismo step padre) antes de expandir
+                  if (!currentExpansion) {
+                    // Obtener todos los status del step padre
+                    final parentStepStatuses =
+                        getJsonField(parentStep, r'''$.activities_status''')
+                            .toList();
+
+                    // Colapsar todos los status hermanos
+                    for (var siblingStatus in parentStepStatuses) {
+                      final siblingStatusId = getJsonField(
+                          siblingStatus, r'''$.id_activity_status''');
+                      final siblingExpansionKey =
+                          '${parentStepId}_$siblingStatusId';
+                      _statusExpansionState[siblingExpansionKey] = false;
+                    }
+                  }
+
+                  _statusExpansionState[expansionKey] = !currentExpansion;
+
+                  // Si estamos expandiendo (no colapsando), mantener step padre expandido
+                  if (!currentExpansion) {
+                    _stepExpansionState[parentStepId] = true;
+
+                    // Expandir los steps hijos si son requeridos
+                    for (var childStep in stepsChilds) {
+                      final childStepId =
+                          getJsonField(childStep, r'''$.id_activity_step''');
+                      final isChildRequired =
+                          getJsonField(childStep, r'''$.is_required''') == true;
+                      if (isChildRequired) {
+                        _stepExpansionState[childStepId] = true;
+                      }
+                    }
+                  }
+                } else {
+                  // ✅ Si el status NO tiene hijos (ÚLTIMA ANIDACIÓN):
+                  // - COLAPSAR solo el step padre del status seleccionado
+                  _stepExpansionState[parentStepId] = false;
+
+                  // También colapsar todos los status hermanos del mismo step
                   final parentStepStatuses =
                       getJsonField(parentStep, r'''$.activities_status''')
                           .toList();
-
-                  // Colapsar todos los status hermanos
                   for (var siblingStatus in parentStepStatuses) {
-                    final siblingStatusId = getJsonField(
-                        siblingStatus, r'''$.id_activity_status''');
+                    final siblingStatusId =
+                        getJsonField(siblingStatus, r'''$.id_activity_status''');
                     final siblingExpansionKey =
                         '${parentStepId}_$siblingStatusId';
                     _statusExpansionState[siblingExpansionKey] = false;
                   }
                 }
-
-                _statusExpansionState[expansionKey] = !currentExpansion;
-
-                // Si estamos expandiendo (no colapsando), mantener step padre expandido
-                if (!currentExpansion) {
-                  _stepExpansionState[parentStepId] = true;
-
-                  // Expandir los steps hijos si son requeridos
-                  for (var childStep in stepsChilds) {
-                    final childStepId =
-                        getJsonField(childStep, r'''$.id_activity_step''');
-                    final isChildRequired =
-                        getJsonField(childStep, r'''$.is_required''') == true;
-                    if (isChildRequired) {
-                      _stepExpansionState[childStepId] = true;
-                    }
-                  }
-                }
-              } else {
-                // ✅ Si el status NO tiene hijos (ÚLTIMA ANIDACIÓN):
-                // - COLAPSAR solo el step padre del status seleccionado
-                _stepExpansionState[parentStepId] = false;
-
-                // También colapsar todos los status hermanos del mismo step
-                final parentStepStatuses =
-                    getJsonField(parentStep, r'''$.activities_status''')
-                        .toList();
-                for (var siblingStatus in parentStepStatuses) {
-                  final siblingStatusId =
-                      getJsonField(siblingStatus, r'''$.id_activity_status''');
-                  final siblingExpansionKey =
-                      '${parentStepId}_$siblingStatusId';
-                  _statusExpansionState[siblingExpansionKey] = false;
-                }
-              }
-            });
+              });
+            } else {
+              // No está seleccionado, SELECCIONAR
+              debugPrint('✅ Seleccionando status...');
+              await _onStatusSelected(parentStep, status);
+            }
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -1673,6 +1963,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // INVERTIDO: Verde oscuro si está seleccionado (y no es number, tag-writer, tag-reader ni distance-extractor)
                 color: (isSelected &&
                         !isNumberType &&
+                        !isTextType &&
                         !isTagWriterType &&
                         !isTagReaderType &&
                         !isDistanceExtractorType)
@@ -1686,8 +1977,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               children: [
                 Row(
                   children: [
-                    // Radio button visual (no mostrar para tag-transfer)
-                    if (!isTagTransferType)
+                    // Radio button visual (no mostrar para tag-transfer, text, photo, video, number, users-list)
+                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType)
                       Container(
                         width: 24,
                         height: 24,
@@ -1717,48 +2008,82 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               )
                             : null,
                       ),
-                    if (!isTagTransferType) const SizedBox(width: 12),
-                    // Icono específico para date y time, indicador de color para otros tipos
-                    if (!isTagReaderType && !isTagWriterType && !isTagTransferType)
-                      Container(
-                        width: 32,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: typeStatus.toLowerCase() == 'date' ||
-                                  typeStatus.toLowerCase() == 'time'
-                              ? color.withValues(alpha: 0.2)
-                              : color,
-                          borderRadius: BorderRadius.circular(6),
-                          border: typeStatus.toLowerCase() == 'date' ||
-                                  typeStatus.toLowerCase() == 'time'
-                              ? Border.all(
-                                  color: color,
-                                  width: 2,
-                                )
-                              : null,
-                          boxShadow: [
-                            BoxShadow(
-                              color: color.withValues(alpha: 0.6),
-                              blurRadius: 12,
-                              offset: const Offset(0, 3),
+                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType) const SizedBox(width: 12),
+                    // Icono específico para date, time, photo y video, indicador de color para otros tipos (excepto number, users-list y text)
+                    if (!isTagReaderType && !isTagWriterType && !isTagTransferType && !isNumberType && !isUsersListType && !isTextType)
+                      // Para photo y video: solo mostrar icono sin contenedor de fondo cuando no está seleccionado
+                      (isPhotoType || isVideoType) && !isSelected
+                          ? Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Icon(
+                                isPhotoType
+                                    ? Icons.photo_camera_rounded
+                                    : Icons.videocam_rounded,
+                                color: const Color(0xFF00a86b), // Verde oscuro consistente
+                                size: 24,
+                              ),
+                            )
+                          : Container(
+                              width: 32,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: (isDateType || isTimeType || isPhotoType || isVideoType)
+                                    ? (isSelected
+                                        ? Colors.white.withValues(alpha: 0.2)
+                                        : ((isPhotoType || isVideoType)
+                                            ? const Color(0xFF00a86b).withValues(alpha: 0.2)
+                                            : color.withValues(alpha: 0.2)))
+                                    : color,
+                                borderRadius: BorderRadius.circular(6),
+                                border: (isDateType || isTimeType || isPhotoType || isVideoType)
+                                    ? Border.all(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : ((isPhotoType || isVideoType)
+                                                ? const Color(0xFF00a86b)
+                                                : color),
+                                        width: 2,
+                                      )
+                                    : null,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: (isSelected
+                                        ? Colors.white
+                                        : ((isPhotoType || isVideoType)
+                                            ? const Color(0xFF00a86b)
+                                            : color)).withValues(alpha: 0.6),
+                                    blurRadius: 12,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: isDateType
+                                  ? Icon(
+                                      Icons.calendar_today_rounded,
+                                      color: isSelected ? Colors.white : color,
+                                      size: 18,
+                                    )
+                                  : isTimeType
+                                      ? Icon(
+                                          Icons.access_time_rounded,
+                                          color: isSelected ? Colors.white : color,
+                                          size: 20,
+                                        )
+                                      : isPhotoType
+                                          ? Icon(
+                                              Icons.photo_camera_rounded,
+                                              color: isSelected ? Colors.white : const Color(0xFF00a86b),
+                                              size: 20,
+                                            )
+                                          : isVideoType
+                                              ? Icon(
+                                                  Icons.videocam_rounded,
+                                                  color: isSelected ? Colors.white : const Color(0xFF00a86b),
+                                                  size: 20,
+                                                )
+                                              : null,
                             ),
-                          ],
-                        ),
-                        child: typeStatus.toLowerCase() == 'date'
-                            ? Icon(
-                                Icons.calendar_today_rounded,
-                                color: color,
-                                size: 18,
-                              )
-                            : typeStatus.toLowerCase() == 'time'
-                                ? Icon(
-                                    Icons.access_time_rounded,
-                                    color: color,
-                                    size: 20,
-                                  )
-                                : null,
-                      ),
-                    if (!isTagReaderType && !isTagWriterType)
+                    if (!isTagReaderType && !isTagWriterType && !isTextType)
                       const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -1862,6 +2187,44 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               child: _buildLabelInfoDisplay(
                                 statusName: statusName,
                                 statusId: statusId,
+                                status: status,
+                              ),
+                            ),
+                          // TextField inline para tipo text - DEBAJO
+                          if (isTextType)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildTextInputControl(
+                                parentStep: parentStep,
+                                status: status,
+                              ),
+                            ),
+                          // Widget inline para tipo users-list - DEBAJO
+                          if (isUsersListType)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildUsersListControl(
+                                parentStep: parentStep,
+                                status: status,
+                              ),
+                            ),
+                          // Display inline para tipo photo - DEBAJO
+                          if (isPhotoType)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildPhotoDisplay(
+                                statusId: statusId,
+                                parentStepId: parentStepId,
+                              ),
+                            ),
+                          // Display inline para tipo video - DEBAJO
+                          if (isVideoType)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildVideoDisplay(
+                                statusId: statusId,
+                                parentStepId: parentStepId,
+                                parentStep: parentStep,
                                 status: status,
                               ),
                             ),
@@ -2043,6 +2406,55 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   setState(() {
                     _tagWriterData[statusId] = parsedData;
                   });
+
+                  // Guardar el contenido en status_response del visit detail (en memoria)
+                  // Buscar el índice existente o agregar nuevo
+                  int existingIndex = -1;
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                      existingIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+                  if (existingIndex >= 0) {
+                    FFAppState().updateVisitDetailsAtIndex(
+                      existingIndex,
+                      (detail) => VisitsDetailsStruct(
+                        idVisitDetail: detail.idVisitDetail,
+                        idVisit: detail.idVisit,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  } else {
+                    FFAppState().addToVisitDetails(
+                      VisitsDetailsStruct(
+                        idVisitDetail: 0,
+                        idVisit: 0,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  }
+                  debugPrint('💾 TAG-WRITER: Contenido guardado en status_response (en memoria)');
                 }
               }
               return;
@@ -2079,6 +2491,55 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                   });
+
+                  // Guardar el contenido en status_response del visit detail (en memoria)
+                  // Buscar el índice existente o agregar nuevo
+                  int existingIndex = -1;
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                      existingIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+                  if (existingIndex >= 0) {
+                    FFAppState().updateVisitDetailsAtIndex(
+                      existingIndex,
+                      (detail) => VisitsDetailsStruct(
+                        idVisitDetail: detail.idVisitDetail,
+                        idVisit: detail.idVisit,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  } else {
+                    FFAppState().addToVisitDetails(
+                      VisitsDetailsStruct(
+                        idVisitDetail: 0,
+                        idVisit: 0,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  }
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -2134,6 +2595,33 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               debugPrint('');
               debugPrint('🔄 TAG-TRANSFER (ROOT): Iniciando lectura de tag de ORIGEN');
 
+              // Parsear TYPE_PRODUCT_START y TYPE_PRODUCT_FINISH desde default_status
+              String? typeProductStart;
+              String? typeProductFinish;
+              // Captura todo hasta ; o } (permitiendo espacios en el nombre)
+              final regexTypeStart = RegExp(r'=TYPE_PRODUCT_START:([^;}]+)');
+              final regexTypeFinish = RegExp(r'TYPE_PRODUCT_FINISH:([^;}]+)');
+              final matchStart = regexTypeStart.firstMatch(defaultStatus);
+              final matchFinish = regexTypeFinish.firstMatch(defaultStatus);
+
+              if (matchStart != null) {
+                typeProductStart = matchStart.group(1)!.trim();
+                debugPrint('📦 TAG-TRANSFER: TYPE_PRODUCT_START detectado: $typeProductStart');
+              }
+              if (matchFinish != null) {
+                typeProductFinish = matchFinish.group(1)!.trim();
+                debugPrint('📦 TAG-TRANSFER: TYPE_PRODUCT_FINISH detectado: $typeProductFinish');
+              }
+
+              // Obtener rememberStatus del JSON
+              final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+
+              // Crear título dinámico para el diálogo
+              String dialogTitle = 'LEER TAG DE ORIGEN';
+              if (typeProductStart != null && typeProductStart.isNotEmpty) {
+                dialogTitle = 'Leer $typeProductStart de origen';
+              }
+
               // Abrir diálogo de lectura NFC (solo leer, no transferir aún)
               await showDialog(
                 barrierDismissible: false,
@@ -2146,6 +2634,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     child: NfcReadDialogWidget(
                       autoStart: true,
                       isTagTransferMode: true,
+                      tagTransferTitle: dialogTitle,
                     ),
                   );
                 },
@@ -2157,6 +2646,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   '📄 TAG-TRANSFER (ROOT): Contenido del tag de origen leído: ${nfcContent.length} caracteres');
 
               if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                // La validación de RFID ya se hizo en readNFC si TYPE_PRODUCT_START está presente
+                // Si llegamos aquí, la validación pasó exitosamente
+
                 // Parsear el contenido del tag y agrupar por headquarterId
                 final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
                 debugPrint(
@@ -2170,36 +2662,80 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 debugPrint(
                     '✅ TAG-TRANSFER (ROOT): Tag de origen guardado correctamente');
 
-                // TODO: Limpieza de TAG deshabilitada temporalmente por problemas de TagLostException
-                // // Limpiar el tag de origen después de leer exitosamente
-                // debugPrint('🧹 TAG-TRANSFER (ROOT): Limpiando tag de origen...');
-                // if (!mounted) return;
-                // final clearSuccess = await actions.clearNFCTag(context);
-                // if (clearSuccess) {
-                //   debugPrint('✅ TAG-TRANSFER (ROOT): Tag de origen limpiado exitosamente');
-                //   if (mounted) {
-                //     ScaffoldMessenger.of(context).showSnackBar(
-                //       const SnackBar(
-                //         content: Row(
-                //           children: [
-                //             Icon(Icons.cleaning_services, color: Colors.white),
-                //             SizedBox(width: 12),
-                //             Expanded(
-                //               child: Text(
-                //                 'Tag de origen leído y limpiado correctamente',
-                //                 style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
-                //               ),
-                //             ),
-                //           ],
-                //         ),
-                //         backgroundColor: Color(0xFF00a86b),
-                //         duration: Duration(seconds: 3),
-                //       ),
-                //     );
-                //   }
-                // } else {
-                //   debugPrint('⚠️ TAG-TRANSFER (ROOT): No se pudo limpiar el tag de origen');
-                // }
+                // Guardar el contenido en status_response del visit detail (en memoria)
+                // Buscar el índice existente o agregar nuevo
+                int existingIndex = -1;
+                for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                  if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                    existingIndex = i;
+                    break;
+                  }
+                }
+
+                if (existingIndex >= 0) {
+                  FFAppState().updateVisitDetailsAtIndex(
+                    existingIndex,
+                    (detail) => VisitsDetailsStruct(
+                      idVisitDetail: detail.idVisitDetail,
+                      idVisit: detail.idVisit,
+                      idActivityStatus: statusId,
+                      statusOption: statusName,
+                      statusResponse: nfcContent,
+                      idStepParent: 0,
+                      rememberStatus: rememberStatus,
+                      defaultStatus: defaultStatus,
+                      typeStatus: typeStatus,
+                      auxStep: 0,
+                    ),
+                  );
+                } else {
+                  FFAppState().addToVisitDetails(
+                    VisitsDetailsStruct(
+                      idVisitDetail: 0,
+                      idVisit: 0,
+                      idActivityStatus: statusId,
+                      statusOption: statusName,
+                      statusResponse: nfcContent,
+                      idStepParent: 0,
+                      rememberStatus: rememberStatus,
+                      defaultStatus: defaultStatus,
+                      typeStatus: typeStatus,
+                      auxStep: 0,
+                    ),
+                  );
+                }
+                debugPrint('💾 TAG-TRANSFER: Contenido guardado en status_response (en memoria)');
+
+                // Limpiar el tag de origen después de leer exitosamente
+                debugPrint('🧹 TAG-TRANSFER (ROOT): Limpiando tag de origen...');
+                if (!mounted) return;
+                final clearSuccess = await actions.clearNFCTag(context);
+                if (clearSuccess) {
+                  debugPrint('✅ TAG-TRANSFER (ROOT): Tag de origen limpiado exitosamente');
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Row(
+                          children: [
+                            Icon(Icons.cleaning_services, color: Colors.white),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Tag de origen leído y limpiado correctamente',
+                                style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                        backgroundColor: Color(0xFF00a86b),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                } else {
+                  debugPrint('⚠️ TAG-TRANSFER (ROOT): No se pudo limpiar el tag de origen');
+                  // Continuar de todos modos, no es crítico
+                }
 
                 debugPrint(
                     '💡 TAG-TRANSFER (ROOT): Ahora el usuario puede presionar "Transferir ahora"');
@@ -2528,6 +3064,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   Widget _buildRootStatusChildOption(dynamic parentStatus, dynamic childStatus,
       {required int level}) {
+    // Alias childStatus como status para compatibilidad con el código interno
+    final status = childStatus;
     final statusId = getJsonField(childStatus, r'''$.id_activity_status''');
     final statusName =
         getJsonField(childStatus, r'''$.status_name''').toString();
@@ -2562,13 +3100,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isExpanded = _statusExpansionState[expansionKey] ?? false;
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
 
-    // Para status de tipo "number", "tag-writer", "tag-reader", "tag-transfer" y "distance-extractor", NO cambiar color de la tarjeta
+    // Para status de tipo "number", "text", "tag-writer", "tag-reader", "tag-transfer" y "distance-extractor", NO cambiar color de la tarjeta
     final isNumberType = typeStatus.toLowerCase() == 'number';
+    final isTextType = typeStatus.toLowerCase() == 'text';
     final isTagWriterType = typeStatus.toLowerCase() == 'tag-writer';
     final isTagReaderType = typeStatus.toLowerCase() == 'tag-reader';
     final isTagTransferType = typeStatus.toLowerCase() == 'tag-transfer';
     final isDistanceExtractorType =
         typeStatus.toLowerCase() == 'distance-extractor';
+    final isPhotoType = typeStatus.toLowerCase() == 'photo';
+    final isDateType = typeStatus.toLowerCase() == 'date';
+    final isTimeType = typeStatus.toLowerCase() == 'time';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -2611,6 +3153,55 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   setState(() {
                     _tagWriterData[statusId] = parsedData;
                   });
+
+                  // Guardar el contenido en status_response del visit detail (en memoria)
+                  // Buscar el índice existente o agregar nuevo
+                  int existingIndex = -1;
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                      existingIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+                  if (existingIndex >= 0) {
+                    FFAppState().updateVisitDetailsAtIndex(
+                      existingIndex,
+                      (detail) => VisitsDetailsStruct(
+                        idVisitDetail: detail.idVisitDetail,
+                        idVisit: detail.idVisit,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  } else {
+                    FFAppState().addToVisitDetails(
+                      VisitsDetailsStruct(
+                        idVisitDetail: 0,
+                        idVisit: 0,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  }
+                  debugPrint('💾 TAG-WRITER: Contenido guardado en status_response (en memoria)');
                 }
               }
               return;
@@ -2647,6 +3238,55 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                   });
+
+                  // Guardar el contenido en status_response del visit detail (en memoria)
+                  // Buscar el índice existente o agregar nuevo
+                  int existingIndex = -1;
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                      existingIndex = i;
+                      break;
+                    }
+                  }
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+                  if (existingIndex >= 0) {
+                    FFAppState().updateVisitDetailsAtIndex(
+                      existingIndex,
+                      (detail) => VisitsDetailsStruct(
+                        idVisitDetail: detail.idVisitDetail,
+                        idVisit: detail.idVisit,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  } else {
+                    FFAppState().addToVisitDetails(
+                      VisitsDetailsStruct(
+                        idVisitDetail: 0,
+                        idVisit: 0,
+                        idActivityStatus: statusId,
+                        statusOption: statusName,
+                        statusResponse: nfcContent,
+                        idStepParent: 0,
+                        rememberStatus: rememberStatus,
+                        defaultStatus: defaultStatus,
+                        typeStatus: typeStatus,
+                        auxStep: 0,
+                      ),
+                    );
+                  }
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -2759,66 +3399,90 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ? (parentStatusChildsRaw is List ? parentStatusChildsRaw : [])
                 : [];
 
-            await _onRootStatusSelected(childStatus, allRootStatus: parentStatusChildsList);
+            // TOGGLE para unique-option: Si ya está seleccionado, deseleccionar
+            if (isSelected) {
+              // Ya está seleccionado, DESELECCIONAR
+              debugPrint('🔄 Root Status Child ya seleccionado, DESELECCIONANDO...');
 
-            setState(() {
-              if (hasChildren) {
-                // ✅ ALTERNAR (toggle) el estado de expansión del status
-                final currentExpansion =
-                    _statusExpansionState[expansionKey] ?? false;
+              // Eliminar de visitDetails
+              List<int> indicesToRemove = [];
+              for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                  indicesToRemove.add(i);
+                }
+              }
 
-                // COLAPSAR todos los status hermanos (del mismo parent status) antes de expandir
-                if (!currentExpansion) {
-                  // Obtener todos los status childs del parent status
+              for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+                FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+              }
+
+              debugPrint('✅ Root Status Child deseleccionado correctamente');
+
+              // Solo hacer setState si DESELECCIONAMOS
+              // (cuando seleccionamos, _onRootStatusSelected ya hace setState)
+              setState(() {
+                if (hasChildren) {
+                  // ✅ ALTERNAR (toggle) el estado de expansión del status
+                  final currentExpansion =
+                      _statusExpansionState[expansionKey] ?? false;
+
+                  // COLAPSAR todos los status hermanos (del mismo parent status) antes de expandir
+                  if (!currentExpansion) {
+                    // Obtener todos los status childs del parent status
+                    final parentStatusChilds = getJsonField(
+                            parentStatus, r'''$.activities_status_childs''')
+                        .toList();
+
+                    // Colapsar todos los status hermanos
+                    for (var siblingStatus in parentStatusChilds) {
+                      final siblingStatusId = getJsonField(
+                          siblingStatus, r'''$.id_activity_status''');
+                      final siblingExpansionKey =
+                          'root_${parentStatusId}_$siblingStatusId';
+                      _statusExpansionState[siblingExpansionKey] = false;
+                    }
+                  }
+
+                  _statusExpansionState[expansionKey] = !currentExpansion;
+
+                  // Si estamos expandiendo (no colapsando), mantener root status expandido
+                  if (!currentExpansion) {
+                    _rootStatusExpansionState[parentStatusId] = true;
+
+                    // Auto-expand required child steps
+                    for (var childStep in stepsChilds) {
+                      final childStepId =
+                          getJsonField(childStep, r'''$.id_activity_step''');
+                      final isChildRequired =
+                          getJsonField(childStep, r'''$.is_required''') == true;
+                      if (isChildRequired) {
+                        _stepExpansionState[childStepId] = true;
+                      }
+                    }
+                  }
+                } else {
+                  // ✅ Si el status NO tiene hijos (ÚLTIMA ANIDACIÓN):
+                  // - COLAPSAR solo el status raíz padre
+                  _rootStatusExpansionState[parentStatusId] = false;
+
+                  // También colapsar todos los status hermanos (hijos del mismo padre)
                   final parentStatusChilds = getJsonField(
                           parentStatus, r'''$.activities_status_childs''')
                       .toList();
-
-                  // Colapsar todos los status hermanos
                   for (var siblingStatus in parentStatusChilds) {
-                    final siblingStatusId = getJsonField(
-                        siblingStatus, r'''$.id_activity_status''');
+                    final siblingStatusId =
+                        getJsonField(siblingStatus, r'''$.id_activity_status''');
                     final siblingExpansionKey =
                         'root_${parentStatusId}_$siblingStatusId';
                     _statusExpansionState[siblingExpansionKey] = false;
                   }
                 }
-
-                _statusExpansionState[expansionKey] = !currentExpansion;
-
-                // Si estamos expandiendo (no colapsando), mantener root status expandido
-                if (!currentExpansion) {
-                  _rootStatusExpansionState[parentStatusId] = true;
-
-                  // Auto-expand required child steps
-                  for (var childStep in stepsChilds) {
-                    final childStepId =
-                        getJsonField(childStep, r'''$.id_activity_step''');
-                    final isChildRequired =
-                        getJsonField(childStep, r'''$.is_required''') == true;
-                    if (isChildRequired) {
-                      _stepExpansionState[childStepId] = true;
-                    }
-                  }
-                }
-              } else {
-                // ✅ Si el status NO tiene hijos (ÚLTIMA ANIDACIÓN):
-                // - COLAPSAR solo el status raíz padre
-                _rootStatusExpansionState[parentStatusId] = false;
-
-                // También colapsar todos los status hermanos (hijos del mismo padre)
-                final parentStatusChilds = getJsonField(
-                        parentStatus, r'''$.activities_status_childs''')
-                    .toList();
-                for (var siblingStatus in parentStatusChilds) {
-                  final siblingStatusId =
-                      getJsonField(siblingStatus, r'''$.id_activity_status''');
-                  final siblingExpansionKey =
-                      'root_${parentStatusId}_$siblingStatusId';
-                  _statusExpansionState[siblingExpansionKey] = false;
-                }
-              }
-            });
+              });
+            } else {
+              // No está seleccionado, SELECCIONAR
+              debugPrint('✅ Seleccionando Root Status Child...');
+              await _onRootStatusSelected(childStatus, allRootStatus: parentStatusChildsList);
+            }
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
@@ -2847,6 +3511,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 // INVERTIDO: Verde oscuro si está seleccionado (y no es number, tag-writer, tag-reader ni distance-extractor)
                 color: (isSelected &&
                         !isNumberType &&
+                        !isTextType &&
                         !isTagWriterType &&
                         !isTagReaderType &&
                         !isDistanceExtractorType)
@@ -2857,8 +3522,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ),
             child: Row(
               children: [
-                // Radio button visual (no mostrar para tag-transfer)
-                if (!isTagTransferType)
+                // Radio button visual (no mostrar para tag-transfer, text, photo)
+                if (!isTagTransferType && !isTextType && !isPhotoType)
                   Container(
                     width: 24,
                     height: 24,
@@ -2888,24 +3553,71 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           )
                         : null,
                   ),
-                if (!isTagTransferType) const SizedBox(width: 12),
-                // Indicador de color (no mostrar para tag-transfer)
+                if (!isTagTransferType && !isTextType && !isPhotoType) const SizedBox(width: 12),
+                // Icono específico para date, time, text y photo, indicador de color para otros tipos
                 if (!isTagTransferType)
-                  Container(
-                    width: 32,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(6),
-                      boxShadow: [
-                        BoxShadow(
-                          color: color.withValues(alpha: 0.6),
-                          blurRadius: 12,
-                          offset: const Offset(0, 3),
+                  // Para text y photo: solo mostrar icono sin contenedor de fondo cuando no está seleccionado
+                  (isTextType || isPhotoType) && !isSelected
+                      ? Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Icon(
+                            isTextType
+                                ? Icons.text_fields_rounded
+                                : Icons.photo_camera_rounded,
+                            color: color,
+                            size: 24,
+                          ),
+                        )
+                      : Container(
+                          width: 32,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: (isDateType || isTimeType || isTextType || isPhotoType)
+                                ? (isSelected
+                                    ? Colors.white.withValues(alpha: 0.2)
+                                    : color.withValues(alpha: 0.2))
+                                : color,
+                            borderRadius: BorderRadius.circular(6),
+                            border: (isDateType || isTimeType || isTextType || isPhotoType)
+                                ? Border.all(
+                                    color: isSelected ? Colors.white : color,
+                                    width: 2,
+                                  )
+                                : null,
+                            boxShadow: [
+                              BoxShadow(
+                                color: (isSelected ? Colors.white : color).withValues(alpha: 0.6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: isDateType
+                              ? Icon(
+                                  Icons.calendar_today_rounded,
+                                  color: isSelected ? Colors.white : color,
+                                  size: 18,
+                                )
+                              : isTimeType
+                                  ? Icon(
+                                      Icons.access_time_rounded,
+                                      color: isSelected ? Colors.white : color,
+                                      size: 20,
+                                    )
+                                  : isTextType
+                                      ? Icon(
+                                          Icons.text_fields_rounded,
+                                          color: isSelected ? Colors.white : color,
+                                          size: 20,
+                                        )
+                                      : isPhotoType
+                                          ? Icon(
+                                              Icons.photo_camera_rounded,
+                                              color: isSelected ? Colors.white : color,
+                                              size: 20,
+                                            )
+                                          : null,
                         ),
-                    ],
-                  ),
-                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Text(
@@ -3023,11 +3735,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
     }
 
-    // Para otros tipos, guardar valor por defecto
+    // Determinar el statusResponse según el tipo
+    String finalStatusResponse = defaultStatus;
+    if (typeStatus.toLowerCase() == 'unique_choice' || typeStatus.toLowerCase() == 'unique-option') {
+      // Para unique_choice y unique-option, guardar checkmark
+      finalStatusResponse = '✓';
+    }
+
+    // Para otros tipos, guardar valor correspondiente
     _saveRootStatusValue(
       statusId: statusId,
       statusName: statusName,
-      statusResponse: defaultStatus,
+      statusResponse: finalStatusResponse,
       typeStatus: typeStatus,
       defaultStatus: defaultStatus,
       rememberStatus: rememberStatus,
@@ -3112,37 +3831,63 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final stepName = getJsonField(parentStep, r'''$.name_step''').toString();
     final typeStep = getJsonField(parentStep, r'''$.type_step''').toString();
 
-    // LÓGICA CLAVE: Por cada id_step_parent solo puede haber UN id_activity_status activo
-    // Si selecciono otro status en el mismo step, ELIMINAR el anterior y AGREGAR el nuevo
-    // IMPORTANTE: Para reference-list SOLO se puede seleccionar UN elemento de la lista
-    // IMPORTANTE: Para unique-list SOLO se puede seleccionar UN elemento de la lista
+    // LÓGICA CLAVE DE SELECCIÓN SEGÚN TIPO DE STEP:
+    // - reference-list: SOLO se puede seleccionar UN elemento
+    // - unique-list: SOLO se puede seleccionar UN elemento
+    // - container-list: Se pueden seleccionar MÚLTIPLES elementos (es solo un contenedor)
 
-    debugPrint('📋 Tipo de step: $typeStep - Solo se permite UNA selección');
+    final isContainerList = typeStep.toLowerCase() == 'container-list';
 
-    // 1. Eliminar TODOS los status previos (idActivityStatus != 0) con el mismo id_step_parent
-    // Esto asegura que solo haya una selección activa por step
+    if (isContainerList) {
+      debugPrint('📋 Tipo de step: $typeStep - Permite MÚLTIPLES selecciones (contenedor)');
+    } else {
+      debugPrint('📋 Tipo de step: $typeStep - Solo se permite UNA selección');
+    }
+
+    // 1. Para unique-list y reference-list: Eliminar TODOS los status previos con el mismo id_step_parent
+    // Para container-list: NO eliminar nada, permitir múltiples selecciones
     List<int> indicesToRemove = [];
-    for (int i = 0; i < FFAppState().visitDetails.length; i++) {
-      if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
-          FFAppState().visitDetails[i].idActivityStatus != 0) {
-        indicesToRemove.add(i);
-        debugPrint('   ⚠️ Eliminando selección previa: ${FFAppState().visitDetails[i].statusOption}');
+
+    if (!isContainerList) {
+      for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+        if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
+            FFAppState().visitDetails[i].idActivityStatus != 0) {
+          indicesToRemove.add(i);
+          debugPrint('   ⚠️ Eliminando selección previa: ${FFAppState().visitDetails[i].statusOption}');
+        }
       }
-    }
 
-    if (indicesToRemove.isNotEmpty) {
-      debugPrint('   🗑️ Eliminando ${indicesToRemove.length} selección(es) previa(s) para permitir solo UNA selección');
-    }
+      if (indicesToRemove.isNotEmpty) {
+        debugPrint('   🗑️ Eliminando ${indicesToRemove.length} selección(es) previa(s) para permitir solo UNA selección');
+      }
 
-    // Remover en orden inverso para no alterar los índices
-    for (int i = indicesToRemove.length - 1; i >= 0; i--) {
-      FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+      // Remover en orden inverso para no alterar los índices
+      for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+        FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+      }
+    } else {
+      debugPrint('   ✅ container-list: No se eliminan selecciones previas, se permite selección múltiple');
     }
 
     // 2. Agregar el nuevo status seleccionado
     // Aplicar la lógica correcta según el tipo del step padre
     String finalStatusOption = statusName;
     String finalStatusResponse = defaultStatus;
+
+    // Para tipo number, obtener el valor actual si ya existe en visitDetails
+    if (typeStatus.toLowerCase() == 'number') {
+      for (var detail in FFAppState().visitDetails) {
+        if (detail.idActivityStatus == statusId && detail.idStepParent == parentStepId) {
+          finalStatusResponse = detail.statusResponse;
+          break;
+        }
+      }
+    }
+
+    // Si el step padre es de tipo "unique-list", guardar checkmark
+    if (typeStep.toLowerCase() == 'unique-list') {
+      finalStatusResponse = '✓';
+    }
 
     // Si el step padre es de tipo "reference-list", invertir los valores
     if (typeStep.toLowerCase() == 'reference-list') {
@@ -3166,6 +3911,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
 
     // 3. Marcar el step padre como completado
+    // Para container-list: actualizar con lista de todos los status seleccionados
+    // Para unique-list/reference-list: actualizar con el único status seleccionado
+
     // Buscar si ya existe un registro del step (idActivityStatus == 0)
     int stepExistingIndex = -1;
     for (int i = 0; i < FFAppState().visitDetails.length; i++) {
@@ -3176,8 +3924,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
     }
 
+    // Para container-list, obtener todos los status seleccionados de este step
+    String stepStatusResponse = statusName;
+    if (isContainerList) {
+      List<String> selectedStatusNames = [];
+      for (var detail in FFAppState().visitDetails) {
+        if (detail.idStepParent == parentStepId && detail.idActivityStatus != 0) {
+          selectedStatusNames.add(detail.statusOption);
+        }
+      }
+      stepStatusResponse = selectedStatusNames.join(', ');
+      debugPrint('   📝 container-list: statusResponse del step = "$stepStatusResponse"');
+    }
+
     if (stepExistingIndex >= 0) {
-      // Actualizar el registro del step con el nombre del status seleccionado
+      // Actualizar el registro del step
       FFAppState().updateVisitDetailsAtIndex(
         stepExistingIndex,
         (detail) => VisitsDetailsStruct(
@@ -3185,7 +3946,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           idVisit: detail.idVisit,
           idActivityStatus: 0,
           statusOption: stepName,
-          statusResponse: statusName,
+          statusResponse: stepStatusResponse,
           idStepParent: parentStepId,
           rememberStatus: false,
           defaultStatus: '',
@@ -3201,7 +3962,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           idVisit: 0,
           idActivityStatus: 0,
           statusOption: stepName,
-          statusResponse: statusName,
+          statusResponse: stepStatusResponse,
           idStepParent: parentStepId,
           rememberStatus: false,
           defaultStatus: '',
@@ -3210,6 +3971,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ),
       );
     }
+
+    // Forzar limpieza del caché para que se actualice el color verde de las opciones
+    // Esto es especialmente importante para unique-list y reference-list donde
+    // eliminamos 1 y agregamos 1 (la longitud no cambia, pero los IDs sí)
+    _visitDetailsSearchCache.clear();
 
     setState(() {});
   }
@@ -4606,10 +5372,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('📊 ID Status: $statusId');
     debugPrint('🗂️  ID Step Parent: $parentStepId');
 
-    // Guardar el valor actualizado
-    await _onStatusSelected(parentStep, status);
-
-    // Actualizar el valor numérico en visitDetails
+    // Actualizar el valor numérico en visitDetails directamente
+    // NO llamar a _onStatusSelected para evitar duplicados en el breadcrumb
     int existingIndex = -1;
     for (int i = 0; i < FFAppState().visitDetails.length; i++) {
       if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
@@ -4651,6 +5415,52 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     }
 
+    // Actualizar el registro del step padre (idActivityStatus == 0)
+    final stepName = getJsonField(parentStep, r'''$.name_step''').toString();
+    int stepExistingIndex = -1;
+    for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+      if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
+          FFAppState().visitDetails[i].idActivityStatus == 0) {
+        stepExistingIndex = i;
+        break;
+      }
+    }
+
+    if (stepExistingIndex >= 0) {
+      // Actualizar el registro del step existente
+      FFAppState().updateVisitDetailsAtIndex(
+        stepExistingIndex,
+        (detail) => VisitsDetailsStruct(
+          idVisitDetail: detail.idVisitDetail,
+          idVisit: detail.idVisit,
+          idActivityStatus: 0,
+          statusOption: stepName,
+          statusResponse: statusName,
+          idStepParent: parentStepId,
+          rememberStatus: false,
+          defaultStatus: '',
+          typeStatus: 'STEP',
+          auxStep: parentStepId,
+        ),
+      );
+    } else {
+      // Crear el registro del step si no existe
+      FFAppState().addToVisitDetails(
+        VisitsDetailsStruct(
+          idVisitDetail: 0,
+          idVisit: 0,
+          idActivityStatus: 0,
+          statusOption: stepName,
+          statusResponse: statusName,
+          idStepParent: parentStepId,
+          rememberStatus: false,
+          defaultStatus: '',
+          typeStatus: 'STEP',
+          auxStep: parentStepId,
+        ),
+      );
+    }
+
     debugPrint('🔄 Llamando _recalculateOperations()...');
     // Recalcular todas las operaciones que dependen de este valor
     _recalculateOperations();
@@ -4683,7 +5493,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // ==========================================================================
 
   // Botón compacto en el header del step
-  Widget _buildCompactSearchButton(int stepId) {
+  Widget _buildCompactSearchButton(int stepId, {required bool hasValue}) {
     final isExpanded = _searchBoxExpansionState[stepId] ?? false;
 
     return InkWell(
@@ -4708,10 +5518,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             width: 1,
           ),
         ),
-        child: const Icon(
+        child: Icon(
           Icons.search_rounded,
           size: 16,
-          color: Color(0xFF00a86b),
+          // Blanco cuando el step tiene valor (fondo verde), verde en caso contrario
+          color: hasValue ? Colors.white : const Color(0xFF00a86b),
         ),
       ),
     );
@@ -4824,9 +5635,66 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // BREADCRUMB DE SELECCIONES
   // ==========================================================================
 
+  // Helper para obtener el tipo de status desde el JSON de la actividad
+  String _getStatusTypeById(int statusId) {
+    final activityStepsRaw = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.activity_steps''',
+    );
+
+    if (activityStepsRaw == null) return '';
+
+    final activitySteps = activityStepsRaw is List ? activityStepsRaw : [];
+
+    // Buscar recursivamente en todos los steps y sus status
+    String searchInSteps(List steps) {
+      for (var step in steps) {
+        // Buscar en activities_status del step
+        final activitiesStatusRaw = getJsonField(step, r'''$.activities_status''');
+        final activitiesStatus = activitiesStatusRaw != null
+            ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+            : [];
+
+        for (var status in activitiesStatus) {
+          final currentStatusId = getJsonField(status, r'''$.id_activity_status''');
+          if (currentStatusId == statusId) {
+            return getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+          }
+
+          // Buscar en activities_status_childs
+          final statusChildsRaw = getJsonField(status, r'''$.activities_status_childs''');
+          final statusChilds = statusChildsRaw != null
+              ? (statusChildsRaw is List ? statusChildsRaw : [])
+              : [];
+
+          for (var childStatus in statusChilds) {
+            final childStatusId = getJsonField(childStatus, r'''$.id_activity_status''');
+            if (childStatusId == statusId) {
+              return getJsonField(childStatus, r'''$.type_status''')?.toString() ?? '';
+            }
+          }
+
+          // Buscar en activities_steps_childs
+          final stepsChildsRaw = getJsonField(status, r'''$.activities_steps_childs''');
+          final stepsChilds = stepsChildsRaw != null
+              ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+              : [];
+
+          if (stepsChilds.isNotEmpty) {
+            final result = searchInSteps(stepsChilds);
+            if (result.isNotEmpty) return result;
+          }
+        }
+      }
+      return '';
+    }
+
+    return searchInSteps(activitySteps);
+  }
+
   Widget _buildSelectionBreadcrumb(int stepId, dynamic step) {
     final visitDetails = FFAppState().visitDetails.toList();
-    final breadcrumbItems = <String>[];
+    final breadcrumbItems = <Map<String, String>>[];
 
     // Función recursiva para construir el breadcrumb
     void buildBreadcrumbRecursive(int currentStepId, dynamic currentStep) {
@@ -4843,92 +5711,192 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       if (stepVisits.isEmpty) return;
 
-      // Tomar la última (más reciente) que tenga datos válidos
-      final selectedVisit = stepVisits.last;
-      final statusId = selectedVisit.idActivityStatus;
-
-      // Para reference-list, el nombre real está en statusResponse, no en statusOption
+      // Obtener el tipo de step
       final typeStep = getJsonField(currentStep, r'''$.type_step''')?.toString() ?? '';
-      final displayName = typeStep.toLowerCase() == 'reference-list'
-          ? selectedVisit.statusResponse
-          : selectedVisit.statusOption;
 
-      // Agregar el nombre del status seleccionado
-      breadcrumbItems.add(displayName);
+      // Para container-list, mostrar TODOS los status seleccionados con sus valores
+      // Para unique-list y reference-list, mostrar solo el último seleccionado
+      if (typeStep.toLowerCase() == 'container-list') {
+        // Agregar todos los status con sus respuestas
+        for (var visit in stepVisits) {
+          // Obtener el tipo de status desde el JSON de la actividad
+          final typeStatus = _getStatusTypeById(visit.idActivityStatus).toLowerCase();
 
-      // Buscar el status completo en el JSON para ver si tiene hijos
-      final activitiesStatusRaw =
-          getJsonField(currentStep, r'''$.activities_status''');
-      final activitiesStatus = activitiesStatusRaw != null
-          ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
-          : [];
-
-      for (var status in activitiesStatus) {
-        final currentStatusId =
-            getJsonField(status, r'''$.id_activity_status''');
-
-        // Buscar por ID en lugar de nombre
-        if (currentStatusId == statusId) {
-          // Verificar si tiene steps_childs
-          final stepsChildsRaw =
-              getJsonField(status, r'''$.activities_steps_childs''');
-          final stepsChilds = stepsChildsRaw != null
-              ? (stepsChildsRaw is List ? stepsChildsRaw : [])
-              : [];
-
-          // Procesar cada step_child recursivamente
-          for (var childStep in stepsChilds) {
-            final childStepId =
-                getJsonField(childStep, r'''$.id_activity_step''');
-
-            // Verificar si este step_child tiene selección de STATUS (no STEP)
-            final hasChildSelection = visitDetails.any((visit) =>
-                visit.idStepParent == childStepId &&
-                visit.typeStatus != 'STEP');
-
-            if (hasChildSelection) {
-              buildBreadcrumbRecursive(childStepId, childStep);
-            }
+          // Determinar el valor a mostrar según el tipo de status
+          String displayValue;
+          if (typeStatus == 'unique_choice' || typeStatus == 'unique-option') {
+            // Para unique_choice y unique-option, NO mostrar el HTML
+            displayValue = '';
+          } else if (typeStatus == 'photo' ||
+              typeStatus == 'video' ||
+              typeStatus == 'tag-writer' ||
+              typeStatus == 'tag-reader' ||
+              typeStatus == 'tag-transfer') {
+            displayValue = visit.statusResponse.isNotEmpty ? '1' : '-';
+          } else {
+            displayValue = visit.statusResponse.isNotEmpty ? visit.statusResponse : '-';
           }
 
-          // Verificar si tiene status_childs
-          final statusChildsRaw =
-              getJsonField(status, r'''$.activities_status_childs''');
-          final statusChilds = statusChildsRaw?.toList() ?? [];
+          breadcrumbItems.add({
+            'label': visit.statusOption,
+            'value': displayValue,
+          });
+        }
 
-          for (var childStatus in statusChilds) {
-            final childStatusId =
-                getJsonField(childStatus, r'''$.id_activity_status''');
+        // Para container-list, no continuar recursivamente (solo mostrar los status de primer nivel)
+        return;
+      } else {
+        // Para unique-list y reference-list, tomar el último seleccionado
+        final selectedVisit = stepVisits.last;
+        final statusId = selectedVisit.idActivityStatus;
 
-            // Verificar si este status_child está seleccionado (solo STATUS, no STEP)
-            final isChildSelected = visitDetails.any((visit) =>
-                visit.idActivityStatus == childStatusId &&
-                visit.typeStatus != 'STEP');
+        // Obtener el tipo de status desde el JSON de la actividad
+        final typeStatus = _getStatusTypeById(selectedVisit.idActivityStatus).toLowerCase();
 
-            if (isChildSelected) {
-              final childStatusName =
-                  getJsonField(childStatus, r'''$.status_name''').toString();
-              breadcrumbItems.add(childStatusName);
+        // Para reference-list, el nombre real está en statusResponse, no en statusOption
+        final displayName = typeStep.toLowerCase() == 'reference-list'
+            ? selectedVisit.statusResponse
+            : selectedVisit.statusOption;
 
-              // Si este status_child tiene steps_childs, procesarlos también
-              final childStepsChilds =
-                  getJsonField(childStatus, r'''$.activities_steps_childs''')
-                      .toList();
-              for (var nestedStep in childStepsChilds) {
-                final nestedStepId =
-                    getJsonField(nestedStep, r'''$.id_activity_step''');
-                final hasNestedSelection = visitDetails.any((visit) =>
-                    visit.idStepParent == nestedStepId &&
-                    visit.typeStatus != 'STEP');
+        // Determinar el valor a mostrar según el tipo de step y status
+        String displayValue;
 
-                if (hasNestedSelection) {
-                  buildBreadcrumbRecursive(nestedStepId, nestedStep);
+        if (typeStep.toLowerCase() == 'unique-list' ||
+            typeStatus == 'unique_choice' ||
+            typeStatus == 'unique-option') {
+          // Para unique-list, unique_choice y unique-option, mostrar el checkmark
+          displayValue = selectedVisit.statusResponse.isNotEmpty ? selectedVisit.statusResponse : '';
+        } else if (typeStatus == 'photo' ||
+            typeStatus == 'video' ||
+            typeStatus == 'tag-writer' ||
+            typeStatus == 'tag-reader' ||
+            typeStatus == 'tag-transfer') {
+          // Para photo, video, tag-writer, tag-reader y tag-transfer, mostrar contador simple
+          displayValue = selectedVisit.statusResponse.isNotEmpty ? '1' : displayName;
+        } else {
+          // Para otros casos (reference-list, etc.), mostrar el statusResponse
+          displayValue = selectedVisit.statusResponse.isNotEmpty ? selectedVisit.statusResponse : displayName;
+        }
+
+        // Agregar el nombre del status seleccionado con su respuesta
+        breadcrumbItems.add({
+          'label': selectedVisit.statusOption,
+          'value': displayValue,
+        });
+
+        // Buscar el status completo en el JSON para ver si tiene hijos
+        final activitiesStatusRaw =
+            getJsonField(currentStep, r'''$.activities_status''');
+        final activitiesStatus = activitiesStatusRaw != null
+            ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+            : [];
+
+        for (var status in activitiesStatus) {
+          final currentStatusId =
+              getJsonField(status, r'''$.id_activity_status''');
+
+          // Buscar por ID en lugar de nombre
+          if (currentStatusId == statusId) {
+            // Verificar si tiene steps_childs
+            final stepsChildsRaw =
+                getJsonField(status, r'''$.activities_steps_childs''');
+            final stepsChilds = stepsChildsRaw != null
+                ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+                : [];
+
+            // Procesar cada step_child recursivamente
+            for (var childStep in stepsChilds) {
+              final childStepId =
+                  getJsonField(childStep, r'''$.id_activity_step''');
+
+              // Verificar si este step_child tiene selección de STATUS (no STEP)
+              final hasChildSelection = visitDetails.any((visit) =>
+                  visit.idStepParent == childStepId &&
+                  visit.typeStatus != 'STEP');
+
+              if (hasChildSelection) {
+                buildBreadcrumbRecursive(childStepId, childStep);
+              }
+            }
+
+            // Verificar si tiene status_childs
+            final statusChildsRaw =
+                getJsonField(status, r'''$.activities_status_childs''');
+            final statusChilds = statusChildsRaw?.toList() ?? [];
+
+            for (var childStatus in statusChilds) {
+              final childStatusId =
+                  getJsonField(childStatus, r'''$.id_activity_status''');
+
+              // Verificar si este status_child está seleccionado (solo STATUS, no STEP)
+              final isChildSelected = visitDetails.any((visit) =>
+                  visit.idActivityStatus == childStatusId &&
+                  visit.typeStatus != 'STEP');
+
+              if (isChildSelected) {
+                final childStatusName =
+                    getJsonField(childStatus, r'''$.status_name''').toString();
+
+                // Buscar la respuesta del child status
+                final childVisit = visitDetails.firstWhere(
+                  (visit) => visit.idActivityStatus == childStatusId && visit.typeStatus != 'STEP',
+                  orElse: () => VisitsDetailsStruct(
+                    idVisitDetail: 0,
+                    idVisit: 0,
+                    idActivityStatus: 0,
+                    statusOption: '',
+                    statusResponse: '',
+                    idStepParent: 0,
+                    rememberStatus: false,
+                    defaultStatus: '',
+                    typeStatus: '',
+                    auxStep: 0,
+                  ),
+                );
+
+                // Obtener el tipo de status desde el JSON de la actividad
+                final childTypeStatus = _getStatusTypeById(childVisit.idActivityStatus).toLowerCase();
+
+                // Determinar el valor a mostrar según el tipo de status
+                String childDisplayValue;
+                if (childTypeStatus == 'unique_choice' || childTypeStatus == 'unique-option') {
+                  // Para unique_choice y unique-option, NO mostrar el HTML
+                  childDisplayValue = '';
+                } else if (childTypeStatus == 'photo' ||
+                    childTypeStatus == 'video' ||
+                    childTypeStatus == 'tag-writer' ||
+                    childTypeStatus == 'tag-reader' ||
+                    childTypeStatus == 'tag-transfer') {
+                  childDisplayValue = childVisit.statusResponse.isNotEmpty ? '1' : childStatusName;
+                } else {
+                  childDisplayValue = childVisit.statusResponse.isNotEmpty ? childVisit.statusResponse : childStatusName;
+                }
+
+                breadcrumbItems.add({
+                  'label': childStatusName,
+                  'value': childDisplayValue,
+                });
+
+                // Si este status_child tiene steps_childs, procesarlos también
+                final childStepsChilds =
+                    getJsonField(childStatus, r'''$.activities_steps_childs''')
+                        .toList();
+                for (var nestedStep in childStepsChilds) {
+                  final nestedStepId =
+                      getJsonField(nestedStep, r'''$.id_activity_step''');
+                  final hasNestedSelection = visitDetails.any((visit) =>
+                      visit.idStepParent == nestedStepId &&
+                      visit.typeStatus != 'STEP');
+
+                  if (hasNestedSelection) {
+                    buildBreadcrumbRecursive(nestedStepId, nestedStep);
+                  }
                 }
               }
             }
-          }
 
-          break;
+            break;
+          }
         }
       }
     }
@@ -4944,32 +5912,60 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Construir el widget del breadcrumb
     return Padding(
       padding: const EdgeInsets.only(top: 6),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        children: [
-          for (int i = 0; i < breadcrumbItems.length; i++) ...[
-            // Texto del item
-            Text(
-              breadcrumbItems[i],
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-                letterSpacing: 0.2,
-              ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: breadcrumbItems.map((item) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Viñeta (bullet point)
+                Padding(
+                  padding: const EdgeInsets.only(top: 5),
+                  child: Container(
+                    width: 4,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Texto del item con label y value
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      children: [
+                        TextSpan(
+                          text: '${item['label']}: ',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.85),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        TextSpan(
+                          text: item['value'],
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-
-            // Separador (excepto para el último item)
-            if (i < breadcrumbItems.length - 1)
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: Colors.white.withValues(alpha: 0.7),
-              ),
-          ],
-        ],
+          );
+        }).toList(),
       ),
     );
   }
@@ -5134,77 +6130,83 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
+    // Verificar si es estilo compacto
+    final isCompactStyle = defaultStatus == '=STYLE:COMPACT';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(4, (index) {
-            final number = index + 1;
-            // Solo poner naranja si está seleccionado Y NO se usó up/down
-            final isSelected = currentValue == number && !usedUpDown;
+        // Solo mostrar los números rápidos si NO es estilo compacto
+        if (!isCompactStyle) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(4, (index) {
+              final number = index + 1;
+              // Solo poner naranja si está seleccionado Y NO se usó up/down
+              final isSelected = currentValue == number && !usedUpDown;
 
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _numberUsedUpDown[statusId] =
-                      false; // Marcar como NO usado con up/down
-                  _updateRootNumberValue(status, number);
-                });
-              },
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  // INVERTIDO: Verde si está seleccionado, Naranja si NO está seleccionado
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isSelected
-                        ? [
-                            const Color(0xFF00a86b),
-                            const Color(0xFF00d980),
-                          ]
-                        : [
-                            const Color(0xFFF1F8F4),
-                            const Color(0xFFFAFDFB),
-                          ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF00a86b)
-                        : const Color(0xFFE8F5E9),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _numberUsedUpDown[statusId] =
+                        false; // Marcar como NO usado con up/down
+                    _updateRootNumberValue(status, number);
+                  });
+                },
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    // INVERTIDO: Verde si está seleccionado, Naranja si NO está seleccionado
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isSelected
+                          ? [
+                              const Color(0xFF00a86b),
+                              const Color(0xFF00d980),
+                            ]
+                          : [
+                              const Color(0xFFF1F8F4),
+                              const Color(0xFFFAFDFB),
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF00a86b).withValues(alpha: 0.5)
-                          : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                          ? const Color(0xFF00a86b)
+                          : const Color(0xFFE8F5E9),
+                      width: 2,
                     ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    number.toString(),
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          isSelected ? Colors.white : const Color(0xFF00a86b),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isSelected
+                            ? const Color(0xFF00a86b).withValues(alpha: 0.5)
+                            : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      number.toString(),
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color:
+                            isSelected ? Colors.white : const Color(0xFF00a86b),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 12),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+        ],
         // Botón INGRESAR OTRO NUMERO
         InkWell(
           onTap: () async {
@@ -5388,77 +6390,83 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
+    // Verificar si es estilo compacto
+    final isCompactStyle = defaultStatus == '=STYLE:COMPACT';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(4, (index) {
-            final number = index + 1;
-            // Solo poner naranja si está seleccionado Y NO se usó up/down
-            final isSelected = currentValue == number && !usedUpDown;
+        // Solo mostrar los números rápidos si NO es estilo compacto
+        if (!isCompactStyle) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: List.generate(4, (index) {
+              final number = index + 1;
+              // Solo poner naranja si está seleccionado Y NO se usó up/down
+              final isSelected = currentValue == number && !usedUpDown;
 
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  _numberUsedUpDown[statusId] =
-                      false; // Marcar como NO usado con up/down
-                  _updateNumberValue(parentStep, status, number);
-                });
-              },
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  // INVERTIDO: Verde si está seleccionado, Naranja si NO está seleccionado
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isSelected
-                        ? [
-                            const Color(0xFF00a86b),
-                            const Color(0xFF00d980),
-                          ]
-                        : [
-                            const Color(0xFFF1F8F4),
-                            const Color(0xFFFAFDFB),
-                          ],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isSelected
-                        ? const Color(0xFF00a86b)
-                        : const Color(0xFFE8F5E9),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
+              return InkWell(
+                onTap: () {
+                  setState(() {
+                    _numberUsedUpDown[statusId] =
+                        false; // Marcar como NO usado con up/down
+                    _updateNumberValue(parentStep, status, number);
+                  });
+                },
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    // INVERTIDO: Verde si está seleccionado, Naranja si NO está seleccionado
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: isSelected
+                          ? [
+                              const Color(0xFF00a86b),
+                              const Color(0xFF00d980),
+                            ]
+                          : [
+                              const Color(0xFFF1F8F4),
+                              const Color(0xFFFAFDFB),
+                            ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF00a86b).withValues(alpha: 0.5)
-                          : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                          ? const Color(0xFF00a86b)
+                          : const Color(0xFFE8F5E9),
+                      width: 2,
                     ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    number.toString(),
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color:
-                          isSelected ? Colors.white : const Color(0xFF00a86b),
+                    boxShadow: [
+                      BoxShadow(
+                        color: isSelected
+                            ? const Color(0xFF00a86b).withValues(alpha: 0.5)
+                            : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      number.toString(),
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color:
+                            isSelected ? Colors.white : const Color(0xFF00a86b),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 12),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+        ],
         // Botón INGRESAR OTRO NUMERO
         InkWell(
           onTap: () async {
@@ -5688,8 +6696,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       String nfcContent) {
     final Map<int, Map<String, dynamic>> groupedByHeadquarter = {};
 
-    // El contenido puede tener múltiples registros separados por comas
+    // Verificar si es el nuevo formato JSON
+    if (actions.isNewJsonFormat(nfcContent)) {
+      debugPrint('✅ TAG-WRITER: Formato JSON detectado');
+      final nfcJson = actions.parseNfcJson(nfcContent);
+
+      if (nfcJson != null) {
+        // Extraer visitas del JSON usando el helper
+        final visits = actions.extractVisitsFromJson(nfcJson);
+        debugPrint('📋 TAG-WRITER: ${visits.length} visitas extraídas del JSON');
+
+        // Agrupar por headquarterId usando el helper
+        return actions.groupVisitsByHeadquarter(visits);
+      }
+
+      return groupedByHeadquarter;
+    }
+
+    // Formato antiguo: El contenido puede tener múltiples registros separados por comas
     // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
+    debugPrint('⚠️ TAG-WRITER: Formato antiguo detectado');
 
     // Extraer todos los registros entre {}
     final regexRecords = RegExp(r'\{([^}]+)\}');
@@ -6049,8 +7075,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   List<Map<String, dynamic>> _parseNfcTagContent(String nfcContent) {
     final List<Map<String, dynamic>> parsedData = [];
 
-    // El contenido puede tener múltiples registros separados por comas
+    // Verificar si es el nuevo formato JSON
+    if (actions.isNewJsonFormat(nfcContent)) {
+      debugPrint('✅ TAG-READER: Formato JSON detectado');
+      final nfcJson = actions.parseNfcJson(nfcContent);
+
+      if (nfcJson != null) {
+        // Extraer visitas del JSON usando el helper
+        parsedData.addAll(actions.extractVisitsFromJson(nfcJson));
+        debugPrint('📋 TAG-READER: ${parsedData.length} visitas extraídas del JSON');
+      }
+
+      return parsedData;
+    }
+
+    // Formato antiguo: El contenido puede tener múltiples registros separados por comas
     // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
+    debugPrint('⚠️ TAG-READER: Formato antiguo detectado');
 
     // Extraer todos los registros entre {}
     final regexRecords = RegExp(r'\{([^}]+)\}');
@@ -9081,6 +10122,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       grandTotalVisits += (entry['totalVisits'] as int?) ?? 0;
     }
 
+    // Obtener el default_status del visit detail para extraer TYPE_PRODUCT_START
+    String titleText = 'Tag de origen leído';
+    for (var detail in FFAppState().visitDetails) {
+      if (detail.idActivityStatus == statusId) {
+        final defaultStatus = detail.defaultStatus;
+        // Captura todo hasta ; o } (permitiendo espacios en el nombre)
+        final regexTypeStart = RegExp(r'=TYPE_PRODUCT_START:([^;}]+)');
+        final matchStart = regexTypeStart.firstMatch(defaultStatus);
+        if (matchStart != null) {
+          final typeProductStart = matchStart.group(1)!.trim();
+          titleText = '$typeProductStart de origen';
+          debugPrint('📦 TAG-TRANSFER Summary: Título dinámico: $titleText');
+        }
+        break;
+      }
+    }
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -9102,9 +10160,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 18,
               ),
               const SizedBox(width: 6),
-              const Text(
-                'Tag de origen leído',
-                style: TextStyle(
+              Text(
+                titleText,
+                style: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -9200,6 +10258,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   return;
                 }
 
+                // Extraer TYPE_PRODUCT_FINISH para título dinámico del diálogo de destino
+                String? destinationTitle;
+                for (var detail in FFAppState().visitDetails) {
+                  if (detail.idActivityStatus == statusId) {
+                    final defaultStatus = detail.defaultStatus;
+                    // Captura todo hasta ; o } (permitiendo espacios en el nombre)
+                    final regexTypeFinish = RegExp(r'TYPE_PRODUCT_FINISH:([^;}]+)');
+                    final matchFinish = regexTypeFinish.firstMatch(defaultStatus);
+                    if (matchFinish != null) {
+                      final typeProductFinish = matchFinish.group(1)!.trim();
+                      destinationTitle = 'Escribir $typeProductFinish de destino';
+                      debugPrint('📦 TAG-TRANSFER: Título dinámico destino: $destinationTitle');
+                    }
+                    break;
+                  }
+                }
+
                 // Abrir diálogo de escritura en tag de destino
                 final result = await showDialog<bool>(
                   barrierDismissible: false,
@@ -9211,6 +10286,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       backgroundColor: Colors.transparent,
                       child: NfcTransferWriteDialogWidget(
                         sourceTagContent: sourceTagContent,
+                        destinationTitle: destinationTitle,
                       ),
                     );
                   },
@@ -9853,6 +10929,1001 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ],
       ),
     );
+  }
+
+  Widget _buildTextInputControl({
+    required dynamic parentStep,
+    required dynamic status,
+  }) {
+    final statusId = getJsonField(status, r'''$.id_activity_status''');
+    final statusName = getJsonField(status, r'''$.status_name''').toString();
+    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+
+    // Obtener o crear el controlador y FocusNode para este status
+    if (!_textControllers.containsKey(statusId)) {
+      // Obtener el valor actual del texto desde visitDetails
+      String currentValue = '';
+      final existingDetail = FFAppState().visitDetails.firstWhere(
+        (d) => d.idActivityStatus == statusId && d.idStepParent == parentStepId,
+        orElse: () => VisitsDetailsStruct(
+          idVisitDetail: 0,
+          idVisit: 0,
+          idActivityStatus: 0,
+          statusOption: '',
+          statusResponse: '',
+          idStepParent: 0,
+          rememberStatus: false,
+          defaultStatus: '',
+          typeStatus: '',
+          auxStep: 0,
+        ),
+      );
+      currentValue = existingDetail.statusResponse;
+
+      _textControllers[statusId] = TextEditingController(text: currentValue);
+      _textFocusNodes[statusId] = FocusNode();
+
+      // Listener para detectar cuando pierde el foco
+      _textFocusNodes[statusId]!.addListener(() {
+        if (!_textFocusNodes[statusId]!.hasFocus) {
+          // Perdió el foco, guardar el valor
+          _saveTextValue(parentStep, status, _textControllers[statusId]!.text);
+        }
+      });
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8F4),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: TextField(
+        controller: _textControllers[statusId],
+        focusNode: _textFocusNodes[statusId],
+        style: const TextStyle(
+          fontFamily: 'Roboto',
+          fontSize: 20,
+          color: Color(0xFF00a86b),
+          fontWeight: FontWeight.w700,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Escribe aquí...',
+          hintStyle: TextStyle(
+            color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        ),
+        maxLines: 3,
+        minLines: 1,
+        textInputAction: TextInputAction.done,
+        onChanged: (value) {
+          // Validar y guardar con cada letra que se escribe
+          _saveTextValue(parentStep, status, value);
+        },
+        onSubmitted: (value) {
+          // Al presionar Enter/Done, guardar
+          _saveTextValue(parentStep, status, value);
+        },
+      ),
+    );
+  }
+
+  // Widget inline para búsqueda de usuarios (tipo users-list)
+  Widget _buildUsersListControl({
+    required dynamic parentStep,
+    required dynamic status,
+  }) {
+    final statusId = getJsonField(status, r'''$.id_activity_status''');
+    final statusName = getJsonField(status, r'''$.status_name''').toString();
+    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+
+    // Obtener o crear el controlador y FocusNode para este status
+    if (!_usersSearchControllers.containsKey(statusId)) {
+      _usersSearchControllers[statusId] = TextEditingController();
+      _usersSearchFocusNodes[statusId] = FocusNode();
+      _usersSearchResults[statusId] = [];
+    }
+
+    // Obtener el usuario seleccionado desde visitDetails
+    String selectedUserName = '';
+    final existingDetail = FFAppState().visitDetails.firstWhere(
+      (d) => d.idActivityStatus == statusId && d.idStepParent == parentStepId,
+      orElse: () => VisitsDetailsStruct(
+        idVisitDetail: 0,
+        idVisit: 0,
+        idActivityStatus: 0,
+        statusOption: '',
+        statusResponse: '',
+        idStepParent: 0,
+        rememberStatus: false,
+        defaultStatus: '',
+        typeStatus: '',
+        auxStep: 0,
+      ),
+    );
+    selectedUserName = existingDetail.statusResponse;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFFF1F8F4),
+            const Color(0xFFFAFDFB),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF00a86b).withValues(alpha: 0.1),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Usuario seleccionado (si existe)
+          if (selectedUserName.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF00a86b),
+                    Color(0xFF00d980),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white,
+                        width: 2,
+                      ),
+                    ),
+                    child: Center(
+                      child: Text(
+                        _getUserInitials(selectedUserName),
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      selectedUserName,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    onPressed: () {
+                      // Limpiar la selección
+                      _removeUserSelection(parentStep, status);
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+          // Barra de búsqueda
+          Row(
+            children: [
+              Expanded(
+                child: Container(
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: TextField(
+                    controller: _usersSearchControllers[statusId],
+                    focusNode: _usersSearchFocusNodes[statusId],
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 15,
+                      color: Color(0xFF00a86b),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Buscar usuario...',
+                      hintStyle: TextStyle(
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: Color(0xFF00a86b),
+                        size: 22,
+                      ),
+                      suffixIcon: _usersSearchControllers[statusId]!.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear,
+                                color: const Color(0xFF00a86b).withValues(alpha: 0.6),
+                                size: 20,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _usersSearchControllers[statusId]?.clear();
+                                  _usersSearchResults[statusId] = [];
+                                });
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                    ),
+                    onChanged: (value) async {
+                      // Búsqueda en tiempo real
+                      await _searchUsers(statusId, value);
+                    },
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Botón para abrir diálogo de pantalla completa
+              InkWell(
+                onTap: () async {
+                  await _openFullScreenUserSearch(parentStep, status);
+                },
+                child: Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [
+                        Color(0xFF00a86b),
+                        Color(0xFF00d980),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.open_in_full,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Mini lista de resultados (primeras 2 coincidencias)
+          if (_usersSearchResults[statusId]!.isNotEmpty)
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              constraints: const BoxConstraints(maxHeight: 150),
+              child: ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: _usersSearchResults[statusId]!.length > 2
+                    ? 2
+                    : _usersSearchResults[statusId]!.length,
+                itemBuilder: (context, index) {
+                  final user = _usersSearchResults[statusId]![index];
+                  return _buildUserListItem(
+                    user: user,
+                    onTap: () {
+                      _selectUser(parentStep, status, user);
+                    },
+                  );
+                },
+              ),
+            ),
+
+          // Indicador de más resultados
+          if (_usersSearchResults[statusId]!.length > 2)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(
+                child: Text(
+                  '+${_usersSearchResults[statusId]!.length - 2} usuarios más...',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Widget para mostrar un usuario en la lista
+  Widget _buildUserListItem({
+    required UsersStruct user,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00a86b).withValues(alpha: 0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [
+                    Color(0xFF00a86b),
+                    Color(0xFF00d980),
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  _getUserInitials(user.nameUser),
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.nameUser,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF00a86b),
+                      letterSpacing: -0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Código: ${user.operID}',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: const Color(0xFF00a86b).withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Obtener iniciales del nombre de usuario
+  String _getUserInitials(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+
+    final parts = trimmed.split(' ').where((p) => p.isNotEmpty).toList();
+
+    if (parts.isEmpty) return '?';
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  }
+
+  // Buscar usuarios en SQLite
+  Future<void> _searchUsers(int statusId, String searchText) async {
+    if (searchText.trim().isEmpty) {
+      setState(() {
+        _usersSearchResults[statusId] = [];
+      });
+      return;
+    }
+
+    try {
+      final results = await actions.searchUsersSqlite(searchText);
+      setState(() {
+        _usersSearchResults[statusId] = results;
+      });
+    } catch (e) {
+      debugPrint('❌ Error buscando usuarios: $e');
+      setState(() {
+        _usersSearchResults[statusId] = [];
+      });
+    }
+  }
+
+  // Seleccionar un usuario
+  void _selectUser(dynamic parentStep, dynamic status, UsersStruct user) {
+    final statusId = getJsonField(status, r'''$.id_activity_status''');
+    final statusName = getJsonField(status, r'''$.status_name''').toString();
+    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+    final rememberStatus = getJsonField(status, r'''$.remember_status''') ?? false;
+    final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+    final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+
+    // Buscar si ya existe un registro para este status
+    final existingIndex = FFAppState().visitDetails.indexWhere(
+      (d) => d.idActivityStatus == statusId && d.idStepParent == parentStepId,
+    );
+
+    if (existingIndex != -1) {
+      // Actualizar el registro existente
+      FFAppState().updateVisitDetailsAtIndex(
+        existingIndex,
+        (detail) => VisitsDetailsStruct(
+          idVisitDetail: detail.idVisitDetail,
+          idVisit: detail.idVisit,
+          idActivityStatus: statusId,
+          statusOption: statusName,
+          statusResponse: user.nameUser,
+          idStepParent: parentStepId,
+          rememberStatus: rememberStatus,
+          defaultStatus: defaultStatus,
+          typeStatus: typeStatus,
+          auxStep: parentStepId,
+        ),
+      );
+    } else {
+      // Crear un nuevo registro
+      FFAppState().addToVisitDetails(
+        VisitsDetailsStruct(
+          idVisitDetail: 0,
+          idVisit: 0,
+          idActivityStatus: statusId,
+          statusOption: statusName,
+          statusResponse: user.nameUser,
+          idStepParent: parentStepId,
+          rememberStatus: rememberStatus,
+          defaultStatus: defaultStatus,
+          typeStatus: typeStatus,
+          auxStep: parentStepId,
+        ),
+      );
+    }
+
+    // Limpiar la búsqueda
+    setState(() {
+      _usersSearchControllers[statusId]?.clear();
+      _usersSearchResults[statusId] = [];
+    });
+
+    debugPrint('✅ Usuario seleccionado: ${user.nameUser}');
+  }
+
+  // Remover selección de usuario
+  void _removeUserSelection(dynamic parentStep, dynamic status) {
+    final statusId = getJsonField(status, r'''$.id_activity_status''');
+    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+
+    // Buscar y eliminar el registro
+    final existingIndex = FFAppState().visitDetails.indexWhere(
+      (d) => d.idActivityStatus == statusId && d.idStepParent == parentStepId,
+    );
+
+    if (existingIndex != -1) {
+      FFAppState().removeAtIndexFromVisitDetails(existingIndex);
+      setState(() {});
+      debugPrint('✅ Usuario deseleccionado');
+    }
+  }
+
+  // Abrir diálogo de búsqueda de pantalla completa
+  Future<void> _openFullScreenUserSearch(dynamic parentStep, dynamic status) async {
+    final selectedUser = await showDialog<UsersStruct>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return _FullScreenUserSearchDialog();
+      },
+    );
+
+    if (selectedUser != null) {
+      _selectUser(parentStep, status, selectedUser);
+    }
+  }
+
+  // Generar nombre de foto usando fecha, hora y nombre de la actividad
+  String _generatePhotoName() {
+    final now = DateTime.now();
+    final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
+    // Obtener nombre de la actividad desde FFAppState
+    final activityName = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.name_activity''',
+    )?.toString() ?? 'Actividad';
+
+    // Limpiar el nombre de la actividad (quitar espacios y caracteres especiales)
+    final cleanActivityName = activityName
+        .replaceAll(' ', '_')
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .toLowerCase();
+
+    return '${cleanActivityName}_${dateStr}_${timeStr}.jpg';
+  }
+
+  // Display inline para foto capturada (tipo photo)
+  Widget _buildPhotoDisplay({
+    required int statusId,
+    required int parentStepId,
+  }) {
+    // Buscar el registro en visitDetails
+    final photoDetail = FFAppState().visitDetails.firstWhere(
+      (d) => d.idActivityStatus == statusId && d.idStepParent == parentStepId,
+      orElse: () => VisitsDetailsStruct(
+        idVisitDetail: 0,
+        idVisit: 0,
+        idActivityStatus: 0,
+        statusOption: '',
+        statusResponse: '',
+        idStepParent: 0,
+        rememberStatus: false,
+        defaultStatus: '',
+        typeStatus: '',
+        auxStep: 0,
+      ),
+    );
+
+    // Si no hay foto, no mostrar nada
+    if (photoDetail.statusResponse.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final photoBase64 = photoDetail.statusResponse;
+
+    // Crear una clave única para el caché (statusId + parentStepId)
+    final cacheKey = '${statusId}_$parentStepId';
+
+    // Decodificar base64 a bytes solo si no está en caché
+    Uint8List imageBytes;
+    if (_cachedPhotoImages.containsKey(cacheKey)) {
+      imageBytes = _cachedPhotoImages[cacheKey]!;
+    } else {
+      try {
+        imageBytes = base64Decode(photoBase64);
+        _cachedPhotoImages[cacheKey] = imageBytes;
+      } catch (e) {
+        debugPrint('❌ Error decodificando base64 de foto: $e');
+        return const SizedBox.shrink();
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F8F4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Miniatura de la foto con bordes redondeados
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Image.memory(
+                imageBytes,
+                fit: BoxFit.cover,
+                cacheWidth: 120, // Cachear a 120px (2x el tamaño de display para buena calidad)
+                cacheHeight: 120,
+                gaplessPlayback: true, // Evitar parpadeo durante rebuilds
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.grey[300],
+                    child: const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 24,
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Nombre de la foto
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: const Color(0xFF00a86b),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Foto capturada',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF00a86b),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _generatePhotoName(),
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF00a86b),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Display inline para video capturado (tipo video)
+  Widget _buildVideoDisplay({
+    required int statusId,
+    required int parentStepId,
+    required dynamic parentStep,
+    required dynamic status,
+  }) {
+    // Buscar el registro en visitDetails
+    final videoDetail = FFAppState().visitDetails.firstWhere(
+      (d) => d.idActivityStatus == statusId && d.idStepParent == parentStepId,
+      orElse: () => VisitsDetailsStruct(
+        idVisitDetail: 0,
+        idVisit: 0,
+        idActivityStatus: 0,
+        statusOption: '',
+        statusResponse: '',
+        idStepParent: 0,
+        rememberStatus: false,
+        defaultStatus: '',
+        typeStatus: '',
+        auxStep: 0,
+      ),
+    );
+
+    // Si no hay video, no mostrar nada
+    if (videoDetail.statusResponse.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final videoPath = videoDetail.statusResponse;
+    final statusName = getJsonField(status, r'''$.status_name''').toString();
+
+    return GestureDetector(
+      onTap: () async {
+        debugPrint('🎬 Abriendo diálogo de captura de video con video existente');
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (dialogContext) {
+            return Dialog(
+              elevation: 0,
+              insetPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              child: VideoCaptureComponentWidget(
+                idStatus: statusId,
+                statusName: statusName,
+                statusJSON: status,
+                idStepParent: parentStepId,
+              ),
+            );
+          },
+        );
+
+        // Actualizar la UI después de cerrar el diálogo
+        setState(() {});
+      },
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF1F8F4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+            width: 1.5,
+          ),
+        ),
+        child: Row(
+        children: [
+          // Miniatura del video usando VideoPlayer
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                  width: 2,
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Stack(
+                children: [
+                  // Thumbnail del video
+                  _VideoThumbnail(videoPath: videoPath),
+                  // Overlay de play icon
+                  Positioned.fill(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.play_circle_filled,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Información del video
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.check_circle_rounded,
+                      color: const Color(0xFF00a86b),
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Video capturado',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFF00a86b),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _generateVideoName(),
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF00a86b),
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
+  // Generar nombre de video usando fecha, hora y nombre de la actividad
+  String _generateVideoName() {
+    final now = DateTime.now();
+    final dateStr = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
+    final timeStr = '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+
+    // Obtener nombre de la actividad desde FFAppState
+    final activityName = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.name_activity''',
+    )?.toString() ?? 'Actividad';
+
+    // Limpiar el nombre de la actividad (quitar espacios y caracteres especiales)
+    final cleanActivityName = activityName
+        .replaceAll(' ', '_')
+        .replaceAll(RegExp(r'[^\w\s]'), '')
+        .toLowerCase();
+
+    return '${cleanActivityName}_${dateStr}_${timeStr}.mp4';
+  }
+
+  // Guardar el valor de texto en visitDetails
+  Future<void> _saveTextValue(
+      dynamic parentStep, dynamic status, String value) async {
+    final statusId = getJsonField(status, r'''$.id_activity_status''');
+    final statusName = getJsonField(status, r'''$.status_name''').toString();
+    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+    final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+    final defaultStatus = getJsonField(status, r'''$.default_status''').toString();
+    final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+
+    debugPrint('📝 Guardando texto para "$statusName": "$value" (${value.length} caracteres)');
+
+    final trimmedValue = value.trim();
+
+    // Si el texto está vacío, eliminar de visitDetails
+    if (trimmedValue.isEmpty) {
+      debugPrint('⚠️ Texto vacío. Eliminando de visitDetails...');
+
+      List<int> indicesToRemove = [];
+      for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+        if (FFAppState().visitDetails[i].idActivityStatus == statusId &&
+            FFAppState().visitDetails[i].idStepParent == parentStepId) {
+          indicesToRemove.add(i);
+        }
+      }
+
+      for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+        FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+      }
+
+      // Limpiar caché para que el estado se actualice correctamente
+      _visitDetailsSearchCache.clear();
+
+      setState(() {});
+      return;
+    }
+
+    // Buscar si ya existe el detalle
+    int existingIndex = -1;
+    for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+      if (FFAppState().visitDetails[i].idActivityStatus == statusId &&
+          FFAppState().visitDetails[i].idStepParent == parentStepId) {
+        existingIndex = i;
+        break;
+      }
+    }
+
+    if (existingIndex >= 0) {
+      // Actualizar existente
+      FFAppState().updateVisitDetailsAtIndex(
+        existingIndex,
+        (detail) => VisitsDetailsStruct(
+          idVisitDetail: detail.idVisitDetail,
+          idVisit: detail.idVisit,
+          idActivityStatus: statusId,
+          statusOption: statusName,
+          statusResponse: trimmedValue,
+          idStepParent: parentStepId,
+          rememberStatus: rememberStatus,
+          defaultStatus: defaultStatus,
+          typeStatus: typeStatus,
+          auxStep: parentStepId,
+        ),
+      );
+    } else {
+      // Crear nuevo DIRECTAMENTE (sin llamar a _onStatusSelected)
+      // Esto hace que text se comporte como number
+      FFAppState().addToVisitDetails(
+        VisitsDetailsStruct(
+          idVisitDetail: 0,
+          idVisit: 0,
+          idActivityStatus: statusId,
+          statusOption: statusName,
+          statusResponse: trimmedValue,
+          idStepParent: parentStepId,
+          rememberStatus: rememberStatus,
+          defaultStatus: defaultStatus,
+          typeStatus: typeStatus,
+          auxStep: parentStepId,
+        ),
+      );
+    }
+
+    // Limpiar caché para que el estado se actualice correctamente
+    _visitDetailsSearchCache.clear();
+
+    setState(() {});
   }
 
   Widget _buildDistanceExtractorDisplay({required int statusId}) {
@@ -11052,6 +13123,567 @@ class _FullScreenNumericKeyboardDialogState
               size: 32,
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// Diálogo de búsqueda de usuarios de pantalla completa
+class _FullScreenUserSearchDialog extends StatefulWidget {
+  const _FullScreenUserSearchDialog({Key? key}) : super(key: key);
+
+  @override
+  State<_FullScreenUserSearchDialog> createState() =>
+      _FullScreenUserSearchDialogState();
+}
+
+class _FullScreenUserSearchDialogState
+    extends State<_FullScreenUserSearchDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  List<UsersStruct> _searchResults = [];
+  bool _isSearching = false;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  Future<void> _performSearch(String searchText) async {
+    if (searchText.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+    });
+
+    try {
+      final results = await actions.searchUsersSqlite(searchText);
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+    } catch (e) {
+      debugPrint('❌ Error buscando usuarios: $e');
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.zero,
+      child: Container(
+        width: MediaQuery.of(context).size.width,
+        height: MediaQuery.of(context).size.height,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF0F172A),
+              Color(0xFF1E293B),
+              Color(0xFF0F172A),
+            ],
+            stops: [0.0, 0.5, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    // Fila de título y botón cerrar
+                    Row(
+                      children: [
+                        // Botón volver
+                        InkWell(
+                          onTap: () {
+                            Navigator.of(context).pop();
+                          },
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.white.withValues(alpha: 0.15),
+                                  Colors.white.withValues(alpha: 0.08),
+                                ],
+                              ),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back,
+                              color: Colors.white,
+                              size: 22,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // Título
+                        const Expanded(
+                          child: Text(
+                            'Buscar Usuario',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    // Barra de búsqueda
+                    Container(
+                      height: 54,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.15),
+                            Colors.white.withValues(alpha: 0.08),
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          width: 1.5,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.1),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: TextField(
+                        controller: _searchController,
+                        focusNode: _searchFocusNode,
+                        autofocus: true,
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Buscar por nombre o código...',
+                          hintStyle: TextStyle(
+                            fontFamily: 'Roboto',
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 16,
+                          ),
+                          prefixIcon: Icon(
+                            Icons.search,
+                            color: Colors.white.withValues(alpha: 0.6),
+                            size: 24,
+                          ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(
+                                    Icons.clear,
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                    size: 22,
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _searchController.clear();
+                                      _searchResults = [];
+                                    });
+                                  },
+                                )
+                              : null,
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 16),
+                        ),
+                        onChanged: (value) async {
+                          await _performSearch(value);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Lista de resultados
+              Expanded(
+                child: _isSearching
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+                        ),
+                      )
+                    : _searchResults.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 120,
+                                  height: 120,
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        const Color(0xFF00a86b)
+                                            .withValues(alpha: 0.2),
+                                        const Color(0xFF00d980)
+                                            .withValues(alpha: 0.2),
+                                      ],
+                                    ),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.person_search,
+                                    size: 60,
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                                Text(
+                                  _searchController.text.isEmpty
+                                      ? 'Escribe para buscar'
+                                      : 'No se encontraron usuarios',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white.withValues(alpha: 0.8),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _searchController.text.isEmpty
+                                      ? 'Busca por nombre o código de usuario'
+                                      : 'Intenta con otro término de búsqueda',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 14,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 16),
+                            itemCount: _searchResults.length,
+                            itemBuilder: (context, index) {
+                              final user = _searchResults[index];
+                              return _buildUserCard(user);
+                            },
+                          ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserCard(UsersStruct user) {
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).pop(user);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.white.withValues(alpha: 0.12),
+              Colors.white.withValues(alpha: 0.06),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
+            child: Row(
+              children: [
+                // Avatar con iniciales
+                Container(
+                  width: 68,
+                  height: 68,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF00a86b),
+                        Color(0xFF00d980),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0xFF00a86b),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      _getUserInitials(user.nameUser),
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                // Información del usuario
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.nameUser,
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: -0.3,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              const Color(0xFF00a86b).withValues(alpha: 0.3),
+                              const Color(0xFF00d980).withValues(alpha: 0.3),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: const Color(0xFF00a86b)
+                                .withValues(alpha: 0.5),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.tag,
+                              size: 14,
+                              color: Color(0xFF00d980),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Código: ${user.operID}',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white.withValues(alpha: 0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // Icono de navegación
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Color(0xFF00a86b),
+                        Color(0xFF00d980),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getUserInitials(String name) {
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+
+    final parts = trimmed.split(' ').where((p) => p.isNotEmpty).toList();
+
+    if (parts.isEmpty) return '?';
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    }
+    return parts[0][0].toUpperCase();
+  }
+}
+
+// Widget para mostrar la miniatura del video (primer frame)
+class _VideoThumbnail extends StatefulWidget {
+  final String videoPath;
+
+  const _VideoThumbnail({required this.videoPath});
+
+  @override
+  State<_VideoThumbnail> createState() => _VideoThumbnailState();
+}
+
+class _VideoThumbnailState extends State<_VideoThumbnail> {
+  VideoPlayerController? _controller;
+  bool _isInitialized = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      debugPrint('🎬 Inicializando thumbnail para video: ${widget.videoPath}');
+
+      final file = File(widget.videoPath);
+      if (!await file.exists()) {
+        debugPrint('❌ Video no existe: ${widget.videoPath}');
+        setState(() {
+          _hasError = true;
+        });
+        return;
+      }
+
+      _controller = VideoPlayerController.file(file);
+      await _controller!.initialize();
+
+      // Pausar en el primer frame
+      await _controller!.seekTo(Duration.zero);
+      await _controller!.pause();
+
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+
+      debugPrint('✅ Thumbnail inicializado correctamente');
+    } catch (e) {
+      debugPrint('❌ Error al inicializar thumbnail: $e');
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError) {
+      // Mostrar ícono de error si hubo problema
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[300],
+        child: const Icon(
+          Icons.error_outline,
+          color: Colors.red,
+          size: 40,
+        ),
+      );
+    }
+
+    if (!_isInitialized || _controller == null) {
+      // Mostrar indicador de carga
+      return Container(
+        width: double.infinity,
+        height: double.infinity,
+        color: Colors.grey[300],
+        child: const Center(
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+          ),
+        ),
+      );
+    }
+
+    // Mostrar el primer frame del video
+    return SizedBox(
+      width: double.infinity,
+      height: double.infinity,
+      child: FittedBox(
+        fit: BoxFit.cover,
+        child: SizedBox(
+          width: _controller!.value.size.width,
+          height: _controller!.value.size.height,
+          child: VideoPlayer(_controller!),
         ),
       ),
     );

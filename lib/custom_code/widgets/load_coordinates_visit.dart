@@ -295,11 +295,17 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   Future<void> _checkGPSPoints() async {
+    debugPrint('🌐🌐🌐 ========================================');
+    debugPrint('🌐🌐🌐 INICIO DE _checkGPSPoints()');
+    debugPrint('🌐🌐🌐 ========================================');
+
     setState(() {
       _isWaiting = true;
       _statusMessage = 'Obteniendo coordenadas GPS precisas...';
       _elapsedSeconds = 0;
     });
+
+    debugPrint('🔍 Estado cambiado: _isWaiting = true');
 
     try {
       final startTime = DateTime.now();
@@ -354,6 +360,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
           if (_gpsPoints.length >= 1) {
             debugPrint('✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 1)');
+            debugPrint('📍 RUTA 1: Llamando _createVisit() desde AppState geoLocationsList...');
             await _createVisit();
             return;
           }
@@ -412,6 +419,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       if (_gpsPoints.length >= 2) {
         debugPrint('✅ Usando puntos de SQLite');
+        debugPrint('📍 RUTA 2: Llamando _createVisit() desde SQLite Location_tracking...');
         await _createVisit();
       } else {
         _retryAttempts++;
@@ -546,6 +554,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         ));
       }
 
+      debugPrint('📍 RUTA 3: Llamando _createVisit() desde fallback Geolocator...');
       await _createVisit();
     } catch (e) {
       debugPrint('❌ Error en fallback de geolocator: $e');
@@ -558,16 +567,24 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   Future<void> _createVisit() async {
+    debugPrint('🚀🚀🚀 ============================================');
+    debugPrint('🚀🚀🚀 INICIO DE _createVisit() - FUNCIÓN LLAMADA');
+    debugPrint('🚀🚀🚀 ============================================');
+
     setState(() {
       _isProcessing = true;
       _statusMessage = 'Guardando visita...';
     });
 
+    debugPrint('🔍 Estado cambiado: _isProcessing = true');
+
     try {
+      debugPrint('🔍 Obteniendo datos de FFAppState...');
       final deviceDefault = FFAppState().deviceDefault;
       final userSelected = FFAppState().userSelected;
       final activitySelectedJSON = FFAppState().activitySelectedJSON;
       final visitDetails = FFAppState().visitDetails;
+      debugPrint('✅ Datos de FFAppState obtenidos exitosamente');
 
       // PRIORIDAD 1: Usar activitySelected (struct que se persiste correctamente)
       final activitySelected = FFAppState().activitySelected;

@@ -560,117 +560,89 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
           ),
         ],
       ),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Icono y tipo de TAG
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: color, size: 24),
-                ),
-                Spacer(),
-                if (readCount > 1)
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icono y tipo de TAG
+              Row(
+                children: [
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: color.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Text(
-                      '×$readCount',
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white70,
-                      ),
-                    ),
+                    child: Icon(icon, color: color, size: 24),
                   ),
-              ],
-            ),
-            SizedBox(height: 12),
-
-            // Tipo de TAG
-            Text(
-              tagType,
-              style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            SizedBox(height: 8),
-
-            // ID del TAG
-            Container(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                tagId,
-                style: TextStyle(fontFamily: 'Roboto Mono',
-                  fontSize: 10,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-
-            // Gráfico de pie de espacio
-            if (totalSpace > 0) ...[
-              SizedBox(height: 12),
-              Center(
-                child: Column(
-                  children: [
-                    _buildPieChart(usedSpace, totalSpace),
-                    SizedBox(height: 4),
-                    Text(
-                      'Espacio: ${usedSpace}/${totalSpace} bytes',
-                      style: TextStyle(fontFamily: 'Roboto',
-                        fontSize: 10,
-                        color: Colors.white60,
+                  Spacer(),
+                  if (readCount > 1)
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-
-            Spacer(),
-
-            // Última lectura
-            Divider(color: Colors.white.withOpacity(0.1), height: 16),
-            Row(
-              children: [
-                Icon(Icons.access_time, color: Colors.white60, size: 14),
-                SizedBox(width: 6),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        formattedDate,
+                      child: Text(
+                        '×$readCount',
                         style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 11,
+                          fontWeight: FontWeight.bold,
                           color: Colors.white70,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
+                    ),
+                ],
+              ),
+              SizedBox(height: 12),
+
+              // Tipo de TAG
+              Text(
+                tagType,
+                style: TextStyle(fontFamily: 'Roboto',
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              SizedBox(height: 8),
+
+              // ID del TAG
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  tagId,
+                  style: TextStyle(fontFamily: 'Roboto Mono',
+                    fontSize: 10,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+
+              // Gráfico de pie de espacio
+              if (totalSpace > 0) ...[
+                SizedBox(height: 12),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildPieChart(usedSpace, totalSpace),
+                      SizedBox(height: 4),
                       Text(
-                        formattedTime,
+                        'Espacio: ${usedSpace}/${totalSpace} bytes',
                         style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 10,
                           color: Colors.white60,
@@ -680,8 +652,42 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                   ),
                 ),
               ],
-            ),
-          ],
+
+              SizedBox(height: 12),
+
+              // Última lectura
+              Divider(color: Colors.white.withOpacity(0.1), height: 16),
+              Row(
+                children: [
+                  Icon(Icons.access_time, color: Colors.white60, size: 14),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          formattedDate,
+                          style: TextStyle(fontFamily: 'Roboto',
+                            fontSize: 11,
+                            color: Colors.white70,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          formattedTime,
+                          style: TextStyle(fontFamily: 'Roboto',
+                            fontSize: 10,
+                            color: Colors.white60,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

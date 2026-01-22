@@ -20,6 +20,7 @@ export 'calibrate_g_p_s.dart' show calibrateGPS;
 export 'check_calibration_needed.dart' show checkCalibrationNeeded;
 export 'mark_calibration_completed.dart' show markCalibrationCompleted;
 export 'read_n_f_c.dart' show readNFC;
+export 'read_nfc_basic.dart' show readNFCBasic;
 export 'read_nfc_detailed.dart' show readNfcDetailed;
 export 'read_q_r.dart' show readQR;
 export 'get_sp3_nav_file.dart' show getSp3NavFile;
@@ -60,3 +61,16 @@ export 'background_location_service.dart'
 export 'check_nfc_status.dart' show checkNfcStatus, openNfcSettings, NfcStatus;
 export 'detect_nfc_capacity.dart' show detectNfcCapacity;
 export 'write_n_f_c_tag_direct.dart' show writeNFCTagDirect;
+export 'search_users_sqlite.dart' show searchUsersSqlite;
+export 'nfc_json_helper.dart'
+    show
+        buildInitialNfcJson,
+        updateReadInfo,
+        addVisitToNfcJson,
+        parseNfcJson,
+        nfcJsonToString,
+        extractVisitsFromJson,
+        groupVisitsByHeadquarter,
+        migrateOldFormatToJson,
+        isNewJsonFormat,
+        isOldFormat;

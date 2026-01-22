@@ -276,45 +276,35 @@ class _InformationFormState extends State<InformationForm>
     final imei = FFAppState().deviceDefault.imeI1;
     final authToken = FFAppState().loginResponse['token'] as String? ?? '';
 
-    // Mostrar diálogo con SyncVisitsForm y esperar resultado
-    final result = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: SyncVisitsForm(
-          width: MediaQuery.of(context).size.width - 32,
-          height: MediaQuery.of(context).size.height - 100,
-          newsAdd: newsAdd,
-          idCompany: idCompany,
-          idsHeadquarters: idsHeadquarters,
-          imei: imei,
-          authToken: authToken,
-        ),
-      ),
+    // Navegar a la nueva página de sincronización moderna
+    await context.pushNamed(
+      'ModernSyncPage',
+      queryParameters: {
+        'newsAdd': serializeParam(newsAdd, ParamType.DataStruct, isList: true),
+        'idCompany': serializeParam(idCompany, ParamType.int),
+        'idsHeadquarters': serializeParam(idsHeadquarters, ParamType.String),
+        'imei': serializeParam(imei, ParamType.String),
+        'authToken': serializeParam(authToken, ParamType.String),
+      }.withoutNulls,
     );
 
-    // Si la sincronización fue exitosa, recargar toda la información
-    if (result == true) {
-      debugPrint(
-          '✅ Sincronización exitosa - Recargando información de la UI...');
+    // Después de regresar de la página de sincronización, recargar toda la información
+    debugPrint('🔄 Regresando de la sincronización - Recargando información de la UI...');
 
-      // Mostrar indicador de carga mientras se recargan los datos
-      if (mounted) {
-        setState(() {
-          _isLoadingData = true;
-        });
-      }
-
-      // Pequeño delay para que la UI se actualice
-      await Future.delayed(const Duration(milliseconds: 300));
-
-      // Recargar todos los datos
-      await _loadAllData();
-
-      debugPrint('✅ Información de la UI actualizada correctamente');
+    // Mostrar indicador de carga mientras se recargan los datos
+    if (mounted) {
+      setState(() {
+        _isLoadingData = true;
+      });
     }
+
+    // Pequeño delay para que la UI se actualice
+    await Future.delayed(const Duration(milliseconds: 300));
+
+    // Recargar todos los datos
+    await _loadAllData();
+
+    debugPrint('✅ Información de la UI actualizada correctamente');
   }
 
   void _navigateToAdvancedConfig() {
@@ -886,7 +876,7 @@ class _InformationFormState extends State<InformationForm>
             _buildDeviceInfoRow(
               icon: Icons.info_outline,
               label: 'Versión App',
-              value: 'v24',
+              value: 'v25',
             ),
           ],
         ),

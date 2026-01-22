@@ -240,30 +240,19 @@ Future<bool> clearNFCTag(BuildContext context) async {
             debugPrint(
                 '✅ TAG Mifare Classic limpiado: $blocksCleared bloques borrados${tagLost ? " (TAG perdido)" : ""}');
 
-            // Solo intentar reformatear si el TAG sigue conectado
-            if (!tagLost && blocksCleared > 0) {
-              try {
-                debugPrint('🔄 Reformateando TAG con contenido mínimo...');
-                final ndefFormatableAfterClear = NdefFormatableAndroid.from(tag);
-                if (ndefFormatableAfterClear != null) {
-                  final minimalMessage = _createMinimalNdefMessage();
-                  await ndefFormatableAfterClear.format(minimalMessage);
-                  debugPrint('✅ TAG reformateado exitosamente (contenido: "0")');
-                } else {
-                  debugPrint(
-                      '⚠️ TAG no soporta reformateo NDEF, pero bloques limpiados');
-                }
-              } catch (reformatError) {
-                debugPrint('⚠️ No se pudo reformatear como NDEF: $reformatError');
-                debugPrint('   (Los bloques fueron limpiados exitosamente)');
-              }
-            }
-
-            // Detener sesión
+            // Detener sesión inmediatamente después de limpiar
+            // NO intentar reformatear porque el TAG puede estar en estado inestable
             await NfcManager.instance.stopSession();
 
             // Si se limpió al menos un bloque, considerar éxito
-            completer.complete(blocksCleared > 0);
+            // El usuario deberá formatear el TAG en una operación separada si desea escribir datos NDEF
+            if (blocksCleared > 0) {
+              debugPrint('ℹ️ TAG limpiado exitosamente. Si desea escribir datos, acerque el TAG nuevamente.');
+              completer.complete(true);
+            } else {
+              debugPrint('⚠️ No se pudieron limpiar bloques del TAG');
+              completer.complete(false);
+            }
             return;
           } catch (e) {
             debugPrint('❌ Error al limpiar Mifare Classic: $e');

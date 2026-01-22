@@ -45,6 +45,7 @@ export '/visits/history_visits_page/history_visits_page_widget.dart'
 export '/configuration/config_maps_page/config_maps_page_widget.dart'
     show ConfigMapsPageWidget;
 export '/sync/sync_page/sync_page_widget.dart' show SyncPageWidget;
+export '/sync/modern_sync_page_widget.dart' show ModernSyncPageWidget;
 export '/configuration/config_backups_page/config_backups_page_widget.dart'
     show ConfigBackupsPageWidget;
 export '/visits/load_coordinates_page/load_coordinates_page_widget.dart'

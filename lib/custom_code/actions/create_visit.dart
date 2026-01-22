@@ -61,12 +61,8 @@ Future<VisitsStruct?> createVisit(
       debugPrint('       Remember Status: ${detail.rememberStatus}');
     }
 
-    // 0.5. NUEVO: Limpiar status de tipo tag-reader, tag-writer, tag-transfer con rememberStatus = false
-    final cleanedVisitsDetails = _cleanTagStatusByRememberFlag(visitsDetails);
-    
-    debugPrint('🧹 LIMPIEZA DE TAGS: ${visitsDetails.length} detalles → ${cleanedVisitsDetails.length} detalles después de filtrar');
-
-    // 1. Crear el objeto VisitsStruct (igual que createVisitsObject)
+    // 1. Crear el objeto VisitsStruct con TODOS los detalles (sin filtrar)
+    // ✅ TODOS los registros deben guardarse en SQLite
     final visitsStruct = VisitsStruct(
       createdAt: createdAt,
       idStatus: idStatus,
@@ -78,7 +74,7 @@ Future<VisitsStruct?> createVisit(
       idUser: idUser,
       idDevice: idDevice,
       locationDefault: locationDefault,
-      visitsDetails: cleanedVisitsDetails,
+      visitsDetails: visitsDetails, // ✅ Sin filtrar - guardar TODO en SQLite
       locationsAdd: locationsAdd,
     );
 
@@ -166,11 +162,32 @@ Future<VisitsStruct?> createVisit(
       debugPrint('ℹ️ No hay detalles de visita para insertar');
     }
 
-    // 8. NUEVO: Actualizar la lista visitsAdd en el AppState
-    await _updateVisitsAddInAppState(context, visitsStruct);
+    // 8. LIMPIAR memoria: Eliminar registros con rememberStatus=false DESPUÉS de guardar en SQLite
+    debugPrint('🧹 LIMPIEZA DE MEMORIA: Aplicando filtro después de guardar en SQLite');
+    final cleanedVisitsDetails = _cleanTagStatusByRememberFlag(visitsDetails);
+    debugPrint('   ✅ ${visitsDetails.length} registros → ${cleanedVisitsDetails.length} registros en memoria');
+
+    // Crear nuevo VisitsStruct con la lista limpia para retornar y actualizar memoria
+    final cleanedVisitsStruct = VisitsStruct(
+      createdAt: createdAt,
+      idStatus: idStatus,
+      idVisit: idVisit,
+      idCompany: idCompany,
+      idActivity: idActivity,
+      idHeadquarter: idHeadquarter,
+      idProduct: idProduct,
+      idUser: idUser,
+      idDevice: idDevice,
+      locationDefault: locationDefault,
+      visitsDetails: cleanedVisitsDetails, // ✅ Lista limpia para memoria
+      locationsAdd: locationsAdd,
+    );
+
+    // 9. Actualizar la lista visitsAdd en el AppState con la lista limpia
+    await _updateVisitsAddInAppState(context, cleanedVisitsStruct);
 
     debugPrint('=== Visita creada exitosamente ===');
-    return visitsStruct;
+    return cleanedVisitsStruct; // Retornar la lista limpia para actualizar memoria
   } catch (e) {
     debugPrint('❌ Error creando visita: $e');
     return null;
@@ -428,23 +445,22 @@ Map<String, double> _parseLocationString(String locationString) {
   }
 }
 
-/// Limpia los status de tipo tag-reader, tag-writer, tag-transfer con rememberStatus = false
-/// Solo mantiene los status que deben ser recordados
+/// Limpia TODOS los status con rememberStatus = false de la memoria
+/// Solo mantiene los status que tienen rememberStatus = true
+/// Esto se aplica DESPUÉS de guardar en SQLite
 List<VisitsDetailsStruct> _cleanTagStatusByRememberFlag(
     List<VisitsDetailsStruct> visitsDetails) {
-  debugPrint('🧹 LIMPIEZA DE STATUS: Filtrando status de tipos NFC con rememberStatus=false');
-  
-  // Tipos de status que se deben limpiar si rememberStatus es false
-  const nfcOperationTypes = {'tag-reader', 'tag-writer', 'tag-transfer'};
+  debugPrint('🧹 LIMPIEZA DE STATUS: Filtrando TODOS los status con rememberStatus=false');
 
   final filteredDetails = visitsDetails.where((detail) {
-    final typeStatus = detail.typeStatus.toLowerCase();
-    final shouldRemove = nfcOperationTypes.contains(typeStatus) && !detail.rememberStatus;
-    
+    final shouldRemove = !detail.rememberStatus;
+
     if (shouldRemove) {
-      debugPrint('   ❌ Removiendo: ${detail.statusOption} (tipo=$typeStatus, remember=${detail.rememberStatus})');
+      debugPrint('   ❌ Removiendo de memoria: ${detail.statusOption} (tipo=${detail.typeStatus}, remember=${detail.rememberStatus})');
+    } else {
+      debugPrint('   ✅ Manteniendo en memoria: ${detail.statusOption} (tipo=${detail.typeStatus}, remember=${detail.rememberStatus})');
     }
-    
+
     return !shouldRemove;
   }).toList();
 

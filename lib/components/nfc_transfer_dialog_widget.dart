@@ -59,37 +59,55 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
   bool _validateTagFormat(String content) {
     debugPrint('🔍 TAG-TRANSFER: Validando formato del tag');
 
-    // Validar que contenga al menos un registro con el formato {DH:...;OP:...;VISITS:...;RESULTS:...;HE:...}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(content);
-
-    debugPrint('📊 TAG-TRANSFER: Registros encontrados en validación: ${matches.length}');
-
-    if (matches.isEmpty) {
-      debugPrint('❌ TAG-TRANSFER: No se encontraron registros con formato {}');
+    // Validar formato JSON nuevo
+    if (actions.isNewJsonFormat(content)) {
+      debugPrint('📋 TAG-TRANSFER: Formato JSON detectado');
+      final nfcJson = actions.parseNfcJson(content);
+      if (nfcJson != null && nfcJson['Visits'] != null) {
+        final visits = nfcJson['Visits'] as List;
+        debugPrint('📊 TAG-TRANSFER: ${visits.length} visitas encontradas en JSON');
+        if (visits.isNotEmpty) {
+          debugPrint('✅ TAG-TRANSFER: Formato JSON válido');
+          return true;
+        }
+      }
+      debugPrint('❌ TAG-TRANSFER: JSON sin visitas');
       return false;
     }
 
-    // Verificar que cada registro tenga los campos requeridos
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
+    // Validar formato antiguo (retrocompatibilidad)
+    if (actions.isOldFormat(content)) {
+      final regexRecords = RegExp(r'\{([^}]+)\}');
+      final matches = regexRecords.allMatches(content);
 
-      debugPrint('📄 TAG-TRANSFER: Validando registro: $recordContent');
+      debugPrint('📊 TAG-TRANSFER: Registros encontrados en formato antiguo: ${matches.length}');
 
-      // Validar que contenga todos los campos requeridos
-      if (!recordContent.contains('DH:') ||
-          !recordContent.contains('OP:') ||
-          !recordContent.contains('VISITS:') ||
-          !recordContent.contains('RESULTS:') ||
-          !recordContent.contains('HE:')) {
-        debugPrint('❌ TAG-TRANSFER: Registro sin todos los campos requeridos');
+      if (matches.isEmpty) {
+        debugPrint('❌ TAG-TRANSFER: No se encontraron registros');
         return false;
       }
+
+      // Verificar que cada registro tenga los campos requeridos
+      for (var match in matches) {
+        final recordContent = match.group(1);
+        if (recordContent == null) continue;
+
+        if (!recordContent.contains('DH:') ||
+            !recordContent.contains('OP:') ||
+            !recordContent.contains('VISITS:') ||
+            !recordContent.contains('RESULTS:') ||
+            !recordContent.contains('HE:')) {
+          debugPrint('❌ TAG-TRANSFER: Registro sin todos los campos requeridos');
+          return false;
+        }
+      }
+
+      debugPrint('✅ TAG-TRANSFER: Formato antiguo válido');
+      return true;
     }
 
-    debugPrint('✅ TAG-TRANSFER: Formato válido');
-    return true;
+    debugPrint('❌ TAG-TRANSFER: Formato no reconocido');
+    return false;
   }
 
   /// Muestra una alerta elegante cuando el tag es inválido
@@ -340,88 +358,122 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
     debugPrint('🔍 TAG-TRANSFER: Parseando contenido del tag');
     debugPrint('📄 Contenido: $nfcContent');
 
-    // El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204},{DH:...}
+    try {
+      // Detectar si es formato JSON nuevo
+      if (actions.isNewJsonFormat(nfcContent)) {
+        debugPrint('📋 TAG-TRANSFER: Parseando formato JSON nuevo');
+        final nfcJson = actions.parseNfcJson(nfcContent);
+        if (nfcJson != null) {
+          final visits = actions.extractVisitsFromJson(nfcJson);
 
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(nfcContent);
+          debugPrint('📊 Visitas extraídas: ${visits.length}');
 
-    debugPrint('📊 Registros encontrados: ${matches.length}');
+          for (var visit in visits) {
+            final heId = visit['headquarterId'] as int? ?? 0;
 
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
+            // Si el lote no existe en el map, crearlo
+            if (!groupedByHeadquarter.containsKey(heId)) {
+              groupedByHeadquarter[heId] = {
+                'totalVisits': 0,
+                'totalResults': 0,
+                'records': <Map<String, dynamic>>[],
+              };
+            }
 
-      // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {};
-      final fields = recordContent.split(';');
+            // Agregar el registro al lote
+            groupedByHeadquarter[heId]!['totalVisits'] =
+                (groupedByHeadquarter[heId]!['totalVisits'] as int) +
+                    (visit['visits'] as int? ?? 0);
+            groupedByHeadquarter[heId]!['totalResults'] =
+                (groupedByHeadquarter[heId]!['totalResults'] as int) +
+                    (visit['results'] as int? ?? 0);
+            (groupedByHeadquarter[heId]!['records']
+                    as List<Map<String, dynamic>>)
+                .add(visit);
+          }
+        }
+      } else if (actions.isOldFormat(nfcContent)) {
+        // Formato antiguo (retrocompatibilidad)
+        debugPrint('📋 TAG-TRANSFER: Parseando formato antiguo');
+        final regexRecords = RegExp(r'\{([^}]+)\}');
+        final matches = regexRecords.allMatches(nfcContent);
 
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value = parts.sublist(1).join(':').trim();
+        debugPrint('📊 Registros encontrados: ${matches.length}');
 
-          switch (key) {
-            case 'DH':
-              // Parsear fecha: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  record['dateTime'] =
-                      DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                record['dateTime'] = DateTime.now();
+        for (var match in matches) {
+          final recordContent = match.group(1);
+          if (recordContent == null) continue;
+
+          final Map<String, dynamic> record = {};
+          final fields = recordContent.split(';');
+
+          for (var field in fields) {
+            final parts = field.split(':');
+            if (parts.length >= 2) {
+              final key = parts[0].trim();
+              final value = parts.sublist(1).join(':').trim();
+
+              switch (key) {
+                case 'DH':
+                  try {
+                    final dateStr = value.replaceAll('_', '-');
+                    final dateParts = dateStr.split('-');
+                    if (dateParts.length >= 4) {
+                      final year = int.parse(dateParts[0]);
+                      final month = int.parse(dateParts[1]);
+                      final day = int.parse(dateParts[2]);
+                      final timeParts = dateParts[3].split(':');
+                      final hour = int.parse(timeParts[0]);
+                      final minute = int.parse(timeParts[1]);
+                      final second = int.parse(timeParts[2]);
+                      record['dateTime'] =
+                          DateTime(year, month, day, hour, minute, second);
+                    }
+                  } catch (e) {
+                    record['dateTime'] = DateTime.now();
+                  }
+                  break;
+                case 'OP':
+                  record['operatorId'] = value;
+                  break;
+                case 'VISITS':
+                  record['visits'] = int.tryParse(value) ?? 0;
+                  break;
+                case 'RESULTS':
+                  record['results'] = int.tryParse(value) ?? 0;
+                  break;
+                case 'HE':
+                  record['headquarterId'] = int.tryParse(value) ?? 0;
+                  break;
               }
-              break;
-            case 'OP':
-              record['operatorId'] = value;
-              break;
-            case 'VISITS':
-              record['visits'] = int.tryParse(value) ?? 0;
-              break;
-            case 'RESULTS':
-              record['results'] = int.tryParse(value) ?? 0;
-              break;
-            case 'HE':
-              record['headquarterId'] = int.tryParse(value) ?? 0;
-              break;
+            }
+          }
+
+          if (record.isNotEmpty) {
+            final heId = record['headquarterId'] as int? ?? 0;
+
+            if (!groupedByHeadquarter.containsKey(heId)) {
+              groupedByHeadquarter[heId] = {
+                'totalVisits': 0,
+                'totalResults': 0,
+                'records': <Map<String, dynamic>>[],
+              };
+            }
+
+            groupedByHeadquarter[heId]!['totalVisits'] =
+                (groupedByHeadquarter[heId]!['totalVisits'] as int) +
+                    (record['visits'] as int? ?? 0);
+            groupedByHeadquarter[heId]!['totalResults'] =
+                (groupedByHeadquarter[heId]!['totalResults'] as int) +
+                    (record['results'] as int? ?? 0);
+            (groupedByHeadquarter[heId]!['records']
+                    as List<Map<String, dynamic>>)
+                .add(record);
           }
         }
       }
-
-      if (record.isNotEmpty) {
-        final heId = record['headquarterId'] as int? ?? 0;
-
-        // Si el lote no existe en el map, crearlo
-        if (!groupedByHeadquarter.containsKey(heId)) {
-          groupedByHeadquarter[heId] = {
-            'totalVisits': 0,
-            'totalResults': 0,
-            'records': <Map<String, dynamic>>[],
-          };
-        }
-
-        // Agregar el registro al lote
-        groupedByHeadquarter[heId]!['totalVisits'] =
-            (groupedByHeadquarter[heId]!['totalVisits'] as int) +
-                (record['visits'] as int? ?? 0);
-        groupedByHeadquarter[heId]!['totalResults'] =
-            (groupedByHeadquarter[heId]!['totalResults'] as int) +
-                (record['results'] as int? ?? 0);
-        (groupedByHeadquarter[heId]!['records'] as List<Map<String, dynamic>>)
-            .add(record);
-      }
+    } catch (e) {
+      debugPrint('❌ TAG-TRANSFER: Error parseando: $e');
     }
 
     debugPrint(

@@ -35,9 +35,42 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Generar datos de prueba
-    _model.dataToWrite =
-        '{DH:2025_11_27_13:36:48;OP:4442;VISITS:3;RESULTS:6;HE:112},{DH:2025_11_27_13:36:48;OP:4442;VISITS:3;RESULTS:6;HE:112}';
+    // Generar datos de prueba en formato JSON
+    final testJson = actions.buildInitialNfcJson(
+      idProduct: 999999,
+      rfid: 'TEST1234',
+      nameProduct: 'TAG de Prueba',
+    );
+
+    // Agregar visitas de prueba
+    actions.addVisitToNfcJson(
+      testJson,
+      operatorId: 293,
+      visits: 10,
+      results: 8,
+      headquarterId: 204,
+      dateTime: DateTime.now(),
+    );
+
+    actions.addVisitToNfcJson(
+      testJson,
+      operatorId: 294,
+      visits: 15,
+      results: 10,
+      headquarterId: 204,
+      dateTime: DateTime.now().add(Duration(minutes: 10)),
+    );
+
+    actions.addVisitToNfcJson(
+      testJson,
+      operatorId: 295,
+      visits: 17,
+      results: 11,
+      headquarterId: 204,
+      dateTime: DateTime.now().add(Duration(minutes: 20)),
+    );
+
+    _model.dataToWrite = actions.nfcJsonToString(testJson);
   }
 
   @override

@@ -79,7 +79,8 @@ class _TagConfigurationStepperWidgetState
     });
 
     try {
-      final content = await actions.readNFC(context, autoClose: false);
+      // Usar readNFCBasic para Centro de Administración (sin validación de tipo)
+      final content = await actions.readNFCBasic(context, autoClose: false);
       if (mounted) {
         setState(() {
           _tagContent = content ?? '';
