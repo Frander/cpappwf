@@ -11,7 +11,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
-import 'dart:convert';
 import 'video_capture_component_model.dart';
 export 'video_capture_component_model.dart';
 
@@ -85,41 +84,39 @@ class _VideoCaptureComponentWidgetState
   }
 
   Future<void> _loadExistingVideo() async {
-    final existingVideoBase64 = functions.statusResponseByActivityStatusAlternative(
+    final existingVideo = functions.statusResponseByActivityStatusAlternative(
       widget.idStatus,
       FFAppState().visitDetails.toList(),
       widget.idStepParent,
     );
 
-    if (existingVideoBase64.isNotEmpty) {
-      debugPrint('🎬 Cargando video existente desde base64: ${existingVideoBase64.length} caracteres');
+    if (existingVideo.isNotEmpty) {
+      debugPrint('🎬 Cargando video existente: $existingVideo');
 
       try {
-        // Decodificar base64 a bytes
-        final videoBytes = base64Decode(existingVideoBase64);
+        // Verificar que el archivo existe
+        final file = File(existingVideo);
+        if (await file.exists()) {
+          // Inicializar el controlador de video para preview
+          _videoController?.dispose();
+          _videoController = VideoPlayerController.file(file);
+          await _videoController!.initialize();
 
-        // Crear archivo temporal para el preview
-        final tempDir = Directory.systemTemp;
-        final tempFile = File('${tempDir.path}/temp_video_${DateTime.now().millisecondsSinceEpoch}.mp4');
-        await tempFile.writeAsBytes(videoBytes);
+          // Pausar en el primer frame
+          await _videoController!.seekTo(Duration.zero);
 
-        // Inicializar el controlador de video para preview
-        _videoController?.dispose();
-        _videoController = VideoPlayerController.file(tempFile);
-        await _videoController!.initialize();
+          setState(() {
+            _existingVideoPath = existingVideo;
+            _model.videoPath = existingVideo;
+            _model.isVideoTaken = true;
+          });
 
-        // Pausar en el primer frame
-        await _videoController!.seekTo(Duration.zero);
-
-        setState(() {
-          _existingVideoPath = tempFile.path;
-          _model.videoPath = tempFile.path;
-          _model.isVideoTaken = true;
-        });
-
-        debugPrint('✅ Video existente cargado correctamente desde base64');
+          debugPrint('✅ Video existente cargado correctamente');
+        } else {
+          debugPrint('⚠️ El archivo de video no existe: $existingVideo');
+        }
       } catch (e) {
-        debugPrint('❌ Error al cargar video existente desde base64: $e');
+        debugPrint('❌ Error al cargar video existente: $e');
       }
     }
   }
@@ -161,25 +158,16 @@ class _VideoCaptureComponentWidgetState
   }
 
   Future<void> _saveVideo(String videoPath) async {
-    // Convertir video a base64 (el video ya viene comprimido, no necesita gzip adicional)
-    String videoBase64 = '';
-
-    if (videoPath.isNotEmpty) {
-      try {
-        final bytes = await File(videoPath).readAsBytes();
-        videoBase64 = base64Encode(bytes);
-        debugPrint('🎥 Video convertido a base64: ${bytes.length} bytes → ${videoBase64.length} caracteres');
-      } catch (e) {
-        debugPrint('❌ Error convirtiendo video a base64: $e');
-      }
-    }
+    // Guardar solo el path del video (no base64) para evitar OutOfMemoryError
+    // El video se convertirá a base64 cuando se sincronice la visita
+    debugPrint('🎥 Guardando path del video: $videoPath');
 
     final visitDetailsCopy = await actions.updateOrAddVisitDetail(
       FFAppState().visitDetails.toList(),
       widget.idStatus,
       widget.idStepParent,
       widget.statusName,
-      videoBase64, // Guardar base64 del video
+      videoPath, // Guardar path del video temporalmente
       getJsonField(widget.statusJSON, r'''$.remember_status'''),
       getJsonField(widget.statusJSON, r'''$.default_status''').toString(),
       0,
@@ -189,7 +177,7 @@ class _VideoCaptureComponentWidgetState
         visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
 
-    debugPrint('✅ Video guardado exitosamente en visitDetails como base64');
+    debugPrint('✅ Video guardado exitosamente en visitDetails (path)');
   }
 
   Future<void> _deleteVideo() async {

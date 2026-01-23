@@ -10,8 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:convert';
-import 'dart:io' show gzip;
 import 'photo_capture_component_model.dart';
 export 'photo_capture_component_model.dart';
 
@@ -45,8 +43,8 @@ class _PhotoCaptureComponentWidgetState
   late Animation<double> _pulseAnimation;
   final ImagePicker _picker = ImagePicker();
 
-  // Variable para almacenar foto existente en base64 (desde visitDetails)
-  String? _existingPhotoBase64;
+  // Variable para almacenar foto existente como path (desde visitDetails)
+  String? _existingPhotoPath;
 
   @override
   void setState(VoidCallback callback) {
@@ -88,12 +86,24 @@ class _PhotoCaptureComponentWidgetState
     );
 
     if (existingPhoto.isNotEmpty) {
-      setState(() {
-        // Guardar el base64 existente
-        _existingPhotoBase64 = existingPhoto;
-        _model.isPhotoTaken = true;
-        // NO establecer photoPath aquí, porque es base64, no un path
-      });
+      debugPrint('📸 Cargando foto existente: $existingPhoto');
+
+      try {
+        // Verificar que el archivo existe
+        final file = File(existingPhoto);
+        if (await file.exists()) {
+          setState(() {
+            _existingPhotoPath = existingPhoto;
+            _model.photoPath = existingPhoto;
+            _model.isPhotoTaken = true;
+          });
+          debugPrint('✅ Foto existente cargada correctamente');
+        } else {
+          debugPrint('⚠️ El archivo de foto no existe: $existingPhoto');
+        }
+      } catch (e) {
+        debugPrint('❌ Error al cargar foto existente: $e');
+      }
     }
   }
 
@@ -112,8 +122,8 @@ class _PhotoCaptureComponentWidgetState
         setState(() {
           _model.photoPath = photo.path;
           _model.isPhotoTaken = true;
-          // Limpiar el base64 existente porque ahora tenemos una foto nueva
-          _existingPhotoBase64 = null;
+          // Limpiar el path existente porque ahora tenemos una foto nueva
+          _existingPhotoPath = null;
         });
 
         HapticFeedback.heavyImpact();
@@ -132,34 +142,16 @@ class _PhotoCaptureComponentWidgetState
   }
 
   Future<void> _savePhoto(String photoPath) async {
-    // Convertir imagen a base64 comprimido con gzip
-    String photoBase64 = '';
-
-    // Si hay una foto nueva capturada (photoPath), convertirla a base64 comprimido
-    if (photoPath.isNotEmpty) {
-      try {
-        final bytes = await File(photoPath).readAsBytes();
-        // Comprimir con gzip ANTES de convertir a base64
-        final compressedBytes = gzip.encode(bytes);
-        photoBase64 = base64Encode(compressedBytes);
-        debugPrint('📸 Foto comprimida con gzip: ${bytes.length} bytes → ${compressedBytes.length} bytes');
-        debugPrint('📸 Foto convertida a base64: ${photoBase64.length} caracteres');
-      } catch (e) {
-        debugPrint('❌ Error convirtiendo foto a base64 comprimido: $e');
-      }
-    }
-    // Si no hay foto nueva pero existe base64 de una foto anterior, usar ese
-    else if (_existingPhotoBase64 != null && _existingPhotoBase64!.isNotEmpty) {
-      photoBase64 = _existingPhotoBase64!;
-      debugPrint('📸 Usando foto existente desde base64: ${photoBase64.length} caracteres');
-    }
+    // Guardar solo el path de la foto (no base64) para evitar OutOfMemoryError
+    // La foto se comprimirá con GZIP y convertirá a base64 cuando se sincronice la visita
+    debugPrint('📸 Guardando path de la foto: $photoPath');
 
     final visitDetailsCopy = await actions.updateOrAddVisitDetail(
       FFAppState().visitDetails.toList(),
       widget.idStatus,
       widget.idStepParent,
       widget.statusName,
-      photoBase64, // Guardar base64 en lugar de path
+      photoPath, // Guardar path de la foto temporalmente
       getJsonField(widget.statusJSON, r'''$.remember_status'''),
       getJsonField(widget.statusJSON, r'''$.default_status''').toString(),
       0,
@@ -168,6 +160,8 @@ class _PhotoCaptureComponentWidgetState
     FFAppState().visitDetails =
         visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
+
+    debugPrint('✅ Foto guardada exitosamente en visitDetails (path)');
   }
 
   Future<void> _deletePhoto() async {
@@ -176,7 +170,7 @@ class _PhotoCaptureComponentWidgetState
     setState(() {
       _model.photoPath = null;
       _model.isPhotoTaken = false;
-      _existingPhotoBase64 = null; // Limpiar también el base64 existente
+      _existingPhotoPath = null; // Limpiar también el path existente
     });
 
     // Eliminar de visitDetails
@@ -513,14 +507,14 @@ class _PhotoCaptureComponentWidgetState
         borderRadius: BorderRadius.circular(24),
         child: Stack(
           children: [
-            // Foto (desde archivo nuevo o desde base64 existente)
+            // Foto (desde archivo - path existente o nuevo)
             SizedBox(
               width: double.infinity,
               height: double.infinity,
-              child: _existingPhotoBase64 != null
-                  // Mostrar desde base64 (foto existente cargada de visitDetails)
-                  ? Image.memory(
-                      base64Decode(_existingPhotoBase64!),
+              child: _existingPhotoPath != null
+                  // Mostrar desde path (foto existente cargada de visitDetails)
+                  ? Image.file(
+                      File(_existingPhotoPath!),
                       fit: BoxFit.cover,
                       gaplessPlayback: true,
                       errorBuilder: (context, error, stackTrace) {

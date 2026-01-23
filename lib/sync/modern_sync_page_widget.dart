@@ -1,7 +1,6 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/app_state.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:sqflite/sqflite.dart';
@@ -10,7 +9,6 @@ import 'package:path/path.dart' as path;
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 
 /// Página moderna de sincronización con cuatro opciones:
 /// 1. Sincronización Completa (redes estables - con compresión)
@@ -251,18 +249,19 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _buildSyncOptionCard(
-                    title: 'Sincronización Completa',
-                    description:
-                        'Para redes más estables. Comprime visitas y ubicaciones antes de enviar',
-                    icon: Icons.cloud_sync_rounded,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF00a86b), Color(0xFF00ff9f)],
-                    ),
-                    onTap: () => _startSync(SyncMode.fullSync),
-                    badge: 'RECOMENDADO',
-                  ),
-                  const SizedBox(height: 16),
+                  // Sincronización Completa - OCULTA
+                  // _buildSyncOptionCard(
+                  //   title: 'Sincronización Completa',
+                  //   description:
+                  //       'Para redes más estables. Comprime visitas y ubicaciones antes de enviar',
+                  //   icon: Icons.cloud_sync_rounded,
+                  //   gradient: LinearGradient(
+                  //     colors: [Color(0xFF00a86b), Color(0xFF00ff9f)],
+                  //   ),
+                  //   onTap: () => _startSync(SyncMode.fullSync),
+                  //   badge: 'RECOMENDADO',
+                  // ),
+                  // const SizedBox(height: 16),
                   _buildSyncOptionCard(
                     title: 'Sincronización Optimizada',
                     description:
@@ -272,7 +271,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                       colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)],
                     ),
                     onTap: () => _startSync(SyncMode.optimizedSync),
-                    badge: 'REDES LENTAS',
+                    badge: 'RECOMENDADO',
                   ),
                   const SizedBox(height: 20),
                   // Botones compactos en una fila
@@ -1300,7 +1299,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         await Future.delayed(Duration(milliseconds: 800));
       }
 
-      // 5. Sincronizar visitas
+      // 5. Guardar backup JSON y sincronizar visitas
+      await _updateProgress(0.80, 'Guardando backup local...');
+      await _saveVisitsBackup();
+
       await _updateProgress(0.85, 'Enviando ${syncStats.totalVisits} visitas');
 
       bool success = await _syncVisits();
@@ -1393,7 +1395,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         await Future.delayed(Duration(milliseconds: 800));
       }
 
-      // 5. Sincronizar visitas SIN COMPRIMIR (modo optimizado para redes lentas)
+      // 5. Guardar backup JSON y sincronizar visitas SIN COMPRIMIR (modo optimizado para redes lentas)
+      await _updateProgress(0.80, 'Guardando backup local...');
+      await _saveVisitsBackup();
+
       await _updateProgress(0.85, 'Enviando ${syncStats.totalVisits} visitas (sin comprimir)');
 
       // Usar _syncVisitsOptimized que envía sin comprimir
@@ -1449,6 +1454,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       }
 
       await _updateProgress(0.3, 'Recolectando visitas pendientes...');
+
+      // Guardar backup JSON antes de sincronizar
+      await _updateProgress(0.4, 'Guardando backup local...');
+      await _saveVisitsBackup();
 
       // Intentar con endpoint multipart primero
       await _updateProgress(0.5, 'Enviando visitas (método 1)...');
@@ -1586,7 +1595,15 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       FFAppState().activitiesStatusSelected = [];
       FFAppState().newsAdd = [];
       FFAppState().StatusAdd = [];
-      FFAppState().geoLocationsList = [];
+      // CRÍTICO: Mantener al menos la última ubicación en geoLocationsList
+      final currentGeoLocations = FFAppState().geoLocationsList;
+      if (currentGeoLocations.isNotEmpty) {
+        FFAppState().geoLocationsList = [currentGeoLocations.last];
+        debugPrint('📍 geoLocationsList: mantenida última ubicación (${currentGeoLocations.length} -> 1)');
+      } else {
+        FFAppState().geoLocationsList = [];
+        debugPrint('⚠️ geoLocationsList estaba vacío al hacer logout');
+      }
       FFAppState().loginResponse = null;
       FFAppState().userSelected = UsersStruct();
       FFAppState().companyDefault = CompaniesStruct();
@@ -1703,6 +1720,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       final visitsAddJson = await _getVisitsAddFromSQLiteForJson(widget.idCompany);
 
       final payload = {
+        'created_at': DateTime.now().toIso8601String(),
         'news_add': newsAddJson,
         'visits_add': visitsAddJson,
         'id_company': widget.idCompany,
@@ -1765,38 +1783,138 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           v.Id_activity as id_activity,
           v.Id_headquarter as id_headquarter,
           v.Id_product as id_product,
-          p.Rfid as rfid,
           v.Id_user as id_user,
           v.Id_device as id_device,
           v.Created_at as created_at,
           v.Latitude,
           v.Longitude,
           v.Altitude,
-          v.Error_horizontal
+          v.Error_horizontal,
+          v.Rfid as rfid,
+
+          vd.Id_visit_detail as detail_id,
+          vd.Id_activity_status as detail_activity_status,
+          vd.Status_option as detail_status_option,
+          vd.Status_response as detail_status_response,
+
+          ast.Type_status as detail_type_status
         FROM Visits v
-        LEFT JOIN Products p ON v.Id_product = p.Id_product
+        LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
+        LEFT JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
         WHERE v.Id_company = ?
+        ORDER BY v.Created_at DESC, vd.Id_visit_detail ASC
       ''', [idCompany]);
 
+      // NO cerrar la BD todavía - la necesitamos para obtener Visits_locations
+      debugPrint('📍 Obteniendo ubicaciones desde tabla Visits_locations (SQLite)...');
+
+      final Map<int, Map<String, dynamic>> visitsMap = {};
+
+      for (final row in rawData) {
+        final int visitId = row['id_visit'];
+
+        if (!visitsMap.containsKey(visitId)) {
+          // Parsear y validar created_at
+          String createdAt;
+          try {
+            final rawCreatedAt = row['created_at'];
+            if (rawCreatedAt != null && rawCreatedAt.toString().isNotEmpty) {
+              final parsedDate = DateTime.tryParse(rawCreatedAt.toString());
+              if (parsedDate != null && parsedDate.year > 1900) {
+                createdAt = parsedDate.toIso8601String();
+              } else {
+                createdAt = DateTime.now().toIso8601String();
+              }
+            } else {
+              createdAt = DateTime.now().toIso8601String();
+            }
+          } catch (e) {
+            createdAt = DateTime.now().toIso8601String();
+            debugPrint('⚠️ Error parseando created_at para visita $visitId: $e');
+          }
+
+          // Obtener las últimas 3 ubicaciones desde la tabla Visits_locations
+          final locationRows = await db.rawQuery('''
+            SELECT Latitude, Longitude, Altitude, HorizontalError, CreatedAt
+            FROM Visits_locations
+            WHERE Id_visit = ?
+            ORDER BY CreatedAt DESC
+            LIMIT 3
+          ''', [visitId]);
+
+          debugPrint('📍 Visita $visitId: ${locationRows.length} ubicaciones encontradas en Visits_locations');
+
+          // Construir location_default desde los campos de la tabla Visits
+          final String locationDefault = 'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}';
+
+          // Construir locations_add: primero location_default, luego las últimas 3 de Visits_locations
+          final List<String> locationsAddList = [locationDefault];
+
+          // Agregar las últimas 3 ubicaciones de Visits_locations
+          locationsAddList.addAll(locationRows.map((locRow) {
+            final lat = locRow['Latitude'] ?? 0.0;
+            final lon = locRow['Longitude'] ?? 0.0;
+            final alt = locRow['Altitude'] ?? 0.0;
+            final erh = locRow['HorizontalError'] ?? 0.0;
+            return 'LAT:$lat;LON:$lon;ALT:$alt;ERH:$erh';
+          }).toList());
+
+          debugPrint('📍 locations_add total: ${locationsAddList.length} ubicaciones (1 default + ${locationRows.length} adicionales)');
+
+          visitsMap[visitId] = {
+            'created_at': createdAt,
+            'id_visit': row['id_visit'],
+            'id_company': row['id_company'],
+            'id_activity': row['id_activity'],
+            'id_headquarter': row['id_headquarter'],
+            'id_product': row['id_product'],
+            'id_user': row['id_user'],
+            'id_device': row['id_device'],
+            'rfid': row['rfid'],
+            'visits_details': <Map<String, dynamic>>[],
+            'locations_add': locationsAddList,
+            'location_default': locationDefault,
+            '_details_ids': <int>{},
+          };
+        }
+
+        final visit = visitsMap[visitId]!;
+
+        // Procesar detalles de visita
+        if (row['detail_id'] != null) {
+          final int detailId = row['detail_id'];
+          if (!visit['_details_ids'].contains(detailId)) {
+            visit['_details_ids'].add(detailId);
+
+            String statusResponse = row['detail_status_response'] ?? '';
+
+            visit['visits_details'].add({
+              'id_visit_detail': 0,
+              'id_visit': 0,
+              'id_activity_status': row['detail_activity_status'],
+              'status_option': row['detail_status_option'] ?? '',
+              'status_response': statusResponse,
+            });
+          }
+        }
+      }
+
+      final List<Map<String, dynamic>> visitsFormatted =
+          visitsMap.values.map((visit) {
+        visit.remove('_details_ids');
+        return visit;
+      }).toList();
+
+      // Cerrar la base de datos
       await db.close();
 
-      return rawData.map((row) {
-        return {
-          'id_visit': row['id_visit'],
-          'id_company': row['id_company'],
-          'id_activity': row['id_activity'],
-          'id_headquarter': row['id_headquarter'],
-          'id_product': row['id_product'],
-          'rfid': row['rfid'],
-          'id_user': row['id_user'],
-          'id_device': row['id_device'],
-          'created_at': row['created_at'],
-          'latitude': row['Latitude'],
-          'longitude': row['Longitude'],
-          'altitude': row['Altitude'],
-          'error_horizontal': row['Error_horizontal'],
-        };
-      }).toList();
+      debugPrint('✅ Visits_add procesadas: ${visitsFormatted.length}');
+      for (var i = 0; i < visitsFormatted.length && i < 5; i++) {
+        final visit = visitsFormatted[i];
+        debugPrint('   📍 Visita ${visit['id_visit']}: ${visit['locations_add'].length} ubicaciones');
+      }
+
+      return visitsFormatted;
     } catch (e) {
       debugPrint('❌ Error obteniendo visits_add: $e');
       return [];
@@ -1810,10 +1928,11 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       final Database db = await openDatabase(dbPath);
 
       await db.transaction((txn) async {
-        // Limpiar visitas y detalles
+        // Limpiar visitas, detalles y ubicaciones
         await txn.delete('Visits');
         await txn.delete('Visits_details');
-        debugPrint('✅ Visitas limpiadas de SQLite');
+        await txn.delete('Visits_locations');
+        debugPrint('✅ Visitas, detalles y ubicaciones limpiadas de SQLite');
       });
 
       await db.close();
@@ -2534,6 +2653,30 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
     } catch (e) {
       debugPrint('❌ Error sincronizando visitas: $e');
       return false;
+    }
+  }
+
+  /// Guarda un backup JSON de las visitas antes de sincronizar
+  Future<void> _saveVisitsBackup() async {
+    try {
+      debugPrint('💾 Guardando backup JSON de visitas...');
+
+      // Obtener todas las visitas del AppState
+      final visits = FFAppState().visitsAdd;
+
+      if (visits.isEmpty) {
+        debugPrint('⚠️ No hay visitas para guardar en backup');
+        return;
+      }
+
+      // Llamar a la función que guarda el archivo JSON
+      await actions.saveVisitsToDownloads(visits);
+
+      debugPrint('✅ Backup JSON guardado exitosamente (${visits.length} visitas)');
+    } catch (e) {
+      debugPrint('⚠️ Error guardando backup JSON: $e');
+      // No lanzar excepción para no interrumpir la sincronización
+      // El backup es opcional, si falla continuamos con la sincronización
     }
   }
 

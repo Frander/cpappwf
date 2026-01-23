@@ -876,7 +876,7 @@ class _InformationFormState extends State<InformationForm>
             _buildDeviceInfoRow(
               icon: Icons.info_outline,
               label: 'Versión App',
-              value: 'v25',
+              value: 'v27',
             ),
           ],
         ),

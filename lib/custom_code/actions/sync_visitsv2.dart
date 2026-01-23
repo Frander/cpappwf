@@ -367,8 +367,34 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
       final int visitId = row['id_visit'];
 
       if (!visitsMap.containsKey(visitId)) {
+        // Parsear y validar created_at
+        String createdAt;
+        try {
+          final rawCreatedAt = row['created_at'];
+          if (rawCreatedAt != null && rawCreatedAt.toString().isNotEmpty) {
+            // Intentar parsear la fecha
+            final parsedDate = DateTime.tryParse(rawCreatedAt.toString());
+            if (parsedDate != null && parsedDate.year > 1900) {
+              // Fecha válida
+              createdAt = parsedDate.toIso8601String();
+            } else {
+              // Fecha inválida, usar fecha actual
+              createdAt = DateTime.now().toIso8601String();
+              debugPrint('⚠️ Fecha inválida para visita $visitId, usando fecha actual');
+            }
+          } else {
+            // Campo vacío, usar fecha actual
+            createdAt = DateTime.now().toIso8601String();
+            debugPrint('⚠️ Campo created_at vacío para visita $visitId, usando fecha actual');
+          }
+        } catch (e) {
+          // Error parseando, usar fecha actual
+          createdAt = DateTime.now().toIso8601String();
+          debugPrint('⚠️ Error parseando created_at para visita $visitId: $e, usando fecha actual');
+        }
+
         visitsMap[visitId] = {
-          'created_at': row['created_at'],
+          'created_at': createdAt,
           'id_visit': row['id_visit'],
           'id_company': row['id_company'],
           'id_activity': row['id_activity'],
@@ -622,8 +648,34 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
       final int visitId = row['id_visit'];
 
       if (!visitsMap.containsKey(visitId)) {
+        // Parsear y validar created_at
+        String createdAt;
+        try {
+          final rawCreatedAt = row['created_at'];
+          if (rawCreatedAt != null && rawCreatedAt.toString().isNotEmpty) {
+            // Intentar parsear la fecha
+            final parsedDate = DateTime.tryParse(rawCreatedAt.toString());
+            if (parsedDate != null && parsedDate.year > 1900) {
+              // Fecha válida
+              createdAt = parsedDate.toIso8601String();
+            } else {
+              // Fecha inválida, usar fecha actual
+              createdAt = DateTime.now().toIso8601String();
+              debugPrint('⚠️ Fecha inválida para visita $visitId, usando fecha actual');
+            }
+          } else {
+            // Campo vacío, usar fecha actual
+            createdAt = DateTime.now().toIso8601String();
+            debugPrint('⚠️ Campo created_at vacío para visita $visitId, usando fecha actual');
+          }
+        } catch (e) {
+          // Error parseando, usar fecha actual
+          createdAt = DateTime.now().toIso8601String();
+          debugPrint('⚠️ Error parseando created_at para visita $visitId: $e, usando fecha actual');
+        }
+
         visitsMap[visitId] = {
-          'created_at': row['created_at'],
+          'created_at': createdAt,
           'id_visit': row['id_visit'],
           'id_company': row['id_company'],
           'id_activity': row['id_activity'],
@@ -978,37 +1030,61 @@ String _formatLocationString(
 /// 1. Decodifica base64 → bytes
 /// 2. Comprime con GZIP
 /// 3. Re-codifica a base64
-String _compressPhotoBase64(String base64Content) {
+String _compressPhotoBase64(String photoPathOrBase64) {
   try {
-    if (base64Content.isEmpty) {
-      return base64Content;
+    if (photoPathOrBase64.isEmpty) {
+      return photoPathOrBase64;
     }
 
-    debugPrint('🗜️ Comprimiendo foto...');
+    debugPrint('🗜️ Procesando foto para compresión...');
 
-    // Remover prefijo data URI si existe (data:image/jpeg;base64,)
-    String cleanBase64 = base64Content;
-    if (base64Content.contains(',')) {
-      final parts = base64Content.split(',');
-      if (parts.length > 1 && parts[0].contains('base64')) {
-        cleanBase64 = parts[1];
-        debugPrint('   ℹ️ Prefijo data URI removido');
+    Uint8List originalBytes;
+
+    // Verificar si es una ruta de archivo
+    if (photoPathOrBase64.startsWith('/') ||
+        photoPathOrBase64.contains('/data/') ||
+        photoPathOrBase64.contains('/cache/')) {
+      // Es una ruta de archivo, leer el archivo
+      debugPrint('   📂 Detectado como ruta de archivo');
+      debugPrint('   📂 Ruta: ${photoPathOrBase64.length > 80 ? photoPathOrBase64.substring(0, 80) + "..." : photoPathOrBase64}');
+
+      final File photoFile = File(photoPathOrBase64);
+      if (!photoFile.existsSync()) {
+        debugPrint('   ⚠️ Archivo no existe: $photoPathOrBase64');
+        return photoPathOrBase64; // Retornar ruta original si no existe
       }
+
+      // Leer bytes del archivo
+      originalBytes = photoFile.readAsBytesSync();
+      debugPrint('   ✅ Archivo leído: ${originalBytes.length} bytes (${(originalBytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
+    } else {
+      // Es base64, decodificar
+      debugPrint('   📄 Detectado como base64');
+
+      // Remover prefijo data URI si existe (data:image/jpeg;base64,)
+      String cleanBase64 = photoPathOrBase64;
+      if (photoPathOrBase64.contains(',')) {
+        final parts = photoPathOrBase64.split(',');
+        if (parts.length > 1 && parts[0].contains('base64')) {
+          cleanBase64 = parts[1];
+          debugPrint('   ℹ️ Prefijo data URI removido');
+        }
+      }
+
+      // Decodificar base64 a bytes
+      debugPrint('   📄 Decodificando base64: ${photoPathOrBase64.length} caracteres');
+      originalBytes = base64.decode(cleanBase64);
+      debugPrint('   ✅ Base64 decodificado: ${originalBytes.length} bytes');
     }
 
-    // 1. Decodificar base64 a bytes
-    debugPrint('   📄 Decodificando base64: ${base64Content.length} caracteres');
-    final Uint8List originalBytes = base64.decode(cleanBase64);
-    debugPrint('   ✅ Base64 decodificado: ${originalBytes.length} bytes');
-
-    // 2. Comprimir con GZIP
+    // Comprimir con GZIP
     debugPrint('   🗜️ Comprimiendo con GZIP...');
     final List<int> compressedBytes = gzip.encode(originalBytes);
     debugPrint('   ✅ Comprimido: ${compressedBytes.length} bytes');
 
-    // 3. Re-codificar a base64
+    // Codificar a base64
     final String compressedBase64 = base64.encode(compressedBytes);
-    debugPrint('   ✅ Re-codificado a base64: ${compressedBase64.length} caracteres');
+    debugPrint('   ✅ Convertido a base64: ${compressedBase64.length} caracteres');
 
     // Calcular ratio de compresión
     final double compressionRatio = (1 - compressedBytes.length / originalBytes.length) * 100;
@@ -1019,7 +1095,7 @@ String _compressPhotoBase64(String base64Content) {
   } catch (e) {
     debugPrint('⚠️ Error comprimiendo foto: $e');
     debugPrint('   Retornando contenido original sin comprimir');
-    return base64Content;
+    return photoPathOrBase64;
   }
 }
 

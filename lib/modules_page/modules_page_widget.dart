@@ -34,13 +34,10 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
-  String _appVersion = '...';
-
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => ModulesPageModel());
-    _loadAppVersion();
 
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       await Future.wait([
@@ -103,26 +100,6 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
   }
-
-  Future<void> _loadAppVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      final versionCode = int.tryParse(packageInfo.buildNumber) ?? 0;
-      if (mounted) {
-        setState(() {
-          _appVersion = 'Versión $versionCode';
-        });
-      }
-    } catch (e) {
-      debugPrint('❌ Error obteniendo versión: $e');
-      if (mounted) {
-        setState(() {
-          _appVersion = 'Versión --';
-        });
-      }
-    }
-  }
-
   @override
   void dispose() {
     _model.dispose();
@@ -194,34 +171,6 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   fit: BoxFit.contain,
                                 ),
                               ),
-                            ),
-                            // Versión
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Container(
-                                  padding: EdgeInsetsDirectional.fromSTEB(
-                                      10.0, 4.0, 10.0, 4.0),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    _appVersion,
-                                    style: FlutterFlowTheme.of(context)
-                                        .bodyMedium
-                                        .override(
-                                          font: TextStyle(fontFamily: 'Roboto',
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          color: Color(0xFF00a86b),
-                                          fontSize: 11,
-                                          letterSpacing: 0.5,
-                                        ),
-                                  ),
-                                ),
-                              ],
                             ),
                           ],
                         ),

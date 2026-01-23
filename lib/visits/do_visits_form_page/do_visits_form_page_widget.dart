@@ -13,7 +13,6 @@ import 'package:flutter/services.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'dart:io';
-import 'dart:convert';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
@@ -151,9 +150,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Map para FocusNodes de texto (tipo text)
   final Map<int, FocusNode> _textFocusNodes = {};
-
-  // Map para cachear imágenes decodificadas (tipo photo) - evita parpadeo
-  final Map<String, Uint8List> _cachedPhotoImages = {};
 
   // Map para controladores de búsqueda de usuarios (tipo users-list)
   final Map<int, TextEditingController> _usersSearchControllers = {};
@@ -3738,8 +3734,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Determinar el statusResponse según el tipo
     String finalStatusResponse = defaultStatus;
     if (typeStatus.toLowerCase() == 'unique_choice' || typeStatus.toLowerCase() == 'unique-option') {
-      // Para unique_choice y unique-option, guardar checkmark
-      finalStatusResponse = '✓';
+      // Para unique_choice y unique-option, guardar "Seleccionado"
+      finalStatusResponse = 'Seleccionado';
     }
 
     // Para otros tipos, guardar valor correspondiente
@@ -4995,9 +4991,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
       }
 
-      // Obtener las últimas 3 geolocalizaciones del AppState
-      final geoLocations = FFAppState().geoLocationsList;
-      if (geoLocations.isEmpty) {
+      // Obtener geolocalizaciones de los últimos 5 segundos desde geoLocationsList
+      final allGeoLocations = FFAppState().geoLocationsList;
+      if (allGeoLocations.isEmpty) {
         debugPrint('⚠️ No hay geolocalizaciones disponibles');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -5025,15 +5021,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         return false;
       }
 
-      // Tomar las últimas 3 geolocalizaciones (o menos si no hay suficientes)
-      final recentGeoLocations = geoLocations.length <= 3
-          ? geoLocations.toList()
-          : geoLocations.sublist(geoLocations.length - 3);
+      // Filtrar ubicaciones de los últimos 5 segundos
+      final now = DateTime.now();
+      final fiveSecondsAgo = now.subtract(const Duration(seconds: 5));
+
+      final recentGeoLocations = allGeoLocations.where((loc) {
+        if (loc.dateHourRead == null) return false;
+        return loc.dateHourRead!.isAfter(fiveSecondsAgo) && loc.dateHourRead!.isBefore(now);
+      }).toList();
+
+      // Si no hay ubicaciones de los últimos 5 segundos, usar la más reciente
+      final locationsToSave = recentGeoLocations.isNotEmpty
+          ? recentGeoLocations
+          : [allGeoLocations.last];
 
       // Usar la ubicación más reciente como la principal de la visita
-      final mainLocation = recentGeoLocations.last;
+      final mainLocation = locationsToSave.last;
       debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
-      debugPrint('📍 Total geolocalizaciones a guardar: ${recentGeoLocations.length}');
+      debugPrint('📍 Total geolocalizaciones de los últimos 5 segundos: ${locationsToSave.length}');
 
       // Obtener visitDetails filtrados
       final visitDetails = FFAppState().visitDetails;
@@ -5096,7 +5101,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         debugPrint('✅ $insertedCount detalles de visita insertados');
 
         // Insertar las geolocalizaciones
-        for (var geoPoint in recentGeoLocations) {
+        for (var geoPoint in locationsToSave) {
           await txn.rawInsert('''
             INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -5110,7 +5115,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ]);
         }
 
-        debugPrint('✅ ${recentGeoLocations.length} ubicaciones GPS insertadas');
+        debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
       });
 
       await database.close();
@@ -5195,9 +5200,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
       }
 
-      // Obtener las últimas 3 geolocalizaciones del AppState
-      final geoLocations = FFAppState().geoLocationsList;
-      if (geoLocations.isEmpty) {
+      // Obtener geolocalizaciones de los últimos 5 segundos desde geoLocationsList
+      final allGeoLocations = FFAppState().geoLocationsList;
+      if (allGeoLocations.isEmpty) {
         debugPrint('⚠️ No hay geolocalizaciones disponibles');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -5225,15 +5230,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         return false;
       }
 
-      // Tomar las últimas 3 geolocalizaciones (o menos si no hay suficientes)
-      final recentGeoLocations = geoLocations.length <= 3
-          ? geoLocations.toList()
-          : geoLocations.sublist(geoLocations.length - 3);
+      // Filtrar ubicaciones de los últimos 5 segundos
+      final now = DateTime.now();
+      final fiveSecondsAgo = now.subtract(const Duration(seconds: 5));
+
+      final recentGeoLocations = allGeoLocations.where((loc) {
+        if (loc.dateHourRead == null) return false;
+        return loc.dateHourRead!.isAfter(fiveSecondsAgo) && loc.dateHourRead!.isBefore(now);
+      }).toList();
+
+      // Si no hay ubicaciones de los últimos 5 segundos, usar la más reciente
+      final locationsToSave = recentGeoLocations.isNotEmpty
+          ? recentGeoLocations
+          : [allGeoLocations.last];
 
       // Usar la ubicación más reciente como la principal de la visita
-      final mainLocation = recentGeoLocations.last;
+      final mainLocation = locationsToSave.last;
       debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
-      debugPrint('📍 Total geolocalizaciones a guardar: ${recentGeoLocations.length}');
+      debugPrint('📍 Total geolocalizaciones de los últimos 5 segundos: ${locationsToSave.length}');
 
       // Obtener visitDetails filtrados
       final visitDetails = FFAppState().visitDetails;
@@ -5296,7 +5310,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         debugPrint('✅ $insertedCount detalles de visita insertados');
 
         // Insertar las geolocalizaciones
-        for (var geoPoint in recentGeoLocations) {
+        for (var geoPoint in locationsToSave) {
           await txn.rawInsert('''
             INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -5310,7 +5324,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ]);
         }
 
-        debugPrint('✅ ${recentGeoLocations.length} ubicaciones GPS insertadas');
+        debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
       });
 
       await database.close();
@@ -11556,23 +11570,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return const SizedBox.shrink();
     }
 
-    final photoBase64 = photoDetail.statusResponse;
+    final photoPath = photoDetail.statusResponse;
 
-    // Crear una clave única para el caché (statusId + parentStepId)
-    final cacheKey = '${statusId}_$parentStepId';
-
-    // Decodificar base64 a bytes solo si no está en caché
-    Uint8List imageBytes;
-    if (_cachedPhotoImages.containsKey(cacheKey)) {
-      imageBytes = _cachedPhotoImages[cacheKey]!;
-    } else {
-      try {
-        imageBytes = base64Decode(photoBase64);
-        _cachedPhotoImages[cacheKey] = imageBytes;
-      } catch (e) {
-        debugPrint('❌ Error decodificando base64 de foto: $e');
-        return const SizedBox.shrink();
-      }
+    // Verificar que el archivo existe
+    final photoFile = File(photoPath);
+    if (!photoFile.existsSync()) {
+      debugPrint('⚠️ Archivo de foto no existe: $photoPath');
+      return const SizedBox.shrink();
     }
 
     return Container(
@@ -11600,8 +11604,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 ),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Image.memory(
-                imageBytes,
+              child: Image.file(
+                photoFile,
                 fit: BoxFit.cover,
                 cacheWidth: 120, // Cachear a 120px (2x el tamaño de display para buena calidad)
                 cacheHeight: 120,
