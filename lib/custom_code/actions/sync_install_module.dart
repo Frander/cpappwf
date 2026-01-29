@@ -75,6 +75,20 @@ Future<bool> syncInstallModule(
     final Map<String, dynamic> data = jsonDecode(response.body);
     debugPrint('✅ JSON parseado exitosamente');
 
+    // DEBUG: Mostrar todas las keys del JSON
+    debugPrint('🔍 Keys disponibles en JSON de respuesta:');
+    debugPrint('   ${data.keys.toList()}');
+
+    // DEBUG: Verificar si headquarters_weights existe en el JSON
+    debugPrint('🔍 Verificando headquarters_weights en JSON:');
+    debugPrint('   - Existe key? ${data.containsKey('headquarters_weights')}');
+    if (data.containsKey('headquarters_weights')) {
+      debugPrint('   - Es List? ${data['headquarters_weights'] is List}');
+      if (data['headquarters_weights'] is List) {
+        debugPrint('   - Cantidad: ${(data['headquarters_weights'] as List).length}');
+      }
+    }
+
     // 3. ABRIR BASE DE DATOS (usando el mismo método que validate_db_sqlite.dart)
     final String dbPath = await _getDatabasePath();
     final Database db = await openDatabase(dbPath);
@@ -112,6 +126,13 @@ Future<bool> syncInstallModule(
         // 4.5 Insertar Products y sus coordenadas
         if (data['products'] != null && data['products'] is List) {
           await _insertProducts(txn, data['products'], headquarterId);
+        }
+
+        // 4.6 Insertar Headquarters_weights
+        if (data['headquarters_weights'] != null &&
+            data['headquarters_weights'] is List) {
+          await _insertHeadquartersWeights(
+              txn, data['headquarters_weights'], headquarterId);
         }
       });
     } catch (e) {
@@ -433,6 +454,44 @@ Future<void> _insertTypePoint(
   } catch (e) {
     debugPrint('   ⚠️ Error insertando type_point individual: $e');
     // No rethrow porque type_point es opcional
+  }
+}
+
+/// Inserta Headquarters_weights del lote
+Future<void> _insertHeadquartersWeights(
+  Transaction txn,
+  List<dynamic> weights,
+  int headquarterId,
+) async {
+  try {
+    debugPrint('   📝 Insertando ${weights.length} Headquarters_weights...');
+
+    final batch = txn.batch();
+
+    for (final weight in weights) {
+      batch.insert(
+        'Headquarters_weights',
+        {
+          'Id_headquarter_weight': weight['id_headquarter_weight'],
+          'Id_headquarter': weight['id_headquarter'],
+          'Id_company': weight['id_company'],
+          'Date_year': weight['date_year'],
+          'Date_month': weight['date_month'],
+          'Weight': weight['weight'],
+          'Created_at': weight['created_at'],
+          'Modified_at': weight['modified_at'],
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+
+    debugPrint(
+        '   ✅ ${weights.length} Headquarters_weights insertados/actualizados');
+  } catch (e) {
+    debugPrint('   ❌ Error insertando Headquarters_weights: $e');
+    rethrow;
   }
 }
 

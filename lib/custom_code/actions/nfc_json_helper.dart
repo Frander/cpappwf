@@ -165,7 +165,7 @@ Map<int, Map<String, dynamic>> groupVisitsByHeadquarter(
       grouped[headquarterId] = {
         'totalVisits': 0,
         'totalResults': 0,
-        'entries': <Map<String, dynamic>>[],
+        'records': <Map<String, dynamic>>[],
       };
     }
 
@@ -173,7 +173,7 @@ Map<int, Map<String, dynamic>> groupVisitsByHeadquarter(
         (grouped[headquarterId]!['totalVisits'] as int) + (visit['visits'] as int? ?? 0);
     grouped[headquarterId]!['totalResults'] =
         (grouped[headquarterId]!['totalResults'] as int) + (visit['results'] as int? ?? 0);
-    (grouped[headquarterId]!['entries'] as List).add(visit);
+    (grouped[headquarterId]!['records'] as List).add(visit);
   }
 
   return grouped;

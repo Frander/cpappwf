@@ -248,14 +248,23 @@ Future<bool> writeNFCTag(
             // Si falla la lectura, continuar con solo el nuevo contenido
           }
 
-          // === PROCESAR FORMATO JSON (NUEVO) ===
-          // Parsear el dataToWrite para extraer los campos necesarios
-          // Formato esperado: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204}
-          int? operatorId;
-          int? visits;
-          int? results;
-          int? headquarterId;
-          DateTime? dateTime;
+          // === DETECTAR TIPO DE OPERACIÓN ===
+          // Si dataToWrite ya es un JSON completo válido (tag-transfer),
+          // escribirlo directamente sin modificar
+          if (isNewJsonFormat(dataToWrite)) {
+            debugPrint('🔄 TAG-TRANSFER: JSON completo detectado, escribiendo directamente');
+            finalContent = dataToWrite;
+          } else {
+            // === PROCESAR FORMATO ANTIGUO (TAG-WRITER) ===
+            // Parsear el dataToWrite para extraer los campos necesarios
+            // Formato esperado: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204}
+            int? operatorId;
+            int? visits;
+            int? results;
+            int? headquarterId;
+            DateTime? dateTime;
+
+            debugPrint('📝 TAG-WRITER: Parseando dataToWrite: $dataToWrite');
 
           final recordRegex = RegExp(r'\{([^}]+)\}');
           final recordMatch = recordRegex.firstMatch(dataToWrite);
@@ -263,6 +272,7 @@ Future<bool> writeNFCTag(
           if (recordMatch != null) {
             final recordContent = recordMatch.group(1);
             if (recordContent != null) {
+              debugPrint('📋 Contenido del registro: $recordContent');
               final fields = recordContent.split(';');
               for (var field in fields) {
                 final parts = field.split(':');
@@ -306,6 +316,8 @@ Future<bool> writeNFCTag(
               }
             }
           }
+
+          debugPrint('📊 Valores parseados: OP=$operatorId, VISITS=$visits, RESULTS=$results, HE=$headquarterId');
 
           // Verificar si tenemos la información del producto desde la validación anterior
           int? productId;
@@ -427,6 +439,7 @@ Future<bool> writeNFCTag(
               debugPrint('✅ JSON inicial creado');
             }
           }
+          } // Fin del else para TAG-WRITER
         }
 
         // VALIDAR ESPACIO DISPONIBLE

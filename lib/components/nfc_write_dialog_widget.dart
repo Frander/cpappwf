@@ -301,7 +301,10 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
   }
 
   String _generateNfcData(DateTime dateTime) {
-    // Nuevo formato JSON para NFC tags
+    // Generar formato de escritura para NFC tags
+    // El formato antiguo se usa como "instrucción" para writeNFCTag,
+    // que luego construye el JSON completo al escribir en el tag
+
     // Validar que el operatorId no esté vacío
     final operatorIdValue = _model.operatorId.isEmpty
         ? FFAppState().userSelected.operID
@@ -316,24 +319,12 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
     debugPrint('✅ NFC TAG: OP field = $operatorIdInt');
 
-    // Construir JSON usando el helper de custom actions
-    final nfcJson = actions.buildInitialNfcJson(
-      idProduct: 0, // Se actualizará cuando se lea el tag
-      rfid: '', // Se actualizará cuando se lea el tag
-      nameProduct: '', // Se actualizará cuando se lea el tag
-    );
+    // Formato de fecha: 2025_11_06_13:20:00
+    final dateStr = '${dateTime.year}_${dateTime.month.toString().padLeft(2, '0')}_${dateTime.day.toString().padLeft(2, '0')}_${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
 
-    // Agregar la visita actual
-    actions.addVisitToNfcJson(
-      nfcJson,
-      operatorId: operatorIdInt,
-      visits: _model.totalVisits,
-      results: _model.totalResults,
-      headquarterId: _model.headquarterId,
-      dateTime: dateTime,
-    );
-
-    return actions.nfcJsonToString(nfcJson);
+    // Generar string en formato antiguo: {DH:...;OP:...;VISITS:...;RESULTS:...;HE:...}
+    // writeNFCTag parseará esto y construirá el JSON completo
+    return '{DH:$dateStr;OP:$operatorIdInt;VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
   }
 
   /// Cuenta visitas desde la base de datos SQLite agrupadas por Lote (Id_headquarter)

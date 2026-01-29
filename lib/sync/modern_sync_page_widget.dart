@@ -7,8 +7,10 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 /// Página moderna de sincronización con cuatro opciones:
 /// 1. Sincronización Completa (redes estables - con compresión)
@@ -80,6 +82,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   int _totalProducts = 0;
   int _totalExclusions = 0;
   int _syncedItems = 0;
+
+  // Archivos de media para envío multipart
+  Map<String, String> _mediaFilesToUpload = {};
+  int _mediaFileCounter = 0;
 
   @override
   void initState() {
@@ -1499,7 +1505,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       await _updateProgress(0.7, 'Enviando visitas (método 2)...');
       debugPrint('📤 Intento 2: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      final jsonSuccess = await _syncVisitsSimpleJson();
+      final jsonSuccess = await _syncVisitsMultipart();
 
       if (jsonSuccess) {
         debugPrint('✅ Sincronización exitosa con endpoint JSON (fallback)');
@@ -1695,11 +1701,15 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   }
 
   /// Método de fallback que usa el endpoint simple SyncVisitsAdd (JSON POST)
-  Future<bool> _syncVisitsSimpleJson() async {
+  Future<bool> _syncVisitsMultipart() async {
     try {
-      debugPrint('🚀 Iniciando sincronización con endpoint JSON simple...');
+      debugPrint('🚀 Iniciando sincronización con endpoint multipart...');
 
       const String url = 'https://api.clickpalm.com/Sync_times/SyncVisitsAdd';
+
+      // Resetear contador y mapa de archivos media
+      _mediaFileCounter = 0;
+      _mediaFilesToUpload.clear();
 
       // Preparar newsAdd
       final List<Map<String, dynamic>> newsAddJson =
@@ -1716,7 +1726,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         };
       }).toList();
 
-      // Obtener visits_add desde SQLite
+      // Obtener visits_add desde SQLite (llena _mediaFilesToUpload)
       final visitsAddJson = await _getVisitsAddFromSQLiteForJson(widget.idCompany);
 
       final payload = {
@@ -1726,44 +1736,87 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         'id_company': widget.idCompany,
         'ids_headquarters': widget.idsHeadquarters,
         'imei': widget.imei,
-        'id_user': FFAppState().userSelected.idUser, // ID del usuario seleccionado
+        'id_user': FFAppState().userSelected.idUser,
       };
 
-      final jsonBody = jsonEncode(payload);
-
-      debugPrint('📤 ===== PAYLOAD ENVIADO AL API (JSON) =====');
+      debugPrint('📤 ===== PAYLOAD MULTIPART =====');
       debugPrint('   - URL: $url');
       debugPrint('   - News: ${newsAddJson.length}');
       debugPrint('   - Visits: ${visitsAddJson.length}');
+      debugPrint('   - Archivos media: ${_mediaFilesToUpload.length}');
 
-      // Enviar request JSON
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.authToken}',
-        },
-        body: jsonBody,
-      );
+      // DEBUG: Verificar que status_response tenga solo referencias, no base64
+      if (visitsAddJson.isNotEmpty && visitsAddJson[0]['visits_details'] != null) {
+        final firstDetail = (visitsAddJson[0]['visits_details'] as List).firstOrNull;
+        if (firstDetail != null) {
+          debugPrint('   🔍 DEBUG - Primer detail status_response: ${firstDetail['status_response']}');
+        }
+      }
 
-      debugPrint('📥 ===== RESPUESTA DEL API (JSON) =====');
+      // Crear request multipart
+      final request = http.MultipartRequest('POST', Uri.parse(url));
+      request.headers['Authorization'] = 'Bearer ${widget.authToken}';
+
+      // Agregar JSON como campo de texto (nombre esperado por el backend)
+      request.fields['SyncModelJson'] = jsonEncode(payload);
+
+      // Agregar archivos de media
+      for (final entry in _mediaFilesToUpload.entries) {
+        final fieldName = entry.key; // "media_0", "media_1", etc.
+        final filePath = entry.value;
+
+        final file = File(filePath);
+        if (await file.exists()) {
+          final fileBytes = await file.readAsBytes();
+          final fileName = filePath.split('/').last;
+
+          // Detectar tipo MIME
+          String mimeType = 'application/octet-stream';
+          if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+            mimeType = 'image/jpeg';
+          } else if (fileName.endsWith('.png')) {
+            mimeType = 'image/png';
+          } else if (fileName.endsWith('.mp4')) {
+            mimeType = 'video/mp4';
+          } else if (fileName.endsWith('.mov')) {
+            mimeType = 'video/quicktime';
+          }
+
+          request.files.add(http.MultipartFile.fromBytes(
+            fieldName,
+            fileBytes,
+            filename: fileName,
+            contentType: MediaType.parse(mimeType),
+          ));
+
+          debugPrint('   📎 $fieldName: $fileName (${(fileBytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
+        } else {
+          debugPrint('   ⚠️ Archivo no encontrado: $filePath');
+        }
+      }
+
+      // Enviar request
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      debugPrint('📥 ===== RESPUESTA DEL API =====');
       debugPrint('   - Status Code: ${response.statusCode}');
       debugPrint('   - Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 202) {
-        debugPrint('✅ Sincronización JSON exitosa');
+        debugPrint('✅ Sincronización multipart exitosa');
 
         // Limpiar datos después de sincronización exitosa
         await _cleanupSQLiteDataAfterSync();
         return true;
       } else {
-        debugPrint('❌ Error en sincronización JSON');
+        debugPrint('❌ Error en sincronización multipart');
         debugPrint('   Status: ${response.statusCode}');
         debugPrint('   Response: ${response.body}');
         return false;
       }
     } catch (e, stackTrace) {
-      debugPrint('❌ EXCEPCIÓN en _syncVisitsSimpleJson: $e');
+      debugPrint('❌ EXCEPCIÓN en _syncVisitsMultipart: $e');
       debugPrint('Stack trace: $stackTrace');
       return false;
     }
@@ -1887,6 +1940,21 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             visit['_details_ids'].add(detailId);
 
             String statusResponse = row['detail_status_response'] ?? '';
+            final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
+
+            // Para photo/video: crear referencia "media_X" y guardar path del archivo
+            if ((typeStatus == 'photo' || typeStatus == 'video') && statusResponse.isNotEmpty) {
+              // Verificar que sea una ruta de archivo válida
+              if (statusResponse.contains('/') && !statusResponse.startsWith('http')) {
+                final mediaFieldName = 'media_$_mediaFileCounter';
+                _mediaFilesToUpload[mediaFieldName] = statusResponse;
+                statusResponse = mediaFieldName; // Reemplazar con referencia
+                _mediaFileCounter++;
+
+                final filePath = _mediaFilesToUpload[mediaFieldName]!;
+                debugPrint('📎 Archivo $typeStatus agregado: $mediaFieldName → ${filePath.length > 80 ? "${filePath.substring(0, 80)}..." : filePath}');
+              }
+            }
 
             visit['visits_details'].add({
               'id_visit_detail': 0,
@@ -2641,7 +2709,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       debugPrint('⚠️ Endpoint multipart falló, iniciando FALLBACK...');
       debugPrint('📤 Intento 2: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      final bool jsonSuccess = await _syncVisitsSimpleJson();
+      final bool jsonSuccess = await _syncVisitsMultipart();
 
       if (jsonSuccess) {
         debugPrint('✅ Sincronización exitosa con endpoint JSON (fallback)');
@@ -2689,7 +2757,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       // INTENTO 1: Endpoint simple JSON (SyncVisitsAdd) - sin compresión
       debugPrint('📤 Intento 1: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      final bool jsonSuccess = await _syncVisitsSimpleJson();
+      final bool jsonSuccess = await _syncVisitsMultipart();
 
       if (jsonSuccess) {
         debugPrint('✅ Sincronización optimizada exitosa con endpoint JSON');

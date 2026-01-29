@@ -423,15 +423,24 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
           String statusResponse = row['detail_status_response'] ?? '';
           final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
 
-          // Procesar según tipo de media
+          // ⚠️ DESHABILITADO: No convertir a base64
+          // Los archivos de media deben enviarse como multipart, no como base64 en JSON
+          // El backend espera referencias "media_X" en status_response y archivos multipart separados
+          /*
           if (statusResponse.isNotEmpty) {
             if (typeStatus == 'photo') {
-              // Fotos: Comprimir con GZIP
               statusResponse = _compressPhotoBase64(statusResponse);
             } else if (typeStatus == 'video') {
-              // Videos: Leer archivo y convertir a base64 (sin comprimir)
               statusResponse = await _convertVideoToBase64(statusResponse);
             }
+          }
+          */
+
+          // Para archivos de media, dejar la ruta tal cual temporalmente
+          // TODO: Implementar sistema de referencias "media_X" + multipart
+          if ((typeStatus == 'photo' || typeStatus == 'video') && statusResponse.isNotEmpty) {
+            debugPrint('⚠️ ADVERTENCIA: Archivo $typeStatus con ruta local no será sincronizado correctamente: ${statusResponse.substring(0, 100)}');
+            debugPrint('⚠️ Se requiere implementar sistema de referencias multipart para este archivo');
           }
 
           visit['visits_details'].add({
@@ -704,15 +713,24 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
           String statusResponse = row['detail_status_response'] ?? '';
           final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
 
-          // Procesar según tipo de media
+          // ⚠️ DESHABILITADO: No convertir a base64
+          // Los archivos de media deben enviarse como multipart, no como base64 en JSON
+          // El backend espera referencias "media_X" en status_response y archivos multipart separados
+          /*
           if (statusResponse.isNotEmpty) {
             if (typeStatus == 'photo') {
-              // Fotos: Comprimir con GZIP
               statusResponse = _compressPhotoBase64(statusResponse);
             } else if (typeStatus == 'video') {
-              // Videos: Leer archivo y convertir a base64 (sin comprimir)
               statusResponse = await _convertVideoToBase64(statusResponse);
             }
+          }
+          */
+
+          // Para archivos de media, dejar la ruta tal cual temporalmente
+          // TODO: Implementar sistema de referencias "media_X" + multipart
+          if ((typeStatus == 'photo' || typeStatus == 'video') && statusResponse.isNotEmpty) {
+            debugPrint('⚠️ ADVERTENCIA: Archivo $typeStatus con ruta local no será sincronizado correctamente: ${statusResponse.substring(0, 100)}');
+            debugPrint('⚠️ Se requiere implementar sistema de referencias multipart para este archivo');
           }
 
           visit['visits_details'].add({

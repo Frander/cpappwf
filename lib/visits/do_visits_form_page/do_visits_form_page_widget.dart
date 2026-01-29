@@ -1562,6 +1562,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
                   await _autoCalculateRelatedDistances(statusId, statusName);
+
+                  // Calcular automáticamente los headquarter-weight que referencien este tag-reader
+                  debugPrint('🎯 TAG-READER: Llamando a _autoCalculateRelatedHeadquarterWeights() con statusName="$statusName"');
+                  await _autoCalculateRelatedHeadquarterWeights(statusId, statusName);
                 }
               }
               return;
@@ -2233,13 +2237,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 statusId: statusId,
                               ),
                             ),
-                          // Resumen de weights de headquarters - DEBAJO
+                          // TextField INLINE para headquarter-weight (muestra fórmula evaluada)
                           if (isHeadquarterWeightType &&
-                              (_calculatedHeadquarterWeights.isNotEmpty ||
+                              _calculatedHeadquarterWeights.containsKey(statusId))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildHeadquarterWeightInlineDisplay(
+                                statusId: statusId,
+                                status: status,
+                              ),
+                            ),
+                          // Resumen de weights of headquarters - DEBAJO
+                          if (isHeadquarterWeightType &&
+                              (_calculatedHeadquarterWeights.containsKey(statusId) ||
                                   _headquartersWithoutWeight.isNotEmpty))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
-                              child: _buildHeadquarterWeightsDisplay(),
+                              child: _buildHeadquarterWeightsDisplay(statusId),
                             ),
                           // Cajones numéricos del 1 al 5 (solo para tipo number) - DEBAJO
                           if (typeStatus.toLowerCase() == 'number')
@@ -2320,6 +2334,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusChilds = statusChildsRaw != null
         ? (statusChildsRaw is List ? statusChildsRaw : [])
         : [];
+
+    // Extraer color del status para unique-option y unique_choice
+    final statusColor = getJsonField(status, r'''$.color''')?.toString() ?? '#00ff9f';
+
+    // Función para parsear color hex a Color
+    Color parseColor(String hexColor) {
+      try {
+        final hex = hexColor.replaceAll('#', '');
+        return Color(int.parse('FF$hex', radix: 16));
+      } catch (e) {
+        return const Color(0xFF00ff9f); // Color por defecto
+      }
+    }
+
+    final statusColorParsed = parseColor(statusColor);
 
     // Log de renderizado (solo la primera vez para cada status)
     if (!_loggedStatusIds.contains(statusId)) {
@@ -2569,6 +2598,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
                   await _autoCalculateRelatedDistances(statusId, statusName);
+
+                  // Calcular automáticamente los headquarter-weight que referencien este tag-reader
+                  debugPrint('🎯 TAG-READER: Llamando a _autoCalculateRelatedHeadquarterWeights() con statusName="$statusName"');
+                  await _autoCalculateRelatedHeadquarterWeights(statusId, statusName);
                 }
               }
               return;
@@ -2813,21 +2846,38 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     typeStatus != 'tag-writer' &&
                     typeStatus != 'tag-reader' &&
                     typeStatus != 'tag-transfer')
-                  Icon(
-                    typeStatus == 'number'
-                        ? Icons.numbers_rounded
-                        : typeStatus == 'text'
-                            ? Icons.text_fields_rounded
-                            : typeStatus == 'date'
-                                ? Icons.calendar_today_rounded
-                                : typeStatus == 'time'
-                                    ? Icons.access_time_rounded
-                                    : Icons.check_circle_outline_rounded,
-                    color: (hasValue && !isNumberType && !isTagWriterType)
-                        ? Colors.white
-                        : const Color(0xFF00a86b),
-                    size: 28,
-                  ),
+                  // Mostrar indicador de color para unique-option y unique_choice
+                  (typeStatus.toLowerCase() == 'unique-option' || typeStatus.toLowerCase() == 'unique_choice')
+                      ? Container(
+                          width: 32,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: statusColorParsed,
+                            borderRadius: BorderRadius.circular(6),
+                            boxShadow: [
+                              BoxShadow(
+                                color: statusColorParsed.withValues(alpha: 0.6),
+                                blurRadius: 12,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                        )
+                      : Icon(
+                          typeStatus == 'number'
+                              ? Icons.numbers_rounded
+                              : typeStatus == 'text'
+                                  ? Icons.text_fields_rounded
+                                  : typeStatus == 'date'
+                                      ? Icons.calendar_today_rounded
+                                      : typeStatus == 'time'
+                                          ? Icons.access_time_rounded
+                                          : Icons.check_circle_outline_rounded,
+                          color: (hasValue && !isNumberType && !isTagWriterType)
+                              ? Colors.white
+                              : const Color(0xFF00a86b),
+                          size: 28,
+                        ),
                 const SizedBox(width: 8),
                 // Nombre del status
                 Expanded(
@@ -2971,12 +3021,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildDistanceExtractorDisplay(statusId: statusId),
                         ),
-                      // Resumen de weights de headquarters
+                      // TextField INLINE para headquarter-weight (muestra fórmula evaluada)
                       if (isHeadquarterWeightType &&
-                          (_calculatedHeadquarterWeights.isNotEmpty || _headquartersWithoutWeight.isNotEmpty))
+                          _calculatedHeadquarterWeights.containsKey(statusId))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: _buildHeadquarterWeightsDisplay(),
+                          child: _buildHeadquarterWeightInlineDisplay(
+                            statusId: statusId,
+                            status: status,
+                          ),
+                        ),
+                      // Resumen de weights de headquarters
+                      if (isHeadquarterWeightType &&
+                          (_calculatedHeadquarterWeights.containsKey(statusId) || _headquartersWithoutWeight.isNotEmpty))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildHeadquarterWeightsDisplay(statusId),
                         ),
                       // Cajones numéricos del 1 al 5
                       if (isNumberType)
@@ -3316,6 +3376,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                   // Calcular automáticamente las distancias de los distance-extractor que referencien este tag-reader
                   await _autoCalculateRelatedDistances(statusId, statusName);
+
+                  // Calcular automáticamente los headquarter-weight que referencien este tag-reader
+                  debugPrint('🎯 TAG-READER: Llamando a _autoCalculateRelatedHeadquarterWeights() con statusName="$statusName"');
+                  await _autoCalculateRelatedHeadquarterWeights(statusId, statusName);
                 }
               }
               return;
@@ -3701,14 +3765,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return;
     }
 
-    // LÓGICA UNIQUE_CHOICE: Si el tipo es "unique_choice", eliminar otros status raíz seleccionados
-    if (typeStatus.toLowerCase() == 'unique_choice' && allRootStatus != null) {
-      // Obtener todos los IDs de status raíz que son unique_choice (excepto el actual)
+    // LÓGICA UNIQUE_CHOICE y UNIQUE-OPTION: Si el tipo es "unique_choice" o "unique-option", eliminar otros status raíz seleccionados
+    if ((typeStatus.toLowerCase() == 'unique_choice' || typeStatus.toLowerCase() == 'unique-option') && allRootStatus != null) {
+      // Obtener todos los IDs de status raíz que son unique_choice o unique-option (excepto el actual)
       final List<int> siblingStatusIds = [];
       for (var sibling in allRootStatus) {
         final siblingId = getJsonField(sibling, r'''$.id_activity_status''');
         final siblingType = getJsonField(sibling, r'''$.type_status''')?.toString().toLowerCase() ?? '';
-        if (siblingId != statusId && siblingType == 'unique_choice') {
+        if (siblingId != statusId && (siblingType == 'unique_choice' || siblingType == 'unique-option')) {
           siblingStatusIds.add(siblingId);
         }
       }
@@ -3727,7 +3791,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
         // Limpiar cache de búsqueda porque cambiaron los visitDetails
         _visitDetailsSearchCache.clear();
-        debugPrint('🔘 UNIQUE_CHOICE: Eliminados ${indicesToRemove.length} status hermanos');
+        debugPrint('🔘 UNIQUE_CHOICE/UNIQUE-OPTION: Eliminados ${indicesToRemove.length} status hermanos');
       }
     }
 
@@ -3972,6 +4036,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Esto es especialmente importante para unique-list y reference-list donde
     // eliminamos 1 y agregamos 1 (la longitud no cambia, pero los IDs sí)
     _visitDetailsSearchCache.clear();
+
+    // Para unique-list y reference-list: COLAPSAR automáticamente el step después de seleccionar
+    // Esto evita que el usuario tenga que tocar manualmente el header para cerrar la lista
+    if (!isContainerList) {
+      debugPrint('🔽 Auto-colapsando step "$stepName" (tipo: $typeStep)');
+      _stepExpansionState[parentStepId] = false;
+      // También cerrar el search box si estaba abierto
+      _searchBoxExpansionState[parentStepId] = false;
+    }
 
     setState(() {});
   }
@@ -5478,6 +5551,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('🔄 Llamando _recalculateOperations()...');
     // Recalcular todas las operaciones que dependen de este valor
     _recalculateOperations();
+
+    // Recalcular fórmulas de headquarter-weight que dependan de este campo
+    debugPrint('🔄 Verificando si este campo es usado en fórmulas...');
+    await _recalculateHeadquarterWeightFormulas(statusName);
+
     debugPrint('✅ ===== FIN ACTUALIZACIÓN DE VALOR (STEP STATUS) =====');
     debugPrint('');
   }
@@ -6016,6 +6094,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint('🔄 Llamando _recalculateOperations()...');
     // Recalcular todas las operaciones que dependen de este valor
     _recalculateOperations();
+
+    // Recalcular fórmulas de headquarter-weight que dependan de este campo
+    debugPrint('🔄 Verificando si este campo es usado en fórmulas...');
+    await _recalculateHeadquarterWeightFormulas(statusName);
+
     debugPrint('✅ ===== FIN ACTUALIZACIÓN DE VALOR (ROOT STATUS) =====');
     debugPrint('');
   }
@@ -7589,11 +7672,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     Database? db;
     try {
       final now = DateTime.now();
-      final currentYear = now.year;
-      final currentMonth = now.month;
+
+      // Calcular mes anterior (manejar rollover de año)
+      int previousYear = now.year;
+      int previousMonth = now.month - 1;
+
+      if (previousMonth == 0) {
+        // Si el mes actual es enero (1), el mes anterior es diciembre (12) del año pasado
+        previousMonth = 12;
+        previousYear = now.year - 1;
+      }
 
       debugPrint(
-          '📊 Cargando weights para ${headquarterIds.length} lotes (año: $currentYear, mes: $currentMonth)');
+          '📊 Cargando weights DEL MES ANTERIOR para ${headquarterIds.length} lotes (año: $previousYear, mes: $previousMonth)');
+      debugPrint('   📅 Fecha actual: ${now.year}-${now.month} → Buscando: $previousYear-$previousMonth');
 
       // Limpiar lista de lotes sin peso antes de cargar
       _headquartersWithoutWeight.clear();
@@ -7625,14 +7717,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           // Usar nombre por defecto
         }
 
-        // Consultar SQLite directamente
+        // Consultar SQLite directamente con el mes ANTERIOR
         final results = await db.rawQuery('''
           SELECT * FROM Headquarters_weights
           WHERE Id_headquarter = ?
             AND Date_year = ?
             AND Date_month = ?
           LIMIT 1
-        ''', [headquarterId, currentYear, currentMonth]);
+        ''', [headquarterId, previousYear, previousMonth]);
 
         if (results.isNotEmpty) {
           final weightData = results.first['Weight'];
@@ -7676,11 +7768,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   /// Calcula el peso total por headquarter: totalResults * weight
   /// Se llama después de leer el tag y cargar los weights
+  /// Si se proporciona targetStatusId, solo calcula para ese status
   void _calculateHeadquarterWeightResults(
-      int tagReaderStatusId, String tagReaderStatusName) {
+      int tagReaderStatusId, String tagReaderStatusName,
+      {int? targetStatusId}) {
     debugPrint('');
     debugPrint('⚖️ ===== CÁLCULO DE PESO POR HEADQUARTER =====');
     debugPrint('📍 Tag Reader: "$tagReaderStatusName" (ID: $tagReaderStatusId)');
+    if (targetStatusId != null) {
+      debugPrint('🎯 Calculando solo para statusId: $targetStatusId');
+    }
     debugPrint('📋 _tagReaderData tiene ${_tagReaderData.length} entradas');
     debugPrint('📋 _headquarterWeights tiene ${_headquarterWeights.length} pesos');
 
@@ -7698,8 +7795,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     debugPrint('📊 Total de registros encontrados: ${allTagData.length}');
 
-    // Limpiar cálculos anteriores
-    _calculatedHeadquarterWeights.clear();
+    // Si se especificó targetStatusId, limpiar solo ese cálculo
+    // De lo contrario, limpiar todos
+    if (targetStatusId != null) {
+      _calculatedHeadquarterWeights.remove(targetStatusId);
+    } else {
+      _calculatedHeadquarterWeights.clear();
+    }
 
     // Agrupar resultados por headquarterId
     final Map<int, int> resultsByHeadquarter = {};
@@ -7718,6 +7820,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     // Calcular peso para cada headquarter
+    final Map<int, Map<String, dynamic>> resultsForThisStatus = {};
     for (var entry in resultsByHeadquarter.entries) {
       final headquarterId = entry.key;
       final totalResults = entry.value;
@@ -7740,7 +7843,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           // Usar nombre por defecto
         }
 
-        _calculatedHeadquarterWeights[headquarterId] = {
+        resultsForThisStatus[headquarterId] = {
           'headquarterName': headquarterName,
           'weight': weight,
           'totalResults': totalResults,
@@ -7757,13 +7860,790 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Calcular total general
     double grandTotal = 0;
-    for (var data in _calculatedHeadquarterWeights.values) {
+    for (var data in resultsForThisStatus.values) {
       grandTotal += (data['calculatedWeight'] as double? ?? 0);
     }
     debugPrint('');
     debugPrint('📦 PESO TOTAL CALCULADO: ${grandTotal.toStringAsFixed(2)} kg');
+
+    // Construir fórmula evaluada para mostrar INLINE
+    String evaluatedFormula = '';
+    if (resultsForThisStatus.length == 1) {
+      // Si solo hay un lote, mostrar fórmula simple: "4 × 250 = 1.000,00"
+      final data = resultsForThisStatus.values.first;
+      final totalResults = data['totalResults'] as int;
+      final weight = data['weight'] as double;
+      final formattedWeight = _formatNumberForFormula(weight);
+      final formattedTotal = _formatDecimal(grandTotal);
+      evaluatedFormula = '$totalResults × $formattedWeight = $formattedTotal';
+    } else {
+      // Si hay múltiples lotes, mostrar suma: "(4×250) + (3×200) = 1.600,00"
+      final List<String> parts = [];
+      for (var data in resultsForThisStatus.values) {
+        final totalResults = data['totalResults'] as int;
+        final weight = data['weight'] as double;
+        final formattedWeight = _formatNumberForFormula(weight);
+        parts.add('($totalResults×$formattedWeight)');
+      }
+      final formattedTotal = _formatDecimal(grandTotal);
+      evaluatedFormula = '${parts.join(' + ')} = $formattedTotal';
+    }
+
+    // Guardar resultados usando el statusId como clave
+    final statusIdForStorage = targetStatusId ?? tagReaderStatusId;
+    _calculatedHeadquarterWeights[statusIdForStorage] = {
+      'isFormulaResult': false,
+      'resultsByHeadquarter': resultsForThisStatus,
+      'grandTotal': grandTotal,
+      'evaluatedFormula': evaluatedFormula, // Fórmula para mostrar INLINE
+    };
+
     debugPrint('⚖️ ===== FIN CÁLCULO DE PESO =====');
     debugPrint('');
+  }
+
+  /// Busca automáticamente los campos headquarter-weight que referencien el TAG_READER actual
+  /// y los calcula automáticamente (ya sea formula o cálculo tradicional)
+  Future<void> _autoCalculateRelatedHeadquarterWeights(
+      int tagReaderStatusId, String tagReaderName) async {
+    try {
+      debugPrint('');
+      debugPrint(
+          '🔍 Buscando headquarter-weight que referencien TAG_READER "$tagReaderName" (ID: $tagReaderStatusId)');
+
+      // Obtener steps y status con manejo de nulos
+      final activityStepsRaw = getJsonField(
+        FFAppState().currentActivity,
+        r'''$.activity_steps''',
+      );
+      final activitySteps = activityStepsRaw != null
+          ? (activityStepsRaw is List ? activityStepsRaw : [])
+          : [];
+
+      final activityStatusRaw = getJsonField(
+        FFAppState().currentActivity,
+        r'''$.activity_status''',
+      );
+      final activityStatus = activityStatusRaw != null
+          ? (activityStatusRaw is List ? activityStatusRaw : [])
+          : [];
+
+      debugPrint('📊 Activity steps encontrados: ${activitySteps.length}');
+      debugPrint('📊 Activity status encontrados: ${activityStatus.length}');
+
+      int foundCount = 0;
+      int totalHeadquarterWeights = 0;
+
+      // Función helper para procesar un status y buscar headquarter-weight
+      Future<void> processStatus(dynamic status, dynamic parentStep) async {
+        final typeStatus =
+            getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+
+        if (typeStatus.toLowerCase() == 'headquarter-weight') {
+          totalHeadquarterWeights++;
+          final statusId = getJsonField(status, r'''$.id_activity_status''');
+          final statusName =
+              getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+          final defaultStatus =
+              getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+
+          debugPrint(
+              '   📋 headquarter-weight #$totalHeadquarterWeights: "$statusName" (ID: $statusId)');
+          debugPrint('      default_status: "$defaultStatus"');
+          debugPrint(
+              '      Comparando con: "=tag_reader:${tagReaderName.toLowerCase()}"');
+
+          // Verificar si este headquarter-weight referencia al tag-reader actual
+          final normalizedDefault =
+              defaultStatus.trim().toLowerCase().replaceAll(' ', '');
+          final tagReaderPattern =
+              '=tag_reader:${tagReaderName.toLowerCase()}'.replaceAll(' ', '');
+
+          // Verificar si contiene referencia al TAG_READER
+          if (normalizedDefault.contains(tagReaderPattern) ||
+              defaultStatus
+                  .toLowerCase()
+                  .contains('tag_reader:${tagReaderName.toLowerCase()}')) {
+            foundCount++;
+            debugPrint('      ✅ COINCIDE! Calculando peso...');
+
+            // Verificar si es una fórmula (contiene operadores + variables de formulario)
+            final isFormula = _isHeadquarterWeightFormula(defaultStatus);
+
+            if (isFormula) {
+              debugPrint('      🧮 Detectado como FÓRMULA, evaluando...');
+              await _evaluateHeadquarterWeightFormula(
+                statusId,
+                defaultStatus,
+                tagReaderName,
+              );
+            } else {
+              debugPrint(
+                  '      📊 Detectado como CÁLCULO TRADICIONAL (TAG_READER simple)');
+
+              // IMPORTANTE: Primero cargar los weights desde SQLite
+              // Obtener los headquarterIds del tag
+              final List<int> headquarterIds = [];
+              for (var entry in _tagReaderData.entries) {
+                for (var record in entry.value) {
+                  final hqId = record['headquarterId'] as int? ?? 0;
+                  if (hqId > 0 && !headquarterIds.contains(hqId)) {
+                    headquarterIds.add(hqId);
+                  }
+                }
+              }
+
+              if (headquarterIds.isNotEmpty) {
+                debugPrint('      📦 Cargando weights para ${headquarterIds.length} lote(s)...');
+                await _loadHeadquarterWeights(headquarterIds);
+              }
+
+              // Calcular usando el método tradicional, pero especificando el statusId
+              _calculateHeadquarterWeightResults(
+                tagReaderStatusId,
+                tagReaderName,
+                targetStatusId: statusId,
+              );
+            }
+          } else {
+            debugPrint('      ❌ No coincide');
+          }
+        }
+
+        // Buscar recursivamente en steps_childs
+        final stepsChildsRaw = getJsonField(status, r'''$.steps_childs''');
+        final stepsChilds = stepsChildsRaw != null
+            ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+            : [];
+        for (var childStep in stepsChilds) {
+          final childStatusListRaw =
+              getJsonField(childStep, r'''$.activity_status''');
+          final childStatusList = childStatusListRaw != null
+              ? (childStatusListRaw is List ? childStatusListRaw : [])
+              : [];
+          for (var childStatus in childStatusList) {
+            await processStatus(childStatus, childStep);
+          }
+        }
+
+        // Buscar recursivamente en status_childs
+        final statusChildsRaw = getJsonField(status, r'''$.status_childs''');
+        final statusChilds = statusChildsRaw != null
+            ? (statusChildsRaw is List ? statusChildsRaw : [])
+            : [];
+        for (var childStatus in statusChilds) {
+          await processStatus(childStatus, parentStep);
+        }
+      }
+
+      // Buscar en steps
+      for (var step in activitySteps) {
+        final statusListRaw = getJsonField(step, r'''$.activity_status''');
+        final statusList = statusListRaw != null
+            ? (statusListRaw is List ? statusListRaw : [])
+            : [];
+        for (var status in statusList) {
+          await processStatus(status, step);
+        }
+      }
+
+      // Buscar en status raíz
+      for (var status in activityStatus) {
+        await processStatus(status, null);
+      }
+
+      debugPrint('');
+      debugPrint('📊 Resumen búsqueda:');
+      debugPrint(
+          '   Total headquarter-weight encontrados: $totalHeadquarterWeights');
+      debugPrint('   Que referencian "$tagReaderName": $foundCount');
+
+      if (foundCount == 0) {
+        debugPrint('   ⚠️  No se encontraron coincidencias');
+      } else {
+        debugPrint('   ✅ Total calculados: $foundCount');
+      }
+      debugPrint('');
+    } catch (e) {
+      debugPrint('❌ Error en _autoCalculateRelatedHeadquarterWeights: $e');
+      debugPrint('');
+    }
+  }
+
+  /// Formatea un número decimal con formato europeo/latinoamericano
+  /// Punto (.) para miles, coma (,) para decimales
+  /// Ejemplo: 1234.56 → "1.234,56"
+  String _formatDecimal(double value, {int decimals = 2}) {
+    final str = value.toStringAsFixed(decimals);
+    final parts = str.split('.');
+    final integerPart = int.parse(parts[0]);
+    final decimalPart = parts[1];
+
+    // Formatear parte entera con puntos como separador de miles
+    final intStr = integerPart.toString();
+    final reversed = intStr.split('').reversed.toList();
+    final List<String> formattedParts = [];
+
+    for (int i = 0; i < reversed.length; i++) {
+      if (i > 0 && i % 3 == 0) {
+        formattedParts.add('.');
+      }
+      formattedParts.add(reversed[i]);
+    }
+
+    final formattedInteger = formattedParts.reversed.join('');
+    return '$formattedInteger,$decimalPart';
+  }
+
+  /// Formatea un número para mostrar en fórmulas con separador de miles
+  /// - Enteros: sin decimales, con separador de miles (ej: 20.000)
+  /// - Decimales: 2 decimales, con separador de miles (ej: 1.234,56)
+  /// Usa formato europeo/latinoamericano: punto para miles, coma para decimales
+  String _formatNumberForFormula(double value) {
+    // Si es un número entero (sin decimales), formatear sin parte decimal
+    if (value == value.toInt()) {
+      // Convertir a entero y agregar separador de miles
+      final intValue = value.toInt();
+      final str = intValue.toString();
+
+      // Agregar puntos como separador de miles
+      final reversed = str.split('').reversed.toList();
+      final List<String> parts = [];
+
+      for (int i = 0; i < reversed.length; i++) {
+        if (i > 0 && i % 3 == 0) {
+          parts.add('.');
+        }
+        parts.add(reversed[i]);
+      }
+
+      return parts.reversed.join('');
+    } else {
+      // Si tiene decimales, formatear con 2 decimales y separador de miles
+      final decimalPart = value.toStringAsFixed(2).split('.')[1];
+      final integerPart = value.toInt();
+
+      // Formatear parte entera con separador de miles (puntos)
+      final str = integerPart.toString();
+      final reversed = str.split('').reversed.toList();
+      final List<String> parts = [];
+
+      for (int i = 0; i < reversed.length; i++) {
+        if (i > 0 && i % 3 == 0) {
+          parts.add('.');
+        }
+        parts.add(reversed[i]);
+      }
+
+      final formattedInteger = parts.reversed.join('');
+      // Usar coma como separador decimal
+      return '$formattedInteger,$decimalPart';
+    }
+  }
+
+  /// Verifica si el default_status es una fórmula (tiene operadores y variables)
+  bool _isHeadquarterWeightFormula(String defaultStatus) {
+    // Es fórmula si contiene operadores matemáticos (+, -, *, /) y variables del formulario
+    // Las variables pueden ser: TARE, DESTARE, u otros campos del form
+    final hasOperators = defaultStatus.contains('+') ||
+        defaultStatus.contains('-') ||
+        defaultStatus.contains('*') ||
+        defaultStatus.contains('/');
+
+    final hasFormVariables = defaultStatus.toUpperCase().contains('TARE') ||
+        defaultStatus.toUpperCase().contains('DESTARE');
+
+    return hasOperators && hasFormVariables;
+  }
+
+  /// Evalúa una fórmula de headquarter-weight
+  /// Ejemplo: =(TARE-DESTARE)/TAG_READER:Lectura en TAG
+  Future<void> _evaluateHeadquarterWeightFormula(
+    int statusId,
+    String formula,
+    String tagReaderName,
+  ) async {
+    try {
+      debugPrint('');
+      debugPrint('🧮 ===== EVALUANDO FÓRMULA =====');
+      debugPrint('📋 StatusId: $statusId');
+      debugPrint('📝 Fórmula original: "$formula"');
+
+      // 1. Obtener el valor de TAG_READER (total de RESULTS)
+      final tagReaderValue = await _getTotalResultsFromTagReader();
+      debugPrint('📊 TAG_READER total results: $tagReaderValue');
+
+      if (tagReaderValue == 0) {
+        debugPrint('⚠️ TAG_READER es 0, no se puede calcular');
+        debugPrint('🧮 ===== FIN EVALUACIÓN (ERROR) =====');
+        debugPrint('');
+        return;
+      }
+
+      // 2. Obtener valores de variables del formulario (TARE, DESTARE, etc.)
+      debugPrint('');
+      debugPrint('🔍 Buscando variables del formulario...');
+      debugPrint('   Total visitDetails: ${FFAppState().visitDetails.length}');
+
+      final Map<String, double> formVariables = {};
+
+      // Listar todos los campos disponibles para debug
+      debugPrint('   Total visitDetails: ${FFAppState().visitDetails.length}');
+      for (var detail in FFAppState().visitDetails) {
+        final isStepRecord = detail.idActivityStatus == 0;
+        final recordType = isStepRecord ? 'STEP' : 'STATUS';
+        debugPrint('   📌 [$recordType] Campo: "${detail.statusOption}" = "${detail.statusResponse}"');
+      }
+
+      // Buscar TARE - Buscar exactamente por el nombre del campo
+      var tareDetail = FFAppState().visitDetails.firstWhere(
+            (d) => d.statusOption.toUpperCase() == 'TARE',
+            orElse: () => VisitsDetailsStruct(),
+          );
+
+      // Si no se encuentra exactamente, buscar que contenga TARE
+      if (tareDetail.statusResponse.isEmpty) {
+        tareDetail = FFAppState().visitDetails.firstWhere(
+              (d) => d.statusOption.toUpperCase().contains('TARE') &&
+                     !d.statusOption.toUpperCase().contains('DESTARE'),
+              orElse: () => VisitsDetailsStruct(),
+            );
+      }
+
+      if (tareDetail.statusResponse.isNotEmpty) {
+        final tareValue = double.tryParse(tareDetail.statusResponse) ?? 0.0;
+        formVariables['TARE'] = tareValue;
+        debugPrint('   ✅ TARE encontrado: ${tareDetail.statusOption} = $tareValue');
+      } else {
+        debugPrint('   ⚠️ TARE no encontrado en visitDetails');
+      }
+
+      // Buscar DESTARE - Buscar exactamente por el nombre del campo
+      var destareDetail = FFAppState().visitDetails.firstWhere(
+            (d) => d.statusOption.toUpperCase() == 'DESTARE',
+            orElse: () => VisitsDetailsStruct(),
+          );
+
+      // Si no se encuentra exactamente, buscar que contenga DESTARE
+      if (destareDetail.statusResponse.isEmpty) {
+        destareDetail = FFAppState().visitDetails.firstWhere(
+              (d) => d.statusOption.toUpperCase().contains('DESTARE'),
+              orElse: () => VisitsDetailsStruct(),
+            );
+      }
+
+      if (destareDetail.statusResponse.isNotEmpty) {
+        final destareValue = double.tryParse(destareDetail.statusResponse) ?? 0.0;
+        formVariables['DESTARE'] = destareValue;
+        debugPrint('   ✅ DESTARE encontrado: ${destareDetail.statusOption} = $destareValue');
+      } else {
+        debugPrint('   ⚠️ DESTARE no encontrado en visitDetails');
+      }
+
+      if (formVariables.isEmpty) {
+        debugPrint('');
+        debugPrint('❌ No se encontraron variables (TARE, DESTARE) para evaluar la fórmula');
+        debugPrint('🧮 ===== FIN EVALUACIÓN (ERROR) =====');
+        debugPrint('');
+        return;
+      }
+
+      debugPrint('');
+      debugPrint('🔄 Procesando fórmula...');
+
+      // 3. Reemplazar TAG_READER:... con su valor
+      // El patrón captura desde TAG_READER: hasta el final de la palabra/frase
+      String processedFormula = formula;
+
+      // Primero remover el signo = inicial si existe
+      if (processedFormula.startsWith('=')) {
+        processedFormula = processedFormula.substring(1);
+      }
+
+      // Reemplazar TAG_READER con case insensitive y capturar todo después de ":"
+      final tagReaderPattern = RegExp(
+        r'TAG_READER:[^\s\)]+(?:\s+[^\s\)]+)*',
+        caseSensitive: false,
+      );
+
+      final match = tagReaderPattern.firstMatch(processedFormula);
+      if (match != null) {
+        debugPrint('   TAG_READER encontrado: "${match.group(0)}"');
+        processedFormula = processedFormula.replaceAll(
+          tagReaderPattern,
+          tagReaderValue.toString()
+        );
+        debugPrint('   Reemplazado por: $tagReaderValue');
+      } else {
+        debugPrint('   ⚠️ No se encontró patrón TAG_READER en la fórmula');
+      }
+
+      debugPrint('   Fórmula después de TAG_READER: "$processedFormula"');
+
+      // 4. Reemplazar variables del formulario
+      // Crear dos versiones: una para calcular (sin formato) y otra para mostrar (con formato)
+      String displayFormula = processedFormula;
+
+      for (var entry in formVariables.entries) {
+        final variableName = entry.key;
+        final variableValue = entry.value;
+
+        // Para CÁLCULO: usar valor sin formato
+        processedFormula = processedFormula.replaceAllMapped(
+          RegExp('\\b$variableName\\b', caseSensitive: false),
+          (match) => variableValue.toString(),
+        );
+
+        // Para DISPLAY: usar valor formateado con separador de miles
+        final formattedValue = _formatNumberForFormula(variableValue);
+        displayFormula = displayFormula.replaceAllMapped(
+          RegExp('\\b$variableName\\b', caseSensitive: false),
+          (match) => formattedValue,
+        );
+
+        debugPrint('   $variableName reemplazado por: $formattedValue');
+      }
+
+      debugPrint('   Fórmula para cálculo: "$processedFormula"');
+      debugPrint('   Fórmula para display: "$displayFormula"');
+
+      // 5. Evaluar la expresión matemática (sin formato, sin comas)
+      debugPrint('');
+      debugPrint('🧮 Evaluando expresión matemática...');
+      final result = _evaluateMathExpressionWithParentheses(processedFormula);
+      debugPrint('✅ Resultado: $result kg');
+
+      // 6. Guardar resultado en el estado
+      _calculatedHeadquarterWeights[statusId] = {
+        'isFormulaResult': true,
+        'formulaResult': result,
+        'grandTotal': result,
+        'formula': formula,
+        'evaluatedFormula': displayFormula, // Fórmula formateada para mostrar
+      };
+
+      debugPrint('');
+      debugPrint('🧮 ===== FIN EVALUACIÓN (ÉXITO) =====');
+      debugPrint('');
+
+      setState(() {});
+    } catch (e, stackTrace) {
+      debugPrint('');
+      debugPrint('❌ Error evaluando fórmula: $e');
+      debugPrint('Stack trace: $stackTrace');
+      debugPrint('🧮 ===== FIN EVALUACIÓN (ERROR) =====');
+      debugPrint('');
+    }
+  }
+
+  /// Obtiene el total de RESULTS de todos los registros del TAG_READER
+  Future<int> _getTotalResultsFromTagReader() async {
+    int totalResults = 0;
+
+    // Sumar todos los RESULTS de todas las entradas del tag
+    for (var entry in _tagReaderData.entries) {
+      for (var record in entry.value) {
+        final results = record['results'] as int? ?? 0;
+        totalResults += results;
+      }
+    }
+
+    return totalResults;
+  }
+
+  /// Evalúa una expresión matemática simple con paréntesis
+  /// Soporta: +, -, *, /, ()
+  double _evaluateMathExpressionWithParentheses(String expression) {
+    try {
+      debugPrint('   🔢 Evaluando: "$expression"');
+
+      // Remover espacios
+      expression = expression.replaceAll(' ', '');
+
+      // Evaluar paréntesis recursivamente
+      int iterations = 0;
+      while (expression.contains('(')) {
+        iterations++;
+        if (iterations > 100) {
+          throw Exception('Demasiadas iteraciones, posible loop infinito');
+        }
+
+        final openIndex = expression.lastIndexOf('(');
+        final closeIndex = expression.indexOf(')', openIndex);
+
+        if (closeIndex == -1) {
+          throw Exception('Paréntesis no balanceados');
+        }
+
+        final subExpr = expression.substring(openIndex + 1, closeIndex);
+        debugPrint('   📐 Evaluando sub-expresión: "$subExpr"');
+        final subResult = _evaluateSimpleMathExpression(subExpr);
+        debugPrint('   📐 Resultado: $subResult');
+
+        expression = expression.substring(0, openIndex) +
+            subResult.toString() +
+            expression.substring(closeIndex + 1);
+
+        debugPrint('   🔄 Expresión actualizada: "$expression"');
+      }
+
+      // Evaluar expresión sin paréntesis
+      debugPrint('   📊 Evaluando expresión final: "$expression"');
+      final result = _evaluateSimpleMathExpression(expression);
+      debugPrint('   ✅ Resultado final: $result');
+      return result;
+    } catch (e) {
+      debugPrint('   ❌ Error evaluando expresión "$expression": $e');
+      return 0.0;
+    }
+  }
+
+  /// Recalcula todas las fórmulas de headquarter-weight que usen el campo modificado
+  Future<void> _recalculateHeadquarterWeightFormulas(String modifiedFieldName) async {
+    try {
+      debugPrint('🔍 Buscando fórmulas que usen el campo "$modifiedFieldName"...');
+
+      // Obtener steps y status con manejo de nulos
+      final activityStepsRaw = getJsonField(
+        FFAppState().currentActivity,
+        r'''$.activity_steps''',
+      );
+      final activitySteps = activityStepsRaw != null
+          ? (activityStepsRaw is List ? activityStepsRaw : [])
+          : [];
+
+      final activityStatusRaw = getJsonField(
+        FFAppState().currentActivity,
+        r'''$.activity_status''',
+      );
+      final activityStatus = activityStatusRaw != null
+          ? (activityStatusRaw is List ? activityStatusRaw : [])
+          : [];
+
+      int recalculatedCount = 0;
+
+      // Función helper para procesar un status
+      Future<void> processStatus(dynamic status) async {
+        final typeStatus =
+            getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+
+        if (typeStatus.toLowerCase() == 'headquarter-weight') {
+          final statusId = getJsonField(status, r'''$.id_activity_status''');
+          final statusName =
+              getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+          final defaultStatus =
+              getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+
+          // Verificar si la fórmula contiene el campo modificado
+          final normalizedFormula = defaultStatus.toUpperCase();
+          final normalizedFieldName = modifiedFieldName.toUpperCase();
+
+          if (normalizedFormula.contains(normalizedFieldName)) {
+            debugPrint('   ✅ Fórmula encontrada en "$statusName" (ID: $statusId)');
+            debugPrint('      Fórmula: "$defaultStatus"');
+
+            // Verificar si es una fórmula (contiene operadores y variables)
+            final isFormula = _isHeadquarterWeightFormula(defaultStatus);
+
+            if (isFormula) {
+              debugPrint('      🧮 Recalculando fórmula...');
+
+              // Obtener el nombre del TAG_READER referenciado
+              final tagReaderPattern = RegExp(
+                r'TAG_READER:([^\s\)]+(?:\s+[^\s\)]+)*)',
+                caseSensitive: false,
+              );
+              final match = tagReaderPattern.firstMatch(defaultStatus);
+              String tagReaderName = '';
+              if (match != null && match.groupCount >= 1) {
+                tagReaderName = match.group(1) ?? '';
+              }
+
+              if (tagReaderName.isNotEmpty) {
+                await _evaluateHeadquarterWeightFormula(
+                  statusId,
+                  defaultStatus,
+                  tagReaderName,
+                );
+                recalculatedCount++;
+              } else {
+                debugPrint('      ⚠️ No se encontró TAG_READER en la fórmula');
+              }
+            }
+          }
+        }
+
+        // Buscar recursivamente en steps_childs
+        final stepsChildsRaw = getJsonField(status, r'''$.steps_childs''');
+        final stepsChilds = stepsChildsRaw != null
+            ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+            : [];
+        for (var childStep in stepsChilds) {
+          final childStatusListRaw =
+              getJsonField(childStep, r'''$.activity_status''');
+          final childStatusList = childStatusListRaw != null
+              ? (childStatusListRaw is List ? childStatusListRaw : [])
+              : [];
+          for (var childStatus in childStatusList) {
+            await processStatus(childStatus);
+          }
+        }
+
+        // Buscar recursivamente en status_childs
+        final statusChildsRaw = getJsonField(status, r'''$.status_childs''');
+        final statusChilds = statusChildsRaw != null
+            ? (statusChildsRaw is List ? statusChildsRaw : [])
+            : [];
+        for (var childStatus in statusChilds) {
+          await processStatus(childStatus);
+        }
+      }
+
+      // Buscar en steps
+      for (var step in activitySteps) {
+        final statusListRaw = getJsonField(step, r'''$.activity_status''');
+        final statusList = statusListRaw != null
+            ? (statusListRaw is List ? statusListRaw : [])
+            : [];
+        for (var status in statusList) {
+          await processStatus(status);
+        }
+      }
+
+      // Buscar en status raíz
+      for (var status in activityStatus) {
+        await processStatus(status);
+      }
+
+      if (recalculatedCount > 0) {
+        debugPrint('✅ $recalculatedCount fórmula(s) recalculada(s)');
+        setState(() {});
+      } else {
+        debugPrint('   ℹ️ No se encontraron fórmulas que usen "$modifiedFieldName"');
+      }
+    } catch (e) {
+      debugPrint('❌ Error en _recalculateHeadquarterWeightFormulas: $e');
+    }
+  }
+
+  /// Evalúa una expresión matemática simple sin paréntesis
+  /// Respeta precedencia de operadores: *, / antes que +, -
+  double _evaluateSimpleMathExpression(String expression) {
+    try {
+      // Remover espacios
+      expression = expression.replaceAll(' ', '');
+
+      if (expression.isEmpty) {
+        debugPrint('   ⚠️ Expresión vacía');
+        return 0.0;
+      }
+
+      // Separar en tokens
+      final List<String> tokens = [];
+      final buffer = StringBuffer();
+
+      for (int i = 0; i < expression.length; i++) {
+        final char = expression[i];
+        // Considerar - como negativo si está al inicio o después de operador
+        final isNegativeSign = char == '-' &&
+            (i == 0 || '+-*/'.contains(expression[i - 1]));
+
+        if ('+-*/'.contains(char) && !isNegativeSign) {
+          if (buffer.isNotEmpty) {
+            tokens.add(buffer.toString());
+            buffer.clear();
+          }
+          tokens.add(char);
+        } else {
+          buffer.write(char);
+        }
+      }
+      if (buffer.isNotEmpty) {
+        tokens.add(buffer.toString());
+      }
+
+      debugPrint('      Tokens: $tokens');
+
+      if (tokens.isEmpty) {
+        return 0.0;
+      }
+
+      // Convertir números
+      final List<dynamic> processed = [];
+      for (var token in tokens) {
+        if ('+-*/'.contains(token)) {
+          processed.add(token);
+        } else {
+          final num = double.tryParse(token);
+          if (num == null) {
+            debugPrint('      ⚠️ No se pudo parsear: "$token"');
+            return 0.0;
+          }
+          processed.add(num);
+        }
+      }
+
+      debugPrint('      Procesados: $processed');
+
+      // Si solo hay un número, retornarlo
+      if (processed.length == 1) {
+        return processed[0] as double;
+      }
+
+      // Procesar * y / primero
+      int i = 1;
+      while (i < processed.length) {
+        if (i >= processed.length - 1) break;
+
+        if (processed[i] == '*') {
+          final result = (processed[i - 1] as double) * (processed[i + 1] as double);
+          debugPrint('      ${processed[i - 1]} * ${processed[i + 1]} = $result');
+          processed.removeRange(i - 1, i + 2);
+          processed.insert(i - 1, result);
+        } else if (processed[i] == '/') {
+          final divisor = processed[i + 1] as double;
+          if (divisor == 0) {
+            debugPrint('      ⚠️ División por cero');
+            return 0.0;
+          }
+          final result = (processed[i - 1] as double) / divisor;
+          debugPrint('      ${processed[i - 1]} / ${processed[i + 1]} = $result');
+          processed.removeRange(i - 1, i + 2);
+          processed.insert(i - 1, result);
+        } else {
+          i += 2;
+        }
+      }
+
+      debugPrint('      Después de */ : $processed');
+
+      // Procesar + y -
+      i = 1;
+      while (i < processed.length) {
+        if (i >= processed.length - 1) break;
+
+        if (processed[i] == '+') {
+          final result = (processed[i - 1] as double) + (processed[i + 1] as double);
+          debugPrint('      ${processed[i - 1]} + ${processed[i + 1]} = $result');
+          processed.removeRange(i - 1, i + 2);
+          processed.insert(i - 1, result);
+        } else if (processed[i] == '-') {
+          final result = (processed[i - 1] as double) - (processed[i + 1] as double);
+          debugPrint('      ${processed[i - 1]} - ${processed[i + 1]} = $result');
+          processed.removeRange(i - 1, i + 2);
+          processed.insert(i - 1, result);
+        } else {
+          i += 2;
+        }
+      }
+
+      debugPrint('      Resultado final: ${processed[0]}');
+      return processed[0] as double;
+    } catch (e, stackTrace) {
+      debugPrint('   ❌ Error en _evaluateSimpleMathExpression: $e');
+      debugPrint('   Stack: $stackTrace');
+      return 0.0;
+    }
   }
 
   /// Muestra un diálogo de advertencia cuando hay lotes sin peso promedio configurado
@@ -12097,12 +12977,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // ===== VISUALIZACIÓN DE HEADQUARTER WEIGHTS =====
 
-  Widget _buildHeadquarterWeightsDisplay() {
-    debugPrint('🎨 _buildHeadquarterWeightsDisplay llamado');
-    debugPrint('   _calculatedHeadquarterWeights: ${_calculatedHeadquarterWeights.length}');
-    debugPrint('   _headquartersWithoutWeight: ${_headquartersWithoutWeight.length}');
-    debugPrint('   _tagReaderData: ${_tagReaderData.length}');
-
+  Widget _buildHeadquarterWeightsDisplay(int statusId) {
     // Si no hay datos del tag, mostrar mensaje para leer primero
     if (_tagReaderData.isEmpty) {
       return Container(
@@ -12138,6 +13013,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ],
         ),
       );
+    }
+
+    // Si no hay resultado para este statusId específico, no mostrar nada
+    if (!_calculatedHeadquarterWeights.containsKey(statusId)) {
+      return const SizedBox.shrink();
     }
 
     // Si hay lotes sin peso, mostrar SOLO advertencia
@@ -12293,49 +13173,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     }
 
-    // Si no hay cálculos aún, mostrar mensaje de espera
-    if (_calculatedHeadquarterWeights.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF1E3A5F), Color(0xFF2A4A6F)],
-          ),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: const Color(0xFF2196F3).withValues(alpha: 0.3),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.calculate_outlined,
-              color: Color(0xFF64B5F6),
-              size: 24,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Calculando peso... Toque nuevamente este status para ver el resultado.',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // Si todos los lotes tienen peso, mostrar display con cálculo
-    // Calcular el peso total general
-    double grandTotalWeight = 0;
-    for (var data in _calculatedHeadquarterWeights.values) {
-      grandTotalWeight += (data['calculatedWeight'] as double? ?? 0);
-    }
+    // Obtener el dato para este statusId específico
+    final data = _calculatedHeadquarterWeights[statusId]!;
+    final isFormulaResult = data['isFormulaResult'] as bool? ?? false;
+    final grandTotal = data['grandTotal'] as double? ?? 0;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -12362,7 +13203,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
-                  'Peso Calculado por Lote',
+                  isFormulaResult ? 'Peso Calculado por racimo' : 'Peso Calculado por Lote',
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
@@ -12375,196 +13216,216 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ],
           ),
           const SizedBox(height: 12),
-          // Mostrar cada headquarter con su cálculo
-          ..._calculatedHeadquarterWeights.entries.map((entry) {
-            final headquarterId = entry.key;
-            final data = entry.value;
-            final headquarterName =
-                data['headquarterName'] as String? ?? 'Lote $headquarterId';
-            final weight = data['weight'] as double? ?? 0;
-            final totalResults = data['totalResults'] as int? ?? 0;
-            final calculatedWeight = data['calculatedWeight'] as double? ?? 0;
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: const Color(0xFF52B788).withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Nombre del lote
-                    Text(
-                      headquarterName,
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white.withValues(alpha: 0.9),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Fórmula: resultados x peso = total
-                    Row(
-                      children: [
-                        // Resultados
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFF2196F3).withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '$totalResults',
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text(
-                            '×',
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ),
-                        // Peso unitario
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color:
-                                const Color(0xFFFFA500).withValues(alpha: 0.3),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${weight.toStringAsFixed(2)} kg',
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text(
-                            '=',
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white.withValues(alpha: 0.7),
-                            ),
-                          ),
-                        ),
-                        // Peso calculado
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [Color(0xFF52B788), Color(0xFF40916C)],
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              '${calculatedWeight.toStringAsFixed(2)} kg',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          }),
-          // Mostrar total general si hay cálculos
-          if (_calculatedHeadquarterWeights.isNotEmpty)
+          // Si es resultado de fórmula, mostrar de forma simple
+          if (isFormulaResult) ...[
             Container(
-              margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFF00a86b).withValues(alpha: 0.3),
-                    const Color(0xFF00a86b).withValues(alpha: 0.2),
-                  ],
-                ),
+                color: Colors.black.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                  color: const Color(0xFF52B788).withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Resultado
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.summarize_rounded,
-                        color: Color(0xFF00a86b),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        'PESO TOTAL',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white.withValues(alpha: 0.9),
-                          letterSpacing: 0.5,
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '${_formatDecimal(grandTotal)} kg',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                ],
+              ),
+            ),
+          ]
+          // Si es cálculo tradicional, mostrar desglose por lote
+          else ...[
+            if (data['resultsByHeadquarter'] != null)
+              ...((data['resultsByHeadquarter'] as Map<int, Map<String, dynamic>>)
+                  .entries
+                  .map((hqEntry) {
+                final headquarterId = hqEntry.key;
+                final hqData = hqEntry.value;
+                final headquarterName =
+                    hqData['headquarterName'] as String? ?? 'Lote $headquarterId';
+                final weight = hqData['weight'] as double? ?? 0;
+                final totalResults = hqData['totalResults'] as int? ?? 0;
+                final calculatedWeight = hqData['calculatedWeight'] as double? ?? 0;
+
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF00a86b), Color(0xFF008c5a)],
+                      color: Colors.black.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: const Color(0xFF52B788).withValues(alpha: 0.3),
+                        width: 1,
                       ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF00a86b).withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Nombre del lote
+                        Text(
+                          headquarterName,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        // Fórmula: resultados x peso = total
+                        Row(
+                          children: [
+                            // Resultados
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2196F3)
+                                    .withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$totalResults',
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                '×',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ),
+                            // Peso unitario
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFA500)
+                                    .withValues(alpha: 0.3),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '${_formatDecimal(weight)} kg',
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                '=',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ),
+                            // Peso calculado
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '${_formatDecimal(calculatedWeight)} kg',
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                    child: Text(
-                      '${grandTotalWeight.toStringAsFixed(2)} kg',
+                  ),
+                );
+              })),
+            // Mostrar total general
+            if (grandTotal > 0)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'TOTAL GENERAL:',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    Text(
+                      '${_formatDecimal(grandTotal)} kg',
                       style: const TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 16,
@@ -12572,10 +13433,72 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         color: Colors.white,
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Muestra la fórmula evaluada INLINE para headquarter-weight
+  Widget _buildHeadquarterWeightInlineDisplay({
+    required int statusId,
+    required dynamic status,
+  }) {
+    // Obtener el dato para este statusId
+    final data = _calculatedHeadquarterWeights[statusId];
+    if (data == null) {
+      return const SizedBox.shrink();
+    }
+
+    final evaluatedFormula = data['evaluatedFormula'] as String? ?? '';
+    final grandTotal = data['grandTotal'] as double? ?? 0;
+
+    if (evaluatedFormula.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    // Obtener fórmula original del default_status
+    final originalFormula = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B4332), // Verde oscuro igual que tag-reader
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF40916C).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Fórmula evaluada con valores reemplazados
+          Row(
+            children: [
+              const Icon(
+                Icons.calculate_outlined,
+                color: Color(0xFF52B788),
+                size: 18,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  evaluatedFormula,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto Mono',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
