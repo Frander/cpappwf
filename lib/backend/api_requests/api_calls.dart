@@ -236,6 +236,7 @@ class APIClickPalmGroup {
   static UsersidDELETECall usersidDELETECall = UsersidDELETECall();
   static UsersFiltersGETCall usersFiltersGETCall = UsersFiltersGETCall();
   static UsersbyoperidGETCall usersbyoperidGETCall = UsersbyoperidGETCall();
+  static ValidateSupervisorGETCall validateSupervisorGETCall = ValidateSupervisorGETCall();
   static UsersCredentialsGETCall usersCredentialsGETCall =
       UsersCredentialsGETCall();
   static UsersCredentialsPOSTCall usersCredentialsPOSTCall =
@@ -4239,6 +4240,28 @@ class UsersbyoperidGETCall {
     return ApiManager.instance.makeApiCall(
       callName: '/Users/by-operid/{operID} GET',
       apiUrl: '${baseUrl}/Users/by-operid/${operID}',
+      callType: ApiCallType.GET,
+      headers: {},
+      params: {},
+      returnBody: true,
+      encodeBodyUtf8: false,
+      decodeUtf8: false,
+      cache: false,
+      isStreamingApi: false,
+      alwaysAllowBody: false,
+    );
+  }
+}
+
+class ValidateSupervisorGETCall {
+  Future<ApiCallResponse> call({
+    required String code,
+  }) async {
+    final baseUrl = APIClickPalmGroup.getBaseUrl();
+
+    return ApiManager.instance.makeApiCall(
+      callName: '/users/validate-supervisor/{code} GET',
+      apiUrl: '${baseUrl}/users/validate-supervisor/${code}',
       callType: ApiCallType.GET,
       headers: {},
       params: {},

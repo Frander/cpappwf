@@ -17,6 +17,19 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:math';
 import 'package:flutter/services.dart';
 
+/// Clase auxiliar para representar una ubicación de almacenamiento
+class StorageLocation {
+  final String path;
+  final String name;
+  final bool accessible;
+
+  StorageLocation({
+    required this.path,
+    required this.name,
+    required this.accessible,
+  });
+}
+
 Future<String> getPersistentId(BuildContext context) async {
   if (!Platform.isAndroid) {
     throw UnsupportedError('Esta función solo está disponible en Android');
@@ -32,38 +45,152 @@ Future<String> getPersistentId(BuildContext context) async {
       throw Exception('Permisos de almacenamiento no otorgados');
     }
 
-    // 2. Obtener ruta segura y persistente
-    final String docsPath = await _getBestDocumentsPath();
-    final Directory dir = Directory(docsPath);
+    // 2. Obtener las 3 ubicaciones de almacenamiento
+    List<StorageLocation> locations = await _getStorageLocations();
 
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
+    // 3. Buscar archivo en todas las ubicaciones
+    String? foundId;
+    String? foundLocation;
 
-    final String filePath = '$docsPath/$fileName';
-    final File file = File(filePath);
+    for (var location in locations) {
+      if (!location.accessible) continue;
 
-    // 3. Si ya existe, leerlo
-    if (await file.exists()) {
-      final String savedId = await file.readAsString();
-      if (savedId.trim().isNotEmpty) {
-        debugPrint('UUID recuperado: $savedId');
-        return savedId.trim();
+      final filePath = '${location.path}/$fileName';
+      final file = File(filePath);
+
+      if (await file.exists()) {
+        final content = await file.readAsString();
+        if (content.trim().isNotEmpty) {
+          foundId = content.trim();
+          foundLocation = location.name;
+          debugPrint('✅ ID encontrado en ${location.name}: $foundId');
+          break;
+        }
       }
     }
 
-    // 4. Generar nuevo número de 10 dígitos
-    final String newId = _generate10DigitNumber(random);
+    // 4. Si se encontró el ID, sincronizar a las demás ubicaciones
+    if (foundId != null) {
+      debugPrint('🔄 Sincronizando ID desde $foundLocation a otras ubicaciones...');
+      await _syncIdToAllLocations(foundId, locations);
+      return foundId;
+    }
 
-    // 5. Guardar en la ruta persistente
-    await file.writeAsString(newId, flush: true);
+    // 5. No se encontró en ninguna ubicación, generar nuevo ID
+    final newId = _generate10DigitNumber(random);
+    debugPrint('🆕 Generando nuevo ID: $newId');
 
-    debugPrint('Nuevo número generado y guardado: $newId');
+    // 6. Guardar en todas las ubicaciones
+    await _syncIdToAllLocations(newId, locations);
+
     return newId;
   } catch (e) {
     debugPrint('Error crítico en getPersistentId: $e');
     return _generate10DigitNumber(random); // fallback en memoria
   }
+}
+
+/// Obtiene las 3 ubicaciones de almacenamiento con verificación de accesibilidad
+Future<List<StorageLocation>> _getStorageLocations() async {
+  List<StorageLocation> locations = [];
+
+  try {
+    final externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) {
+      throw Exception('No se pudo acceder al almacenamiento externo');
+    }
+
+    // 1. Ubicación ClickPalmData (PRIORITARIA)
+    final clickPalmPath = '${externalDir.path}/ClickPalmData';
+    locations.add(StorageLocation(
+      path: clickPalmPath,
+      name: 'ClickPalmData',
+      accessible: await _isLocationAccessible(clickPalmPath),
+    ));
+
+    // 2. Ubicación Documents
+    final docsPath = '${externalDir.path}/Documents';
+    locations.add(StorageLocation(
+      path: docsPath,
+      name: 'Documents',
+      accessible: await _isLocationAccessible(docsPath),
+    ));
+
+    // 3. Ubicación Downloads
+    final downloadsPath = '${externalDir.path}/Downloads';
+    locations.add(StorageLocation(
+      path: downloadsPath,
+      name: 'Downloads',
+      accessible: await _isLocationAccessible(downloadsPath),
+    ));
+  } catch (e) {
+    debugPrint('❌ Error obteniendo ubicaciones de almacenamiento: $e');
+  }
+
+  return locations;
+}
+
+/// Verifica si una ubicación de almacenamiento es accesible
+Future<bool> _isLocationAccessible(String path) async {
+  try {
+    final dir = Directory(path);
+    // Intentar crear el directorio si no existe
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    // Verificar si podemos leer/escribir
+    return await dir.exists();
+  } catch (e) {
+    debugPrint('⚠️ Ubicación no accesible: $path - $e');
+    return false;
+  }
+}
+
+/// Sincroniza el ID a todas las ubicaciones accesibles
+Future<void> _syncIdToAllLocations(
+    String id, List<StorageLocation> locations) async {
+  const fileName = 'persistent_id.txt';
+  int successCount = 0;
+  int failCount = 0;
+
+  for (var location in locations) {
+    if (!location.accessible) {
+      debugPrint('⚠️ Saltando ${location.name} - no accesible');
+      continue;
+    }
+
+    try {
+      final dir = Directory(location.path);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+
+      final filePath = '${location.path}/$fileName';
+      final file = File(filePath);
+
+      // Escribir o actualizar el archivo
+      if (!await file.exists()) {
+        await file.writeAsString(id, flush: true);
+        debugPrint('✅ ID sincronizado a ${location.name}');
+        successCount++;
+      } else {
+        final existingContent = await file.readAsString();
+        if (existingContent.trim() != id.trim()) {
+          await file.writeAsString(id, flush: true);
+          debugPrint('✅ ID actualizado en ${location.name}');
+          successCount++;
+        } else {
+          debugPrint('ℹ️ ID ya existe en ${location.name}');
+          successCount++;
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error al sincronizar a ${location.name}: $e');
+      failCount++;
+    }
+  }
+
+  debugPrint('📊 Sincronización completa: $successCount exitosos, $failCount fallidos');
 }
 
 String _generate10DigitNumber(Random random) {
@@ -73,23 +200,6 @@ String _generate10DigitNumber(Random random) {
     buffer.write(random.nextInt(10)); // 9 dígitos 0-9
   }
   return buffer.toString();
-}
-
-Future<String> _getBestDocumentsPath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
-  }
-
-  final String path =
-      '${externalDir.path}/ClickPalmData'; // Carpeta personalizada
-  final Directory targetDir = Directory(path);
-
-  if (!await targetDir.exists()) {
-    await targetDir.create(recursive: true);
-  }
-
-  return targetDir.path;
 }
 
 Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {

@@ -1,19 +1,14 @@
 import '/backend/api_requests/api_calls.dart';
 import '/backend/schema/structs/index.dart';
 import '/components/info_dialog_widget.dart';
-import '/components/keyboard_num_component_widget.dart';
-import '/components/company_selection_grid_widget.dart';
 import '/components/device_selection_grid_widget.dart';
 import '/components/sync_loading_widget.dart';
 import '/components/device_registration_loading_widget.dart';
 import '/components/device_registration_form_widget.dart';
 import '/components/supervisor_code_keyboard_widget.dart';
 import '/components/connection_retry_dialog_widget.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:async';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -256,45 +251,157 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
             return;
           } else {
-            // El IMEI no existe en la base de datos, mostrar selección de empresa/CTR
-            debugPrint('⚠️ IMEI no registrado, mostrando selección de empresa/CTR');
+            // El IMEI no existe en la base de datos, validar supervisor primero
+            debugPrint('⚠️ IMEI no registrado, solicitando código de supervisor');
 
             // Cerrar el diálogo de progreso
             if (Navigator.of(context).canPop()) {
               Navigator.pop(context);
             }
 
-            // PASO 1: Seleccionar Empresa
-            CompaniesStruct? selectedCompany = await showDialog<CompaniesStruct>(
-              context: context,
-              barrierDismissible: false,
-              builder: (dialogContext) {
-                return PopScope(
-                  canPop: false,
-                  child: Dialog(
+            // PASO 1: Validar código de supervisor (reemplaza selección de empresa)
+            CompaniesStruct? selectedCompany;
+            bool supervisorValidated = false;
+
+            while (!supervisorValidated) {
+              // Mostrar teclado de supervisor
+              String? enteredCode = await showDialog<String>(
+                context: context,
+                barrierDismissible: false,
+                builder: (dialogContext) {
+                  return PopScope(
+                    canPop: false,
+                    child: Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: Container(
+                        width: MediaQuery.sizeOf(context).width,
+                        height: MediaQuery.sizeOf(context).height,
+                        child: SupervisorCodeKeyboardWidget(
+                          onCodeEntered: (String code) async {
+                            Navigator.pop(dialogContext, code);
+                          },
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+
+              if (enteredCode == null || enteredCode.isEmpty) {
+                continue;
+              }
+
+              // Mostrar loading mientras valida
+              showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (loadingContext) {
+                  return Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    child: Container(
-                      width: MediaQuery.sizeOf(context).width,
-                      height: MediaQuery.sizeOf(context).height,
-                      child: CompanySelectionGridWidget(
-                        onCompanySelected: (CompaniesStruct company) async {
-                          Navigator.pop(dialogContext, company);
-                        },
-                      ),
+                    child: DeviceRegistrationLoadingWidget(
+                      message: 'Validando código de supervisor...',
                     ),
-                  ),
-                );
-              },
-            );
+                  );
+                },
+              );
 
-            if (selectedCompany == null) {
-              debugPrint('❌ No se seleccionó empresa, cerrando app');
-              return;
+              try {
+                // Llamar nuevo API para validar supervisor
+                ApiCallResponse? supervisorResponse =
+                    await APIClickPalmGroup.validateSupervisorGETCall.call(
+                  code: enteredCode,
+                );
+
+                // Cerrar loading
+                if (Navigator.of(context).canPop()) {
+                  Navigator.pop(context);
+                }
+
+                if (supervisorResponse.succeeded &&
+                    supervisorResponse.jsonBody != null) {
+                  var supervisorData = supervisorResponse.jsonBody;
+
+                  // El endpoint ya valida que sea supervisor, solo extraemos la empresa
+                  selectedCompany = CompaniesStruct.maybeFromMap(getJsonField(
+                    supervisorData,
+                    r'''$.company''',
+                  ));
+
+                  if (selectedCompany != null) {
+                    debugPrint('✅ Supervisor validado. Empresa: ${selectedCompany.nameCompany}');
+                    supervisorValidated = true;
+                  } else {
+                    await showDialog(
+                      context: context,
+                      builder: (dialogContext) {
+                        return Dialog(
+                          elevation: 0,
+                          insetPadding: EdgeInsets.zero,
+                          backgroundColor: Colors.transparent,
+                          child: Container(
+                            height: MediaQuery.sizeOf(context).height * 0.6,
+                            width: MediaQuery.sizeOf(context).width * 0.8,
+                            child: InfoDialogWidget(
+                              info: 'Error al obtener información de la empresa. Intente nuevamente.',
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                    continue;
+                  }
+                } else {
+                  // Error 404 o cualquier otro error
+                  await showDialog(
+                    context: context,
+                    builder: (dialogContext) {
+                      return Dialog(
+                        elevation: 0,
+                        insetPadding: EdgeInsets.zero,
+                        backgroundColor: Colors.transparent,
+                        child: Container(
+                          height: MediaQuery.sizeOf(context).height * 0.6,
+                          width: MediaQuery.sizeOf(context).width * 0.8,
+                          child: InfoDialogWidget(
+                            info: 'El código ingresado no corresponde a un supervisor válido. Intente nuevamente.',
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                  continue;
+                }
+              } catch (e) {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.pop(context);
+                }
+
+                await showDialog(
+                  context: context,
+                  builder: (dialogContext) {
+                    return Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: Container(
+                        height: MediaQuery.sizeOf(context).height * 0.6,
+                        width: MediaQuery.sizeOf(context).width * 0.8,
+                        child: InfoDialogWidget(
+                          info: 'Error al validar supervisor: ${e.toString()}. Intente nuevamente.',
+                        ),
+                      ),
+                    );
+                  },
+                );
+                continue;
+              }
             }
 
-            // PASO 2: Mostrar lista de dispositivos CTR de la empresa seleccionada
+            // PASO 2: Mostrar lista de dispositivos CTR de la empresa (ahora obtenida del supervisor)
             bool? shouldRegisterNewDevice = await showDialog<bool>(
               context: context,
               barrierDismissible: false,
@@ -464,189 +571,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             if (shouldRegisterNewDevice == true) {
               // Usuario quiere registrar un nuevo dispositivo
               debugPrint('📱 Usuario solicitó agregar nuevo dispositivo');
-
-              // LOOP: Validar código de supervisor - no avanza hasta que sea correcto
-              bool supervisorValidated = false;
-              int supervisorCompanyId = selectedCompany!.idCompany;
-
-              while (!supervisorValidated) {
-                // Mostrar teclado de supervisor (sin opción de retroceder)
-                String? enteredCode = await showDialog<String>(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (dialogContext) {
-                    return PopScope(
-                      canPop: false,
-                      child: Dialog(
-                        elevation: 0,
-                        insetPadding: EdgeInsets.zero,
-                        backgroundColor: Colors.transparent,
-                        child: Container(
-                          width: MediaQuery.sizeOf(context).width,
-                          height: MediaQuery.sizeOf(context).height,
-                          child: SupervisorCodeKeyboardWidget(
-                            onCodeEntered: (String code) async {
-                              Navigator.pop(dialogContext, code);
-                            },
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-
-                if (enteredCode == null || enteredCode.isEmpty) {
-                  continue;
-                }
-
-                // Mostrar loading mientras valida
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (loadingContext) {
-                    return Dialog(
-                      elevation: 0,
-                      insetPadding: EdgeInsets.zero,
-                      backgroundColor: Colors.transparent,
-                      child: DeviceRegistrationLoadingWidget(
-                        message: 'Validando código de supervisor...',
-                      ),
-                    );
-                  },
-                );
-
-                try {
-                  // Llamar API para validar supervisor por operID
-                  ApiCallResponse? supervisorResponse =
-                      await APIClickPalmGroup.usersbyoperidGETCall.call(
-                    operID: enteredCode,
-                  );
-
-                  // Cerrar loading
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.pop(context);
-                  }
-
-                  if (supervisorResponse.succeeded &&
-                      supervisorResponse.jsonBody != null) {
-                    var supervisorData = supervisorResponse.jsonBody;
-
-                    // Verificar permisos del usuario
-                    List<dynamic> permissions = getJsonField(
-                      supervisorData,
-                      r'''$.users_permissions''',
-                      true,
-                    ) ?? [];
-
-                    bool isSupervisor = false;
-                    for (var permission in permissions) {
-                      String? permissionName = getJsonField(
-                        permission,
-                        r'''$.name_permission''',
-                      )?.toString();
-
-                      if (permissionName?.toUpperCase() == 'SUPERVISOR') {
-                        isSupervisor = true;
-                        break;
-                      }
-                    }
-
-                    if (!isSupervisor) {
-                      await showDialog(
-                        context: context,
-                        builder: (dialogContext) {
-                          return Dialog(
-                            elevation: 0,
-                            insetPadding: EdgeInsets.zero,
-                            backgroundColor: Colors.transparent,
-                            child: Container(
-                              height: MediaQuery.sizeOf(context).height * 0.6,
-                              width: MediaQuery.sizeOf(context).width * 0.8,
-                              child: InfoDialogWidget(
-                                info: 'El código ingresado no corresponde a un supervisor. Intente nuevamente.',
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                      continue;
-                    }
-
-                    // Verificar que el supervisor pertenece a la empresa seleccionada
-                    int supervisorCompany = getJsonField(
-                      supervisorData,
-                      r'''$.id_company''',
-                    ) ?? 0;
-
-                    if (supervisorCompany != selectedCompany!.idCompany) {
-                      await showDialog(
-                        context: context,
-                        builder: (dialogContext) {
-                          return Dialog(
-                            elevation: 0,
-                            insetPadding: EdgeInsets.zero,
-                            backgroundColor: Colors.transparent,
-                            child: Container(
-                              height: MediaQuery.sizeOf(context).height * 0.6,
-                              width: MediaQuery.sizeOf(context).width * 0.8,
-                              child: InfoDialogWidget(
-                                info: 'El supervisor no pertenece a la empresa seleccionada. Intente con otro código.',
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                      continue;
-                    }
-
-                    supervisorValidated = true;
-                  } else {
-                    await showDialog(
-                      context: context,
-                      builder: (dialogContext) {
-                        return Dialog(
-                          elevation: 0,
-                          insetPadding: EdgeInsets.zero,
-                          backgroundColor: Colors.transparent,
-                          child: Container(
-                            height: MediaQuery.sizeOf(context).height * 0.6,
-                            width: MediaQuery.sizeOf(context).width * 0.8,
-                            child: InfoDialogWidget(
-                              info: 'No se encontró un usuario con ese código. Intente nuevamente.',
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                    continue;
-                  }
-                } catch (e) {
-                  if (Navigator.of(context).canPop()) {
-                    Navigator.pop(context);
-                  }
-
-                  await showDialog(
-                    context: context,
-                    builder: (dialogContext) {
-                      return Dialog(
-                        elevation: 0,
-                        insetPadding: EdgeInsets.zero,
-                        backgroundColor: Colors.transparent,
-                        child: Container(
-                          height: MediaQuery.sizeOf(context).height * 0.6,
-                          width: MediaQuery.sizeOf(context).width * 0.8,
-                          child: InfoDialogWidget(
-                            info: 'Error al validar supervisor: ${e.toString()}. Intente nuevamente.',
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                  continue;
-                }
-              }
-
-              // Supervisor validado, continuar con el registro
+              // Supervisor ya fue validado al inicio, continuar con el registro
               // Obtener información del dispositivo
               String deviceModel = await actions.getDeviceModel();
               String deviceSerialId = await actions.getAndroidSerialId();
@@ -668,7 +593,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         deviceImei: deviceImei,
                         deviceModel: deviceModel,
                         deviceSerialId: deviceSerialId,
-                        supervisorCompanyId: supervisorCompanyId,
+                        supervisorCompanyId: selectedCompany!.idCompany,
                         onSubmit: (String deviceName, String? cellPhone) async {
                           Navigator.pop(dialogContext, {
                             'deviceName': deviceName,
@@ -703,7 +628,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   ApiCallResponse? createDeviceResponse =
                       await APIClickPalmGroup.devicesPOSTCall.call(
                     idDevice: 0,
-                    idCompany: supervisorCompanyId,
+                    idCompany: selectedCompany!.idCompany,
                     deviceName: deviceFormData['deviceName']!,
                     cellPhone: deviceFormData['cellPhone'],
                     serialId: deviceSerialId,
@@ -1141,32 +1066,24 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               return;
             }
           } else {
-            // PASO 1: Seleccionar Empresa (sin opción de retroceder)
-            CompaniesStruct? selectedCompany = await showDialog<CompaniesStruct>(
-              context: context,
-              barrierDismissible: false,
-              builder: (dialogContext) {
-                return PopScope(
-                  canPop: false,
-                  child: Dialog(
-                    elevation: 0,
-                    insetPadding: EdgeInsets.zero,
-                    backgroundColor: Colors.transparent,
-                    child: Container(
-                      width: MediaQuery.sizeOf(context).width,
-                      height: MediaQuery.sizeOf(context).height,
-                      child: CompanySelectionGridWidget(
-                        onCompanySelected: (CompaniesStruct company) async {
-                          Navigator.pop(dialogContext, company);
-                        },
-                      ),
-                    ),
-                  ),
-                );
-              },
+            // PASO 1: Validar código de supervisor
+            Map<String, dynamic>? supervisorData = await _showSupervisorCodeDialog();
+
+            if (supervisorData == null) {
+              debugPrint('⚠️ No se validó código de supervisor');
+              return;
+            }
+
+            int supervisorCompanyId = supervisorData['id_company'] ?? 0;
+            debugPrint('✅ Supervisor validado (Empresa: $supervisorCompanyId)');
+
+            // Crear estructura de empresa del supervisor
+            CompaniesStruct selectedCompany = CompaniesStruct(
+              idCompany: supervisorCompanyId,
             );
 
-            if (selectedCompany != null) {
+            // PASO 2: Continuar con selección de dispositivo CTR
+            if (true) {
               // PASO 2: Mostrar lista de dispositivos CTR de la empresa seleccionada (sin opción de retroceder)
               bool? shouldRegisterNewDevice = await showDialog<bool>(
                 context: context,
@@ -1194,13 +1111,6 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               // Guardar el dispositivo seleccionado en AppState
                               FFAppState().deviceDefault = selectedDevice;
 
-                              // Persistir el ID del dispositivo en archivo
-                              await actions.savePersistentId(
-                                context,
-                                selectedDevice.idDevice.toString(),
-                              );
-                              debugPrint('✅ ID persistido correctamente');
-
                               // Paso 4: Iniciando sesión
                               _updateProgress(4, 'Iniciando sesión de forma segura...');
                               await Future.delayed(Duration(milliseconds: 400));
@@ -1209,6 +1119,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               String loginIdentifier = selectedDevice.imeI1.isNotEmpty
                                   ? selectedDevice.imeI1
                                   : selectedDevice.idDevice.toString();
+
+                              // Persistir el identificador en archivo (IMEI o idDevice como fallback)
+                              await actions.savePersistentId(
+                                context,
+                                loginIdentifier,
+                              );
+                              debugPrint('✅ ID persistido correctamente: $loginIdentifier');
 
                               debugPrint('🔵 Realizando login con IMEI: $loginIdentifier');
                               // Hacer login con el dispositivo seleccionado
@@ -1924,6 +1841,207 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         _model.stepMessage = message;
       });
     }
+  }
+
+  /// Muestra el diálogo de código de supervisor y valida el código ingresado
+  /// Retorna los datos del supervisor validado o null si se cancela
+  Future<Map<String, dynamic>?> _showSupervisorCodeDialog() async {
+    bool supervisorValidated = false;
+    Map<String, dynamic>? supervisorResult;
+
+    while (!supervisorValidated) {
+      // Mostrar teclado de código de supervisor
+      String? enteredCode = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return PopScope(
+            canPop: false,
+            child: Dialog(
+              elevation: 0,
+              insetPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              child: Container(
+                width: MediaQuery.sizeOf(context).width,
+                height: MediaQuery.sizeOf(context).height,
+                child: SupervisorCodeKeyboardWidget(
+                  onCodeEntered: (String code) async {
+                    Navigator.pop(dialogContext, code);
+                  },
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+      // Si no se ingresó código (cancelado), retornar null
+      if (enteredCode == null || enteredCode.isEmpty) {
+        debugPrint('⚠️ Usuario canceló ingreso de código de supervisor');
+        return null;
+      }
+
+      debugPrint('🔐 Validando código de supervisor: $enteredCode');
+
+      // Mostrar loading mientras se valida
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) {
+          return Dialog(
+            elevation: 0,
+            insetPadding: EdgeInsets.zero,
+            backgroundColor: Colors.transparent,
+            child: DeviceRegistrationLoadingWidget(
+              message: 'Validando código de supervisor...',
+            ),
+          );
+        },
+      );
+
+      try {
+        // Llamar API para validar supervisor por operID
+        ApiCallResponse? supervisorResponse =
+            await APIClickPalmGroup.usersbyoperidGETCall.call(
+          operID: enteredCode,
+        );
+
+        // Cerrar loading
+        if (Navigator.of(context).canPop()) {
+          Navigator.pop(context);
+        }
+
+        if (supervisorResponse.succeeded && supervisorResponse.jsonBody != null) {
+          var supervisorData = supervisorResponse.jsonBody;
+
+          // Verificar permisos del usuario
+          List<dynamic> permissions = getJsonField(
+            supervisorData,
+            r'''$.users_permissions''',
+            true,
+          ) ?? [];
+
+          bool isSupervisor = false;
+          for (var permission in permissions) {
+            String? permissionName = getJsonField(
+              permission,
+              r'''$.name_permission''',
+            )?.toString();
+
+            if (permissionName?.toUpperCase() == 'SUPERVISOR') {
+              isSupervisor = true;
+              break;
+            }
+          }
+
+          if (!isSupervisor) {
+            debugPrint('❌ Código no corresponde a un supervisor');
+            await showDialog(
+              context: context,
+              builder: (dialogContext) {
+                return Dialog(
+                  elevation: 0,
+                  insetPadding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  child: Container(
+                    height: MediaQuery.sizeOf(context).height * 0.6,
+                    width: MediaQuery.sizeOf(context).width * 0.8,
+                    child: InfoDialogWidget(
+                      info: 'El código ingresado no corresponde a un supervisor. Intente nuevamente.',
+                    ),
+                  ),
+                );
+              },
+            );
+            continue; // Volver a solicitar código
+          }
+
+          // Extraer información del supervisor
+          int idCompany = getJsonField(supervisorData, r'''$.id_company''') ?? 0;
+
+          if (idCompany == 0) {
+            debugPrint('❌ Supervisor sin empresa asignada');
+            await showDialog(
+              context: context,
+              builder: (dialogContext) {
+                return Dialog(
+                  elevation: 0,
+                  insetPadding: EdgeInsets.zero,
+                  backgroundColor: Colors.transparent,
+                  child: Container(
+                    height: MediaQuery.sizeOf(context).height * 0.6,
+                    width: MediaQuery.sizeOf(context).width * 0.8,
+                    child: InfoDialogWidget(
+                      info: 'El supervisor no tiene una empresa asignada. Intente con otro código.',
+                    ),
+                  ),
+                );
+              },
+            );
+            continue; // Volver a solicitar código
+          }
+
+          supervisorResult = {
+            'id_company': idCompany,
+            'operID': enteredCode,
+            'name': getJsonField(supervisorData, r'''$.name''') ?? 'Supervisor',
+            'full_data': supervisorData,
+          };
+
+          debugPrint('✅ Supervisor validado: ${supervisorResult['name']} (Empresa: $idCompany)');
+          supervisorValidated = true;
+
+        } else {
+          debugPrint('❌ No se encontró usuario con código: $enteredCode');
+          await showDialog(
+            context: context,
+            builder: (dialogContext) {
+              return Dialog(
+                elevation: 0,
+                insetPadding: EdgeInsets.zero,
+                backgroundColor: Colors.transparent,
+                child: Container(
+                  height: MediaQuery.sizeOf(context).height * 0.6,
+                  width: MediaQuery.sizeOf(context).width * 0.8,
+                  child: InfoDialogWidget(
+                    info: 'No se encontró un usuario con ese código. Intente nuevamente.',
+                  ),
+                ),
+              );
+            },
+          );
+          continue; // Volver a solicitar código
+        }
+
+      } catch (e) {
+        // Cerrar loading si está abierto
+        if (Navigator.of(context).canPop()) {
+          Navigator.pop(context);
+        }
+
+        debugPrint('❌ Error al validar supervisor: $e');
+        await showDialog(
+          context: context,
+          builder: (dialogContext) {
+            return Dialog(
+              elevation: 0,
+              insetPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              child: Container(
+                height: MediaQuery.sizeOf(context).height * 0.6,
+                width: MediaQuery.sizeOf(context).width * 0.8,
+                child: InfoDialogWidget(
+                  info: 'Error al validar supervisor: ${e.toString()}. Intente nuevamente.',
+                ),
+              ),
+            );
+          },
+        );
+        continue; // Volver a solicitar código
+      }
+    }
+
+    return supervisorResult;
   }
 
   /// Verifica la conexión a internet con reintentos automáticos durante 5 minutos.

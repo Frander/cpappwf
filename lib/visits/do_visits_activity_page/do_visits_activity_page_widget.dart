@@ -3,9 +3,7 @@ import '/components/read_n_f_c_component_widget.dart';
 import '/flutter_flow/flutter_flow_radio_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -20,7 +18,7 @@ class DoVisitsActivityPageWidget extends StatefulWidget {
   const DoVisitsActivityPageWidget({
     super.key,
     String? tittle,
-  }) : this.tittle = tittle ?? 'Módulo ClickPalm';
+  }) : tittle = tittle ?? 'Módulo ClickPalm';
 
   final String tittle;
 
@@ -66,17 +64,17 @@ class _DoVisitsActivityPageWidgetState
         body: SafeArea(
           top: true,
           child: Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Color(0xFF101827),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.max,
               children: [
                 Padding(
-                  padding: EdgeInsetsDirectional.fromSTEB(0.0, 15.0, 0.0, 0.0),
+                  padding: const EdgeInsetsDirectional.fromSTEB(0.0, 15.0, 0.0, 0.0),
                   child: Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(),
+                    decoration: const BoxDecoration(),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -131,14 +129,14 @@ class _DoVisitsActivityPageWidgetState
                               direction: Axis.horizontal,
                               radioButtonColor:
                                   FlutterFlowTheme.of(context).primary,
-                              inactiveRadioButtonColor: Color(0xFF2E363C),
+                              inactiveRadioButtonColor: const Color(0xFF2E363C),
                               toggleable: false,
                               horizontalAlignment: WrapAlignment.center,
                               verticalAlignment: WrapCrossAlignment.start,
                             ),
                           ],
                         ),
-                      ].divide(SizedBox(height: 5.0)),
+                      ].divide(const SizedBox(height: 5.0)),
                     ),
                   ),
                 ),
@@ -167,7 +165,7 @@ class _DoVisitsActivityPageWidgetState
                                 scrollDirection: Axis.vertical,
                                 itemCount: activityStatusItem.length,
                                 separatorBuilder: (_, __) =>
-                                    SizedBox(height: 5.0),
+                                    const SizedBox(height: 5.0),
                                 itemBuilder:
                                     (context, activityStatusItemIndex) {
                                   final activityStatusItemItem =
@@ -178,7 +176,7 @@ class _DoVisitsActivityPageWidgetState
                                     children: [
                                       Builder(
                                         builder: (context) => Padding(
-                                          padding:
+                                          padding: const
                                               EdgeInsetsDirectional.fromSTEB(
                                                   15.0, 0.0, 15.0, 0.0),
                                           child: InkWell(
@@ -187,7 +185,6 @@ class _DoVisitsActivityPageWidgetState
                                             hoverColor: Colors.transparent,
                                             highlightColor: Colors.transparent,
                                             onTap: () async {
-                                              var _shouldSetState = false;
                                               HapticFeedback.vibrate();
                                               FFAppState().stopVoice = true;
                                               FFAppState().addToVisitDetails(
@@ -214,90 +211,85 @@ class _DoVisitsActivityPageWidgetState
                                               FFAppState().stopVoice = false;
                                               if (_model.radioButtonValue ==
                                                   'GPS') {
-                                                context.pushNamed(
-                                                  LoadCoordinatesPageWidget
-                                                      .routeName,
-                                                  extra: <String, dynamic>{
-                                                    kTransitionInfoKey:
-                                                        TransitionInfo(
-                                                      hasTransition: true,
-                                                      transitionType:
-                                                          PageTransitionType
-                                                              .fade,
-                                                      duration: Duration(
-                                                          milliseconds: 1000),
-                                                    ),
-                                                  },
-                                                );
-
-                                                if (_shouldSetState)
-                                                  safeSetState(() {});
+                                                if (context.mounted) {
+                                                  context.pushNamed(
+                                                    LoadCoordinatesPageWidget
+                                                        .routeName,
+                                                    extra: <String, dynamic>{
+                                                      kTransitionInfoKey:
+                                                          const TransitionInfo(
+                                                        hasTransition: true,
+                                                        transitionType:
+                                                            PageTransitionType
+                                                                .fade,
+                                                        duration: Duration(
+                                                            milliseconds: 1000),
+                                                      ),
+                                                    },
+                                                  );
+                                                }
                                                 return;
                                               } else {
                                                 if (_model.radioButtonValue ==
                                                     'NFC') {
-                                                  await showDialog(
-                                                    barrierDismissible: false,
-                                                    context: context,
-                                                    builder: (dialogContext) {
-                                                      return Dialog(
-                                                        elevation: 0,
-                                                        insetPadding:
-                                                            EdgeInsets.zero,
-                                                        backgroundColor:
-                                                            Colors.transparent,
-                                                        alignment:
-                                                            AlignmentDirectional(
-                                                                    0.0, 0.0)
-                                                                .resolve(
-                                                                    Directionality.of(
-                                                                        context)),
-                                                        child: GestureDetector(
-                                                          onTap: () {
-                                                            FocusScope.of(
-                                                                    dialogContext)
-                                                                .unfocus();
-                                                            FocusManager
-                                                                .instance
-                                                                .primaryFocus
-                                                                ?.unfocus();
-                                                          },
-                                                          child: Container(
-                                                            height: MediaQuery
-                                                                        .sizeOf(
-                                                                            context)
-                                                                    .height *
-                                                                0.9,
-                                                            width: MediaQuery
-                                                                        .sizeOf(
-                                                                            context)
-                                                                    .width *
-                                                                0.9,
-                                                            child:
-                                                                ReadNFCComponentWidget(),
+                                                  if (context.mounted) {
+                                                    await showDialog(
+                                                      barrierDismissible: false,
+                                                      context: context,
+                                                      builder: (dialogContext) {
+                                                        return Dialog(
+                                                          elevation: 0,
+                                                          insetPadding:
+                                                              EdgeInsets.zero,
+                                                          backgroundColor:
+                                                              Colors.transparent,
+                                                          alignment:
+                                                              const AlignmentDirectional(
+                                                                      0.0, 0.0)
+                                                                  .resolve(
+                                                                      Directionality.of(
+                                                                          context)),
+                                                          child: GestureDetector(
+                                                            onTap: () {
+                                                              FocusScope.of(
+                                                                      dialogContext)
+                                                                  .unfocus();
+                                                              FocusManager
+                                                                  .instance
+                                                                  .primaryFocus
+                                                                  ?.unfocus();
+                                                            },
+                                                            child: SizedBox(
+                                                              height: MediaQuery
+                                                                          .sizeOf(
+                                                                              context)
+                                                                      .height *
+                                                                  0.9,
+                                                              width: MediaQuery
+                                                                          .sizeOf(
+                                                                              context)
+                                                                      .width *
+                                                                  0.9,
+                                                              child:
+                                                                  const ReadNFCComponentWidget(),
+                                                            ),
                                                           ),
-                                                        ),
-                                                      );
-                                                    },
-                                                  );
-
-                                                  if (_shouldSetState)
-                                                    safeSetState(() {});
+                                                        );
+                                                      },
+                                                    );
+                                                  }
                                                   return;
                                                 } else {
-                                                  _model.qrRead =
-                                                      await actions.readQR(
-                                                    context,
-                                                  );
-                                                  _shouldSetState = true;
-                                                  if (_shouldSetState)
+                                                  if (context.mounted) {
+                                                    _model.qrRead =
+                                                        await actions.readQR(
+                                                      context,
+                                                    );
                                                     safeSetState(() {});
+                                                  }
                                                   return;
                                                 }
                                               }
-
-                                              if (_shouldSetState)
-                                                safeSetState(() {});
                                             },
                                             child: Container(
                                               width: MediaQuery.sizeOf(context)
@@ -305,8 +297,8 @@ class _DoVisitsActivityPageWidgetState
                                                   1.0,
                                               height: 70.0,
                                               decoration: BoxDecoration(
-                                                color: Color(0xFF004628),
-                                                boxShadow: [
+                                                color: const Color(0xFF004628),
+                                                boxShadow: const [
                                                   BoxShadow(
                                                     blurRadius: 8.0,
                                                     color: Color(0x33000000),
@@ -320,7 +312,7 @@ class _DoVisitsActivityPageWidgetState
                                                     BorderRadius.circular(22.0),
                                               ),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         20.0, 0.0, 20.0, 0.0),
                                                 child: Row(
@@ -332,10 +324,10 @@ class _DoVisitsActivityPageWidgetState
                                                   children: [
                                                     Expanded(
                                                       child: Text(
-                                                        '${getJsonField(
+                                                        getJsonField(
                                                           activityStatusItemItem,
                                                           r'''$.status_name''',
-                                                        ).toString()}',
+                                                        ).toString(),
                                                         textAlign:
                                                             TextAlign.start,
                                                         style:
@@ -396,9 +388,9 @@ class _DoVisitsActivityPageWidgetState
                       ),
                       Container(
                         height: 71.27,
-                        decoration: BoxDecoration(),
+                        decoration: const BoxDecoration(),
                         child: Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
                               10.0, 5.0, 10.0, 10.0),
                           child: Row(
                             mainAxisSize: MainAxisSize.max,
@@ -421,7 +413,7 @@ class _DoVisitsActivityPageWidgetState
                                     decoration: BoxDecoration(
                                       color:
                                           FlutterFlowTheme.of(context).primary,
-                                      boxShadow: [
+                                      boxShadow: const [
                                         BoxShadow(
                                           blurRadius: 8.0,
                                           color: Color(0x33000000),
@@ -441,7 +433,7 @@ class _DoVisitsActivityPageWidgetState
                                         Container(
                                           width: 50.0,
                                           height: 50.0,
-                                          decoration: BoxDecoration(),
+                                          decoration: const BoxDecoration(),
                                           child: Icon(
                                             Icons.stop_circle,
                                             color: FlutterFlowTheme.of(context)
@@ -450,7 +442,7 @@ class _DoVisitsActivityPageWidgetState
                                           ),
                                         ),
                                         Padding(
-                                          padding:
+                                          padding: const
                                               EdgeInsetsDirectional.fromSTEB(
                                                   0.0, 0.0, 10.0, 0.0),
                                           child: Text(
@@ -459,13 +451,8 @@ class _DoVisitsActivityPageWidgetState
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: TextStyle(fontFamily: 'Roboto',
+                                                  font: const TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
-                                                    fontStyle:
-                                                        FlutterFlowTheme.of(
-                                                                context)
-                                                            .bodyMedium
-                                                            .fontStyle,
                                                   ),
                                                   color: FlutterFlowTheme.of(
                                                           context)
@@ -473,15 +460,10 @@ class _DoVisitsActivityPageWidgetState
                                                   fontSize: 20.0,
                                                   letterSpacing: 0.0,
                                                   fontWeight: FontWeight.bold,
-                                                  fontStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .bodyMedium
-                                                          .fontStyle,
                                                 ),
                                           ),
                                         ),
-                                      ].divide(SizedBox(width: 10.0)),
+                                      ].divide(const SizedBox(width: 10.0)),
                                     ),
                                   ),
                                 ),
@@ -502,7 +484,7 @@ class _DoVisitsActivityPageWidgetState
                                         ),
                                       }.withoutNulls,
                                       extra: <String, dynamic>{
-                                        kTransitionInfoKey: TransitionInfo(
+                                        kTransitionInfoKey: const TransitionInfo(
                                           hasTransition: true,
                                           transitionType:
                                               PageTransitionType.fade,
@@ -516,8 +498,8 @@ class _DoVisitsActivityPageWidgetState
                                     width: double.infinity,
                                     height: double.infinity,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFDA6B00),
-                                      boxShadow: [
+                                      color: const Color(0xFFDA6B00),
+                                      boxShadow: const [
                                         BoxShadow(
                                           blurRadius: 8.0,
                                           color: Color(0x33000000),
@@ -537,7 +519,7 @@ class _DoVisitsActivityPageWidgetState
                                         Container(
                                           width: 50.0,
                                           height: 50.0,
-                                          decoration: BoxDecoration(),
+                                          decoration: const BoxDecoration(),
                                           child: Icon(
                                             Icons.map,
                                             color: FlutterFlowTheme.of(context)
@@ -546,7 +528,7 @@ class _DoVisitsActivityPageWidgetState
                                           ),
                                         ),
                                         Padding(
-                                          padding:
+                                          padding: const
                                               EdgeInsetsDirectional.fromSTEB(
                                                   0.0, 0.0, 9.0, 0.0),
                                           child: Text(
@@ -555,13 +537,8 @@ class _DoVisitsActivityPageWidgetState
                                             style: FlutterFlowTheme.of(context)
                                                 .bodyMedium
                                                 .override(
-                                                  font: TextStyle(fontFamily: 'Roboto',
+                                                  font: const TextStyle(fontFamily: 'Roboto',
                                                     fontWeight: FontWeight.bold,
-                                                    fontStyle:
-                                                        FlutterFlowTheme.of(
-                                                                context)
-                                                            .bodyMedium
-                                                            .fontStyle,
                                                   ),
                                                   color: FlutterFlowTheme.of(
                                                           context)
@@ -569,20 +546,15 @@ class _DoVisitsActivityPageWidgetState
                                                   fontSize: 20.0,
                                                   letterSpacing: 0.0,
                                                   fontWeight: FontWeight.bold,
-                                                  fontStyle:
-                                                      FlutterFlowTheme.of(
-                                                              context)
-                                                          .bodyMedium
-                                                          .fontStyle,
                                                 ),
                                           ),
                                         ),
-                                      ].divide(SizedBox(width: 10.0)),
+                                      ].divide(const SizedBox(width: 10.0)),
                                     ),
                                   ),
                                 ),
                               ),
-                            ].divide(SizedBox(width: 10.0)),
+                            ].divide(const SizedBox(width: 10.0)),
                           ),
                         ),
                       ),
