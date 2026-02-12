@@ -134,6 +134,18 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
   // UKF
   final ukf = UnscentedKalmanFilter();
 
+  // --- Estabilización con calidad y reinicio de GPS ---
+  // Requiere TIEMPO + CALIDAD para estabilizar. Si no se logra en
+  // maxStabilizationSeconds, reinicia sensores GPS para forzar nueva adquisición.
+  const int maxStabilizationSeconds = 15;
+  const int requiredGoodReadings = 3; // Lecturas con accuracy < maxAccuracy
+  const int maxRestartAttempts = 3;
+  int goodReadingsAfterWarmup = 0;
+  double bestAccuracySeen = double.infinity;
+  int restartAttempts = 0;
+  bool isRestarting = false;
+  Timer? stabilizationWatchdog;
+
   try {
     // Configurar acelerómetro
     accelSub = accelerometerEventStream(
@@ -220,7 +232,7 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
       );
     }
 
-    final startTime = DateTime.now();
+    var startTime = DateTime.now(); // var: se reinicia en cada intento de restart
     bool isWarmedUp = false;
     bool isStabilized = false;
 
@@ -241,13 +253,43 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
         );
       }
 
-      // Enviar progreso de GPS al hilo principal (accuracy actual)
+      // Rastrear precisión bruta para estabilización con calidad
+      // (antes de validación, para no perder datos de calidad)
+      if (position.accuracy < bestAccuracySeen) {
+        bestAccuracySeen = position.accuracy;
+      }
+      if (isWarmedUp && !isStabilized &&
+          position.accuracy < LocationConfig.maxAccuracy) {
+        goodReadingsAfterWarmup++;
+      }
+
+      // Enviar progreso detallado de GPS al hilo principal
       if (!isStabilized) {
         service.invoke('gpsProgress', {
           'accuracy': position.accuracy,
           'elapsed': elapsed,
+          'bestAccuracy': bestAccuracySeen,
+          'goodReadings': goodReadingsAfterWarmup,
+          'requiredGoodReadings': requiredGoodReadings,
+          'restartAttempts': restartAttempts,
+          'maxRestartAttempts': maxRestartAttempts,
+          'speed': position.speed,
+          'altitude': position.altitude,
+          'isWarmedUp': isWarmedUp,
+          'isRestarting': isRestarting,
+          'consecutiveRejects': consecutiveRejects,
+          'updateCount': updateCount,
+          'phase': isRestarting
+              ? 'restarting'
+              : (!isWarmedUp ? 'warmup' : 'stabilizing'),
+          'warmupSeconds': LocationConfig.warmupSeconds,
+          'stabilizationSeconds': LocationConfig.stabilizationSeconds,
+          'maxStabilizationSeconds': maxStabilizationSeconds,
         });
       }
+
+      // Si estamos en proceso de reinicio, ignorar lecturas
+      if (isRestarting) return;
 
       // Validación inicial
       if (!PositionValidator.isValidPosition(
@@ -284,14 +326,20 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
         speedWindow.clear();
       }
 
-      // Marcar como estabilizado
+      // Estabilización con calidad: requiere TIEMPO + CALIDAD de lecturas
+      // No basta con que pase el tiempo; necesitamos lecturas con buena precisión
       if (elapsed >=
               LocationConfig.warmupSeconds +
                   LocationConfig.stabilizationSeconds &&
-          !isStabilized) {
+          !isStabilized &&
+          goodReadingsAfterWarmup >= requiredGoodReadings) {
         isStabilized = true;
+        stabilizationWatchdog?.cancel();
         debugPrint(
-            '✅ Servicio en segundo plano estabilizado después de ${elapsed}s');
+            '✅ Servicio estabilizado después de ${elapsed}s '
+            '(precisión: ${bestAccuracySeen.toStringAsFixed(1)}m, '
+            'lecturas válidas: $goodReadingsAfterWarmup, '
+            'reinicios: $restartAttempts)');
 
         // Notificar al hilo principal que el GPS está estabilizado
         service.invoke('gpsStabilized', {'stabilized': true});
@@ -425,6 +473,126 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
       debugPrint('❌ Error en stream de posiciones (servicio): $error');
     }, cancelOnError: false);
 
+    // --- Función de reinicio suave de GPS ---
+    // Reinicia el estado de procesamiento y fuerza una nueva adquisición GPS
+    // sin cancelar el stream principal (el stream sigue entregando posiciones).
+    // Usa getCurrentPosition con proveedor alternado para estimular el hardware GPS.
+    late final Future<void> Function() restartGPS;
+    restartGPS = () async {
+      if (isStabilized || isRestarting) return;
+      isRestarting = true;
+      restartAttempts++;
+
+      debugPrint(
+          '🔄 Reinicio GPS #$restartAttempts/$maxRestartAttempts - '
+          'mejor precisión vista: ${bestAccuracySeen.toStringAsFixed(1)}m, '
+          'lecturas válidas: $goodReadingsAfterWarmup');
+
+      // Notificar al UI sobre el reinicio
+      service.invoke('gpsRestarting', {
+        'attempt': restartAttempts,
+        'maxAttempts': maxRestartAttempts,
+        'bestAccuracy': bestAccuracySeen,
+      });
+
+      // 1. Reiniciar estado de procesamiento
+      xWindow.clear();
+      yWindow.clear();
+      altWindow.clear();
+      speedWindow.clear();
+      consecutiveRejects = 0;
+      isWarmedUp = false;
+      goodReadingsAfterWarmup = 0;
+      bestAccuracySeen = double.infinity;
+      lastGPSUpdate = null;
+      lastSensorUpdate = null;
+      ukf.reset();
+
+      // 2. Forzar nueva adquisición GPS con proveedor alternado
+      // En intentos pares: FusedLocationProvider (Google Play Services)
+      // En intentos impares: LocationManager nativo (diferente stack GPS)
+      try {
+        final useAlternateProvider = restartAttempts % 2 == 1;
+        late final LocationSettings restartSettings;
+
+        if (Platform.isAndroid) {
+          restartSettings = AndroidSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            forceLocationManager: useAlternateProvider,
+          );
+        } else {
+          restartSettings = const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+          );
+        }
+
+        debugPrint(
+            '🔄 Solicitando posición fresca '
+            '(proveedor alternativo: $useAlternateProvider)...');
+
+        final freshPos = await Geolocator.getCurrentPosition(
+          locationSettings: restartSettings,
+        ).timeout(const Duration(seconds: 8));
+
+        debugPrint(
+            '🔄 Posición fresca obtenida: '
+            'acc=${freshPos.accuracy.toStringAsFixed(1)}m, '
+            'lat=${freshPos.latitude.toStringAsFixed(6)}, '
+            'lon=${freshPos.longitude.toStringAsFixed(6)}');
+
+        if (freshPos.accuracy < bestAccuracySeen) {
+          bestAccuracySeen = freshPos.accuracy;
+        }
+      } catch (e) {
+        debugPrint('⚠️ No se pudo obtener posición fresca: $e');
+      }
+
+      // 3. Reiniciar el ciclo de estabilización
+      startTime = DateTime.now();
+      isRestarting = false;
+
+      // 4. Decidir si seguir intentando o forzar estabilización
+      if (restartAttempts >= maxRestartAttempts) {
+        debugPrint(
+            '⚠️ Máximo de reinicios GPS alcanzado ($maxRestartAttempts). '
+            'Forzando estabilización con precisión: '
+            '${bestAccuracySeen.toStringAsFixed(1)}m');
+        isStabilized = true;
+        service.invoke('gpsStabilized', {
+          'stabilized': true,
+          'forced': true,
+          'accuracy': bestAccuracySeen,
+        });
+      } else {
+        // Programar siguiente watchdog para el próximo ciclo
+        stabilizationWatchdog?.cancel();
+        stabilizationWatchdog = Timer(
+          const Duration(seconds: maxStabilizationSeconds),
+          () {
+            if (!isStabilized && !isRestarting) {
+              restartGPS();
+            }
+          },
+        );
+        debugPrint(
+            '🔄 Nuevo watchdog programado: ${maxStabilizationSeconds}s '
+            'para intento ${restartAttempts + 1}/$maxRestartAttempts');
+      }
+    };
+
+    // --- Iniciar watchdog de estabilización ---
+    // Si no se estabiliza en maxStabilizationSeconds, dispara reinicio GPS
+    stabilizationWatchdog = Timer(
+      const Duration(seconds: maxStabilizationSeconds),
+      () {
+        if (!isStabilized && !isRestarting) {
+          restartGPS();
+        }
+      },
+    );
+    debugPrint(
+        '⏱️ Watchdog de estabilización iniciado: ${maxStabilizationSeconds}s');
+
     // Mantener el servicio vivo
     while (service is AndroidServiceInstance &&
         await service.isForegroundService()) {
@@ -434,6 +602,7 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
     debugPrint('❌ Error en servicio de segundo plano: $e');
   } finally {
     // Cleanup
+    stabilizationWatchdog?.cancel();
     await accelSub?.cancel();
     await gyroSub?.cancel();
     await locationSub?.cancel();

@@ -1135,6 +1135,15 @@ class UnscentedKalmanFilter {
       }
     }
   }
+
+  /// Reiniciar completamente el filtro UKF a su estado inicial
+  void reset() {
+    state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    covariance = List.generate(
+      6,
+      (i) => List.generate(6, (j) => i == j ? 15.0 : 0.0),
+    );
+  }
 }
 
 /// Suscripciones globales

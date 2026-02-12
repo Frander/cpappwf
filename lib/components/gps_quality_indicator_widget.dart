@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'dart:async';
+import '/components/gps_stabilization_monitor_widget.dart';
 
 class GPSQualityIndicator extends StatefulWidget {
   const GPSQualityIndicator({super.key});
@@ -195,75 +196,81 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     final message = isStabilized ? 'GPS Estabilizado' : 'Estabilizando GPS...';
     final iconData = isStabilized ? Icons.check_circle_rounded : Icons.gps_fixed;
 
-    return Material(
-      elevation: 8,
-      borderRadius: BorderRadius.circular(12),
-      shadowColor: isStabilized
-          ? const Color(0xFF00C853).withOpacity(0.4)
-          : Colors.black.withOpacity(0.3),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isStabilized
-                ? const Color(0xFF00E676).withOpacity(0.5)
-                : accentColor.withOpacity(0.3),
-            width: 1.5,
+    return GestureDetector(
+      onTap: () {
+        // Abrir monitor detallado de estabilización GPS
+        GPSStabilizationMonitor.show(context);
+      },
+      child: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(12),
+        shadowColor: isStabilized
+            ? const Color(0xFF00C853).withOpacity(0.4)
+            : Colors.black.withOpacity(0.3),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isStabilized
+                  ? const Color(0xFF00E676).withOpacity(0.5)
+                  : accentColor.withOpacity(0.3),
+              width: 1.5,
+            ),
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icono con animación
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: Icon(
-                iconData,
-                key: ValueKey(isStabilized),
-                color: isStabilized ? Colors.white : accentColor,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 12),
-
-            // Texto del mensaje
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 300),
-              style: TextStyle(
-                color: isStabilized ? Colors.white : Colors.white.withOpacity(0.95),
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.3,
-              ),
-              child: Text(message),
-            ),
-
-            // Badge de precisión solo cuando está estabilizando
-            if (!isStabilized && _currentAccuracy > 0) ...[
-              const SizedBox(width: 12),
-              _buildAccuracyBadge(),
-            ],
-
-            // Spinner solo cuando está estabilizando
-            if (!isStabilized) ...[
-              const SizedBox(width: 12),
-              RepaintBoundary(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    valueColor: AlwaysStoppedAnimation<Color>(accentColor),
-                  ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icono con animación
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: Icon(
+                  iconData,
+                  key: ValueKey(isStabilized),
+                  color: isStabilized ? Colors.white : accentColor,
+                  size: 22,
                 ),
               ),
+              const SizedBox(width: 12),
+
+              // Texto del mensaje
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 300),
+                style: TextStyle(
+                  color: isStabilized ? Colors.white : Colors.white.withOpacity(0.95),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+                child: Text(message),
+              ),
+
+              // Badge de precisión solo cuando está estabilizando
+              if (!isStabilized && _currentAccuracy > 0) ...[
+                const SizedBox(width: 12),
+                _buildAccuracyBadge(),
+              ],
+
+              // Spinner solo cuando está estabilizando
+              if (!isStabilized) ...[
+                const SizedBox(width: 12),
+                RepaintBoundary(
+                  child: SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation<Color>(accentColor),
+                    ),
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );

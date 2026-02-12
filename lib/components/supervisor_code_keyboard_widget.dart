@@ -1,8 +1,5 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'package:flutter/material.dart';
-
-import 'dart:math' as math;
+﻿import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class SupervisorCodeKeyboardWidget extends StatefulWidget {
   const SupervisorCodeKeyboardWidget({
@@ -19,9 +16,8 @@ class SupervisorCodeKeyboardWidget extends StatefulWidget {
 
 class _SupervisorCodeKeyboardWidgetState
     extends State<SupervisorCodeKeyboardWidget>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   String _code = '';
-  late AnimationController _pulseController;
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
   bool _isProcessing = false;
@@ -30,30 +26,25 @@ class _SupervisorCodeKeyboardWidgetState
   void initState() {
     super.initState();
 
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    )..repeat(reverse: true);
-
     _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
 
-    _shakeAnimation = Tween<double>(begin: 0, end: 10).chain(
-      CurveTween(curve: Curves.elasticIn),
+    _shakeAnimation = Tween<double>(begin: 0, end: 8).chain(
+      CurveTween(curve: Curves.easeInOut),
     ).animate(_shakeController);
   }
 
   @override
   void dispose() {
-    _pulseController.dispose();
     _shakeController.dispose();
     super.dispose();
   }
 
   void _onNumberPressed(String number) {
     if (_code.length < 12 && !_isProcessing) {
+      HapticFeedback.lightImpact();
       setState(() {
         _code += number;
       });
@@ -62,6 +53,7 @@ class _SupervisorCodeKeyboardWidgetState
 
   void _onDeletePressed() {
     if (_code.isNotEmpty && !_isProcessing) {
+      HapticFeedback.lightImpact();
       setState(() {
         _code = _code.substring(0, _code.length - 1);
       });
@@ -70,6 +62,7 @@ class _SupervisorCodeKeyboardWidgetState
 
   void _onClearPressed() {
     if (!_isProcessing) {
+      HapticFeedback.mediumImpact();
       setState(() {
         _code = '';
       });
@@ -107,7 +100,7 @@ class _SupervisorCodeKeyboardWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -119,76 +112,74 @@ class _SupervisorCodeKeyboardWidgetState
         ),
       ),
       child: SafeArea(
-        bottom: true,
         top: true,
+        bottom: true,
+        left: true,
+        right: true,
         child: Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+            bottom: MediaQuery.of(context).viewInsets.bottom +
+                    MediaQuery.of(context).viewPadding.bottom,
           ),
           child: SingleChildScrollView(
             child: Column(
               children: [
-                SizedBox(height: 20),
+                const SizedBox(height: 8),
 
-            // Header con icono animado
-            AnimatedBuilder(
-              animation: _pulseController,
-              builder: (context, child) {
-                final scale = 1.0 + (_pulseController.value * 0.1);
-                return Transform.scale(
-                  scale: scale,
-                  child: Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Color(0xFF003420),
-                          Color(0xFF00a86b),
-                        ],
+            // Header compacto: icono + título en una fila
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Color(0xFF003420), Color(0xFF00a86b)],
+                    ),
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Color(0x6600a86b),
+                        blurRadius: 16,
+                        spreadRadius: 2,
                       ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Color(0xFF00a86b).withOpacity(0.6),
-                          blurRadius: 30,
-                          spreadRadius: 5,
-                        ),
-                      ],
-                    ),
-                    child: Icon(
-                      Icons.admin_panel_settings,
-                      size: 40,
-                      color: Colors.white,
-                    ),
+                    ],
                   ),
-                );
-              },
+                  child: const Icon(
+                    Icons.admin_panel_settings,
+                    size: 24,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Código de Supervisor',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Ingrese el código para continuar',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 12,
+                        color: Color(0xB3FFFFFF),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
 
-            SizedBox(height: 24),
-
-            // Título
-            Text(
-              'Código de Supervisor',
-              style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-
-            SizedBox(height: 12),
-
-            Text(
-              'Ingrese el código para continuar',
-              style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
-              ),
-            ),
-
-            SizedBox(height: 32),
+            const SizedBox(height: 14),
 
             // Display del código con animación de shake
             AnimatedBuilder(
@@ -198,89 +189,77 @@ class _SupervisorCodeKeyboardWidgetState
                   offset: Offset(_shakeAnimation.value, 0),
                   child: Container(
                     width: MediaQuery.sizeOf(context).width * 0.85,
-                    padding: EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+                    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(20),
+                      color: const Color(0x0DFFFFFF),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: _code.isEmpty
-                            ? Colors.white.withOpacity(0.2)
-                            : Color(0xFF00a86b),
+                            ? const Color(0x33FFFFFF)
+                            : const Color(0xFF00a86b),
                         width: 2,
                       ),
                       boxShadow: _code.isNotEmpty
-                          ? [
+                          ? const [
                               BoxShadow(
-                                color: Color(0xFF00a86b).withOpacity(0.3),
-                                blurRadius: 20,
-                                spreadRadius: 2,
+                                color: Color(0x4D00a86b),
+                                blurRadius: 16,
+                                spreadRadius: 1,
                               ),
                             ]
-                          : [],
+                          : const [],
                     ),
-                    child: _code.isEmpty
-                        ? Center(
-                            child: Text(
-                              'Ingrese el código',
-                              style: TextStyle(fontFamily: 'Roboto',
-                                fontSize: 16,
-                                color: Colors.white.withOpacity(0.4),
-                                fontWeight: FontWeight.w500,
-                              ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        if (_code.isEmpty)
+                          const Text(
+                            'Ingrese el código',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              color: Color(0x6BFFFFFF),
+                              fontWeight: FontWeight.w500,
                             ),
                           )
-                        : Wrap(
+                        else
+                          Wrap(
                             alignment: WrapAlignment.center,
                             spacing: 8,
                             runSpacing: 8,
-                            children: List.generate(_code.length, (index) {
-                              return TweenAnimationBuilder<double>(
-                                duration: Duration(milliseconds: 200),
-                                tween: Tween(begin: 0.0, end: 1.0),
-                                builder: (context, value, child) {
-                                  return Transform.scale(
-                                    scale: value,
-                                    child: Container(
-                                      width: 14,
-                                      height: 14,
-                                      decoration: BoxDecoration(
-                                        color: Color(0xFF00a86b),
-                                        shape: BoxShape.circle,
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Color(0xFF00a86b).withOpacity(0.6 * value),
-                                            blurRadius: 10 * value,
-                                            spreadRadius: 2 * value,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  );
-                                },
-                              );
-                            }),
+                            children: List.generate(
+                              _code.length,
+                              (index) => Container(
+                                width: 12,
+                                height: 12,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF00a86b),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
                           ),
+                        const SizedBox(width: 10),
+                        Text(
+                          '${_code.length}/12',
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 11,
+                            color: Color(0x80FFFFFF),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
             ),
 
-            SizedBox(height: 16),
-
-            // Contador de dígitos
-            Text(
-              '${_code.length} / 12 dígitos',
-              style: TextStyle(fontFamily: 'Roboto',
-                fontSize: 12,
-                color: Colors.white.withOpacity(0.5),
-              ),
-            ),
-
-            SizedBox(height: 24),
+            const SizedBox(height: 14),
 
             // Teclado numérico
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Column(
                 children: [
                   // Fila 1-2-3
@@ -292,7 +271,7 @@ class _SupervisorCodeKeyboardWidgetState
                       _buildNumberButton('3'),
                     ],
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   // Fila 4-5-6
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -302,7 +281,7 @@ class _SupervisorCodeKeyboardWidgetState
                       _buildNumberButton('6'),
                     ],
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   // Fila 7-8-9
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -312,7 +291,7 @@ class _SupervisorCodeKeyboardWidgetState
                       _buildNumberButton('9'),
                     ],
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   // Fila clear-0-delete
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -334,25 +313,26 @@ class _SupervisorCodeKeyboardWidgetState
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 14),
 
             // Botón de confirmar
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: InkWell(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: GestureDetector(
                 onTap: _code.isEmpty || _isProcessing ? null : _onConfirmPressed,
+                behavior: HitTestBehavior.opaque,
                 child: Container(
                   width: double.infinity,
                   height: 60,
                   decoration: BoxDecoration(
                     gradient: _code.isEmpty || _isProcessing
-                        ? LinearGradient(
+                        ? const LinearGradient(
                             colors: [
-                              Colors.grey.shade700,
-                              Colors.grey.shade600,
+                              Color(0xFF616161),
+                              Color(0xFF757575),
                             ],
                           )
-                        : LinearGradient(
+                        : const LinearGradient(
                             colors: [
                               Color(0xFF003420),
                               Color(0xFF00a86b),
@@ -360,24 +340,24 @@ class _SupervisorCodeKeyboardWidgetState
                           ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: _code.isNotEmpty && !_isProcessing
-                        ? [
+                        ? const [
                             BoxShadow(
-                              color: Color(0xFF00a86b).withOpacity(0.5),
+                              color: Color(0x8000a86b),
                               blurRadius: 20,
                               spreadRadius: 2,
                               offset: Offset(0, 8),
                             ),
                           ]
-                        : [],
+                        : const [],
                   ),
                   child: Center(
                     child: _isProcessing
-                        ? CircularProgressIndicator(
+                        ? const CircularProgressIndicator(
                             valueColor: AlwaysStoppedAnimation<Color>(
                               Colors.white,
                             ),
                           )
-                        : Row(
+                        : const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
@@ -388,7 +368,8 @@ class _SupervisorCodeKeyboardWidgetState
                               SizedBox(width: 12),
                               Text(
                                 'VALIDAR CÓDIGO',
-                                style: TextStyle(fontFamily: 'Roboto',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -402,7 +383,12 @@ class _SupervisorCodeKeyboardWidgetState
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 10),
+
+            // Espaciado adicional para evitar botones de navegación
+            SizedBox(height: MediaQuery.of(context).viewPadding.bottom > 0
+                ? 0
+                : 20),
               ],
             ),
           ),
@@ -412,37 +398,32 @@ class _SupervisorCodeKeyboardWidgetState
   }
 
   Widget _buildNumberButton(String number) {
-    return InkWell(
+    return GestureDetector(
       onTap: _isProcessing ? null : () => _onNumberPressed(number),
+      behavior: HitTestBehavior.opaque,
       child: Container(
         width: 75,
         height: 75,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF1E293B).withOpacity(0.8),
-              Color(0xFF004629).withOpacity(0.6),
+              Color(0xCC1E293B),
+              Color(0x99004629),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Color(0xFF00a86b).withOpacity(0.3),
+            color: const Color(0x4D00a86b),
             width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.2),
-              blurRadius: 10,
-              offset: Offset(0, 4),
-            ),
-          ],
         ),
         child: Center(
           child: Text(
             number,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -458,39 +439,24 @@ class _SupervisorCodeKeyboardWidgetState
     required VoidCallback onPressed,
     required Color color,
   }) {
-    return InkWell(
+    return GestureDetector(
       onTap: _isProcessing ? null : onPressed,
+      behavior: HitTestBehavior.opaque,
       child: Container(
         width: 75,
         height: 75,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              color.withOpacity(0.8),
-              color.withOpacity(0.6),
-            ],
-          ),
+          color: color.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: color.withOpacity(0.5),
+            color: color.withValues(alpha: 0.5),
             width: 1,
           ),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.3),
-              blurRadius: 15,
-              offset: Offset(0, 4),
-            ),
-          ],
         ),
-        child: Center(
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 28,
-          ),
+        child: Icon(
+          icon,
+          color: Colors.white,
+          size: 28,
         ),
       ),
     );

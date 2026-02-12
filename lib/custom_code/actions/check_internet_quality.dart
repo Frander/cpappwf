@@ -4,7 +4,6 @@
 
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -12,6 +11,7 @@ import 'package:geolocator/geolocator.dart';
 DateTime? _lastCheckTime;
 Map<String, dynamic>? _cachedResult;
 final Duration _cacheDuration = Duration(minutes: 2);
+final Duration _negativeCacheDuration = Duration(seconds: 15);
 
 class ServerConfig {
   final String url;
@@ -32,19 +32,23 @@ class ServerConfig {
 }
 
 // FUNCIÓN OPTIMIZADA CON SELECCIÓN INTELIGENTE DE SERVIDORES Y SCORING NUEVO
-Future<dynamic> checkInternetQuality() async {
+Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
   // VERIFICAR CACHÉ AL INICIO
-  if (_lastCheckTime != null && _cachedResult != null) {
+  if (!forceRefresh && _lastCheckTime != null && _cachedResult != null) {
     final timeSinceLastCheck = DateTime.now().difference(_lastCheckTime!);
+    final bool isNegativeResult = _cachedResult!['hasInternet'] == false;
+    final effectiveCacheDuration = isNegativeResult ? _negativeCacheDuration : _cacheDuration;
 
-    if (timeSinceLastCheck < _cacheDuration) {
+    if (timeSinceLastCheck < effectiveCacheDuration) {
       final secondsSinceCheck = timeSinceLastCheck.inSeconds;
-      print('📦 ✅ Usando resultado en caché (${secondsSinceCheck}s desde último chequeo, válido por ${_cacheDuration.inMinutes} minutos)');
-      print('⏱️ Próximo chequeo en: ${(_cacheDuration.inSeconds - secondsSinceCheck)}s');
+      print('📦 ✅ Usando resultado en caché (${secondsSinceCheck}s desde último chequeo, válido por ${effectiveCacheDuration.inSeconds}s)');
+      print('⏱️ Próximo chequeo en: ${(effectiveCacheDuration.inSeconds - secondsSinceCheck)}s');
       return _cachedResult;
     } else {
-      print('⏰ Caché expirado (${timeSinceLastCheck.inMinutes} minutos y ${timeSinceLastCheck.inSeconds % 60} segundos), realizando nuevo chequeo...');
+      print('⏰ Caché expirado (${timeSinceLastCheck.inSeconds}s), realizando nuevo chequeo...');
     }
+  } else if (forceRefresh) {
+    print('🔄 Force refresh solicitado, omitiendo caché...');
   } else {
     print('🔍 Primera ejecución o caché vacío, realizando chequeo completo...');
   }
@@ -135,25 +139,33 @@ Future<dynamic> checkInternetQuality() async {
       print('   📡 ${server.name} (${server.city}) - ${server.type}');
     }
 
-    // 4. VERIFICAR CONECTIVIDAD CON INTERNET_CONNECTION_CHECKER_PLUS
+    // 4. VERIFICAR CONECTIVIDAD CON HTTP DIRECTO (más confiable que internet_connection_checker_plus)
     print('🌐 Verificando acceso real a internet...');
 
-    final internetChecker = InternetConnection.createInstance(
-      customCheckOptions: optimalServers
-          .where((s) => s.type == 'ping')
-          .take(4)
-          .map((s) => InternetCheckOption(uri: Uri.parse(s.url)))
-          .toList(),
-      checkInterval: Duration(seconds: 1),
-    );
-
     bool hasInternet = false;
+    final checkDio = Dio(BaseOptions(
+      connectTimeout: Duration(seconds: 5),
+      receiveTimeout: Duration(seconds: 5),
+      followRedirects: true,
+      validateStatus: (status) => status! < 500,
+    ));
+
     try {
-      hasInternet = await internetChecker.hasInternetAccess;
-      print('✅ Acceso a internet confirmado: $hasInternet');
+      // Intentar múltiples endpoints en paralelo - basta que uno responda
+      final results = await Future.wait<bool>([
+        _quickHttpCheck(checkDio, 'https://www.google.com/generate_204'),
+        _quickHttpCheck(checkDio, 'https://connectivitycheck.gstatic.com/generate_204'),
+        _quickHttpCheck(checkDio, 'https://1.1.1.1/cdn-cgi/trace'),
+      ]).timeout(Duration(seconds: 8), onTimeout: () => [false, false, false]);
+
+      hasInternet = results.any((r) => r);
+      print('✅ Acceso a internet confirmado: $hasInternet (${results.where((r) => r).length}/3 endpoints OK)');
+
+      checkDio.close();
     } catch (e) {
       print('❌ Error verificando internet: $e');
       hasInternet = false;
+      checkDio.close();
     }
 
     if (!hasInternet) {
@@ -488,6 +500,16 @@ Future<dynamic> checkInternetQuality() async {
     } catch (e) {
       print('⚠️ Error liberando recursos: $e');
     }
+  }
+}
+
+// CHECK RÁPIDO DE HTTP - retorna true si el endpoint responde
+Future<bool> _quickHttpCheck(Dio dio, String url) async {
+  try {
+    final response = await dio.get(url);
+    return response.statusCode != null && response.statusCode! < 400;
+  } catch (e) {
+    return false;
   }
 }
 

@@ -15,30 +15,41 @@ import '/backend/sqlite/global_db_singleton.dart';
 Future<List<UsersStruct>> searchUsersSqlite(String searchText) async {
   // Usa el singleton global en lugar de abrir conexión aislada
   return await globalDb.executeOperation((db) async {
-    // Si el texto de búsqueda está vacío, retornar lista vacía
+    final List<Map<String, dynamic>> queryResult;
+
     if (searchText.trim().isEmpty) {
-      return [];
+      // Si el texto de búsqueda está vacío, retornar todos los usuarios
+      queryResult = await db.rawQuery('''
+        SELECT
+          Id_user as id_user,
+          Id_company as id_company,
+          Oper_id as operID,
+          Name_user as name_user,
+          Email as email,
+          Created_at as created_at,
+          Modified_at as modifiedAt
+        FROM Users
+        ORDER BY Name_user ASC
+      ''');
+    } else {
+      // Construir la consulta SQL para buscar por nombre o operID
+      final searchPattern = '%${searchText.trim()}%';
+
+      queryResult = await db.rawQuery('''
+        SELECT
+          Id_user as id_user,
+          Id_company as id_company,
+          Oper_id as operID,
+          Name_user as name_user,
+          Email as email,
+          Created_at as created_at,
+          Modified_at as modifiedAt
+        FROM Users
+        WHERE Name_user LIKE ? OR Oper_id LIKE ?
+        ORDER BY Name_user ASC
+        LIMIT 50
+      ''', [searchPattern, searchPattern]);
     }
-
-    // Construir la consulta SQL para buscar por nombre o operID
-    final searchPattern = '%${searchText.trim()}%';
-
-    // Ejecutar la consulta SELECT con búsqueda en nombre y operID
-    // Usar alias para que coincida con el mapeo de UsersStruct.fromMap()
-    final List<Map<String, dynamic>> queryResult = await db.rawQuery('''
-      SELECT
-        Id_user as id_user,
-        Id_company as id_company,
-        Oper_id as operID,
-        Name_user as name_user,
-        Email as email,
-        Created_at as created_at,
-        Modified_at as modifiedAt
-      FROM Users
-      WHERE Name_user LIKE ? OR Oper_id LIKE ?
-      ORDER BY Name_user ASC
-      LIMIT 50
-    ''', [searchPattern, searchPattern]);
 
     // Mapear los resultados a una lista de UsersStruct
     final List<UsersStruct> usersList =

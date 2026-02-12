@@ -474,6 +474,10 @@ class _InformationFormState extends State<InformationForm>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Botones de acción modernos (movidos al top)
+          _buildModernActionButtons(),
+          const SizedBox(height: 24),
+
           // Grid de Pendientes por Sincronizar
           _buildSectionHeader(
             icon: Icons.cloud_upload_outlined,
@@ -498,10 +502,6 @@ class _InformationFormState extends State<InformationForm>
           ),
           const SizedBox(height: 12),
           _buildDownloadedDataGrid(),
-          const SizedBox(height: 32),
-
-          // Botones de acción modernos
-          _buildModernActionButtons(),
           const SizedBox(height: 20),
         ],
       ),
@@ -576,7 +576,7 @@ class _InformationFormState extends State<InformationForm>
 
   Widget _buildPendingSyncGrid() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -594,78 +594,58 @@ class _InformationFormState extends State<InformationForm>
       ),
       child: Column(
         children: [
-          // Primera fila: 3 elementos
-          Row(
-            children: [
-              Expanded(
-                child: _buildGridItem(
-                  icon: Icons.event_note_outlined,
-                  label: 'Visitas',
-                  value: _pendingVisits,
-                  color: const Color(0xFFFF6B35),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildGridItem(
-                  icon: Icons.my_location_outlined,
-                  label: 'Geolocalizaciones',
-                  value: _pendingLocationTracking,
-                  color: const Color(0xFF52B788),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildGridItem(
-                  icon: Icons.edit_location_alt_outlined,
-                  label: 'Mod. Zonas',
-                  value: _pendingExclusionZones,
-                  color: const Color(0xFFFFAA00),
-                ),
-              ),
-            ],
+          _buildPendingListItem(
+            icon: Icons.event_note_outlined,
+            label: 'Visitas',
+            value: _pendingVisits,
+            color: const Color(0xFFFF6B35),
           ),
-          const SizedBox(height: 12),
-          // Segunda fila: 2 elementos
-          Row(
-            children: [
-              Expanded(
-                child: _buildGridItem(
-                  icon: Icons.new_releases_outlined,
-                  label: 'Novedades',
-                  value: _pendingNewsAdd,
-                  color: const Color(0xFFFF8C42),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildGridItemWithSubtitle(
-                  icon: Icons.local_offer_outlined,
-                  label: 'Tags',
-                  value: _totalPendingTags,
-                  subtitle: '$_pendingTagsNew new, $_pendingTagsUpdated upd',
-                  color: const Color(0xFF8B5CF6),
-                ),
-              ),
-            ],
+          const SizedBox(height: 8),
+          _buildPendingListItem(
+            icon: Icons.my_location_outlined,
+            label: 'Geolocalizaciones',
+            value: _pendingLocationTracking,
+            color: const Color(0xFF52B788),
+          ),
+          const SizedBox(height: 8),
+          _buildPendingListItem(
+            icon: Icons.edit_location_alt_outlined,
+            label: 'Modificaciones de Zonas',
+            value: _pendingExclusionZones,
+            color: const Color(0xFFFFAA00),
+          ),
+          const SizedBox(height: 8),
+          _buildPendingListItem(
+            icon: Icons.new_releases_outlined,
+            label: 'Novedades',
+            value: _pendingNewsAdd,
+            color: const Color(0xFFFF8C42),
+          ),
+          const SizedBox(height: 8),
+          _buildPendingListItemWithSubtitle(
+            icon: Icons.local_offer_outlined,
+            label: 'Tags',
+            value: _totalPendingTags,
+            subtitle: '$_pendingTagsNew nuevos, $_pendingTagsUpdated actualizados',
+            color: const Color(0xFF8B5CF6),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGridItem({
+  Widget _buildPendingListItem({
     required IconData icon,
     required String label,
     required int value,
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [
             color.withValues(alpha: 0.15),
             color.withValues(alpha: 0.05),
@@ -674,46 +654,59 @@ class _InformationFormState extends State<InformationForm>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  value.toString(),
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withValues(alpha: 0.8)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Text(
+              value.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGridItemWithSubtitle({
+  Widget _buildPendingListItemWithSubtitle({
     required IconData icon,
     required String label,
     required int value,
@@ -721,11 +714,11 @@ class _InformationFormState extends State<InformationForm>
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
           colors: [
             color.withValues(alpha: 0.15),
             color.withValues(alpha: 0.05),
@@ -734,58 +727,74 @@ class _InformationFormState extends State<InformationForm>
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.4), width: 1),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: color, size: 20),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  value.toString(),
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
-                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.9),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+                if (value > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: color.withValues(alpha: 0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
           ),
-          if (value > 0) ...[
-            const SizedBox(height: 2),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: color.withValues(alpha: 0.8),
-                fontSize: 9,
-                fontWeight: FontWeight.w400,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [color, color.withValues(alpha: 0.8)],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
             ),
-          ],
+            child: Text(
+              value.toString(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
+
 
   Widget _buildDeviceInfoCollapsible() {
     final device = FFAppState().deviceDefault;
@@ -1110,9 +1119,9 @@ class _InformationFormState extends State<InformationForm>
   Widget _buildModernActionButtons() {
     return Column(
       children: [
-        // Botón Historial de Visitas
+        // Botón Historial de Visitas (icono mejorado)
         _buildModernButton(
-          icon: Icons.history_outlined,
+          icon: Icons.assignment_outlined,
           label: 'Historial de Visitas',
           gradientColors: const [Color(0xFF52B788), Color(0xFF40916C)],
           shadowColor: const Color(0xFF52B788),
@@ -1120,9 +1129,9 @@ class _InformationFormState extends State<InformationForm>
         ),
         const SizedBox(height: 12),
 
-        // Botón Sincronizar
+        // Botón Sincronizar (icono mejorado)
         _buildModernButton(
-          icon: Icons.cloud_sync_outlined,
+          icon: Icons.sync,
           label: 'Sincronizar Datos',
           gradientColors: const [Color(0xFFFF6B35), Color(0xFFFF8C42)],
           shadowColor: const Color(0xFFFF6B35),
@@ -1131,9 +1140,9 @@ class _InformationFormState extends State<InformationForm>
         ),
         const SizedBox(height: 12),
 
-        // Botón Configuración Avanzada
+        // Botón Configuración Avanzada (icono mejorado)
         _buildModernButton(
-          icon: Icons.settings_outlined,
+          icon: Icons.admin_panel_settings,
           label: 'Configuración Avanzada',
           gradientColors: [
             const Color(0xFF2D6A4F).withValues(alpha: 0.7),
@@ -1252,7 +1261,8 @@ class _InformationFormState extends State<InformationForm>
                 width: 2,
               ),
             ),
-            child: Column(
+            child: SingleChildScrollView(
+              child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Icono de seguridad
@@ -1480,6 +1490,7 @@ class _InformationFormState extends State<InformationForm>
                   ],
                 ),
               ],
+            ),
             ),
           ),
         );

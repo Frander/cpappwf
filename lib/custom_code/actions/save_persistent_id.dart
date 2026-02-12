@@ -75,39 +75,39 @@ Future<bool> savePersistentId(BuildContext context, String deviceId) async {
   }
 }
 
-/// Obtiene las 3 ubicaciones de almacenamiento con verificación de accesibilidad
+/// Obtiene las ubicaciones de almacenamiento PÚBLICAS con verificación de accesibilidad
+/// Android 11+ no permite crear carpetas personalizadas en la raíz, solo carpetas estándar
 Future<List<StorageLocation>> _getStorageLocations() async {
   List<StorageLocation> locations = [];
 
   try {
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
-    }
+    const publicRoot = '/storage/emulated/0';
 
-    // 1. Ubicación ClickPalmData (PRIORITARIA)
-    final clickPalmPath = '${externalDir.path}/ClickPalmData';
-    locations.add(StorageLocation(
-      path: clickPalmPath,
-      name: 'ClickPalmData',
-      accessible: await _isLocationAccessible(clickPalmPath),
-    ));
-
-    // 2. Ubicación Documents
-    final docsPath = '${externalDir.path}/Documents';
+    // 1. Documents pública (PRIORITARIA - visible en explorador de archivos)
+    const docsPath = '$publicRoot/Documents';
     locations.add(StorageLocation(
       path: docsPath,
       name: 'Documents',
       accessible: await _isLocationAccessible(docsPath),
     ));
 
-    // 3. Ubicación Downloads
-    final downloadsPath = '${externalDir.path}/Downloads';
+    // 2. Download pública (respaldo - visible en explorador de archivos)
+    const downloadsPath = '$publicRoot/Download';
     locations.add(StorageLocation(
       path: downloadsPath,
-      name: 'Downloads',
+      name: 'Download',
       accessible: await _isLocationAccessible(downloadsPath),
     ));
+
+    // 3. Fallback: directorio privado de la app (siempre accesible)
+    final appDir = await getExternalStorageDirectory();
+    if (appDir != null) {
+      locations.add(StorageLocation(
+        path: appDir.path,
+        name: 'AppData',
+        accessible: await _isLocationAccessible(appDir.path),
+      ));
+    }
   } catch (e) {
     debugPrint('❌ Error obteniendo ubicaciones de almacenamiento: $e');
   }

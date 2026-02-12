@@ -9,6 +9,7 @@ import '/components/supervisor_code_keyboard_widget.dart';
 import '/components/connection_retry_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:async';
+import 'dart:io';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -96,16 +97,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           debugPrint('🔵 No hay device default pero existe UUID (${_model.identifierCTR}), haciendo login directo...');
         }
 
-        // Paso 2: Verificando conexión a internet con reintentos
+        // Paso 2: Verificando conexión a internet (rápido, sin diagnóstico completo)
         _updateProgress(2, 'Verificando conexión a internet...');
-        await Future.delayed(Duration(milliseconds: 400));
 
-        // Verificar conexión con reintentos automáticos durante 5 minutos
-        final hasConnection = await _checkConnectionWithRetry();
+        final hasConnection = await _quickConnectionCheck();
         if (hasConnection) {
           // Paso 3: Iniciando sesión
           _updateProgress(3, 'Iniciando sesión de forma segura...');
-          await Future.delayed(Duration(milliseconds: 400));
 
           // Usar el IMEI/identificador del deviceDefault para login
           String loginIdentifier = FFAppState().deviceDefault.imeI1.isNotEmpty
@@ -326,13 +324,11 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   var supervisorData = supervisorResponse.jsonBody;
 
                   // El endpoint ya valida que sea supervisor, solo extraemos la empresa
-                  selectedCompany = CompaniesStruct.maybeFromMap(getJsonField(
-                    supervisorData,
-                    r'''$.company''',
-                  ));
+                  int idCompany = getJsonField(supervisorData, r'''$.id_company''') ?? 0;
+                  selectedCompany = CompaniesStruct(idCompany: idCompany);
 
-                  if (selectedCompany != null) {
-                    debugPrint('✅ Supervisor validado. Empresa: ${selectedCompany.nameCompany}');
+                  if (selectedCompany.idCompany != 0) {
+                    debugPrint('✅ Supervisor validado. Empresa ID: ${selectedCompany.idCompany}');
                     supervisorValidated = true;
                   } else {
                     await showDialog(
@@ -1339,10 +1335,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                     );
 
                     try {
-                      // Llamar API para validar supervisor por operID
+                      // Llamar API para validar supervisor
                       ApiCallResponse? supervisorResponse =
-                          await APIClickPalmGroup.usersbyoperidGETCall.call(
-                        operID: enteredCode,
+                          await APIClickPalmGroup.validateSupervisorGETCall.call(
+                        code: enteredCode,
                       );
 
                       // Cerrar loading
@@ -1352,31 +1348,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
                       if (supervisorResponse.succeeded &&
                           supervisorResponse.jsonBody != null) {
-                        // Verificar si el usuario es supervisor
                         var supervisorData = supervisorResponse.jsonBody;
 
-                        // Verificar permisos del usuario
-                        List<dynamic> permissions = getJsonField(
-                          supervisorData,
-                          r'''$.users_permissions''',
-                          true,
-                        ) ?? [];
+                        // El endpoint ya valida que sea supervisor, solo extraemos la empresa
+                        int idCompany = getJsonField(supervisorData, r'''$.id_company''') ?? 0;
+                        CompaniesStruct company = CompaniesStruct(idCompany: idCompany);
 
-                        bool isSupervisor = false;
-                        for (var permission in permissions) {
-                          String? permissionName = getJsonField(
-                            permission,
-                            r'''$.name_permission''',
-                          )?.toString();
-
-                          if (permissionName?.toUpperCase() == 'SUPERVISOR') {
-                            isSupervisor = true;
-                            break;
-                          }
-                        }
-
-                        if (!isSupervisor) {
-                          // No es supervisor - mostrar error y reintentar
+                        if (company.idCompany == 0) {
                           await showDialog(
                             context: context,
                             builder: (dialogContext) {
@@ -1390,7 +1368,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   width: MediaQuery.sizeOf(context).width * 0.8,
                                   child: InfoDialogWidget(
                                     info:
-                                        'El código ingresado no corresponde a un supervisor. Intente nuevamente.',
+                                        'Error al obtener información de la empresa. Intente nuevamente.',
                                   ),
                                 ),
                               );
@@ -1400,36 +1378,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         }
 
                         // Obtener id_company del supervisor
-                        supervisorCompanyId = getJsonField(
-                              supervisorData,
-                              r'''$.id_company''',
-                            ) ??
-                            0;
+                        supervisorCompanyId = company.idCompany;
 
-                        if (supervisorCompanyId == 0) {
-                          await showDialog(
-                            context: context,
-                            builder: (dialogContext) {
-                              return Dialog(
-                                elevation: 0,
-                                insetPadding: EdgeInsets.zero,
-                                backgroundColor: Colors.transparent,
-                                child: Container(
-                                  height:
-                                      MediaQuery.sizeOf(context).height * 0.6,
-                                  width: MediaQuery.sizeOf(context).width * 0.8,
-                                  child: InfoDialogWidget(
-                                    info:
-                                        'Error: El supervisor no tiene una compañía asignada. Intente con otro código.',
-                                  ),
-                                ),
-                              );
-                            },
-                          );
-                          continue; // Volver a mostrar el teclado
-                        }
-
-                        // TODO CORRECTO - salir del loop
+                        debugPrint('✅ Supervisor validado. Empresa ID: ${company.idCompany}');
                         supervisorValidated = true;
                       } else {
                         // Error en la respuesta del API
@@ -1445,7 +1396,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 width: MediaQuery.sizeOf(context).width * 0.8,
                                 child: InfoDialogWidget(
                                   info:
-                                      'No se encontró un usuario con ese código. Intente nuevamente.',
+                                      'El código ingresado no corresponde a un supervisor válido. Intente nuevamente.',
                                 ),
                               ),
                             );
@@ -1900,10 +1851,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       );
 
       try {
-        // Llamar API para validar supervisor por operID
+        // Llamar API para validar supervisor
         ApiCallResponse? supervisorResponse =
-            await APIClickPalmGroup.usersbyoperidGETCall.call(
-          operID: enteredCode,
+            await APIClickPalmGroup.validateSupervisorGETCall.call(
+          code: enteredCode,
         );
 
         // Cerrar loading
@@ -1914,53 +1865,12 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         if (supervisorResponse.succeeded && supervisorResponse.jsonBody != null) {
           var supervisorData = supervisorResponse.jsonBody;
 
-          // Verificar permisos del usuario
-          List<dynamic> permissions = getJsonField(
-            supervisorData,
-            r'''$.users_permissions''',
-            true,
-          ) ?? [];
-
-          bool isSupervisor = false;
-          for (var permission in permissions) {
-            String? permissionName = getJsonField(
-              permission,
-              r'''$.name_permission''',
-            )?.toString();
-
-            if (permissionName?.toUpperCase() == 'SUPERVISOR') {
-              isSupervisor = true;
-              break;
-            }
-          }
-
-          if (!isSupervisor) {
-            debugPrint('❌ Código no corresponde a un supervisor');
-            await showDialog(
-              context: context,
-              builder: (dialogContext) {
-                return Dialog(
-                  elevation: 0,
-                  insetPadding: EdgeInsets.zero,
-                  backgroundColor: Colors.transparent,
-                  child: Container(
-                    height: MediaQuery.sizeOf(context).height * 0.6,
-                    width: MediaQuery.sizeOf(context).width * 0.8,
-                    child: InfoDialogWidget(
-                      info: 'El código ingresado no corresponde a un supervisor. Intente nuevamente.',
-                    ),
-                  ),
-                );
-              },
-            );
-            continue; // Volver a solicitar código
-          }
-
-          // Extraer información del supervisor
+          // El endpoint ya valida que sea supervisor, solo extraemos la empresa
           int idCompany = getJsonField(supervisorData, r'''$.id_company''') ?? 0;
+          CompaniesStruct company = CompaniesStruct(idCompany: idCompany);
 
-          if (idCompany == 0) {
-            debugPrint('❌ Supervisor sin empresa asignada');
+          if (company.idCompany == 0) {
+            debugPrint('❌ Error al obtener información de la empresa');
             await showDialog(
               context: context,
               builder: (dialogContext) {
@@ -1972,7 +1882,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                     height: MediaQuery.sizeOf(context).height * 0.6,
                     width: MediaQuery.sizeOf(context).width * 0.8,
                     child: InfoDialogWidget(
-                      info: 'El supervisor no tiene una empresa asignada. Intente con otro código.',
+                      info: 'Error al obtener información de la empresa. Intente nuevamente.',
                     ),
                   ),
                 );
@@ -1982,17 +1892,18 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           }
 
           supervisorResult = {
-            'id_company': idCompany,
+            'id_company': company.idCompany,
             'operID': enteredCode,
-            'name': getJsonField(supervisorData, r'''$.name''') ?? 'Supervisor',
+            'name': getJsonField(supervisorData, r'''$.name_user''') ?? 'Supervisor',
+            'company_name': '',  // No disponible en respuesta del endpoint
             'full_data': supervisorData,
           };
 
-          debugPrint('✅ Supervisor validado: ${supervisorResult['name']} (Empresa: $idCompany)');
+          debugPrint('✅ Supervisor validado: ${supervisorResult['name']} (Empresa ID: ${company.idCompany})');
           supervisorValidated = true;
 
         } else {
-          debugPrint('❌ No se encontró usuario con código: $enteredCode');
+          debugPrint('❌ Código de supervisor no válido: $enteredCode');
           await showDialog(
             context: context,
             builder: (dialogContext) {
@@ -2004,7 +1915,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   height: MediaQuery.sizeOf(context).height * 0.6,
                   width: MediaQuery.sizeOf(context).width * 0.8,
                   child: InfoDialogWidget(
-                    info: 'No se encontró un usuario con ese código. Intente nuevamente.',
+                    info: 'El código ingresado no corresponde a un supervisor válido. Intente nuevamente.',
                   ),
                 ),
               );
@@ -2044,6 +1955,26 @@ class _StartPageWidgetState extends State<StartPageWidget> {
     return supervisorResult;
   }
 
+  /// Verificación rápida de conectividad: HEAD request al API (~1-2s).
+  /// Para el login directo no necesitamos diagnóstico completo de calidad.
+  Future<bool> _quickConnectionCheck() async {
+    try {
+      final uri = Uri.parse('${APIClickPalmGroup.getBaseUrl()}/Users');
+      final client = HttpClient()..connectionTimeout = const Duration(seconds: 5);
+      final request = await client.headUrl(uri);
+      request.followRedirects = true;
+      final response = await request.close();
+      await response.drain();
+      client.close();
+      debugPrint('⚡ Conexión rápida OK (status: ${response.statusCode})');
+      return response.statusCode < 500;
+    } catch (e) {
+      debugPrint('⚠️ Conexión rápida falló: $e');
+      // Fallback: intentar con el diagnóstico completo y reintentos
+      return _checkConnectionWithRetry();
+    }
+  }
+
   /// Verifica la conexión a internet con reintentos automáticos durante 5 minutos.
   /// Retorna true si se logró conectar, false si el usuario decidió cerrar la app.
   Future<bool> _checkConnectionWithRetry() async {
@@ -2064,7 +1995,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               retryInterval: const Duration(seconds: 10),
               checkConnectionCallback: () async {
                 try {
-                  final connectionResult = await actions.checkInternetQuality();
+                  final connectionResult = await actions.checkInternetQuality(forceRefresh: true);
                   final hasInternet = functions.jsonDynamicToBool(
                     getJsonField(connectionResult, r'''$.hasInternet'''),
                   );

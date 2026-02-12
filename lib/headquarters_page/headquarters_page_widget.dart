@@ -150,33 +150,21 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                         ],
                       ),
                       SizedBox(height: 8),
-                      // Título con efecto brillante
-                      ShaderMask(
-                        shaderCallback: (bounds) {
-                          return LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0xFF00ff9f),
-                              Color(0xFF00a86b),
-                            ],
-                          ).createShader(bounds);
-                        },
-                        child: Text(
-                          'Lista de lotes',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: 1.0,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                color: Color(0xFF00a86b).withOpacity(0.5),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
+                      // Título
+                      Text(
+                        'Lista de lotes',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 1.0,
+                          color: Colors.white,
+                          shadows: [
+                            Shadow(
+                              color: Colors.black.withValues(alpha: 0.3),
+                              blurRadius: 10,
+                            ),
+                          ],
                         ),
                       ),
                       SizedBox(height: 8),
@@ -236,8 +224,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                               font: TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
-                                              color: Color(0xFF00ff9f)
-                                                  .withOpacity(0.7),
+                                              color: Colors.white.withValues(alpha: 0.7),
                                               letterSpacing: 0.5,
                                               fontSize: 13,
                                             ),
@@ -245,8 +232,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                             .labelMedium
                                             .override(
                                               font: TextStyle(fontFamily: 'Roboto',),
-                                              color:
-                                                  Colors.white.withOpacity(0.5),
+                                              color: Colors.white.withValues(alpha: 0.5),
                                               letterSpacing: 0.0,
                                             ),
                                         enabledBorder: InputBorder.none,
@@ -377,7 +363,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               ),
                               SizedBox(width: 8),
                               Text(
-                                '1 seleccionado',
+                                '$selectedCount seleccionado${selectedCount != 1 ? 's' : ''}',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
@@ -554,15 +540,14 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
       highlightColor: Colors.transparent,
       onTap: () {
         setState(() {
-          // Solo permitir UN lote seleccionado (comportamiento de radio button)
+          // Permitir múltiples lotes seleccionados (comportamiento de checkbox)
           if (isSelected) {
             // Si ya está seleccionado, lo deseleccionamos
-            FFAppState().headquartersSelectedList = [];
-            _model.checkboxValueMap.clear();
+            FFAppState().headquartersSelectedList.remove(headquarterItem);
+            _model.checkboxValueMap.remove(headquarterItem);
           } else {
-            // Limpiar selección anterior y seleccionar el nuevo
-            FFAppState().headquartersSelectedList = [headquarterItem];
-            _model.checkboxValueMap.clear();
+            // Agregarlo a la lista de seleccionados
+            FFAppState().headquartersSelectedList.add(headquarterItem);
             _model.checkboxValueMap[headquarterItem] = true;
           }
         });
@@ -627,11 +612,9 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       ),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.grid_view_rounded,
-                      color: isSelected
-                          ? Colors.white
-                          : Color(0xFF00ff9f),
+                      color: Colors.white,
                       size: 18,
                     ),
                   ),
@@ -646,39 +629,33 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                         style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color:
-                              isSelected ? Colors.white : Color(0xFF00ff9f),
+                          color: Colors.white,
                           letterSpacing: 0.3,
                         ),
                       ),
                     ),
                   ),
-                  // Radio button personalizado (solo un lote seleccionable)
+                  // Checkbox personalizado (múltiples lotes seleccionables)
                   Container(
                     width: 20,
                     height: 20,
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Colors.white
-                          : Colors.white.withOpacity(0.2),
-                      shape: BoxShape.circle,
+                          ? FlutterFlowTheme.of(context).primary
+                          : Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(4),
                       border: Border.all(
                         color: isSelected
-                            ? Colors.white
-                            : Color(0xFF00a86b).withOpacity(0.5),
+                            ? FlutterFlowTheme.of(context).primary
+                            : Colors.white.withValues(alpha: 0.5),
                         width: 1.5,
                       ),
                     ),
                     child: isSelected
-                        ? Center(
-                            child: Container(
-                              width: 10,
-                              height: 10,
-                              decoration: BoxDecoration(
-                                color: FlutterFlowTheme.of(context).primary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
+                        ? const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 14,
                           )
                         : null,
                   ),

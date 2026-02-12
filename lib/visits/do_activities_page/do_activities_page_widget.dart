@@ -2,6 +2,7 @@
 import '/components/nfc_write_dialog_widget.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/advanced_sync_dialog_widget.dart';
+import '/components/gps_stabilization_monitor_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
@@ -1015,78 +1016,81 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                         SizedBox(height: 8),
 
-                        // Indicador de estado GPS en tiempo real
-                        AnimatedBuilder(
-                          animation: _pulseController,
-                          builder: (context, child) {
-                            final isStabilized = FFAppState().isStabilized;
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              margin: EdgeInsets.symmetric(horizontal: 20),
-                              decoration: BoxDecoration(
-                                color: isStabilized
-                                    ? Color(0xFF00a86b).withOpacity(0.15)
-                                    : Color(0xFFFF6B6B).withOpacity(0.15 * _pulseAnimation.value),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
+                        // Indicador de estado GPS en tiempo real (tappable → abre monitor)
+                        GestureDetector(
+                          onTap: () => GPSStabilizationMonitor.show(context),
+                          child: AnimatedBuilder(
+                            animation: _pulseController,
+                            builder: (context, child) {
+                              final isStabilized = FFAppState().isStabilized;
+                              return AnimatedContainer(
+                                duration: const Duration(milliseconds: 300),
+                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                margin: EdgeInsets.symmetric(horizontal: 20),
+                                decoration: BoxDecoration(
                                   color: isStabilized
-                                      ? Color(0xFF00a86b).withOpacity(0.4)
-                                      : Color(0xFFFF6B6B).withOpacity(0.4 * _pulseAnimation.value),
-                                  width: 1,
+                                      ? Color(0xFF00a86b).withOpacity(0.15)
+                                      : Color(0xFFFF6B6B).withOpacity(0.15 * _pulseAnimation.value),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isStabilized
+                                        ? Color(0xFF00a86b).withOpacity(0.4)
+                                        : Color(0xFFFF6B6B).withOpacity(0.4 * _pulseAnimation.value),
+                                    width: 1,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // Icono animado de GPS
-                                  Transform.scale(
-                                    scale: isStabilized ? 1.0 : _pulseAnimation.value,
-                                    child: Icon(
-                                      isStabilized
-                                          ? Icons.gps_fixed_rounded
-                                          : Icons.gps_not_fixed_rounded,
-                                      color: isStabilized
-                                          ? Color(0xFF00ff9f)
-                                          : Color(0xFFFF6B6B),
-                                      size: 18,
-                                    ),
-                                  ),
-                                  SizedBox(width: 8),
-                                  // Texto del estado
-                                  Text(
-                                    isStabilized
-                                        ? 'GPS estabilizado'
-                                        : 'Estabilizando GPS...',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600,
-                                      color: isStabilized
-                                          ? Color(0xFF00ff9f)
-                                          : Color(0xFFFF6B6B),
-                                      letterSpacing: 0.3,
-                                    ),
-                                  ),
-                                  // Indicador de carga cuando no está estabilizado
-                                  if (!isStabilized) ...[
-                                    SizedBox(width: 10),
-                                    SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor: AlwaysStoppedAnimation<Color>(
-                                          Color(0xFFFF6B6B).withOpacity(_pulseAnimation.value),
-                                        ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Icono animado de GPS
+                                    Transform.scale(
+                                      scale: isStabilized ? 1.0 : _pulseAnimation.value,
+                                      child: Icon(
+                                        isStabilized
+                                            ? Icons.gps_fixed_rounded
+                                            : Icons.gps_not_fixed_rounded,
+                                        color: isStabilized
+                                            ? Color(0xFF00ff9f)
+                                            : Color(0xFFFF6B6B),
+                                        size: 18,
                                       ),
                                     ),
+                                    SizedBox(width: 8),
+                                    // Texto del estado
+                                    Text(
+                                      isStabilized
+                                          ? 'GPS estabilizado'
+                                          : 'Estabilizando GPS...',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: isStabilized
+                                            ? Color(0xFF00ff9f)
+                                            : Color(0xFFFF6B6B),
+                                        letterSpacing: 0.3,
+                                      ),
+                                    ),
+                                    // Indicador de carga cuando no está estabilizado
+                                    if (!isStabilized) ...[
+                                      SizedBox(width: 10),
+                                      SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            Color(0xFFFF6B6B).withOpacity(_pulseAnimation.value),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            );
-                          },
+                                ),
+                              );
+                            },
+                          ),
                         ),
 
                         SizedBox(height: 8),

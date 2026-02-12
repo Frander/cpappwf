@@ -485,25 +485,46 @@ class _InstallPageState extends State<InstallPage>
       // Iniciar timer de velocidad
       _startSpeedTimer();
 
-      // Crear instancia de Dio
-      final dio = Dio();
       _cancelToken = CancelToken();
 
-      // Descargar con progreso
-      await dio.download(
-        _latestVersion!.downloadUrl,
-        _apkFilePath,
-        cancelToken: _cancelToken,
-        onReceiveProgress: (received, total) {
-          if (total != -1) {
-            setState(() {
-              _downloadedBytes = received;
-              _totalBytes = total;
-              _downloadProgress = received / total;
-            });
-          }
-        },
-      );
+      // Intentar descarga con Dio; si falla por redirect S3, usar HttpClient
+      try {
+        final dio = Dio(BaseOptions(
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 300),
+          followRedirects: true,
+          maxRedirects: 5,
+        ));
+
+        await dio.download(
+          _latestVersion!.downloadUrl,
+          _apkFilePath,
+          cancelToken: _cancelToken,
+          onReceiveProgress: (received, total) {
+            if (total != -1) {
+              setState(() {
+                _downloadedBytes = received;
+                _totalBytes = total;
+                _downloadProgress = received / total;
+              });
+            }
+          },
+        );
+      } catch (e) {
+        // S3 devuelve 301 con endpoint en XML body (sin Location header)
+        // Dart HttpClient no puede seguir este redirect, así que lo manejamos manualmente
+        if (e.toString().contains('RedirectException') ||
+            e.toString().contains('Location header')) {
+          debugPrint(
+              '⚠️ Redirect S3 sin Location header, descargando con HttpClient directo...');
+          await _downloadWithHttpClient(
+            _latestVersion!.downloadUrl,
+            _apkFilePath,
+          );
+        } else {
+          rethrow;
+        }
+      }
 
       debugPrint(
           '✅ Descarga completada: ${(_downloadedBytes / (1024 * 1024)).toStringAsFixed(2)} MB');
@@ -524,6 +545,102 @@ class _InstallPageState extends State<InstallPage>
     } catch (e) {
       rethrow;
     }
+  }
+
+  /// Descarga usando dart:io HttpClient para manejar redirects S3 problemáticos.
+  /// S3 a veces devuelve 301 con el endpoint correcto en el body XML,
+  /// no en el header Location. Dart HttpClient lanza RedirectException en este caso.
+  Future<void> _downloadWithHttpClient(String url, String filePath) async {
+    final client = HttpClient();
+
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      request.followRedirects = false;
+      request.maxRedirects = 0;
+      final response = await request.close();
+
+      debugPrint(
+          '📡 HttpClient status: ${response.statusCode} para $url');
+
+      if (response.statusCode == 200) {
+        // Respuesta directa - descargar normalmente
+        await _streamResponseToFile(response, filePath);
+      } else if (response.statusCode >= 300 && response.statusCode < 400) {
+        // Redirect - intentar extraer endpoint del body XML de S3
+        final body = await response.transform(utf8.decoder).join();
+        debugPrint('📡 S3 redirect body: $body');
+
+        final location = response.headers.value('location');
+        if (location != null && location.isNotEmpty) {
+          // Tiene Location header - seguir redirect
+          final redirectUrl = location.startsWith('http')
+              ? location
+              : Uri.parse(url).resolve(location).toString();
+          debugPrint('🔄 Siguiendo redirect → $redirectUrl');
+          client.close();
+          return _downloadWithHttpClient(redirectUrl, filePath);
+        }
+
+        // Sin Location - extraer endpoint del XML de S3
+        final endpointMatch =
+            RegExp(r'<Endpoint>([^<]+)</Endpoint>').firstMatch(body);
+        if (endpointMatch != null) {
+          final correctEndpoint = endpointMatch.group(1)!;
+          final uri = Uri.parse(url);
+          final correctedUrl = 'https://$correctEndpoint${uri.path}';
+          debugPrint('🔄 Endpoint S3 corregido: $correctedUrl');
+          client.close();
+          return _downloadWithHttpClient(correctedUrl, filePath);
+        }
+
+        // Último recurso: intentar sin región explícita en la URL
+        final noRegionUrl = url.replaceFirst(
+          RegExp(r'\.s3\.[a-z0-9-]+\.amazonaws\.com'),
+          '.s3.amazonaws.com',
+        );
+        if (noRegionUrl != url) {
+          debugPrint('🔄 Intentando URL sin región: $noRegionUrl');
+          client.close();
+          return _downloadWithHttpClient(noRegionUrl, filePath);
+        }
+
+        throw Exception(
+            'S3 redirect sin destino válido (status ${response.statusCode})');
+      } else {
+        final body = await response.transform(utf8.decoder).join();
+        throw Exception('Error HTTP ${response.statusCode}: $body');
+      }
+    } finally {
+      client.close();
+    }
+  }
+
+  /// Streams una respuesta HTTP a un archivo, actualizando progreso
+  Future<void> _streamResponseToFile(
+      HttpClientResponse response, String filePath) async {
+    final file = File(filePath);
+    final sink = file.openWrite();
+    final total = response.contentLength;
+    int received = 0;
+
+    await for (final chunk in response) {
+      sink.add(chunk);
+      received += chunk.length;
+      if (mounted && total > 0) {
+        setState(() {
+          _downloadedBytes = received;
+          _totalBytes = total;
+          _downloadProgress = received / total;
+        });
+      }
+    }
+
+    await sink.flush();
+    await sink.close();
+
+    debugPrint(
+        '✅ Descarga HttpClient completada: '
+        '${(received / (1024 * 1024)).toStringAsFixed(2)} MB');
   }
 
   void _startSpeedTimer() {
@@ -572,26 +689,213 @@ class _InstallPageState extends State<InstallPage>
 
   Future<void> _installApk() async {
     try {
+      // Mostrar diálogo de progreso
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (dialogContext) => Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  FlutterFlowTheme.of(context).primary,
+                  FlutterFlowTheme.of(context).secondary,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    FlutterFlowTheme.of(context).info,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Iniciando instalación...',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: FlutterFlowTheme.of(context).info,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Por favor, confirma en la ventana de instalación del sistema',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+
       debugPrint('📦 Iniciando instalación: $_apkFilePath');
 
+      // Validar que el archivo APK existe
       final apkFile = File(_apkFilePath);
       if (!await apkFile.exists()) {
-        throw Exception('Archivo APK no encontrado');
+        if (mounted) Navigator.pop(context);
+        throw Exception('Archivo APK no encontrado en: $_apkFilePath');
       }
 
+      // Validar tamaño del archivo
+      final fileSize = await apkFile.length();
+      if (fileSize <= 0) {
+        if (mounted) Navigator.pop(context);
+        throw Exception('Archivo APK está vacío (${fileSize} bytes)');
+      }
+      
+      debugPrint('✅ APK validado: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB');
+
+      // Verificar permisos de instalación nuevamente
+      final hasPermissions = await _checkAndRequestInstallPermissions();
+      if (!hasPermissions) {
+        if (mounted) Navigator.pop(context);
+        throw Exception('No se otorgó permiso para instalar paquetes. Por favor, habilita esto en Configuración > Apps > Acceso especial > Instalar apps desconocidas');
+      }
+
+      debugPrint('✅ Permisos validados');
+
       // Instalar usando install_plugin
+      debugPrint('🚀 Enviando intent de instalación a través de install_plugin');
       await InstallPlugin.install(_apkFilePath);
 
-      debugPrint('✅ Intent de instalación enviado');
+      debugPrint('✅ Intent de instalación enviado correctamente');
 
-      // La app se cerrará automáticamente cuando el usuario confirme
-      // Los datos en getApplicationDocumentsDirectory() se preservarán
+      // Pequeño delay para asegurar que el diálogo se vea
+      await Future.delayed(const Duration(milliseconds: 1000));
+
+      // Cerrar el diálogo de progreso si todavía está abierto
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // Mostrar mensaje de éxito temporal
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Abriendo instalador del sistema...'),
+            backgroundColor: FlutterFlowTheme.of(context).success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+
+      debugPrint('✅ Proceso de instalación completado. La app se cerrará cuando el usuario confirme');
+      
     } catch (e) {
       debugPrint('❌ Error en instalación: $e');
-      setState(() {
-        _hasError = true;
-        _errorMessage = 'Error al intentar instalar: $e';
-      });
+      
+      // Cerrar el diálogo de progreso si está abierto
+      if (mounted && Navigator.canPop(context)) {
+        try {
+          Navigator.pop(context);
+        } catch (e) {
+          debugPrint('⚠️ Error cerrando diálogo de progreso: $e');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _errorMessage = 'Error en instalación: $e';
+        });
+
+        // Mostrar diálogo de error detallado
+        showDialog(
+          context: context,
+          builder: (dialogContext) => Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    FlutterFlowTheme.of(context).error,
+                    FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: FlutterFlowTheme.of(context).info,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Error en la instalación',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: FlutterFlowTheme.of(context).info,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.2),
+                      ),
+                    ),
+                    child: Text(
+                      _errorMessage,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: FlutterFlowTheme.of(context).info,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(dialogContext),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: FlutterFlowTheme.of(context).info,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: Text(
+                      'Entendido',
+                      style: TextStyle(
+                        color: FlutterFlowTheme.of(context).error,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     }
   }
 
@@ -1636,7 +1940,7 @@ class _InstallPageState extends State<InstallPage>
 
   Widget _buildCompleteScreen() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1792,7 +2096,7 @@ class _InstallPageState extends State<InstallPage>
 
   Widget _buildErrorScreen() {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

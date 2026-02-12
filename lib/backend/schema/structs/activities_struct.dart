@@ -113,7 +113,7 @@ class ActivitiesStruct extends BaseStruct {
 
   // "tracking_headquarter" field.
   bool? _trackingHeadquarter;
-  bool get trackingHeadquarter => _trackingHeadquarter ?? true;
+  bool get trackingHeadquarter => _trackingHeadquarter ?? false;
   set trackingHeadquarter(bool? val) => _trackingHeadquarter = val;
 
   bool hasTrackingHeadquarter() => _trackingHeadquarter != null;
@@ -130,7 +130,7 @@ class ActivitiesStruct extends BaseStruct {
         typeEffectivity: data['type_effectivity'] as String?,
         moduleActivity: data['module_activity'] as String?,
         isSyncFull: data['is_sync_full'] == 1 || data['is_sync_full'] == true,
-        trackingHeadquarter: data['tracking_headquarter'] == null || data['tracking_headquarter'] == 1 || data['tracking_headquarter'] == true,
+        trackingHeadquarter: data['tracking_headquarter'] == 1 || data['tracking_headquarter'] == true,
       );
 
   static ActivitiesStruct? maybeFromMap(dynamic data) => data is Map
