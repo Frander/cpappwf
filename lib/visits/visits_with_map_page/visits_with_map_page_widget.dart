@@ -44,7 +44,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
     _model = createModel(context, () => VisitsWithMapPageModel());
     _tabController = TabController(
       vsync: this,
-      length: 2,
+      length: 3,
       initialIndex: 0,
     );
     // Inicializar el tipo de lectura desde la actividad actual
@@ -110,9 +110,27 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                         ? null
                         : NeverScrollableScrollPhysics(),
                     children: [
-                      // Tab de Formulario
+                      // Tab 1: Formulario
                       DoVisitsFormPageWidget(),
-                      // Tab de Mapa
+                      
+                      // Tab 2: Brújula
+                      Container(
+                        color: FlutterFlowTheme.of(context).primaryBackground,
+                        child: custom_widgets.CompassClickpalm(
+                          width: MediaQuery.sizeOf(context).width,
+                          height: MediaQuery.sizeOf(context).height,
+                          idHeadquarter: FFAppState()
+                              .headquartersSelectedList
+                              .isNotEmpty
+                              ? FFAppState()
+                                  .headquartersSelectedList
+                                  .first
+                                  .idHeadquarter
+                              : null,
+                        ),
+                      ),
+                      
+                      // Tab 3: Mapa
                       widget.isMapEnabled
                           ? Container(
                               width: double.infinity,
@@ -301,7 +319,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                   fontWeight: FontWeight.w600,
                 ),
                 onTap: (i) async {
-                  if (!widget.isMapEnabled && i == 1) {
+                  if (!widget.isMapEnabled && i == 2) {
                     // Si el mapa está deshabilitado y el usuario intenta acceder
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -331,6 +349,16 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                         Icon(Icons.edit_note_rounded, size: 18),
                         SizedBox(width: 6),
                         Text('Formulario'),
+                      ],
+                    ),
+                  ),
+                  Tab(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.compass_calibration, size: 18),
+                        SizedBox(width: 6),
+                        Text('Brújula'),
                       ],
                     ),
                   ),

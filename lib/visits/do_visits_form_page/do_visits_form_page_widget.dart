@@ -46,9 +46,8 @@ class DoVisitsFormPageWidget extends StatefulWidget {
 }
 
 class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
-    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin {
   late DoVisitsFormPageModel _model;
-  late TabController _tabController;
 
   // Mantener vivo el estado cuando se cambia de tab
   @override
@@ -148,6 +147,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para controladores de texto (tipo text)
   final Map<int, TextEditingController> _textControllers = {};
 
+  // Map para rastrear qué unique-option hijo está seleccionado bajo cada padre multiple-option
+  // Clave: idActivityStatus del padre multiple-option
+  // Valor: idActivityStatus del hijo unique-option seleccionado
+  final Map<int, int> _selectedUniqueOptionByParent = {};
+
   // Map para FocusNodes de texto (tipo text)
   final Map<int, FocusNode> _textFocusNodes = {};
 
@@ -186,7 +190,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   void initState() {
     super.initState();
     _model = createModel(context, () => DoVisitsFormPageModel());
-    _tabController = TabController(length: 2, vsync: this);
     _initializeDataCache(); // LOTE 1: Inicializar caché de datos
     _migrateHtmlToCheckmark(); // Migrar HTML antiguo a checkmark
     _initializeExpansionStates();
@@ -333,7 +336,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   void dispose() {
     // Guardar caché del formulario antes de salir
     _saveFormCache();
-    _tabController.dispose();
     _model.dispose();
     // Disponer controllers de búsqueda
     _searchControllers.forEach((_, controller) => controller.dispose());
@@ -1274,7 +1276,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   Widget _buildStatusOption(dynamic parentStep, dynamic status,
-      {required int level}) {
+      {required int level, int? parentMultipleOptionId}) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
     final typeStatus = getJsonField(status, r'''$.type_status''').toString();
@@ -1854,11 +1856,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               // Ya está seleccionado, DESELECCIONAR
               debugPrint('🔄 Status ya seleccionado, DESELECCIONANDO...');
 
-              // Eliminar de visitDetails
+              // Recopilar IDs de hijos para también eliminarlos
+              final childStatusIds = statusChilds
+                  .map((c) =>
+                      getJsonField(c, r'''$.id_activity_status'''))
+                  .toSet();
+
+              // Eliminar de visitDetails (el status actual Y sus hijos)
               List<int> indicesToRemove = [];
               for (int i = 0; i < FFAppState().visitDetails.length; i++) {
-                if (FFAppState().visitDetails[i].idActivityStatus == statusId &&
-                    FFAppState().visitDetails[i].idStepParent == parentStepId) {
+                final detail = FFAppState().visitDetails[i];
+                if (detail.idStepParent == parentStepId &&
+                    (detail.idActivityStatus == statusId ||
+                        childStatusIds.contains(detail.idActivityStatus))) {
                   indicesToRemove.add(i);
                 }
               }
@@ -1867,7 +1877,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
               }
 
-              debugPrint('✅ Status deseleccionado correctamente');
+              // Limpiar registro de unique-option:
+              // Si es un padre multiple-option, limpiar sus hijos del mapa
+              _selectedUniqueOptionByParent.remove(statusId);
+              // Si es un unique-option hijo, limpiar del registro del padre
+              if (parentMultipleOptionId != null &&
+                  typeStatus.toLowerCase() == 'unique-option') {
+                _selectedUniqueOptionByParent.remove(parentMultipleOptionId);
+              }
+              _visitDetailsSearchCache.clear();
+
+              debugPrint('✅ Status deseleccionado correctamente (incluyendo ${childStatusIds.length} hijos)');
 
               // Solo hacer setState si DESELECCIONAMOS
               // (cuando seleccionamos, _onStatusSelected ya hace setState)
@@ -1933,6 +1953,51 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             } else {
               // No está seleccionado, SELECCIONAR
               debugPrint('✅ Seleccionando status...');
+
+              // Si es un unique-option hijo de un multiple-option,
+              // manejar exclusividad: deseleccionar hermano previamente seleccionado
+              if (parentMultipleOptionId != null &&
+                  typeStatus.toLowerCase() == 'unique-option') {
+                debugPrint(
+                    '🎯 UNIQUE-OPTION HIJO (step-level): statusId=$statusId, parentMultipleOptionId=$parentMultipleOptionId');
+                final previouslySelectedId =
+                    _selectedUniqueOptionByParent[parentMultipleOptionId];
+                if (previouslySelectedId != null &&
+                    previouslySelectedId != statusId) {
+                  // Deseleccionar el unique-option anterior del mismo padre
+                  List<int> siblingIndicesToRemove = [];
+                  for (int i = 0;
+                      i < FFAppState().visitDetails.length;
+                      i++) {
+                    if (FFAppState().visitDetails[i].idActivityStatus ==
+                            previouslySelectedId &&
+                        FFAppState().visitDetails[i].idStepParent ==
+                            parentStepId) {
+                      siblingIndicesToRemove.add(i);
+                      debugPrint(
+                          '   ❌ Deseleccionando hermano anterior: ID=$previouslySelectedId');
+                    }
+                  }
+                  for (int i = siblingIndicesToRemove.length - 1;
+                      i >= 0;
+                      i--) {
+                    FFAppState().removeAtIndexFromVisitDetails(
+                        siblingIndicesToRemove[i]);
+                  }
+                  _visitDetailsSearchCache.clear();
+                }
+                // Registrar el nuevo unique-option seleccionado bajo este padre
+                _selectedUniqueOptionByParent[parentMultipleOptionId] =
+                    statusId;
+                debugPrint(
+                    '   ✅ Registrado nuevo unique-option: statusId=$statusId bajo padre=$parentMultipleOptionId');
+              }
+
+              // Auto-expandir si el status tiene hijos (ej: multiple-option con unique-option hijos)
+              if (hasChildren) {
+                _statusExpansionState[expansionKey] = true;
+              }
+
               await _onStatusSelected(parentStep, status);
             }
           },
@@ -2292,11 +2357,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Column(
               children: [
                 // ✅ PRIMERO: Mostrar status childs (opciones inmediatas del mismo nivel)
+                // IMPORTANTE: Pasar parentStep (el step real), NO el status actual
+                // y pasar statusId como parentMultipleOptionId para exclusividad unique-option
                 ...statusChilds.map<Widget>((childStatus) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildStatusOption(status, childStatus,
-                        level: level + 1),
+                    child: _buildStatusOption(parentStep, childStatus,
+                        level: level + 1,
+                        parentMultipleOptionId: statusId),
                   );
                 }),
 
@@ -3476,6 +3544,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
               }
 
+              // Si es un unique-option hijo, limpiar del registro de selección por padre
+              if (typeStatus.toLowerCase() == 'unique-option') {
+                _selectedUniqueOptionByParent.remove(parentStatusId);
+                debugPrint(
+                    '   ✅ Limpiado registro de unique-option para padre=$parentStatusId');
+              }
+
               debugPrint('✅ Root Status Child deseleccionado correctamente');
 
               // Solo hacer setState si DESELECCIONAMOS
@@ -3541,7 +3616,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             } else {
               // No está seleccionado, SELECCIONAR
               debugPrint('✅ Seleccionando Root Status Child...');
-              await _onRootStatusSelected(childStatus, allRootStatus: parentStatusChildsList);
+              await _onRootStatusSelected(
+                childStatus,
+                allRootStatus: parentStatusChildsList,
+                parentStatusId: parentStatusId,
+              );
             }
           },
           child: Container(
@@ -3747,7 +3826,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
-  Future<void> _onRootStatusSelected(dynamic status, {List<dynamic>? allRootStatus}) async {
+  Future<void> _onRootStatusSelected(
+    dynamic status, {
+    List<dynamic>? allRootStatus,
+    int? parentStatusId,
+  }) async {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
     final typeStatus = getJsonField(status, r'''$.type_status''').toString();
@@ -3765,14 +3848,50 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return;
     }
 
-    // LÓGICA UNIQUE_CHOICE y UNIQUE-OPTION: Si el tipo es "unique_choice" o "unique-option", eliminar otros status raíz seleccionados
-    if ((typeStatus.toLowerCase() == 'unique_choice' || typeStatus.toLowerCase() == 'unique-option') && allRootStatus != null) {
+    // CASO 1: UNIQUE-OPTION HIJO dentro de un MULTIPLE-OPTION PADRE
+    // Deseleccionar solo hermanos del MISMO padre
+    if (typeStatus.toLowerCase() == 'unique-option' &&
+        parentStatusId != null &&
+        allRootStatus != null) {
+      debugPrint(
+          '🎯 UNIQUE-OPTION HIJO: statusId=$statusId, parentId=$parentStatusId');
+
+      // Obtener el unique-option previamente seleccionado bajo este padre
+      final previouslySelectedId = _selectedUniqueOptionByParent[parentStatusId];
+
+      if (previouslySelectedId != null && previouslySelectedId != statusId) {
+        // Deseleccionar el anterior
+        List<int> indicesToRemove = [];
+        for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+          if (FFAppState().visitDetails[i].idActivityStatus ==
+              previouslySelectedId) {
+            indicesToRemove.add(i);
+            debugPrint(
+                '   ❌ Deseleccionando anterior: ID=$previouslySelectedId');
+          }
+        }
+        for (int i = indicesToRemove.length - 1; i >= 0; i--) {
+          FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
+        }
+        _visitDetailsSearchCache.clear();
+      }
+
+      // Registrar el nuevo unique-option seleccionado
+      _selectedUniqueOptionByParent[parentStatusId] = statusId;
+      debugPrint('   ✅ Registrado nuevo unique-option: statusId=$statusId');
+    }
+    // CASO 2: UNIQUE-CHOICE/UNIQUE-OPTION A NIVEL RAÍZ
+    else if ((typeStatus.toLowerCase() == 'unique_choice' ||
+            typeStatus.toLowerCase() == 'unique-option') &&
+        allRootStatus != null) {
       // Obtener todos los IDs de status raíz que son unique_choice o unique-option (excepto el actual)
       final List<int> siblingStatusIds = [];
       for (var sibling in allRootStatus) {
         final siblingId = getJsonField(sibling, r'''$.id_activity_status''');
-        final siblingType = getJsonField(sibling, r'''$.type_status''')?.toString().toLowerCase() ?? '';
-        if (siblingId != statusId && (siblingType == 'unique_choice' || siblingType == 'unique-option')) {
+        final siblingType =
+            getJsonField(sibling, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+        if (siblingId != statusId &&
+            (siblingType == 'unique_choice' || siblingType == 'unique-option')) {
           siblingStatusIds.add(siblingId);
         }
       }
@@ -3781,7 +3900,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (siblingStatusIds.isNotEmpty) {
         List<int> indicesToRemove = [];
         for (int i = 0; i < FFAppState().visitDetails.length; i++) {
-          if (siblingStatusIds.contains(FFAppState().visitDetails[i].idActivityStatus)) {
+          if (siblingStatusIds
+              .contains(FFAppState().visitDetails[i].idActivityStatus)) {
             indicesToRemove.add(i);
           }
         }
@@ -3791,13 +3911,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
         // Limpiar cache de búsqueda porque cambiaron los visitDetails
         _visitDetailsSearchCache.clear();
-        debugPrint('🔘 UNIQUE_CHOICE/UNIQUE-OPTION: Eliminados ${indicesToRemove.length} status hermanos');
+        debugPrint(
+            '🔘 UNIQUE_CHOICE/UNIQUE-OPTION: Eliminados ${indicesToRemove.length} status hermanos');
       }
     }
 
     // Determinar el statusResponse según el tipo
     String finalStatusResponse = defaultStatus;
-    if (typeStatus.toLowerCase() == 'unique_choice' || typeStatus.toLowerCase() == 'unique-option') {
+    if (typeStatus.toLowerCase() == 'unique_choice' ||
+        typeStatus.toLowerCase() == 'unique-option') {
       // Para unique_choice y unique-option, guardar "Seleccionado"
       finalStatusResponse = 'Seleccionado';
     }
@@ -3895,11 +4017,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // - reference-list: SOLO se puede seleccionar UN elemento
     // - unique-list: SOLO se puede seleccionar UN elemento
     // - container-list: Se pueden seleccionar MÚLTIPLES elementos (es solo un contenedor)
+    // - multiple-list: Se pueden seleccionar MÚLTIPLES elementos
 
-    final isContainerList = typeStep.toLowerCase() == 'container-list';
+    final isMultiSelectList = typeStep.toLowerCase() == 'container-list' ||
+        typeStep.toLowerCase() == 'multiple-list';
 
-    if (isContainerList) {
-      debugPrint('📋 Tipo de step: $typeStep - Permite MÚLTIPLES selecciones (contenedor)');
+    if (isMultiSelectList) {
+      debugPrint('📋 Tipo de step: $typeStep - Permite MÚLTIPLES selecciones');
     } else {
       debugPrint('📋 Tipo de step: $typeStep - Solo se permite UNA selección');
     }
@@ -3908,7 +4032,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Para container-list: NO eliminar nada, permitir múltiples selecciones
     List<int> indicesToRemove = [];
 
-    if (!isContainerList) {
+    if (!isMultiSelectList) {
       for (int i = 0; i < FFAppState().visitDetails.length; i++) {
         if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
             FFAppState().visitDetails[i].idActivityStatus != 0) {
@@ -3986,7 +4110,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Para container-list, obtener todos los status seleccionados de este step
     String stepStatusResponse = statusName;
-    if (isContainerList) {
+    if (isMultiSelectList) {
       List<String> selectedStatusNames = [];
       for (var detail in FFAppState().visitDetails) {
         if (detail.idStepParent == parentStepId && detail.idActivityStatus != 0) {
@@ -4039,7 +4163,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Para unique-list y reference-list: COLAPSAR automáticamente el step después de seleccionar
     // Esto evita que el usuario tenga que tocar manualmente el header para cerrar la lista
-    if (!isContainerList) {
+    if (!isMultiSelectList) {
       debugPrint('🔽 Auto-colapsando step "$stepName" (tipo: $typeStep)');
       _stepExpansionState[parentStepId] = false;
       // También cerrar el search box si estaba abierto

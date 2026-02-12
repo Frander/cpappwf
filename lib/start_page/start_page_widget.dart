@@ -58,6 +58,53 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       );
       FFAppState().pathDatabase = _model.pathDBSQLite1!;
 
+      // ============================================================================
+      // DETECTAR DISPOSITIVO NUEVO Y BUSCAR BACKUPS
+      // ============================================================================
+      final isNewDevice = await actions.isNewDevice();
+      if (isNewDevice) {
+        debugPrint('🆕 ¡Dispositivo NUEVO detectado!');
+        
+        // Buscar backups disponibles
+        _updateProgress(2, 'Buscando backups...');
+        final backupResult = await actions.checkAndRestoreBackup();
+        
+        if (backupResult['hasBackup'] == true) {
+          debugPrint('✅ Backup detectado: ${backupResult['mostRecent']?['backupName']}');
+          
+          // Mostrar diálogo de confirmación
+          final shouldRestore = await _showBackupRestoreDialog(
+            backupResult['mostRecent']?['formattedDate'] ?? 'Desconocida',
+            backupResult['mostRecent']?['backupName'] ?? '',
+          );
+          
+          if (shouldRestore) {
+            // Restaurar el backup
+            _updateProgress(2, 'Restaurando información anterior...');
+            try {
+              final restoreResult = 
+                  await actions.restoreBackupData(backupResult['mostRecent']['backupPath']);
+              
+              if (restoreResult['success'] == true) {
+                debugPrint('✅ Backup restaurado exitosamente');
+              } else {
+                debugPrint('❌ Error restaurando backup: ${restoreResult['error']}');
+                await _showErrorDialog('Error al restaurar', 
+                    'No se pudo restaurar el backup: ${restoreResult['error']}');
+              }
+            } catch (e) {
+              debugPrint('❌ Error crítico restaurando backup: $e');
+              await _showErrorDialog('Error crítico', 
+                  'Error al restaurar: $e');
+            }
+          } else {
+            debugPrint('ℹ️ Usuario rechazó restaurar el backup');
+          }
+        } else {
+          debugPrint('⚠️ No hay backups disponibles para restaurar');
+        }
+      }
+
       // Debug: Verificar estado actual (deviceDefault está persistido en AppState)
       debugPrint('🔍 DEBUG StartPage - Estado actual:');
       debugPrint('   isSync: ${FFAppState().isSync}');
@@ -2021,6 +2068,145 @@ class _StartPageWidgetState extends State<StartPageWidget> {
     }
 
     return completer.future;
+  }
+
+  /// Muestra un diálogo de confirmación para restaurar backup
+  Future<bool> _showBackupRestoreDialog(String backupDate, String backupName) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: const Text(
+            '🔄 Backup Detectado',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 12),
+              Text(
+                'Se detectó un backup de una instalación anterior.',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.blue.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Nombre: $backupName',
+                      style: TextStyle(
+                        color: Colors.blue.withValues(alpha: 0.9),
+                        fontSize: 12,
+                        fontFamily: 'Courier',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Fecha: $backupDate',
+                      style: TextStyle(
+                        color: Colors.blue.withValues(alpha: 0.9),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '¿Desea recuperar la información anterior?',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text(
+                'No',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text(
+                'Sí, Restaurar',
+                style: TextStyle(
+                  color: Colors.green,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  /// Muestra un diálogo de error
+  Future<void> _showErrorDialog(String title, String message) async {
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF1E293B),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Text(
+            message,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.9),
+              fontSize: 14,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text(
+                'Aceptar',
+                style: TextStyle(
+                  color: Colors.blue,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override

@@ -328,17 +328,23 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 
       // Estabilización con calidad: requiere TIEMPO + CALIDAD de lecturas
       // No basta con que pase el tiempo; necesitamos lecturas con buena precisión
-      if (elapsed >=
+      // MEJORA: Si el margen de error es ≤7m, estabilizar INMEDIATAMENTE
+      final bool stabilizedByAccuracy = position.accuracy <= 7.0;
+      final bool stabilizedByConditions = elapsed >=
               LocationConfig.warmupSeconds +
                   LocationConfig.stabilizationSeconds &&
           !isStabilized &&
-          goodReadingsAfterWarmup >= requiredGoodReadings) {
+          goodReadingsAfterWarmup >= requiredGoodReadings;
+
+      if (!isStabilized && (stabilizedByAccuracy || stabilizedByConditions)) {
         isStabilized = true;
         stabilizationWatchdog?.cancel();
+        final String reason = stabilizedByAccuracy 
+            ? 'margen de error ≤7m (${position.accuracy.toStringAsFixed(1)}m)'
+            : 'después de ${elapsed}s (precisión: ${bestAccuracySeen.toStringAsFixed(1)}m)';
         debugPrint(
-            '✅ Servicio estabilizado después de ${elapsed}s '
-            '(precisión: ${bestAccuracySeen.toStringAsFixed(1)}m, '
-            'lecturas válidas: $goodReadingsAfterWarmup, '
+            '✅ Servicio estabilizado por $reason '
+            '(lecturas válidas: $goodReadingsAfterWarmup, '
             'reinicios: $restartAttempts)');
 
         // Notificar al hilo principal que el GPS está estabilizado

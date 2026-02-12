@@ -62,6 +62,12 @@ export 'check_nfc_status.dart' show checkNfcStatus, openNfcSettings, NfcStatus;
 export 'detect_nfc_capacity.dart' show detectNfcCapacity;
 export 'write_n_f_c_tag_direct.dart' show writeNFCTagDirect;
 export 'search_users_sqlite.dart' show searchUsersSqlite;
+export 'create_backup.dart' show createBackup;
+export 'restore_backup.dart'
+    show restoreBackup, listAvailableBackups, deleteBackup;
+export 'check_and_restore_backup.dart'
+    show checkAndRestoreBackup, restoreBackupData;
+export 'is_new_device.dart' show isNewDevice;
 export 'nfc_json_helper.dart'
     show
         buildInitialNfcJson,

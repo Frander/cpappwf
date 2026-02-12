@@ -85,8 +85,9 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     _animationController.forward();
 
     // Solo ocultar automáticamente si está estabilizado (GPS listo)
+    // Se cierra rápidamente (800ms) cuando se estabiliza para indicar éxito inmediato
     if (isStabilized) {
-      _hideTimer = Timer(const Duration(milliseconds: 2000), () {
+      _hideTimer = Timer(const Duration(milliseconds: 800), () {
         if (mounted) {
           _hideSnackBar();
         }

@@ -4,6 +4,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '/home_page/home_page_widget.dart';
 import '/custom_code/actions/index.dart' as actions;
@@ -36,6 +37,11 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     _model = createModel(context, () => LoginPageModel());
     _model.textController ??= TextEditingController();
     _model.textFieldFocusNode ??= FocusNode();
+
+    // Verificar si ya existe un usuario seleccionado de sesiones anteriores
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      _checkAndNavigateIfUserSelected();
+    });
 
     // Cargar usuarios desde SQLite al iniciar
     _loadUsersFromSqlite();
@@ -104,6 +110,40 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
       return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     }
     return parts[0][0].toUpperCase();
+  }
+
+  // Verificar si ya existe un usuario seleccionado y navegar si es así
+  Future<void> _checkAndNavigateIfUserSelected() async {
+    try {
+      final userSelected = FFAppState().userSelected;
+      
+      // Si existe un usuario válido, navegar directamente a HomePage
+      if (userSelected.idUser != null && userSelected.idUser! > 0 &&
+          userSelected.nameUser != null && userSelected.nameUser!.isNotEmpty) {
+        
+        debugPrint('✅ Usuario persistente detectado: ${userSelected.nameUser}');
+        debugPrint('🚀 Navegando directamente a HomePage...');
+        
+        // Navegar a HomePage sin mostrar la selección
+        if (mounted) {
+          if (Navigator.of(context).canPop()) {
+            context.pop();
+          }
+          context.pushNamed(
+            HomePageWidget.routeName,
+            extra: <String, dynamic>{
+              kTransitionInfoKey: const TransitionInfo(
+                hasTransition: true,
+                transitionType: PageTransitionType.fade,
+                duration: Duration(milliseconds: 300),
+              ),
+            },
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error al verificar usuario persistente: $e');
+    }
   }
 
   // Manejar selección de usuario
