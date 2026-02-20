@@ -16,6 +16,7 @@ import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'start_page_model.dart';
 export 'start_page_model.dart';
 
@@ -36,6 +37,7 @@ class StartPageWidget extends StatefulWidget {
 
 class _StartPageWidgetState extends State<StartPageWidget> {
   late StartPageModel _model;
+  String _appVersion = '';
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -43,6 +45,14 @@ class _StartPageWidgetState extends State<StartPageWidget> {
   void initState() {
     super.initState();
     _model = createModel(context, () => StartPageModel());
+
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) {
+        setState(() {
+          _appVersion = 'v${info.version} (${info.buildNumber})';
+        });
+      }
+    });
 
     // On page load action.
     SchedulerBinding.instance.addPostFrameCallback((_) async {
@@ -2229,10 +2239,30 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           },
           child: Scaffold(
             key: scaffoldKey,
-            body: SyncLoadingWidget(
-              currentStep: _model.currentStep,
-              totalSteps: _model.totalSteps,
-              stepMessage: _model.stepMessage,
+            body: Stack(
+              children: [
+                SyncLoadingWidget(
+                  currentStep: _model.currentStep,
+                  totalSteps: _model.totalSteps,
+                  stepMessage: _model.stepMessage,
+                ),
+                if (_appVersion.isNotEmpty)
+                  Positioned(
+                    bottom: 8,
+                    right: 12,
+                    child: SafeArea(
+                      child: Text(
+                        _appVersion,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 10,
+                          color: Colors.white.withOpacity(0.3),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),

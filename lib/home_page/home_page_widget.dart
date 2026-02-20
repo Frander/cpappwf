@@ -19,6 +19,7 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import 'home_page_model.dart';
 export 'home_page_model.dart';
@@ -61,6 +62,7 @@ class _ActivityMetrics {
 class _HomePageWidgetState extends State<HomePageWidget>
     with TickerProviderStateMixin {
   late HomePageModel _model;
+  String _appVersion = '';
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
   // Estados para búsqueda
@@ -102,6 +104,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _model = createModel(context, () => HomePageModel());
     _model.searchController ??= TextEditingController();
     _model.searchFocusNode ??= FocusNode();
+
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) {
+        setState(() {
+          _appVersion = 'v${info.version} (${info.buildNumber})';
+        });
+      }
+    });
 
     // Escuchar eventos del servicio de background (GPS estabilizado)
     _setupGpsServiceListener();
@@ -845,6 +855,24 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     ),
                   ),
                 ),
+
+                // Indicador de versión
+                if (_appVersion.isNotEmpty)
+                  Positioned(
+                    bottom: 8,
+                    left: 12,
+                    child: SafeArea(
+                      child: Text(
+                        _appVersion,
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 10,
+                          color: Colors.white.withOpacity(0.3),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                  ),
 
                 // Botones flotantes y nube de búsqueda
                 _buildFloatingButtons(),
