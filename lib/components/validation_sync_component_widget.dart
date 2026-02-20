@@ -260,7 +260,7 @@ class _ValidationSyncComponentWidgetState
                                   FFAppState().lastSync =
                                       DateTime.fromMillisecondsSinceEpoch(
                                           1743526800000);
-                                  FFAppState().isSync = false;
+                                  // ✅ MANTENER isSync = true (solo limpiamos datos temporales, NO datos base de login)
                                   FFAppState().usersList = [];
                                   FFAppState().headquarterSelected =
                                       HeadquartersStruct();
@@ -299,7 +299,7 @@ class _ValidationSyncComponentWidgetState
                                   FFAppState().lastSync =
                                       DateTime.fromMillisecondsSinceEpoch(
                                           1743526800000);
-                                  FFAppState().isSync = false;
+                                  // ✅ MANTENER isSync = true (solo limpiamos datos temporales, NO datos base de login)
                                   FFAppState().usersList = [];
                                   FFAppState().headquarterSelected =
                                       HeadquartersStruct();

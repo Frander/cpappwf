@@ -29,7 +29,7 @@ import 'dart:convert';
 class UpdateConfig {
   static const String apiBaseUrl = 'https://api.clickpalm.com';
   static const String s3BaseUrl =
-      'https://clickpalmv2.s3.us-east-1.amazonaws.com';
+      'https://clickpalmv2.s3.us-west-2.amazonaws.com';
   static const String s3Prefix = 'Installers/Versions';
   static const int maxRetries = 5;
   static const Duration chunkTimeout = Duration(seconds: 30);

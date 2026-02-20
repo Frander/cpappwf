@@ -592,34 +592,8 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                               ],
                             ),
                           ),
-                          InkWell(
-                            splashColor: Colors.transparent,
-                            focusColor: Colors.transparent,
-                            hoverColor: Colors.transparent,
-                            highlightColor: Colors.transparent,
-                            onDoubleTap: () async {
-                              FFAppState().loginResponse = null;
-                              FFAppState().userSelected = UsersStruct();
-                              FFAppState().companyDefault = CompaniesStruct();
-                              FFAppState().headquartersList = [];
-                              FFAppState().zonesList = [];
-                              FFAppState().productsList = [];
-                              FFAppState().lastSync =
-                                  DateTime.fromMillisecondsSinceEpoch(
-                                      1743526800000);
-                              FFAppState().isSync = false;
-                              FFAppState().usersList = [];
-                              FFAppState().headquarterSelected =
-                                  HeadquartersStruct();
-                              FFAppState().zoneSelected = ZonesStruct();
-                              FFAppState().visitsAdd = [];
-                              FFAppState().productsAdd = [];
-                              FFAppState().activitySelectedJSON = null;
-                              FFAppState().activityStatusSelectedJSON = null;
-                              FFAppState().userSelectedJSON = null;
-                              FFAppState().update(() {});
-                            },
-                            child: Container(
+                          // ❌ ELIMINADO: onDoubleTap para cerrar sesión (usar solo botón "Básica" en ModernSyncPage)
+                          Container(
                               width: double.infinity,
                               decoration: BoxDecoration(),
                               child: Padding(
@@ -844,7 +818,6 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                   ],
                                 ),
                               ),
-                            ),
                           ),
                           Container(
                             width: double.infinity,
@@ -986,7 +959,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                             FFAppState().lastSync = DateTime
                                                 .fromMillisecondsSinceEpoch(
                                                     1743526800000);
-                                            FFAppState().isSync = false;
+                                            // ✅ MANTENER isSync = true (solo sincronizamos visitas, NO cerramos sesión)
                                             FFAppState().usersList = [];
                                             FFAppState().headquarterSelected =
                                                 HeadquartersStruct();
@@ -1060,7 +1033,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                           FFAppState().lastSync = DateTime
                                               .fromMillisecondsSinceEpoch(
                                                   1743526800000);
-                                          FFAppState().isSync = false;
+                                          // ✅ MANTENER isSync = true (solo sincronizamos visitas, NO cerramos sesión)
                                           FFAppState().usersList = [];
                                           FFAppState().headquarterSelected =
                                               HeadquartersStruct();

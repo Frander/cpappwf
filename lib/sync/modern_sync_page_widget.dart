@@ -1319,7 +1319,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         // Limpiar AppState igual que el código anterior (sync_visits_form.dart)
         debugPrint('🧹 Limpiando AppState después de sincronización total...');
         FFAppState().lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
-        FFAppState().isSync = false;
+        // ✅ MANTENER isSync = true (solo limpiamos datos temporales, NO datos base de login)
         FFAppState().usersList = [];
         FFAppState().headquarterSelected = HeadquartersStruct();
         FFAppState().zoneSelected = ZonesStruct();
@@ -1416,7 +1416,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         // Limpiar AppState
         debugPrint('🧹 Limpiando AppState después de sincronización optimizada...');
         FFAppState().lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
-        FFAppState().isSync = false;
+        // ✅ MANTENER isSync = true (solo limpiamos datos temporales, NO datos base de login)
         FFAppState().usersList = [];
         FFAppState().headquarterSelected = HeadquartersStruct();
         FFAppState().zoneSelected = ZonesStruct();

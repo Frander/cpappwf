@@ -18,6 +18,7 @@ import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '/components/nfc_view_raw_dialog_widget.dart';
 import '/components/nfc_clear_dialog_widget.dart';
 import '/tag_admin/tag_admin_center_widget.dart';
@@ -72,6 +73,9 @@ class _InformationFormState extends State<InformationForm>
   // Datos descargados (conteo de registros por tabla)
   Map<String, int> _downloadedDataCounts = {};
 
+  // Versión de la app
+  String _appVersion = '';
+
   // Animaciones
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
@@ -81,6 +85,13 @@ class _InformationFormState extends State<InformationForm>
     super.initState();
     _setupAnimations();
     _loadAllData();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) {
+        setState(() {
+          _appVersion = 'v${info.version} (${info.buildNumber})';
+        });
+      }
+    });
   }
 
   @override
@@ -885,7 +896,7 @@ class _InformationFormState extends State<InformationForm>
             _buildDeviceInfoRow(
               icon: Icons.info_outline,
               label: 'Versión App',
-              value: 'v27',
+              value: _appVersion.isNotEmpty ? _appVersion : '...',
             ),
           ],
         ),

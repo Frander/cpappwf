@@ -1652,18 +1652,17 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
               const SizedBox(height: 32),
               ElevatedButton(
                 onPressed: () {
-                  // Actualizar la variable isSync a false en el AppState
-                  FFAppState().isSync = false;
-                  debugPrint('✅ isSync actualizado a false');
+                  // ✅ MANTENER isSync = true (la app ya está sincronizada, solo enviamos visitas)
+                  debugPrint('✅ Sincronización de visitas completada (isSync se mantiene en true)');
 
                   // Cerrar diálogo de éxito
                   Navigator.pop(context);
                   // Cerrar formulario sync con resultado exitoso
                   Navigator.pop(context, true);
 
-                  // Navegar a StartPage para re-sincronizar toda la información
-                  context.goNamed('StartPage');
-                  debugPrint('✅ Navegando a StartPage para re-sincronizar información');
+                  // Navegar a HomePage (no necesitamos re-sincronizar todo desde StartPage)
+                  context.goNamed('HomePage');
+                  debugPrint('✅ Navegando a HomePage');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: FlutterFlowTheme.of(context).info,
