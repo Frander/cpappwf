@@ -9,7 +9,6 @@
       "Bash(do if [ -f \"$file\" ])",
       "Bash(then basename \"$file\" _widget.dart)",
       "Bash(xargs:*)",
-      "Bash(powershell -Command \"(Get-Content ''lib/visits/do_visits_form_page/do_visits_form_page_widget.dart'' -Raw) -replace ''\\.withOpacity\\(([^)]+)\\)'', ''.withValues(alpha: $1)'' | Set-Content ''lib/visits/do_visits_form_page/do_visits_form_page_widget.dart'' -NoNewline\")",
       "Bash(git checkout:*)",
       "Bash(python:*)",
       "Bash(node -e:*)",
@@ -22,7 +21,9 @@
       "Bash(findstr:*)",
       "Bash(flutter clean:*)",
       "Bash(flutter pub get:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(dart analyze:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []

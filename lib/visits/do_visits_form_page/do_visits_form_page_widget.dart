@@ -22,7 +22,6 @@ import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
-import '/tag_admin/tag_admin_center_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -1595,7 +1594,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 barrierDismissible: false,
                 context: context,
                 builder: (dialogContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -4606,169 +4605,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
 
-  /// Calcula distancia geográfica entre dos coordenadas en metros (Haversine)
-  double _calculateGeoDistance(double lat1, double lon1, double lat2, double lon2) {
-    const R = 6371000.0; // Radio de la Tierra en metros
-    final dLat = (lat2 - lat1) * math.pi / 180;
-    final dLon = (lon2 - lon1) * math.pi / 180;
-    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
-        math.cos(lat1 * math.pi / 180) *
-            math.cos(lat2 * math.pi / 180) *
-            math.sin(dLon / 2) *
-            math.sin(dLon / 2);
-    final c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
-    return R * c;
-  }
-
-  /// Muestra información del producto con distancia
-  Future<void> _showProductInfoDialog(
-    Map<String, dynamic> product,
-    double? distance,
-    ReadGeoStruct currentGeo,
-  ) async {
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) {
-        // Auto-cerrar después de 4 segundos
-        Future.delayed(const Duration(seconds: 4), () {
-          if (Navigator.of(dialogContext).canPop()) {
-            Navigator.of(dialogContext).pop();
-          }
-        });
-
-        final distanceText = distance == null
-            ? 'Sin coordenadas instaladas'
-            : distance < 1000
-                ? '${distance.toStringAsFixed(1)} metros'
-                : '${(distance / 1000).toStringAsFixed(2)} km';
-
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1A2E),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF00a86b), width: 2),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Icono de éxito
-                Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: const Color(0xFF00a86b).withValues(alpha: 0.2),
-                  ),
-                  child: const Icon(Icons.check_circle, color: Color(0xFF00a86b), size: 40),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Producto Encontrado',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Información del producto
-                _buildInfoRow('RFID', product['Id_rfid']?.toString() ?? 'N/A'),
-                _buildInfoRow('Código', product['Code_product']?.toString() ?? 'N/A'),
-                _buildInfoRow('Nombre', product['Name_product']?.toString() ?? 'N/A'),
-                _buildInfoRow('Lote', product['Name_headquarter']?.toString() ?? 'N/A'),
-                const Divider(color: Colors.white24, height: 24),
-                // Distancia
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: distance != null && distance < 50
-                        ? const Color(0xFF00a86b).withValues(alpha: 0.2)
-                        : Colors.orange.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: distance != null && distance < 50
-                            ? const Color(0xFF00a86b)
-                            : Colors.orange,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Distancia',
-                              style: TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 12,
-                                color: Colors.white70,
-                              ),
-                            ),
-                            Text(
-                              distanceText,
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 80,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 13,
-                color: Colors.white70,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-
   /// Muestra un diálogo para leer el TAG ID (RFID) del NFC antes de guardar
   /// Retorna el TAG ID leído o null si el usuario cancela
   Future<String?> _showNfcTagIdReaderDialog() async {
@@ -5263,7 +5099,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           userSelected.idUser,
           deviceDefault.idDevice,
           0, // Id_status
-          DateTime.now().toUtc().toIso8601String(),
+          DateTime.now().toIso8601String(),
           100, // Battery (valor por defecto)
           mainLocation.latitude,
           mainLocation.longitude,
@@ -5308,7 +5144,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             geoPoint.longitude,
             geoPoint.altitude,
             geoPoint.errorHorizontal,
-            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toUtc().toIso8601String(),
+            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
           ]);
         }
 
@@ -5472,7 +5308,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           userSelected.idUser,
           deviceDefault.idDevice,
           0, // Id_status
-          DateTime.now().toUtc().toIso8601String(),
+          DateTime.now().toIso8601String(),
           100, // Battery (valor por defecto)
           mainLocation.latitude,
           mainLocation.longitude,
@@ -5517,7 +5353,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             geoPoint.longitude,
             geoPoint.altitude,
             geoPoint.errorHorizontal,
-            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toUtc().toIso8601String(),
+            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
           ]);
         }
 
@@ -9538,6 +9374,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     ReadGeoStruct? result;
     bool cancelled = false;
 
+    if (!context.mounted) return null;
     await showDialog(
       barrierDismissible: false,
       context: context,
@@ -10462,7 +10299,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_unityLabel}: ',
+                                    '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 14,
@@ -10630,7 +10467,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_unityLabel}: ',
+                                    '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 12,
@@ -10925,7 +10762,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_unityLabel}: ',
+                                    '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 14,
@@ -11093,7 +10930,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_unityLabel}: ',
+                                    '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 12,
@@ -11558,7 +11395,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_unityLabel}: ',
+                                    '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 14,
@@ -11726,7 +11563,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
-                                    '${_unityLabel}: ',
+                                    '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 12,
@@ -11954,7 +11791,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     required dynamic status,
   }) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final statusName = getJsonField(status, r'''$.status_name''').toString();
     final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
 
     // Obtener o crear el controlador y FocusNode para este status
@@ -12038,7 +11874,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     required dynamic status,
   }) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final statusName = getJsonField(status, r'''$.status_name''').toString();
     final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
 
     // Obtener o crear el controlador y FocusNode para este status
@@ -12070,12 +11905,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFFF1F8F4),
-            const Color(0xFFFAFDFB),
+            Color(0xFFF1F8F4),
+            Color(0xFFFAFDFB),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
@@ -12338,8 +12173,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
                   colors: [
                     Color(0xFF00a86b),
                     Color(0xFF00d980),
@@ -12517,7 +12352,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) {
-        return _FullScreenUserSearchDialog();
+        return const _FullScreenUserSearchDialog();
       },
     );
 
@@ -12544,7 +12379,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         .replaceAll(RegExp(r'[^\w\s]'), '')
         .toLowerCase();
 
-    return '${cleanActivityName}_${dateStr}_${timeStr}.jpg';
+    return '${cleanActivityName}_${dateStr}_$timeStr.jpg';
   }
 
   // Display inline para foto capturada (tipo photo)
@@ -12633,21 +12468,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.check_circle_rounded,
-                      color: const Color(0xFF00a86b),
+                      color: Color(0xFF00a86b),
                       size: 16,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       'Foto capturada',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF00a86b),
+                        color: Color(0xFF00a86b),
                       ),
                     ),
                   ],
@@ -12655,11 +12490,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 const SizedBox(height: 4),
                 Text(
                   _generatePhotoName(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF00a86b),
+                    color: Color(0xFF00a86b),
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -12784,21 +12619,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.check_circle_rounded,
-                      color: const Color(0xFF00a86b),
+                      color: Color(0xFF00a86b),
                       size: 16,
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       'Video capturado',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF00a86b),
+                        color: Color(0xFF00a86b),
                       ),
                     ),
                   ],
@@ -12806,11 +12641,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 const SizedBox(height: 4),
                 Text(
                   _generateVideoName(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF00a86b),
+                    color: Color(0xFF00a86b),
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -12842,7 +12677,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         .replaceAll(RegExp(r'[^\w\s]'), '')
         .toLowerCase();
 
-    return '${cleanActivityName}_${dateStr}_${timeStr}.mp4';
+    return '${cleanActivityName}_${dateStr}_$timeStr.mp4';
   }
 
   // Guardar el valor de texto en visitDetails
@@ -13578,14 +13413,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     final evaluatedFormula = data['evaluatedFormula'] as String? ?? '';
-    final grandTotal = data['grandTotal'] as double? ?? 0;
 
     if (evaluatedFormula.isEmpty) {
       return const SizedBox.shrink();
     }
-
-    // Obtener fórmula original del default_status
-    final originalFormula = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -14182,7 +14013,7 @@ class _FullScreenNumericKeyboardDialogState
 
 // Diálogo de búsqueda de usuarios de pantalla completa
 class _FullScreenUserSearchDialog extends StatefulWidget {
-  const _FullScreenUserSearchDialog({Key? key}) : super(key: key);
+  const _FullScreenUserSearchDialog();
 
   @override
   State<_FullScreenUserSearchDialog> createState() =>

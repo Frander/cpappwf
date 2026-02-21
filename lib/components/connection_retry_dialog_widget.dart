@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -204,8 +203,8 @@ class _ConnectionRetryDialogWidgetState
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF1A237E).withOpacity(0.95),
-              Color(0xFF0D47A1).withOpacity(0.98),
+              const Color(0xFF1A237E).withValues(alpha: 0.95),
+              const Color(0xFF0D47A1).withValues(alpha: 0.98),
             ],
           ),
         ),
@@ -224,12 +223,12 @@ class _ConnectionRetryDialogWidgetState
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: _hasFailed
-                          ? Colors.red.withOpacity(0.2)
-                          : Colors.white.withOpacity(0.1),
+                          ? Colors.red.withValues(alpha: 0.2)
+                          : Colors.white.withValues(alpha: 0.1),
                       border: Border.all(
                         color: _hasFailed
-                            ? Colors.red.withOpacity(0.5)
-                            : Colors.white.withOpacity(0.3),
+                            ? Colors.red.withValues(alpha: 0.5)
+                            : Colors.white.withValues(alpha: 0.3),
                         width: 3,
                       ),
                     ),
@@ -253,7 +252,7 @@ class _ConnectionRetryDialogWidgetState
                       ? 'Conexión Fallida'
                       : 'Verificando Conexión',
                   style: FlutterFlowTheme.of(context).headlineMedium.override(
-                    font: TextStyle(
+                    font: const TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.bold,
                     ),
@@ -270,7 +269,7 @@ class _ConnectionRetryDialogWidgetState
                   _statusMessage,
                   textAlign: TextAlign.center,
                   style: FlutterFlowTheme.of(context).bodyLarge.override(
-                    font: TextStyle(
+                    font: const TextStyle(
                       fontFamily: 'Roboto',
                       fontWeight: FontWeight.w400,
                     ),
@@ -290,10 +289,10 @@ class _ConnectionRetryDialogWidgetState
                       vertical: 16,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Column(
@@ -301,7 +300,7 @@ class _ConnectionRetryDialogWidgetState
                         Text(
                           'Tiempo restante',
                           style: FlutterFlowTheme.of(context).bodyMedium.override(
-                            font: TextStyle(
+                            font: const TextStyle(
                               fontFamily: 'Roboto',
                               fontWeight: FontWeight.w400,
                             ),
@@ -313,7 +312,7 @@ class _ConnectionRetryDialogWidgetState
                         Text(
                           _formatTime(_remainingSeconds),
                           style: FlutterFlowTheme.of(context).displaySmall.override(
-                            font: TextStyle(
+                            font: const TextStyle(
                               fontFamily: 'Roboto Mono',
                               fontWeight: FontWeight.bold,
                             ),
@@ -332,7 +331,7 @@ class _ConnectionRetryDialogWidgetState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.refresh_rounded,
                         color: Colors.white54,
                         size: 20,
@@ -341,7 +340,7 @@ class _ConnectionRetryDialogWidgetState
                       Text(
                         'Intento #$_retryCount',
                         style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: TextStyle(
+                          font: const TextStyle(
                             fontFamily: 'Roboto',
                             fontWeight: FontWeight.w500,
                           ),
@@ -359,9 +358,9 @@ class _ConnectionRetryDialogWidgetState
                     borderRadius: BorderRadius.circular(8),
                     child: LinearProgressIndicator(
                       value: _isChecking ? null : 1.0,
-                      backgroundColor: Colors.white.withOpacity(0.1),
+                      backgroundColor: Colors.white.withValues(alpha: 0.1),
                       valueColor: AlwaysStoppedAnimation<Color>(
-                        Colors.white.withOpacity(0.5),
+                        Colors.white.withValues(alpha: 0.5),
                       ),
                       minHeight: 4,
                     ),
@@ -373,7 +372,7 @@ class _ConnectionRetryDialogWidgetState
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -391,10 +390,10 @@ class _ConnectionRetryDialogWidgetState
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: Colors.red.withOpacity(0.3),
+                        color: Colors.red.withValues(alpha: 0.3),
                       ),
                     ),
                     child: Column(
@@ -409,7 +408,7 @@ class _ConnectionRetryDialogWidgetState
                           'No fue posible conectar a internet después de $_retryCount intentos durante 5 minutos.',
                           textAlign: TextAlign.center,
                           style: FlutterFlowTheme.of(context).bodyLarge.override(
-                            font: TextStyle(
+                            font: const TextStyle(
                               fontFamily: 'Roboto',
                               fontWeight: FontWeight.w400,
                             ),
@@ -422,7 +421,7 @@ class _ConnectionRetryDialogWidgetState
                           'La aplicación requiere conexión a internet para iniciar por primera vez.',
                           textAlign: TextAlign.center,
                           style: FlutterFlowTheme.of(context).bodyMedium.override(
-                            font: TextStyle(
+                            font: const TextStyle(
                               fontFamily: 'Roboto',
                               fontWeight: FontWeight.w400,
                             ),
@@ -443,7 +442,7 @@ class _ConnectionRetryDialogWidgetState
                         child: FFButtonWidget(
                           onPressed: _retryManually,
                           text: 'Reintentar',
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.refresh_rounded,
                             color: Colors.white,
                             size: 20,
@@ -451,9 +450,9 @@ class _ConnectionRetryDialogWidgetState
                           options: FFButtonOptions(
                             height: 56,
                             padding: const EdgeInsets.symmetric(horizontal: 24),
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             textStyle: FlutterFlowTheme.of(context).titleSmall.override(
-                              font: TextStyle(
+                              font: const TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w600,
                               ),
@@ -462,7 +461,7 @@ class _ConnectionRetryDialogWidgetState
                             ),
                             elevation: 0,
                             borderSide: BorderSide(
-                              color: Colors.white.withOpacity(0.3),
+                              color: Colors.white.withValues(alpha: 0.3),
                               width: 1,
                             ),
                             borderRadius: BorderRadius.circular(16),
@@ -474,7 +473,7 @@ class _ConnectionRetryDialogWidgetState
                         child: FFButtonWidget(
                           onPressed: _closeApp,
                           text: 'Cerrar App',
-                          icon: Icon(
+                          icon: const Icon(
                             Icons.close_rounded,
                             color: Colors.white,
                             size: 20,
@@ -482,9 +481,9 @@ class _ConnectionRetryDialogWidgetState
                           options: FFButtonOptions(
                             height: 56,
                             padding: const EdgeInsets.symmetric(horizontal: 24),
-                            color: Colors.red.withOpacity(0.8),
+                            color: Colors.red.withValues(alpha: 0.8),
                             textStyle: FlutterFlowTheme.of(context).titleSmall.override(
-                              font: TextStyle(
+                              font: const TextStyle(
                                 fontFamily: 'Roboto',
                                 fontWeight: FontWeight.w600,
                               ),
@@ -520,7 +519,7 @@ class _ConnectionRetryDialogWidgetState
           child: Text(
             text,
             style: FlutterFlowTheme.of(context).bodySmall.override(
-              font: TextStyle(
+              font: const TextStyle(
                 fontFamily: 'Roboto',
                 fontWeight: FontWeight.w400,
               ),

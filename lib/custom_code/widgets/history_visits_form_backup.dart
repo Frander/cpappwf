@@ -4679,7 +4679,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
           // 1. Limpiar Location_tracking - SOLO registros >7 días
           final DateTime sevenDaysAgo =
               DateTime.now().subtract(const Duration(days: 7));
-          final String sevenDaysAgoISO = sevenDaysAgo.toUtc().toIso8601String();
+          final String sevenDaysAgoISO = sevenDaysAgo.toIso8601String();
           final deletedTracking = await txn.rawDelete(
               'DELETE FROM Location_tracking WHERE CreatedAt < ?',
               [sevenDaysAgoISO]);

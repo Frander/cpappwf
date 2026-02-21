@@ -681,7 +681,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         ''', [
           userSelected.idCompany, idActivity, idHeadquarter, 0, 0,
           userSelected.idUser, deviceDefault.idDevice, 0,
-          DateTime.now().toUtc().toIso8601String(), mainGPSPoint.battery,
+          DateTime.now().toIso8601String(), mainGPSPoint.battery,
           mainGPSPoint.latitude, mainGPSPoint.longitude, mainGPSPoint.altitude,
           mainGPSPoint.horizontalError, null, 0,
         ]);

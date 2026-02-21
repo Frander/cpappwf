@@ -1,5 +1,3 @@
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 
@@ -60,7 +58,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [
             Color(0xFF102128),
@@ -82,7 +80,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
               mainAxisSize: MainAxisSize.min,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(height: 40),
+                const SizedBox(height: 40),
           // Logo animado
           AnimatedBuilder(
             animation: _pulseController,
@@ -96,7 +94,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0xFF003420).withOpacity(0.3 * _pulseController.value),
+                        color: const Color(0xFF003420).withValues(alpha: 0.3 * _pulseController.value),
                         blurRadius: 30,
                         spreadRadius: 8,
                       ),
@@ -114,7 +112,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
             },
           ),
 
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
 
           // Anillo de carga giratorio
           Stack(
@@ -126,7 +124,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                 height: 90,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
 
@@ -139,7 +137,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                     child: Container(
                       width: 90,
                       height: 90,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: SweepGradient(
                           colors: [
@@ -160,14 +158,14 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
               Container(
                 width: 75,
                 height: 75,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Color(0xFF102128),
                 ),
                 child: Center(
                   child: Text(
                     '${(progress * 100).toInt()}%',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -179,11 +177,11 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
             ],
           ),
 
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
 
           // Barra de progreso
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Column(
               children: [
                 // Texto del paso actual
@@ -192,25 +190,25 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                     letterSpacing: 1.0,
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
 
                 // Barra de progreso
                 Container(
                   height: 8,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(10),
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: LinearProgressIndicator(
                       value: progress,
                       backgroundColor: Colors.transparent,
-                      valueColor: AlwaysStoppedAnimation<Color>(
+                      valueColor: const AlwaysStoppedAnimation<Color>(
                         Color(0xFF00a86b),
                       ),
                     ),
@@ -220,19 +218,19 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
             ),
           ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Mensaje del paso actual con animación de fade
           FadeTransition(
             opacity: _fadeController,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
+              padding: const EdgeInsets.symmetric(horizontal: 40),
               child: Column(
                 children: [
                   Text(
                     widget.stepMessage,
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -240,7 +238,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                       height: 1.3,
                     ),
                   ),
-                  SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
                   // Puntos de carga animados
                   Row(
@@ -252,12 +250,12 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
                           final delay = index * 0.3;
                           final value = (_fadeController.value + delay) % 1.0;
                           return Container(
-                            margin: EdgeInsets.symmetric(horizontal: 4),
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
                             width: 8,
                             height: 8,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: Colors.white.withOpacity(value),
+                              color: Colors.white.withValues(alpha: value),
                             ),
                           );
                         },
@@ -269,11 +267,11 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
             ),
           ),
 
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
 
           // Indicadores de proceso
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 30),
+            padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -300,7 +298,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
               ],
             ),
           ),
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
         ],
             ),
           ),
@@ -318,18 +316,18 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
       mainAxisSize: MainAxisSize.min,
       children: [
         AnimatedContainer(
-          duration: Duration(milliseconds: 300),
+          duration: const Duration(milliseconds: 300),
           width: 42,
           height: 42,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isActive
-                ? Color(0xFF003420)
-                : Colors.white.withOpacity(0.1),
+                ? const Color(0xFF003420)
+                : Colors.white.withValues(alpha: 0.1),
             boxShadow: isActive
                 ? [
                     BoxShadow(
-                      color: Color(0xFF003420).withOpacity(0.4),
+                      color: const Color(0xFF003420).withValues(alpha: 0.4),
                       blurRadius: 12,
                       spreadRadius: 1,
                     ),
@@ -338,11 +336,11 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
           ),
           child: Icon(
             icon,
-            color: isActive ? Colors.white : Colors.white.withOpacity(0.3),
+            color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.3),
             size: 20,
           ),
         ),
-        SizedBox(height: 6),
+        const SizedBox(height: 6),
         Text(
           label,
           style: TextStyle(
@@ -350,7 +348,7 @@ class _SyncLoadingWidgetState extends State<SyncLoadingWidget>
             fontSize: 10,
             color: isActive
                 ? Colors.white
-                : Colors.white.withOpacity(0.3),
+                : Colors.white.withValues(alpha: 0.3),
             fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
           ),
         ),

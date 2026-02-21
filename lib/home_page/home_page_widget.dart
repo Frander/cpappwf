@@ -1,6 +1,5 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import '/components/gps_quality_indicator_widget.dart';
 import '/components/calibration_required_dialog_widget.dart';
 import '/components/modern_calibrate_compass_widget.dart';
@@ -9,14 +8,9 @@ import '/backend/schema/structs/read_geo_struct.dart';
 import 'dart:async';
 import 'dart:math';
 import 'dart:ui';
-import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
-import 'dart:io';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -707,10 +701,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 builder: (calibrateContext) => Dialog(
                   insetPadding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
-                  child: Container(
+                  child: SizedBox(
                     height: MediaQuery.sizeOf(context).height * 0.95,
                     width: MediaQuery.sizeOf(context).width * 0.95,
-                    child: ModernCalibrateCompassWidget(),
+                    child: const ModernCalibrateCompassWidget(),
                   ),
                 ),
               );
@@ -764,7 +758,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
       _searchButtonController.forward();
       _searchCloudController.forward();
       // Auto-focus en el campo de búsqueda
-      Future.delayed(Duration(milliseconds: 300), () {
+      Future.delayed(const Duration(milliseconds: 300), () {
         _model.searchFocusNode?.requestFocus();
       });
     } else {
@@ -810,7 +804,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                   child: Container(
                     width: double.infinity,
                     height: double.infinity,
-                    decoration: BoxDecoration(
+                    decoration: const BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
@@ -829,27 +823,27 @@ class _HomePageWidgetState extends State<HomePageWidget>
                           // 1. Header con identificación de usuario
                           _buildUserHeader(),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // 2. Botones de Información y Sincronización (compactos)
                           _buildInfoSyncButtons(),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // 3. Cuadro de búsqueda con badge de actividad seleccionada
                           _buildSearchSection(),
 
-                          SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
                           // 4. Lista de módulos (5 primeros + "Ver más")
                           _buildModulesList(),
 
-                          SizedBox(height: 20),
+                          const SizedBox(height: 20),
 
                           // 5. Dashboard Agronómico (sin título superior, 2 tabs)
                           _buildDashboard(),
 
-                          SizedBox(height: 100), // Espacio para el botón flotante
+                          const SizedBox(height: 100), // Espacio para el botón flotante
                         ],
                       ),
                     ),
@@ -867,7 +861,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 10,
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           letterSpacing: 0.5,
                         ),
                       ),
@@ -900,31 +894,31 @@ class _HomePageWidgetState extends State<HomePageWidget>
         onTap: () async {
           context.pushNamed('UsersPage');
         },
-        splashColor: Color(0xFF00a86b).withOpacity(0.3),
+        splashColor: const Color(0xFF00a86b).withValues(alpha: 0.3),
         highlightColor: Colors.transparent,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          margin: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 0),
-          padding: EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
+          margin: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 0),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 16, 16, 16),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFF00a86b).withOpacity(0.2),
-                Colors.white.withOpacity(0.05),
+                const Color(0xFF00a86b).withValues(alpha: 0.2),
+                Colors.white.withValues(alpha: 0.05),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Color(0xFF00a86b).withOpacity(0.3),
+              color: const Color(0xFF00a86b).withValues(alpha: 0.3),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: Color(0xFF00a86b).withOpacity(0.3),
+                color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                 blurRadius: 20,
-                offset: Offset(0, 10),
+                offset: const Offset(0, 10),
               ),
             ],
           ),
@@ -940,19 +934,19 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     height: 70,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Color(0xFF003420), // Verde oscuro sólido, sin gradiente
+                      color: const Color(0xFF003420), // Verde oscuro sólido, sin gradiente
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 0.2),
                           blurRadius: 4,
-                          offset: Offset(0, 2),
+                          offset: const Offset(0, 2),
                         ),
                       ],
                     ),
                     child: Center(
                       child: Text(
                         _getUserInitials(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 28,
                           fontWeight: FontWeight.w900,
@@ -963,7 +957,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     ),
                   ),
 
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
 
                   // Información del usuario
                   Expanded(
@@ -976,14 +970,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
                             fontFamily: 'Roboto',
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                             letterSpacing: 0.5,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
                           userName.isNotEmpty ? userName : 'Usuario',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 18,
                             fontWeight: FontWeight.w900,
@@ -993,16 +987,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 6),
                         Container(
-                          padding: EdgeInsetsDirectional.fromSTEB(8, 4, 8, 4),
+                          padding: const EdgeInsetsDirectional.fromSTEB(8, 4, 8, 4),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.3),
+                            color: Colors.black.withValues(alpha: 0.3),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             _lastVisitDate,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontFamily: 'Roboto',
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
@@ -1025,7 +1019,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   Widget _buildInfoSyncButtons() {
     return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
       child: InkWell(
         splashColor: Colors.transparent,
         focusColor: Colors.transparent,
@@ -1035,7 +1029,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
           context.pushNamed(
             InformationPageWidget.routeName,
             extra: <String, dynamic>{
-              kTransitionInfoKey: TransitionInfo(
+              kTransitionInfoKey: const TransitionInfo(
                 hasTransition: true,
                 transitionType: PageTransitionType.bottomToTop,
                 duration: Duration(milliseconds: 600),
@@ -1045,33 +1039,33 @@ class _HomePageWidgetState extends State<HomePageWidget>
         },
         child: Container(
           width: double.infinity,
-          padding: EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 16, 12),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: (FFAppState().visitsAdd.length > 0) ||
-                      (FFAppState().productsAdd.length > 0) ||
-                      (FFAppState().newsSelected.length > 0)
+              colors: (FFAppState().visitsAdd.isNotEmpty) ||
+                      (FFAppState().productsAdd.isNotEmpty) ||
+                      (FFAppState().newsSelected.isNotEmpty)
                   ? [
                       FlutterFlowTheme.of(context).primary,
-                      FlutterFlowTheme.of(context).primary.withOpacity(0.7),
+                      FlutterFlowTheme.of(context).primary.withValues(alpha: 0.7),
                     ]
                   : [
                       FlutterFlowTheme.of(context).orange,
-                      FlutterFlowTheme.of(context).orange.withOpacity(0.7),
+                      FlutterFlowTheme.of(context).orange.withValues(alpha: 0.7),
                     ],
             ),
             boxShadow: [
               BoxShadow(
                 blurRadius: 15,
-                color: ((FFAppState().visitsAdd.length > 0) ||
-                        (FFAppState().productsAdd.length > 0) ||
-                        (FFAppState().newsSelected.length > 0)
+                color: ((FFAppState().visitsAdd.isNotEmpty) ||
+                        (FFAppState().productsAdd.isNotEmpty) ||
+                        (FFAppState().newsSelected.isNotEmpty)
                     ? FlutterFlowTheme.of(context).primary
                     : FlutterFlowTheme.of(context).orange)
-                    .withOpacity(0.4),
-                offset: Offset(0, 6),
+                    .withValues(alpha: 0.4),
+                offset: const Offset(0, 6),
                 spreadRadius: 1,
               )
             ],
@@ -1084,22 +1078,22 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 width: 45,
                 height: 45,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.sync_rounded,
                   color: Colors.white,
                   size: 24,
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Información y sincronización',
                       style: TextStyle(
                         fontFamily: 'Roboto',
@@ -1109,16 +1103,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
                         letterSpacing: 0.5,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
-                      (FFAppState().visitsAdd.length > 0) ||
-                              (FFAppState().productsAdd.length > 0)
+                      (FFAppState().visitsAdd.isNotEmpty) ||
+                              (FFAppState().productsAdd.isNotEmpty)
                           ? 'Hay información pendiente'
                           : 'Sin información pendiente',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontWeight: FontWeight.w500,
-                        color: Colors.white.withOpacity(0.85),
+                        color: Colors.white.withValues(alpha: 0.85),
                         fontSize: 11,
                         letterSpacing: 0.3,
                       ),
@@ -1135,7 +1129,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   Widget _buildSearchSection() {
     return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
       child: Column(
         children: [
           Row(
@@ -1148,9 +1142,9 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     curve: Curves.elasticOut,
                   ),
                   child: Container(
-                    padding: EdgeInsetsDirectional.fromSTEB(12, 8, 12, 8),
+                    padding: const EdgeInsetsDirectional.fromSTEB(12, 8, 12, 8),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [
                           Color(0xFF00ff9f),
                           Color(0xFF00a86b),
@@ -1159,26 +1153,26 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       borderRadius: BorderRadius.circular(12),
                       boxShadow: [
                         BoxShadow(
-                          color: Color(0xFF00ff9f).withOpacity(0.4),
+                          color: const Color(0xFF00ff9f).withValues(alpha: 0.4),
                           blurRadius: 12,
-                          offset: Offset(0, 4),
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.check_circle_rounded,
                           color: Colors.white,
                           size: 18,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: 100),
+                          constraints: const BoxConstraints(maxWidth: 100),
                           child: Text(
                             _selectedActivity!['Name_activity'] as String? ?? '',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontFamily: 'Roboto',
                               fontSize: 12,
                               fontWeight: FontWeight.w900,
@@ -1189,10 +1183,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         InkWell(
                           onTap: _clearSelectedActivity,
-                          child: Icon(
+                          child: const Icon(
                             Icons.close_rounded,
                             color: Colors.white,
                             size: 16,
@@ -1217,7 +1211,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
       left: 0,
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.only(right: 16, bottom: 16),
+          padding: const EdgeInsets.only(right: 16, bottom: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1234,16 +1228,16 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       child: _isSearchExpanded
                           ? Container(
                               width: MediaQuery.of(context).size.width - 32,
-                              constraints: BoxConstraints(maxHeight: 400),
-                              margin: EdgeInsets.only(bottom: 12, left: 16),
+                              constraints: const BoxConstraints(maxHeight: 400),
+                              margin: const EdgeInsets.only(bottom: 12, left: 16),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(28),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF00ff9f).withOpacity(0.3),
+                                color: const Color(0xFF00ff9f).withValues(alpha: 0.3),
                                 blurRadius: 40,
                                 spreadRadius: 5,
-                                offset: Offset(0, 10),
+                                offset: const Offset(0, 10),
                               ),
                             ],
                           ),
@@ -1257,13 +1251,13 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: [
-                                      Colors.black.withOpacity(0.85),
-                                      Color(0xFF001a0f).withOpacity(0.9),
+                                      Colors.black.withValues(alpha: 0.85),
+                                      const Color(0xFF001a0f).withValues(alpha: 0.9),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(28),
                                   border: Border.all(
-                                    color: Color(0xFF00ff9f).withOpacity(0.4),
+                                    color: const Color(0xFF00ff9f).withValues(alpha: 0.4),
                                     width: 2,
                                   ),
                                 ),
@@ -1272,11 +1266,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                   children: [
                                     // Campo de búsqueda
                                     Container(
-                                      padding: EdgeInsets.all(20),
+                                      padding: const EdgeInsets.all(20),
                                       child: TextField(
                                         controller: _model.searchController,
                                         focusNode: _model.searchFocusNode,
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           fontFamily: 'Roboto',
                                           color: Colors.white,
                                           fontSize: 16,
@@ -1286,10 +1280,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                           hintText: 'Buscar actividad...',
                                           hintStyle: TextStyle(
                                             fontFamily: 'Roboto',
-                                            color: Colors.white.withOpacity(0.5),
+                                            color: Colors.white.withValues(alpha: 0.5),
                                             fontSize: 16,
                                           ),
-                                          prefixIcon: Icon(
+                                          prefixIcon: const Icon(
                                             Icons.search_rounded,
                                             color: Color(0xFF00ff9f),
                                             size: 26,
@@ -1298,7 +1292,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                               ? IconButton(
                                                   icon: Icon(
                                                     Icons.clear_rounded,
-                                                    color: Colors.white.withOpacity(0.7),
+                                                    color: Colors.white.withValues(alpha: 0.7),
                                                     size: 22,
                                                   ),
                                                   onPressed: () {
@@ -1310,29 +1304,29 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                                 )
                                               : null,
                                           filled: true,
-                                          fillColor: Colors.white.withOpacity(0.1),
+                                          fillColor: Colors.white.withValues(alpha: 0.1),
                                           border: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(16),
                                             borderSide: BorderSide(
-                                              color: Color(0xFF00ff9f).withOpacity(0.3),
+                                              color: const Color(0xFF00ff9f).withValues(alpha: 0.3),
                                               width: 1.5,
                                             ),
                                           ),
                                           enabledBorder: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(16),
                                             borderSide: BorderSide(
-                                              color: Color(0xFF00ff9f).withOpacity(0.3),
+                                              color: const Color(0xFF00ff9f).withValues(alpha: 0.3),
                                               width: 1.5,
                                             ),
                                           ),
                                           focusedBorder: OutlineInputBorder(
                                             borderRadius: BorderRadius.circular(16),
-                                            borderSide: BorderSide(
+                                            borderSide: const BorderSide(
                                               color: Color(0xFF00ff9f),
                                               width: 2,
                                             ),
                                           ),
-                                          contentPadding: EdgeInsets.symmetric(
+                                          contentPadding: const EdgeInsets.symmetric(
                                             horizontal: 20,
                                             vertical: 16,
                                           ),
@@ -1343,10 +1337,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                     // Resultados de búsqueda
                                     if (_showSearchPreview && _filteredActivities.isNotEmpty)
                                       Container(
-                                        constraints: BoxConstraints(maxHeight: 280),
+                                        constraints: const BoxConstraints(maxHeight: 280),
                                         child: ListView.builder(
                                           shrinkWrap: true,
-                                          padding: EdgeInsets.only(bottom: 16, left: 16, right: 16),
+                                          padding: const EdgeInsets.only(bottom: 16, left: 16, right: 16),
                                           itemCount: _filteredActivities.length > 6
                                               ? 6
                                               : _filteredActivities.length,
@@ -1366,17 +1360,17 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                                 );
                                               },
                                               child: Container(
-                                                margin: EdgeInsets.only(bottom: 8),
+                                                margin: const EdgeInsets.only(bottom: 8),
                                                 decoration: BoxDecoration(
                                                   gradient: LinearGradient(
                                                     colors: [
-                                                      Colors.white.withOpacity(0.08),
-                                                      Colors.white.withOpacity(0.03),
+                                                      Colors.white.withValues(alpha: 0.08),
+                                                      Colors.white.withValues(alpha: 0.03),
                                                     ],
                                                   ),
                                                   borderRadius: BorderRadius.circular(14),
                                                   border: Border.all(
-                                                    color: Color(0xFF00a86b).withOpacity(0.2),
+                                                    color: const Color(0xFF00a86b).withValues(alpha: 0.2),
                                                     width: 1,
                                                   ),
                                                 ),
@@ -1389,14 +1383,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                                       _toggleSearchCloud();
                                                     },
                                                     child: Padding(
-                                                      padding: EdgeInsets.all(14),
+                                                      padding: const EdgeInsets.all(14),
                                                       child: Row(
                                                         children: [
                                                           Container(
                                                             width: 42,
                                                             height: 42,
                                                             decoration: BoxDecoration(
-                                                              gradient: LinearGradient(
+                                                              gradient: const LinearGradient(
                                                                 colors: [
                                                                   Color(0xFF00ff9f),
                                                                   Color(0xFF00a86b),
@@ -1404,17 +1398,17 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                                               ),
                                                               borderRadius: BorderRadius.circular(12),
                                                             ),
-                                                            child: Icon(
+                                                            child: const Icon(
                                                               Icons.work_outline_rounded,
                                                               color: Colors.white,
                                                               size: 22,
                                                             ),
                                                           ),
-                                                          SizedBox(width: 14),
+                                                          const SizedBox(width: 14),
                                                           Expanded(
                                                             child: Text(
                                                               activity['Name_activity'] as String? ?? '',
-                                                              style: TextStyle(
+                                                              style: const TextStyle(
                                                                 fontFamily: 'Roboto',
                                                                 color: Colors.white,
                                                                 fontSize: 15,
@@ -1425,10 +1419,10 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                                               overflow: TextOverflow.ellipsis,
                                                             ),
                                                           ),
-                                                          SizedBox(width: 8),
+                                                          const SizedBox(width: 8),
                                                           Icon(
                                                             Icons.chevron_right_rounded,
-                                                            color: Color(0xFF00ff9f).withOpacity(0.6),
+                                                            color: const Color(0xFF00ff9f).withValues(alpha: 0.6),
                                                             size: 24,
                                                           ),
                                                         ],
@@ -1447,7 +1441,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                             ),
                           ),
                         )
-                      : SizedBox.shrink(),
+                      : const SizedBox.shrink(),
                 ),
               );
             },
@@ -1469,23 +1463,23 @@ class _HomePageWidgetState extends State<HomePageWidget>
                           end: Alignment.bottomRight,
                           colors: _isSearchExpanded
                               ? [
-                                  Color(0xFFff6b6b),
-                                  Color(0xFFee5a6f),
+                                  const Color(0xFFff6b6b),
+                                  const Color(0xFFee5a6f),
                                 ]
                               : [
-                                  Color(0xFF00ff9f),
-                                  Color(0xFF00a86b),
+                                  const Color(0xFF00ff9f),
+                                  const Color(0xFF00a86b),
                                 ],
                         ),
                         boxShadow: [
                           BoxShadow(
                             color: (_isSearchExpanded
-                                    ? Color(0xFFff6b6b)
-                                    : Color(0xFF00ff9f))
-                                .withOpacity(0.5),
+                                    ? const Color(0xFFff6b6b)
+                                    : const Color(0xFF00ff9f))
+                                .withValues(alpha: 0.5),
                             blurRadius: 20,
                             spreadRadius: 2,
-                            offset: Offset(0, 6),
+                            offset: const Offset(0, 6),
                           ),
                         ],
                       ),
@@ -1533,12 +1527,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
     ];
 
     return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título de sección
-          Padding(
+          const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 12),
             child: Text(
               'Módulos rápidos',
@@ -1560,25 +1554,25 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 child: Column(
                   children: [
                     _buildCompactModuleCard(modules[0]),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildCompactModuleCard(modules[2]),
                   ],
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               // Columna derecha: Cosecha + VER MÁS
               Expanded(
                 child: Column(
                   children: [
                     _buildCompactModuleCard(modules[1]),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     // Botón VER MÁS
                     InkWell(
                       onTap: () {
                         context.pushNamed(
                           ModulesPageWidget.routeName,
                           extra: <String, dynamic>{
-                            kTransitionInfoKey: TransitionInfo(
+                            kTransitionInfoKey: const TransitionInfo(
                               hasTransition: true,
                               transitionType: PageTransitionType.fade,
                               duration: Duration(milliseconds: 600),
@@ -1593,17 +1587,17 @@ class _HomePageWidgetState extends State<HomePageWidget>
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFF00a86b).withOpacity(0.3),
-                              Color(0xFF00a86b).withOpacity(0.1),
+                              const Color(0xFF00a86b).withValues(alpha: 0.3),
+                              const Color(0xFF00a86b).withValues(alpha: 0.1),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Color(0xFF00ff9f).withOpacity(0.5),
+                            color: const Color(0xFF00ff9f).withValues(alpha: 0.5),
                             width: 2,
                           ),
                         ),
-                        child: Center(
+                        child: const Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -1654,7 +1648,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
             ),
           }.withoutNulls,
           extra: <String, dynamic>{
-            kTransitionInfoKey: TransitionInfo(
+            kTransitionInfoKey: const TransitionInfo(
               hasTransition: true,
               transitionType: PageTransitionType.bottomToTop,
               duration: Duration(milliseconds: 600),
@@ -1669,13 +1663,13 @@ class _HomePageWidgetState extends State<HomePageWidget>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withOpacity(0.12),
-              Colors.white.withOpacity(0.04),
+              Colors.white.withValues(alpha: 0.12),
+              Colors.white.withValues(alpha: 0.04),
             ],
           ),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: Color(0xFF00a86b).withOpacity(0.25),
+            color: const Color(0xFF00a86b).withValues(alpha: 0.25),
             width: 1.2,
           ),
         ),
@@ -1685,13 +1679,13 @@ class _HomePageWidgetState extends State<HomePageWidget>
             filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Row(
               children: [
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                   ),
                   child: Center(
                     child: ClipRRect(
@@ -1706,11 +1700,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     module['title'] as String,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -1721,7 +1715,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
               ],
             ),
           ),
@@ -1733,19 +1727,19 @@ class _HomePageWidgetState extends State<HomePageWidget>
   Widget _buildDashboard() {
     if (_activityMetrics.isEmpty) {
       return Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
+        padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
         child: Container(
           height: 200,
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.03),
+                Colors.white.withValues(alpha: 0.1),
+                Colors.white.withValues(alpha: 0.03),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Color(0xFF00a86b).withOpacity(0.3),
+              color: const Color(0xFF00a86b).withValues(alpha: 0.3),
               width: 1.5,
             ),
           ),
@@ -1754,7 +1748,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
               'Sin actividades registradas',
               style: TextStyle(
                 fontFamily: 'Roboto',
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 14,
               ),
             ),
@@ -1764,12 +1758,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
     }
 
     return Padding(
-      padding: EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 16, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Título
-          Padding(
+          const Padding(
             padding: EdgeInsets.only(left: 4, bottom: 12),
             child: Text(
               'Resumen de Actividades',
@@ -1803,19 +1797,19 @@ class _HomePageWidgetState extends State<HomePageWidget>
           // Indicadores de página
           if (_activityMetrics.length > 1)
             Padding(
-              padding: EdgeInsets.only(top: 12),
+              padding: const EdgeInsets.only(top: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: List.generate(_activityMetrics.length, (index) {
                   return Container(
-                    margin: EdgeInsets.symmetric(horizontal: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
                     width: _currentCarouselIndex == index ? 24 : 8,
                     height: 8,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(4),
                       color: _currentCarouselIndex == index
-                          ? Color(0xFF00ff9f)
-                          : Colors.white.withOpacity(0.3),
+                          ? const Color(0xFF00ff9f)
+                          : Colors.white.withValues(alpha: 0.3),
                     ),
                   );
                 }),
@@ -1828,31 +1822,31 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   Widget _buildActivityCard(_ActivityMetrics activity) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF1A3A2E).withOpacity(0.9),
-            Color(0xFF0D1F17).withOpacity(0.95),
+            const Color(0xFF1A3A2E).withValues(alpha: 0.9),
+            const Color(0xFF0D1F17).withValues(alpha: 0.95),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Color(0xFF00FF7F).withOpacity(0.3),
+          color: const Color(0xFF00FF7F).withValues(alpha: 0.3),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: Color(0xFF00FF7F).withOpacity(0.15),
+            color: const Color(0xFF00FF7F).withValues(alpha: 0.15),
             blurRadius: 15,
             spreadRadius: 1,
           ),
         ],
       ),
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1860,24 +1854,24 @@ class _HomePageWidgetState extends State<HomePageWidget>
             Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
                     ),
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.agriculture,
                     color: Colors.white,
                     size: 20,
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     activity.activityName,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -1890,7 +1884,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
               ],
             ),
 
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
 
             // Métricas compactas + Gráfico de torta
             Expanded(
@@ -1904,18 +1898,18 @@ class _HomePageWidgetState extends State<HomePageWidget>
                         'Visitas',
                         activity.totalVisits.toString(),
                         Icons.location_on,
-                        Color(0xFF00B4D8),
+                        const Color(0xFF00B4D8),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       _buildCompactMetric(
                         activity.unityLabel,
                         activity.totalResults.toString(),
                         Icons.fact_check,
-                        Color(0xFF00C853),
+                        const Color(0xFF00C853),
                       ),
                     ],
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   // Gráfico de torta
                   Expanded(
                     child: _buildPieChart(
@@ -1927,33 +1921,33 @@ class _HomePageWidgetState extends State<HomePageWidget>
               ),
             ),
 
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
 
             // Rango de fechas
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.3),
+                color: Colors.black.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Color(0xFF00a86b).withOpacity(0.3),
+                  color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.calendar_today,
                     color: Color(0xFF00ff9f),
                     size: 12,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
                     _formatDateRange(activity.firstDate, activity.lastDate),
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 10,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1969,18 +1963,18 @@ class _HomePageWidgetState extends State<HomePageWidget>
   Widget _buildCompactMetric(String label, String value, IconData icon, Color color) {
     return Container(
       width: 110,
-      padding: EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
         children: [
           Icon(icon, color: color, size: 20),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1998,7 +1992,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 10,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -2017,7 +2011,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
           'Sin datos',
           style: TextStyle(
             fontFamily: 'Roboto',
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
             fontSize: 12,
           ),
         ),
@@ -2032,8 +2026,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
           painter: _PieChartPainter(
             visits: visits,
             results: results,
-            visitColor: Color(0xFF00B4D8),
-            resultColor: Color(0xFF00C853),
+            visitColor: const Color(0xFF00B4D8),
+            resultColor: const Color(0xFF00C853),
           ),
           child: Center(
             child: Column(
@@ -2041,7 +2035,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
               children: [
                 Text(
                   total.toString(),
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
@@ -2053,7 +2047,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 10,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -2097,14 +2091,14 @@ class _PieChartPainter extends CustomPainter {
 
     final center = Offset(size.width / 2, size.height / 2);
     final radius = size.width / 2 - 10;
-    final strokeWidth = 20.0;
+    const strokeWidth = 20.0;
 
     final visitAngle = (visits / total) * 2 * 3.14159;
     final resultAngle = (results / total) * 2 * 3.14159;
 
     // Fondo del anillo
     final bgPaint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withValues(alpha: 0.1)
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, bgPaint);

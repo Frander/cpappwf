@@ -58,7 +58,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       // Paso 1: Obteniendo ID del dispositivo
       _updateProgress(1, 'Identificando dispositivo...');
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
 
       _model.identifierCTR = await actions.getPersistentId(
         context,
@@ -134,7 +134,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         context.pushNamed(
           LoginPageWidget.routeName,
           extra: <String, dynamic>{
-            kTransitionInfoKey: TransitionInfo(
+            kTransitionInfoKey: const TransitionInfo(
               hasTransition: true,
               transitionType: PageTransitionType.fade,
               duration: Duration(milliseconds: 1000),
@@ -182,7 +182,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           if ((_model.apiResultLoginDirect?.succeeded ?? true)) {
             // Paso 4: Sincronizando datos
             _updateProgress(4, 'Sincronizando información del usuario...');
-            await Future.delayed(Duration(milliseconds: 400));
+            await Future.delayed(const Duration(milliseconds: 400));
 
             try {
               _model.pathDBSQLite = await actions.validateDbSqlite(
@@ -296,7 +296,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             context.pushNamed(
               LoginPageWidget.routeName,
               extra: <String, dynamic>{
-                kTransitionInfoKey: TransitionInfo(
+                kTransitionInfoKey: const TransitionInfo(
                   hasTransition: true,
                   transitionType: PageTransitionType.fade,
                   duration: Duration(milliseconds: 1000),
@@ -330,7 +330,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       elevation: 0,
                       insetPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
-                      child: Container(
+                      child: SizedBox(
                         width: MediaQuery.sizeOf(context).width,
                         height: MediaQuery.sizeOf(context).height,
                         child: SupervisorCodeKeyboardWidget(
@@ -353,7 +353,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 context: context,
                 barrierDismissible: false,
                 builder: (loadingContext) {
-                  return Dialog(
+                  return const Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
@@ -395,10 +395,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                           elevation: 0,
                           insetPadding: EdgeInsets.zero,
                           backgroundColor: Colors.transparent,
-                          child: Container(
+                          child: SizedBox(
                             height: MediaQuery.sizeOf(context).height * 0.6,
                             width: MediaQuery.sizeOf(context).width * 0.8,
-                            child: InfoDialogWidget(
+                            child: const InfoDialogWidget(
                               info: 'Error al obtener información de la empresa. Intente nuevamente.',
                             ),
                           ),
@@ -416,10 +416,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         elevation: 0,
                         insetPadding: EdgeInsets.zero,
                         backgroundColor: Colors.transparent,
-                        child: Container(
+                        child: SizedBox(
                           height: MediaQuery.sizeOf(context).height * 0.6,
                           width: MediaQuery.sizeOf(context).width * 0.8,
-                          child: InfoDialogWidget(
+                          child: const InfoDialogWidget(
                             info: 'El código ingresado no corresponde a un supervisor válido. Intente nuevamente.',
                           ),
                         ),
@@ -440,7 +440,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       elevation: 0,
                       insetPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
-                      child: Container(
+                      child: SizedBox(
                         height: MediaQuery.sizeOf(context).height * 0.6,
                         width: MediaQuery.sizeOf(context).width * 0.8,
                         child: InfoDialogWidget(
@@ -465,7 +465,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    child: Container(
+                    child: SizedBox(
                       width: MediaQuery.sizeOf(context).width,
                       height: MediaQuery.sizeOf(context).height,
                       child: DeviceSelectionGridWidget(
@@ -488,7 +488,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   child: SizedBox(
                                     width: MediaQuery.sizeOf(context).width,
                                     height: MediaQuery.sizeOf(context).height,
-                                    child: SyncLoadingWidget(
+                                    child: const SyncLoadingWidget(
                                       stepMessage: 'Iniciando sesión...',
                                       currentStep: 1,
                                       totalSteps: 1,
@@ -504,19 +504,19 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               username: device.imeI1,
                             );
 
-                            if (loginResult.succeeded ?? false) {
+                            if (loginResult.succeeded) {
                               // Sincronizar datos
                               final pathDB = await actions.validateDbSqlite(context);
                               await actions.syncLogin(
                                 context,
-                                device.imeI1!,
-                                device.imeI1!,
+                                device.imeI1,
+                                device.imeI1,
                                 getJsonField(loginResult.jsonBody ?? '', r'''$'''),
                               );
 
                               // Actualizar FFAppState
                               FFAppState().pathDatabase = pathDB!;
-                              FFAppState().androidID = device.imeI1!;
+                              FFAppState().androidID = device.imeI1;
                               FFAppState().loginResponse = getJsonField(loginResult.jsonBody ?? '', r'''$''');
                               FFAppState().userSelected = UsersStruct.maybeFromMap(
                                 getJsonField(loginResult.jsonBody ?? '', r'''$.user_default'''))!;
@@ -573,7 +573,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               context.pushNamed(
                                 LoginPageWidget.routeName,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.fade,
                                     duration: Duration(milliseconds: 1000),
@@ -586,7 +586,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 navigator.pop(); // Cerrar loading
                               }
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                                const SnackBar(
                                   content: Text('Error al iniciar sesión con el dispositivo seleccionado'),
                                   backgroundColor: Colors.red,
                                 ),
@@ -605,7 +605,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               SnackBar(
                                 content: Text('Error: $e'),
                                 backgroundColor: Colors.red,
-                                duration: Duration(seconds: 5),
+                                duration: const Duration(seconds: 5),
                               ),
                             );
                           }
@@ -665,7 +665,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   context: context,
                   barrierDismissible: false,
                   builder: (loadingContext) {
-                    return Dialog(
+                    return const Dialog(
                       elevation: 0,
                       insetPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
@@ -696,7 +696,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                     Navigator.pop(context);
                   }
 
-                  if (createDeviceResponse?.succeeded ?? false) {
+                  if (createDeviceResponse.succeeded) {
                     // Guardar el IMEI persistentemente
                     await actions.savePersistentId(
                       context,
@@ -708,7 +708,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       context: context,
                       barrierDismissible: false,
                       builder: (loadingContext) {
-                        return Dialog(
+                        return const Dialog(
                           elevation: 0,
                           insetPadding: EdgeInsets.zero,
                           backgroundColor: Colors.transparent,
@@ -829,7 +829,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       context.pushNamed(
                         LoginPageWidget.routeName,
                         extra: <String, dynamic>{
-                          kTransitionInfoKey: TransitionInfo(
+                          kTransitionInfoKey: const TransitionInfo(
                             hasTransition: true,
                             transitionType: PageTransitionType.fade,
                             duration: Duration(milliseconds: 1000),
@@ -849,10 +849,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                             elevation: 0,
                             insetPadding: EdgeInsets.zero,
                             backgroundColor: Colors.transparent,
-                            child: Container(
+                            child: SizedBox(
                               height: MediaQuery.sizeOf(context).height * 0.4,
                               width: MediaQuery.sizeOf(context).width * 0.8,
-                              child: InfoDialogWidget(
+                              child: const InfoDialogWidget(
                                 info: 'Error al iniciar sesión con el nuevo dispositivo.',
                               ),
                             ),
@@ -869,10 +869,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                           elevation: 0,
                           insetPadding: EdgeInsets.zero,
                           backgroundColor: Colors.transparent,
-                          child: Container(
+                          child: SizedBox(
                             height: MediaQuery.sizeOf(context).height * 0.4,
                             width: MediaQuery.sizeOf(context).width * 0.8,
-                            child: InfoDialogWidget(
+                            child: const InfoDialogWidget(
                               info: 'Error al registrar el dispositivo. Intente nuevamente.',
                             ),
                           ),
@@ -893,7 +893,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         elevation: 0,
                         insetPadding: EdgeInsets.zero,
                         backgroundColor: Colors.transparent,
-                        child: Container(
+                        child: SizedBox(
                           height: MediaQuery.sizeOf(context).height * 0.4,
                           width: MediaQuery.sizeOf(context).width * 0.8,
                           child: InfoDialogWidget(
@@ -921,17 +921,17 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   elevation: 0,
                   insetPadding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
-                  alignment: AlignmentDirectional(0.0, 0.0)
+                  alignment: const AlignmentDirectional(0.0, 0.0)
                       .resolve(Directionality.of(context)),
                   child: GestureDetector(
                     onTap: () {
                       FocusScope.of(dialogContext).unfocus();
                       FocusManager.instance.primaryFocus?.unfocus();
                     },
-                    child: Container(
+                    child: SizedBox(
                       height: MediaQuery.sizeOf(context).height * 0.6,
                       width: MediaQuery.sizeOf(context).width * 0.9,
-                      child: InfoDialogWidget(
+                      child: const InfoDialogWidget(
                         info:
                             '⚠️ CONEXIÓN REQUERIDA\n\nNo se detectó conexión a internet y es necesaria para sincronizar.\n\nPor favor:\n1. Active WiFi o datos móviles\n2. Verifique que tenga una buena señal\n3. Cierre y vuelva a abrir la aplicación',
                       ),
@@ -947,7 +947,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       } else {
         // Paso 2: Verificando conexión a internet
         _updateProgress(2, 'Verificando conexión a internet...');
-        await Future.delayed(Duration(milliseconds: 400));
+        await Future.delayed(const Duration(milliseconds: 400));
 
         _model.connectionJSON = await actions.checkInternetQuality();
         if (functions.jsonDynamicToBool(getJsonField(
@@ -957,7 +957,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             true) {
           // Paso 3: Buscando dispositivo en el sistema
           _updateProgress(3, 'Buscando dispositivo en el sistema...');
-          await Future.delayed(Duration(milliseconds: 400));
+          await Future.delayed(const Duration(milliseconds: 400));
 
           _model.apiResultDevices =
               await APIClickPalmGroup.devicesFiltersGETCall.call(
@@ -971,7 +971,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
           if ((_model.apiResultDevices?.statusCode ?? 200) == 200) {
             // Paso 4: Realizando login
             _updateProgress(4, 'Iniciando sesión de forma segura...');
-            await Future.delayed(Duration(milliseconds: 400));
+            await Future.delayed(const Duration(milliseconds: 400));
 
             _model.apiResultLoginDirect =
                 await APIClickPalmGroup.usersLoginPOSTCall.call(
@@ -982,7 +982,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             if ((_model.apiResultLoginDirect?.succeeded ?? true)) {
               // Paso 5: Sincronizando datos
               _updateProgress(5, 'Sincronizando información del usuario...');
-              await Future.delayed(Duration(milliseconds: 400));
+              await Future.delayed(const Duration(milliseconds: 400));
 
               _model.pathDBSQLite = await actions.validateDbSqlite(
                 context,
@@ -1079,7 +1079,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               context.pushNamed(
                 LoginPageWidget.routeName,
                 extra: <String, dynamic>{
-                  kTransitionInfoKey: TransitionInfo(
+                  kTransitionInfoKey: const TransitionInfo(
                     hasTransition: true,
                     transitionType: PageTransitionType.fade,
                     duration: Duration(milliseconds: 1000),
@@ -1096,17 +1096,17 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    alignment: AlignmentDirectional(0.0, 0.0)
+                    alignment: const AlignmentDirectional(0.0, 0.0)
                         .resolve(Directionality.of(context)),
                     child: GestureDetector(
                       onTap: () {
                         FocusScope.of(dialogContext).unfocus();
                         FocusManager.instance.primaryFocus?.unfocus();
                       },
-                      child: Container(
+                      child: SizedBox(
                         height: MediaQuery.sizeOf(context).height * 0.6,
                         width: MediaQuery.sizeOf(context).width * 0.6,
-                        child: InfoDialogWidget(
+                        child: const InfoDialogWidget(
                           info:
                               'Error encontrando los datos intentalo de nuevo cuando tengas internet!',
                         ),
@@ -1148,7 +1148,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       elevation: 0,
                       insetPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
-                      child: Container(
+                      child: SizedBox(
                         width: MediaQuery.sizeOf(context).width,
                         height: MediaQuery.sizeOf(context).height,
                         child: DeviceSelectionGridWidget(
@@ -1159,14 +1159,14 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
                               // Paso 3: Configurando dispositivo seleccionado
                               _updateProgress(3, 'Configurando dispositivo seleccionado...');
-                              await Future.delayed(Duration(milliseconds: 400));
+                              await Future.delayed(const Duration(milliseconds: 400));
 
                               // Guardar el dispositivo seleccionado en AppState
                               FFAppState().deviceDefault = selectedDevice;
 
                               // Paso 4: Iniciando sesión
                               _updateProgress(4, 'Iniciando sesión de forma segura...');
-                              await Future.delayed(Duration(milliseconds: 400));
+                              await Future.delayed(const Duration(milliseconds: 400));
 
                               // Usar el IMEI real para login, no el ID del dispositivo
                               String loginIdentifier = selectedDevice.imeI1.isNotEmpty
@@ -1193,7 +1193,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               if ((_model.apiResultLoginDirect?.succeeded ?? false)) {
                               // Paso 5: Sincronizando información
                               _updateProgress(5, 'Sincronizando información del usuario...');
-                              await Future.delayed(Duration(milliseconds: 400));
+                              await Future.delayed(const Duration(milliseconds: 400));
 
                               _model.pathDBSQLite = await actions.validateDbSqlite(
                                 context,
@@ -1296,7 +1296,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               context.pushNamed(
                                 LoginPageWidget.routeName,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.fade,
                                     duration: Duration(milliseconds: 1000),
@@ -1308,7 +1308,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               debugPrint('❌ Error en login - succeeded: false');
                               Navigator.pop(dialogContext);
                               ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
+                                const SnackBar(
                                   content: Text('Error al iniciar sesión con el dispositivo seleccionado'),
                                   backgroundColor: Colors.red,
                                 ),
@@ -1322,7 +1322,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 SnackBar(
                                   content: Text('Error: $e'),
                                   backgroundColor: Colors.red,
-                                  duration: Duration(seconds: 5),
+                                  duration: const Duration(seconds: 5),
                                 ),
                               );
                             }
@@ -1356,7 +1356,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                             elevation: 0,
                             insetPadding: EdgeInsets.zero,
                             backgroundColor: Colors.transparent,
-                            child: Container(
+                            child: SizedBox(
                               width: MediaQuery.sizeOf(context).width,
                               height: MediaQuery.sizeOf(context).height,
                               child: SupervisorCodeKeyboardWidget(
@@ -1380,7 +1380,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       context: context,
                       barrierDismissible: false,
                       builder: (loadingContext) {
-                        return Dialog(
+                        return const Dialog(
                           elevation: 0,
                           insetPadding: EdgeInsets.zero,
                           backgroundColor: Colors.transparent,
@@ -1419,11 +1419,11 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 elevation: 0,
                                 insetPadding: EdgeInsets.zero,
                                 backgroundColor: Colors.transparent,
-                                child: Container(
+                                child: SizedBox(
                                   height:
                                       MediaQuery.sizeOf(context).height * 0.6,
                                   width: MediaQuery.sizeOf(context).width * 0.8,
-                                  child: InfoDialogWidget(
+                                  child: const InfoDialogWidget(
                                     info:
                                         'Error al obtener información de la empresa. Intente nuevamente.',
                                   ),
@@ -1448,10 +1448,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               elevation: 0,
                               insetPadding: EdgeInsets.zero,
                               backgroundColor: Colors.transparent,
-                              child: Container(
+                              child: SizedBox(
                                 height: MediaQuery.sizeOf(context).height * 0.6,
                                 width: MediaQuery.sizeOf(context).width * 0.8,
-                                child: InfoDialogWidget(
+                                child: const InfoDialogWidget(
                                   info:
                                       'El código ingresado no corresponde a un supervisor válido. Intente nuevamente.',
                                 ),
@@ -1474,7 +1474,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                             elevation: 0,
                             insetPadding: EdgeInsets.zero,
                             backgroundColor: Colors.transparent,
-                            child: Container(
+                            child: SizedBox(
                               height: MediaQuery.sizeOf(context).height * 0.6,
                               width: MediaQuery.sizeOf(context).width * 0.8,
                               child: InfoDialogWidget(
@@ -1533,7 +1533,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                             context: context,
                             barrierDismissible: false,
                             builder: (loadingContext) {
-                              return Dialog(
+                              return const Dialog(
                                 elevation: 0,
                                 insetPadding: EdgeInsets.zero,
                                 backgroundColor: Colors.transparent,
@@ -1564,7 +1564,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               Navigator.pop(context);
                             }
 
-                            if (createDeviceResponse?.succeeded ?? false) {
+                            if (createDeviceResponse.succeeded) {
                               // Guardar el IMEI persistentemente
                               await actions.savePersistentId(
                                 context,
@@ -1573,7 +1573,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
 
                               // Paso 4: Registrando dispositivo
                               _updateProgress(4, 'Iniciando sesión...');
-                              await Future.delayed(Duration(milliseconds: 400));
+                              await Future.delayed(const Duration(milliseconds: 400));
 
                               // Hacer login con el nuevo dispositivo
                               _model.apiResultLoginRegister =
@@ -1589,7 +1589,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 _updateProgress(
                                     5, 'Sincronizando información...');
                                 await Future.delayed(
-                                    Duration(milliseconds: 400));
+                                    const Duration(milliseconds: 400));
 
                                 _model.pathDBSQLiteRegister =
                                     await actions.validateDbSqlite(
@@ -1703,7 +1703,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 context.pushNamed(
                                   LoginPageWidget.routeName,
                                   extra: <String, dynamic>{
-                                    kTransitionInfoKey: TransitionInfo(
+                                    kTransitionInfoKey: const TransitionInfo(
                                       hasTransition: true,
                                       transitionType: PageTransitionType.fade,
                                       duration: Duration(milliseconds: 1000),
@@ -1720,14 +1720,14 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      child: Container(
+                                      child: SizedBox(
                                         height: MediaQuery.sizeOf(context)
                                                 .height *
                                             0.6,
                                         width:
                                             MediaQuery.sizeOf(context).width *
                                                 0.8,
-                                        child: InfoDialogWidget(
+                                        child: const InfoDialogWidget(
                                           info:
                                               'Error al iniciar sesión con el nuevo dispositivo',
                                         ),
@@ -1745,13 +1745,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                     elevation: 0,
                                     insetPadding: EdgeInsets.zero,
                                     backgroundColor: Colors.transparent,
-                                    child: Container(
+                                    child: SizedBox(
                                       height:
                                           MediaQuery.sizeOf(context).height *
                                               0.6,
                                       width: MediaQuery.sizeOf(context).width *
                                           0.8,
-                                      child: InfoDialogWidget(
+                                      child: const InfoDialogWidget(
                                         info:
                                             'Error al registrar el dispositivo. Intente nuevamente.',
                                       ),
@@ -1774,7 +1774,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   elevation: 0,
                                   insetPadding: EdgeInsets.zero,
                                   backgroundColor: Colors.transparent,
-                                  child: Container(
+                                  child: SizedBox(
                                     height:
                                         MediaQuery.sizeOf(context).height * 0.6,
                                     width:
@@ -1807,17 +1807,17 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   elevation: 0,
                   insetPadding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
-                  alignment: AlignmentDirectional(0.0, 0.0)
+                  alignment: const AlignmentDirectional(0.0, 0.0)
                       .resolve(Directionality.of(context)),
                   child: GestureDetector(
                     onTap: () {
                       FocusScope.of(dialogContext).unfocus();
                       FocusManager.instance.primaryFocus?.unfocus();
                     },
-                    child: Container(
+                    child: SizedBox(
                       height: MediaQuery.sizeOf(context).height * 0.6,
                       width: MediaQuery.sizeOf(context).width * 0.9,
-                      child: InfoDialogWidget(
+                      child: const InfoDialogWidget(
                         info:
                             '⚠️ CONEXIÓN REQUERIDA\n\nNo se detectó conexión a internet y es necesaria para inicializar el dispositivo por primera vez.\n\nPor favor:\n1. Active WiFi o datos móviles\n2. Verifique que tenga una buena señal\n3. Cierre y vuelva a abrir la aplicación\n\nNO PUEDE CONTINUAR sin conexión a internet.',
                       ),
@@ -1869,7 +1869,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               elevation: 0,
               insetPadding: EdgeInsets.zero,
               backgroundColor: Colors.transparent,
-              child: Container(
+              child: SizedBox(
                 width: MediaQuery.sizeOf(context).width,
                 height: MediaQuery.sizeOf(context).height,
                 child: SupervisorCodeKeyboardWidget(
@@ -1896,7 +1896,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
         context: context,
         barrierDismissible: false,
         builder: (dialogContext) {
-          return Dialog(
+          return const Dialog(
             elevation: 0,
             insetPadding: EdgeInsets.zero,
             backgroundColor: Colors.transparent,
@@ -1935,10 +1935,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   elevation: 0,
                   insetPadding: EdgeInsets.zero,
                   backgroundColor: Colors.transparent,
-                  child: Container(
+                  child: SizedBox(
                     height: MediaQuery.sizeOf(context).height * 0.6,
                     width: MediaQuery.sizeOf(context).width * 0.8,
-                    child: InfoDialogWidget(
+                    child: const InfoDialogWidget(
                       info: 'Error al obtener información de la empresa. Intente nuevamente.',
                     ),
                   ),
@@ -1968,10 +1968,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 elevation: 0,
                 insetPadding: EdgeInsets.zero,
                 backgroundColor: Colors.transparent,
-                child: Container(
+                child: SizedBox(
                   height: MediaQuery.sizeOf(context).height * 0.6,
                   width: MediaQuery.sizeOf(context).width * 0.8,
-                  child: InfoDialogWidget(
+                  child: const InfoDialogWidget(
                     info: 'El código ingresado no corresponde a un supervisor válido. Intente nuevamente.',
                   ),
                 ),
@@ -1995,7 +1995,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               elevation: 0,
               insetPadding: EdgeInsets.zero,
               backgroundColor: Colors.transparent,
-              child: Container(
+              child: SizedBox(
                 height: MediaQuery.sizeOf(context).height * 0.6,
                 width: MediaQuery.sizeOf(context).width * 0.8,
                 child: InfoDialogWidget(
@@ -2256,7 +2256,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         style: TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 10,
-                          color: Colors.white.withOpacity(0.3),
+                          color: Colors.white.withValues(alpha: 0.3),
                           letterSpacing: 0.5,
                         ),
                       ),

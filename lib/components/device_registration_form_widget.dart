@@ -1,5 +1,3 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 
 import 'dart:math' as math;
@@ -63,7 +61,7 @@ class _DeviceRegistrationFormWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -77,13 +75,13 @@ class _DeviceRegistrationFormWidgetState
       child: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: EdgeInsets.all(24.0),
+            padding: const EdgeInsets.all(24.0),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Icono animado con shimmer
                   Center(
@@ -104,7 +102,7 @@ class _DeviceRegistrationFormWidgetState
                                   gradient: SweepGradient(
                                     colors: [
                                       Colors.transparent,
-                                      Color(0xFF00a86b).withOpacity(0.3),
+                                      const Color(0xFF00a86b).withValues(alpha: 0.3),
                                       Colors.transparent,
                                     ],
                                   ),
@@ -118,7 +116,7 @@ class _DeviceRegistrationFormWidgetState
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               colors: [
                                 Color(0xFF003420),
                                 Color(0xFF00a86b),
@@ -127,13 +125,13 @@ class _DeviceRegistrationFormWidgetState
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF00a86b).withOpacity(0.5),
+                                color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                                 blurRadius: 30,
                                 spreadRadius: 5,
                               ),
                             ],
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.add_circle_outline,
                             size: 50,
                             color: Colors.white,
@@ -143,10 +141,10 @@ class _DeviceRegistrationFormWidgetState
                     ),
                   ),
 
-                  SizedBox(height: 32),
+                  const SizedBox(height: 32),
 
                   // Título
-                  Text(
+                  const Text(
                     'Registrar Nuevo Dispositivo',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 28,
@@ -157,19 +155,19 @@ class _DeviceRegistrationFormWidgetState
                     textAlign: TextAlign.center,
                   ),
 
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
                   Text(
                     'Complete la información para registrar el dispositivo CTR',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       height: 1.4,
                     ),
                     textAlign: TextAlign.center,
                   ),
 
-                  SizedBox(height: 40),
+                  const SizedBox(height: 40),
 
                   // Información del dispositivo (solo lectura)
                   _buildInfoCard(
@@ -181,7 +179,7 @@ class _DeviceRegistrationFormWidgetState
                     ],
                   ),
 
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   // Formulario editable
                   _buildInfoCard(
@@ -203,7 +201,7 @@ class _DeviceRegistrationFormWidgetState
                           return null;
                         },
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
                       _buildTextField(
                         controller: _cellPhoneController,
                         label: 'Número de Teléfono (Opcional)',
@@ -215,7 +213,7 @@ class _DeviceRegistrationFormWidgetState
                     ],
                   ),
 
-                  SizedBox(height: 40),
+                  const SizedBox(height: 40),
 
                   // Botón de registro
                   InkWell(
@@ -238,7 +236,7 @@ class _DeviceRegistrationFormWidgetState
                             width: double.infinity,
                             height: 60,
                             decoration: BoxDecoration(
-                              gradient: LinearGradient(
+                              gradient: const LinearGradient(
                                 colors: [
                                   Color(0xFF004629),
                                   Color(0xFF00a86b),
@@ -247,14 +245,14 @@ class _DeviceRegistrationFormWidgetState
                               borderRadius: BorderRadius.circular(16),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Color(0xFF00a86b).withOpacity(0.5),
+                                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                                   blurRadius: 20,
                                   spreadRadius: 2,
-                                  offset: Offset(0, 8),
+                                  offset: const Offset(0, 8),
                                 ),
                               ],
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
@@ -280,7 +278,7 @@ class _DeviceRegistrationFormWidgetState
                     ),
                   ),
 
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
                 ],
               ),
             ),
@@ -293,12 +291,12 @@ class _DeviceRegistrationFormWidgetState
   Widget _buildInfoCard(String title, List<Widget> children) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -307,13 +305,13 @@ class _DeviceRegistrationFormWidgetState
         children: [
           Text(
             title,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Color(0xFF00a86b),
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           ...children,
         ],
       ),
@@ -322,23 +320,23 @@ class _DeviceRegistrationFormWidgetState
 
   Widget _buildReadOnlyField(String label, String value, IconData icon) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
           Container(
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Color(0xFF00a86b).withOpacity(0.2),
+              color: const Color(0xFF00a86b).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               icon,
-              color: Color(0xFF00a86b),
+              color: const Color(0xFF00a86b),
               size: 20,
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,13 +345,13 @@ class _DeviceRegistrationFormWidgetState
                   label,
                   style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   value,
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -385,14 +383,14 @@ class _DeviceRegistrationFormWidgetState
           children: [
             Text(
               label,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),
             ),
             if (isRequired)
-              Text(
+              const Text(
                 ' *',
                 style: TextStyle(
                   color: Colors.red,
@@ -401,59 +399,59 @@ class _DeviceRegistrationFormWidgetState
               ),
           ],
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         TextFormField(
           controller: controller,
           keyboardType: keyboardType,
-          style: TextStyle(fontFamily: 'Roboto',
+          style: const TextStyle(fontFamily: 'Roboto',
             color: Colors.white,
             fontSize: 15,
           ),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(fontFamily: 'Roboto',
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
             ),
             prefixIcon: Icon(
               icon,
-              color: Color(0xFF00a86b),
+              color: const Color(0xFF00a86b),
               size: 22,
             ),
             filled: true,
-            fillColor: Colors.white.withOpacity(0.05),
+            fillColor: Colors.white.withValues(alpha: 0.05),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
               ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
               ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
+              borderSide: const BorderSide(
                 color: Color(0xFF00a86b),
                 width: 2,
               ),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
+              borderSide: const BorderSide(
                 color: Colors.red,
               ),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
+              borderSide: const BorderSide(
                 color: Colors.red,
                 width: 2,
               ),
             ),
-            contentPadding: EdgeInsets.symmetric(
+            contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 16,
             ),

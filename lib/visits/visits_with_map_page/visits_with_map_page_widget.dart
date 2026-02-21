@@ -1,11 +1,7 @@
-import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/visits/do_visits_form_page/do_visits_form_page_widget.dart';
 import '/custom_code/widgets/index.dart' as custom_widgets;
-import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -85,7 +81,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
           child: Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -108,10 +104,10 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                     controller: _tabController,
                     physics: widget.isMapEnabled
                         ? null
-                        : NeverScrollableScrollPhysics(),
+                        : const NeverScrollableScrollPhysics(),
                     children: [
                       // Tab 1: Formulario
-                      DoVisitsFormPageWidget(),
+                      const DoVisitsFormPageWidget(),
                       
                       // Tab 2: Brújula
                       Container(
@@ -132,7 +128,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                       
                       // Tab 3: Mapa
                       widget.isMapEnabled
-                          ? Container(
+                          ? SizedBox(
                               width: double.infinity,
                               height: double.infinity,
                               child: custom_widgets.OfflineMapTrackerVisits(
@@ -166,7 +162,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF00a86b).withValues(alpha: 0.2),
+            const Color(0xFF00a86b).withValues(alpha: 0.2),
             Colors.transparent,
           ],
         ),
@@ -175,7 +171,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
         children: [
           // Fila con botón back y título
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
               children: [
                 InkWell(
@@ -194,24 +190,24 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Color(0xFF00a86b).withValues(alpha: 0.3),
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.chevron_left_rounded,
                       color: Color(0xFF00ff9f),
                       size: 24,
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     FFAppState().activitySelected.nameActivity.isNotEmpty
                         ? FFAppState().activitySelected.nameActivity
                         : 'Realizar Visitas',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -238,7 +234,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                     context.pushNamed(
                       NewsPageWidget.routeName,
                       extra: <String, dynamic>{
-                        kTransitionInfoKey: TransitionInfo(
+                        kTransitionInfoKey: const TransitionInfo(
                           hasTransition: true,
                           transitionType: PageTransitionType.fade,
                           duration: Duration(milliseconds: 500),
@@ -258,11 +254,11 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                       ),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Color(0xFFFF9800).withValues(alpha: 0.5),
+                        color: const Color(0xFFFF9800).withValues(alpha: 0.5),
                         width: 1,
                       ),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.warning_amber_rounded,
                       color: Color(0xFFFF9800),
                       size: 20,
@@ -276,7 +272,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
           // Tabs compactos
           Container(
             height: 40,
-            margin: EdgeInsets.symmetric(horizontal: 12),
+            margin: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -286,7 +282,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: Color(0xFF00a86b).withValues(alpha: 0.3),
+                color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
@@ -304,16 +300,16 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                   borderRadius: BorderRadius.circular(10),
                 ),
                 indicatorSize: TabBarIndicatorSize.tab,
-                indicatorPadding: EdgeInsets.all(4),
+                indicatorPadding: const EdgeInsets.all(4),
                 labelColor: Colors.white,
-                unselectedLabelColor: Color(0xFF00ff9f).withValues(alpha: 0.6),
-                labelStyle: TextStyle(
+                unselectedLabelColor: const Color(0xFF00ff9f).withValues(alpha: 0.6),
+                labelStyle: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.5,
                 ),
-                unselectedLabelStyle: TextStyle(
+                unselectedLabelStyle: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -329,20 +325,20 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                             color: FlutterFlowTheme.of(context).primaryText,
                           ),
                         ),
-                        duration: Duration(milliseconds: 3000),
+                        duration: const Duration(milliseconds: 3000),
                         backgroundColor: FlutterFlowTheme.of(context).warning,
                       ),
                     );
                     // Volver a la primera pestaña
                     _tabController.animateTo(
                       0,
-                      duration: Duration(milliseconds: 300),
+                      duration: const Duration(milliseconds: 300),
                       curve: Curves.ease,
                     );
                   }
                 },
                 tabs: [
-                  Tab(
+                  const Tab(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -352,7 +348,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                       ],
                     ),
                   ),
-                  Tab(
+                  const Tab(
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -370,7 +366,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                           widget.isMapEnabled ? Icons.map_rounded : Icons.lock_outline,
                           size: 18,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(widget.isMapEnabled ? 'Mapa' : 'Mapa'),
                       ],
                     ),
@@ -379,7 +375,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
               ),
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -396,7 +392,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  Color(0xFF00a86b).withValues(alpha: 0.3),
+                  const Color(0xFF00a86b).withValues(alpha: 0.3),
                   Colors.transparent,
                 ],
               ),

@@ -2,11 +2,8 @@ import '/backend/api_requests/api_calls.dart';
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'device_selection_grid_model.dart';
 export 'device_selection_grid_model.dart';
@@ -137,18 +134,18 @@ class _DeviceSelectionGridWidgetState
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.white),
-              SizedBox(width: 12),
+              const Icon(Icons.check_circle, color: Colors.white),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Dispositivo "${device.deviceName}" seleccionado',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
             ],
           ),
           backgroundColor: FlutterFlowTheme.of(context).success,
-          duration: Duration(seconds: 2),
+          duration: const Duration(seconds: 2),
         ),
       );
 
@@ -158,7 +155,7 @@ class _DeviceSelectionGridWidgetState
       debugPrint('❌ Error al seleccionar dispositivo: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al seleccionar dispositivo'),
+          content: const Text('Error al seleccionar dispositivo'),
           backgroundColor: FlutterFlowTheme.of(context).error,
         ),
       );
@@ -190,7 +187,7 @@ class _DeviceSelectionGridWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -206,7 +203,7 @@ class _DeviceSelectionGridWidgetState
           children: [
             // Header
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 8.0, 20.0, 4.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 8.0, 20.0, 4.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -217,7 +214,7 @@ class _DeviceSelectionGridWidgetState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
+                            const Text(
                               'Seleccionar Dispositivo CTR',
                               style: TextStyle(
                                 fontSize: 16,
@@ -226,12 +223,12 @@ class _DeviceSelectionGridWidgetState
                                 letterSpacing: 0.5,
                               ),
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               'Elige tu dispositivo de la lista',
                               style: TextStyle(
                                 fontSize: 11,
-                                color: Colors.white.withOpacity(0.7),
+                                color: Colors.white.withValues(alpha: 0.7),
                               ),
                             ),
                           ],
@@ -252,13 +249,13 @@ class _DeviceSelectionGridWidgetState
                             BoxShadow(
                               color: FlutterFlowTheme.of(context)
                                   .primary
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               blurRadius: 16,
-                              offset: Offset(0, 6),
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.devices,
                           color: Colors.white,
                           size: 20,
@@ -267,16 +264,16 @@ class _DeviceSelectionGridWidgetState
                     ],
                   ),
 
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
 
                   // Campo de búsqueda
                   Container(
                     height: 40,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -291,22 +288,22 @@ class _DeviceSelectionGridWidgetState
                       decoration: InputDecoration(
                         hintText: 'Buscar por nombre, serial, IMEI...',
                         hintStyle: TextStyle(
-                          color: Colors.white.withOpacity(0.5),
+                          color: Colors.white.withValues(alpha: 0.5),
                           fontSize: 12,
                         ),
                         prefixIcon: Icon(
                           Icons.search,
-                          color: Colors.white.withOpacity(0.7),
+                          color: Colors.white.withValues(alpha: 0.7),
                           size: 20,
                         ),
-                        prefixIconConstraints: BoxConstraints(
+                        prefixIconConstraints: const BoxConstraints(
                           minWidth: 36,
                         ),
                         suffixIcon: _model.textController!.text.isNotEmpty
                             ? IconButton(
                                 icon: Icon(
                                   Icons.clear,
-                                  color: Colors.white.withOpacity(0.7),
+                                  color: Colors.white.withValues(alpha: 0.7),
                                   size: 18,
                                 ),
                                 onPressed: () {
@@ -319,24 +316,24 @@ class _DeviceSelectionGridWidgetState
                             : null,
                         border: InputBorder.none,
                         contentPadding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                         isDense: true,
                       ),
-                      style: TextStyle(
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 13,
                       ),
                     ),
                   ),
 
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
 
                   // Contador de resultados
                   Text(
                     '${_model.filteredDevicesList.length} dispositivo${_model.filteredDevicesList.length != 1 ? 's' : ''} encontrado${_model.filteredDevicesList.length != 1 ? 's' : ''}',
                     style: TextStyle(
                       fontSize: 13,
-                      color: Colors.white.withOpacity(0.6),
+                      color: Colors.white.withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -361,11 +358,11 @@ class _DeviceSelectionGridWidgetState
                               ),
                             ),
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           Text(
                             'Cargando dispositivos...',
                             style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 13,
                             ),
                           ),
@@ -379,7 +376,7 @@ class _DeviceSelectionGridWidgetState
 
             // Botón agregar nuevo dispositivo
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 8.0, 20.0, 12.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 8.0, 20.0, 12.0),
               child: InkWell(
                 onTap: () async {
                   HapticFeedback.mediumImpact();
@@ -387,14 +384,14 @@ class _DeviceSelectionGridWidgetState
                 },
                 child: Container(
                   width: double.infinity,
-                  padding: EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
                         FlutterFlowTheme.of(context).warning,
-                        FlutterFlowTheme.of(context).warning.withOpacity(0.8),
+                        FlutterFlowTheme.of(context).warning.withValues(alpha: 0.8),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(16),
@@ -402,13 +399,13 @@ class _DeviceSelectionGridWidgetState
                       BoxShadow(
                         color: FlutterFlowTheme.of(context)
                             .warning
-                            .withOpacity(0.4),
+                            .withValues(alpha: 0.4),
                         blurRadius: 20,
-                        offset: Offset(0, 8),
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
@@ -444,10 +441,10 @@ class _DeviceSelectionGridWidgetState
 
   Widget _buildDeviceGrid() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: GridView.builder(
-        padding: EdgeInsets.only(bottom: 20),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        padding: const EdgeInsets.only(bottom: 20),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 2,
           crossAxisSpacing: 16,
           mainAxisSpacing: 16,
@@ -487,25 +484,25 @@ class _DeviceSelectionGridWidgetState
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                FlutterFlowTheme.of(context).primary.withOpacity(0.15),
-                FlutterFlowTheme.of(context).secondary.withOpacity(0.15),
+                FlutterFlowTheme.of(context).primary.withValues(alpha: 0.15),
+                FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.15),
               ],
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: FlutterFlowTheme.of(context).primary.withOpacity(0.2),
+                color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.2),
                 blurRadius: 15,
-                offset: Offset(0, 5),
+                offset: const Offset(0, 5),
               ),
             ],
           ),
           child: Padding(
-            padding: EdgeInsets.all(10),
+            padding: const EdgeInsets.all(10),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.start,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -517,7 +514,7 @@ class _DeviceSelectionGridWidgetState
                     Expanded(
                       child: Text(
                         deviceName,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -526,9 +523,9 @@ class _DeviceSelectionGridWidgetState
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                       decoration: BoxDecoration(
                         color: isActive
                             ? FlutterFlowTheme.of(context).success
@@ -537,7 +534,7 @@ class _DeviceSelectionGridWidgetState
                       ),
                       child: Text(
                         state.toUpperCase(),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 8,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -547,7 +544,7 @@ class _DeviceSelectionGridWidgetState
                   ],
                 ),
 
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
 
                 // Información del dispositivo
                 Expanded(
@@ -556,10 +553,10 @@ class _DeviceSelectionGridWidgetState
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildInfoRow(Icons.tag, 'Serial:', serialId),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       _buildInfoRow(Icons.smartphone, 'Modelo:', model),
                       if (imei1.isNotEmpty) ...[
-                        SizedBox(height: 3),
+                        const SizedBox(height: 3),
                         _buildInfoRow(Icons.numbers, 'IMEI:', imei1,
                             maxLength: 15),
                       ],
@@ -567,7 +564,7 @@ class _DeviceSelectionGridWidgetState
                   ),
                 ),
 
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
 
                 // Botón de selección
                 Container(
@@ -584,16 +581,16 @@ class _DeviceSelectionGridWidgetState
                     boxShadow: _model.selectingDeviceId == device['id_device']
                         ? [
                             BoxShadow(
-                              color: FlutterFlowTheme.of(context).primary.withOpacity(0.6),
+                              color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.6),
                               blurRadius: 12,
-                              offset: Offset(0, 4),
+                              offset: const Offset(0, 4),
                             ),
                           ]
                         : null,
                   ),
                   child: Center(
                     child: _model.selectingDeviceId == device['id_device']
-                        ? Row(
+                        ? const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               SizedBox(
@@ -619,7 +616,7 @@ class _DeviceSelectionGridWidgetState
                               ),
                             ],
                           )
-                        : Text(
+                        : const Text(
                             'SELECCIONAR',
                             style: TextStyle(
                               fontSize: 12,
@@ -642,28 +639,28 @@ class _DeviceSelectionGridWidgetState
       {int? maxLength}) {
     String displayValue = value;
     if (maxLength != null && value.length > maxLength) {
-      displayValue = value.substring(0, maxLength) + '...';
+      displayValue = '${value.substring(0, maxLength)}...';
     }
 
     return Row(
       children: [
         Icon(
           icon,
-          color: Colors.white.withOpacity(0.6),
+          color: Colors.white.withValues(alpha: 0.6),
           size: 12,
         ),
-        SizedBox(width: 6),
+        const SizedBox(width: 6),
         Expanded(
           child: RichText(
             text: TextSpan(
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
               children: [
                 TextSpan(
                   text: '$label ',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+                  style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 TextSpan(text: displayValue),
               ],
@@ -690,36 +687,36 @@ class _DeviceSelectionGridWidgetState
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                  FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                  FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+                  FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.3),
                 ],
               ),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.search_off,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               size: 48,
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Text(
             'No se encontraron dispositivos',
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Intenta con otro término de búsqueda o agrega un nuevo dispositivo',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 height: 1.5,
               ),
             ),

@@ -471,7 +471,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       final dbPath = await _getDatabasePath();
       final db = await openDatabase(dbPath);
 
-      final now = DateTime.now().toUtc().toIso8601String();
+      final now = DateTime.now().toIso8601String();
 
       // Obtener el id_company del AppState o de la zona
       final idCompany = _selectedZone!['Id_company'] ?? 1;

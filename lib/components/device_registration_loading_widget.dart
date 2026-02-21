@@ -1,5 +1,3 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 
 import 'dart:math' as math;
@@ -57,7 +55,7 @@ class _DeviceRegistrationLoadingWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -86,7 +84,7 @@ class _DeviceRegistrationLoadingWidgetState
                         child: Container(
                           width: 140,
                           height: 140,
-                          decoration: BoxDecoration(
+                          decoration: const BoxDecoration(
                             shape: BoxShape.circle,
                             gradient: SweepGradient(
                               colors: [
@@ -113,7 +111,7 @@ class _DeviceRegistrationLoadingWidgetState
                           width: 100,
                           height: 100,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               colors: [
                                 Color(0xFF003420),
                                 Color(0xFF00a86b),
@@ -122,13 +120,13 @@ class _DeviceRegistrationLoadingWidgetState
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF00a86b).withOpacity(0.6),
+                                color: const Color(0xFF00a86b).withValues(alpha: 0.6),
                                 blurRadius: 30,
                                 spreadRadius: 5,
                               ),
                             ],
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.settings_suggest_rounded,
                             size: 50,
                             color: Colors.white,
@@ -140,7 +138,7 @@ class _DeviceRegistrationLoadingWidgetState
                 ],
               ),
 
-              SizedBox(height: 48),
+              const SizedBox(height: 48),
 
               // Pulsing message
               AnimatedBuilder(
@@ -149,10 +147,10 @@ class _DeviceRegistrationLoadingWidgetState
                   return Opacity(
                     opacity: 0.6 + (_fadeController.value * 0.4),
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 40),
                       child: Text(
                         widget.message,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -165,7 +163,7 @@ class _DeviceRegistrationLoadingWidgetState
                 },
               ),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // Animated dots
               AnimatedBuilder(
@@ -179,11 +177,11 @@ class _DeviceRegistrationLoadingWidgetState
                               2.0)
                           .clamp(0.0, 1.0);
                       return Container(
-                        margin: EdgeInsets.symmetric(horizontal: 4),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
                         width: 8,
                         height: 8,
                         decoration: BoxDecoration(
-                          color: Color(0xFF00a86b).withOpacity(opacity),
+                          color: const Color(0xFF00a86b).withValues(alpha: opacity),
                           shape: BoxShape.circle,
                         ),
                       );

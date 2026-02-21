@@ -8118,7 +8118,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
       final String dbPath = await _getDatabasePath();
       final Database db = await openDatabase(dbPath);
 
-      final now = DateTime.now().toUtc().toIso8601String();
+      final now = DateTime.now().toIso8601String();
 
       // Procesar cada punto virtual seleccionado
       for (var point in selectedPoints) {
@@ -8205,7 +8205,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
       final String dbPath = await _getDatabasePath();
       final Database db = await openDatabase(dbPath);
 
-      final now = DateTime.now().toUtc().toIso8601String();
+      final now = DateTime.now().toIso8601String();
 
       // 1. Insertar en historial
       await db.insert(
@@ -8882,7 +8882,7 @@ Future<void> _saveRouteToDatabase(
           'Geometry_warnings': null,
           'Disconnected_components': null,
           'Components_were_connected': null,
-          'Created_at': DateTime.now().toUtc().toIso8601String(),
+          'Created_at': DateTime.now().toIso8601String(),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -9936,7 +9936,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
             'Disconnected_components': routeMetadata['disconnected_components'],
             'Components_were_connected':
                 (routeMetadata['components_were_connected'] == true) ? 1 : 0,
-            'Created_at': DateTime.now().toUtc().toIso8601String(),
+            'Created_at': DateTime.now().toIso8601String(),
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
