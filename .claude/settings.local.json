@@ -23,7 +23,10 @@
       "Bash(flutter pub get:*)",
       "Bash(awk:*)",
       "Bash(dart analyze:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(dart run:*)",
+      "Bash(node --version:*)",
+      "Bash(git stash:*)"
     ],
     "deny": [],
     "ask": []

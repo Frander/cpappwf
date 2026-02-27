@@ -3171,11 +3171,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   );
                 }),
 
-                // Mostrar steps childs
+                // Mostrar steps childs (level: 0 para alinear visualmente con los status childs)
                 ...stepsChilds.map<Widget>((childStep) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildStepCard(childStep, level: level + 1),
+                    child: _buildStepCard(childStep, level: 0),
                   );
                 }),
               ],
@@ -3234,6 +3234,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isPhotoType = typeStatus.toLowerCase() == 'photo';
     final isDateType = typeStatus.toLowerCase() == 'date';
     final isTimeType = typeStatus.toLowerCase() == 'time';
+    final isUsersListType = typeStatus.toLowerCase() == 'users-list';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -3251,6 +3252,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       children: [
         InkWell(
           onTap: () async {
+            // Si es tipo users-list, no hacer nada: el control inline maneja la interacción
+            if (isUsersListType) return;
+
             // Si es tipo tag-writer, abrir el diálogo de escritura NFC
             if (isTagWriterType) {
               final result = await showDialog<bool>(
@@ -3792,6 +3796,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ),
           ),
         ),
+
+        // Control inline para tipo users-list (fuera del InkWell para interacción independiente)
+        if (isUsersListType)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, bottom: 8),
+            child: _buildUsersListControl(
+              parentStep: null,
+              status: status,
+            ),
+          ),
 
         // Hijos expandidos (status o steps childs)
         if (isExpanded && hasChildren)
@@ -11870,11 +11884,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Widget inline para búsqueda de usuarios (tipo users-list)
   Widget _buildUsersListControl({
-    required dynamic parentStep,
+    dynamic parentStep,
     required dynamic status,
   }) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+    final parentStepId = parentStep != null
+        ? (getJsonField(parentStep, r'''$.id_activity_step''') ?? 0)
+        : 0;
 
     // Obtener o crear el controlador y FocusNode para este status
     if (!_usersSearchControllers.containsKey(statusId)) {
@@ -12275,7 +12291,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   void _selectUser(dynamic parentStep, dynamic status, UsersStruct user) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
-    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+    final parentStepId = parentStep != null
+        ? (getJsonField(parentStep, r'''$.id_activity_step''') ?? 0)
+        : 0;
     final rememberStatus = getJsonField(status, r'''$.remember_status''') ?? false;
     final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
     final typeStatus = getJsonField(status, r'''$.type_status''').toString();
@@ -12332,7 +12350,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Remover selección de usuario
   void _removeUserSelection(dynamic parentStep, dynamic status) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
-    final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
+    final parentStepId = parentStep != null
+        ? (getJsonField(parentStep, r'''$.id_activity_step''') ?? 0)
+        : 0;
 
     // Buscar y eliminar el registro
     final existingIndex = FFAppState().visitDetails.indexWhere(

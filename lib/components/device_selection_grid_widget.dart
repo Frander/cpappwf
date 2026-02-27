@@ -128,6 +128,7 @@ class _DeviceSelectionGridWidgetState
 
       // Persistir el IMEI del dispositivo en el archivo
       await _persistDeviceImei(device.imeI1);
+      if (!mounted) return;
 
       // Mostrar mensaje de éxito
       ScaffoldMessenger.of(context).showSnackBar(
@@ -153,12 +154,14 @@ class _DeviceSelectionGridWidgetState
       await widget.onDeviceSelected(device);
     } catch (e) {
       debugPrint('❌ Error al seleccionar dispositivo: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Error al seleccionar dispositivo'),
-          backgroundColor: FlutterFlowTheme.of(context).error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Error al seleccionar dispositivo'),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+          ),
+        );
+      }
     } finally {
       // Ocultar indicador de carga
       if (mounted) {
