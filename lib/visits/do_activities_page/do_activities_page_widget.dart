@@ -1,23 +1,12 @@
 ﻿import '/components/info_dialog_widget.dart';
-import '/components/nfc_write_dialog_widget.dart';
-import '/components/nfc_read_dialog_widget.dart';
 import '/components/advanced_sync_dialog_widget.dart';
 import '/components/gps_stabilization_monitor_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import '/visits/validation_sync_route/validation_sync_route_widget.dart';
-import 'dart:async';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
-import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
-import '/backend/api_requests/api_calls.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/backend/schema/structs/index.dart';
-import 'package:styled_divider/styled_divider.dart';
-import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -33,7 +22,7 @@ class DoActivitiesPageWidget extends StatefulWidget {
   const DoActivitiesPageWidget({
     super.key,
     String? tittle,
-  }) : this.tittle = tittle ?? 'Módulo ClickPalm';
+  }) : tittle = tittle ?? 'Módulo ClickPalm';
 
   final String tittle;
 
@@ -60,7 +49,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
     // Inicializar animación de pulso para indicador GPS
     _pulseController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1200),
     );
     _pulseAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
@@ -110,7 +99,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
           child: Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -128,13 +117,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                 // Header moderno
                 Container(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(12.0, 12.0, 12.0, 16.0),
+                      const EdgeInsetsDirectional.fromSTEB(12.0, 12.0, 12.0, 16.0),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Color(0xFF00a86b).withOpacity(0.15),
+                        const Color(0xFF00a86b).withValues(alpha: 0.15),
                         Colors.transparent,
                       ],
                     ),
@@ -154,7 +143,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               context.pushNamed(
                                 HomePageWidget.routeName,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.fade,
                                     duration: Duration(milliseconds: 500),
@@ -168,26 +157,26 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.white.withOpacity(0.2),
-                                    Colors.white.withOpacity(0.1),
+                                    Colors.white.withValues(alpha: 0.2),
+                                    Colors.white.withValues(alpha: 0.1),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Color(0xFF00a86b).withOpacity(0.3),
+                                  color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.chevron_left_rounded,
                                 color: Color(0xFF00ff9f),
                                 size: 28,
                               ),
                             ),
                           ),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           // Logo
-                          Container(
+                          SizedBox(
                             width: 140,
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8.0),
@@ -198,14 +187,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               ),
                             ),
                           ),
-                          Spacer(),
+                          const Spacer(),
                         ],
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       // Título del módulo con efecto brillante
                       ShaderMask(
                         shaderCallback: (bounds) {
-                          return LinearGradient(
+                          return const LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
@@ -224,7 +213,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                             color: Colors.white,
                             shadows: [
                               Shadow(
-                                color: Color(0xFF00a86b).withOpacity(0.5),
+                                color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                                 blurRadius: 12,
                               ),
                             ],
@@ -235,13 +224,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                   ),
                 ),
 
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
 
                 // Contenido scrolleable
                 Expanded(
                   child: SingleChildScrollView(
                     padding:
-                        EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 16.0),
+                        const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 16.0),
                     child: Column(
                       children: [
                         // 1. Seleccionar Operador
@@ -249,22 +238,17 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           context,
                           stepNumber: '1',
                           icon: 'assets/images/usersv2.png',
-                          title: (FFAppState().userSelected != null) &&
-                                  (FFAppState().userSelected.nameUser != null &&
-                                      FFAppState().userSelected.nameUser != '')
+                          title: FFAppState().userSelected.nameUser != ''
                               ? FFAppState().userSelected.nameUser
                               : 'Seleccione un operador',
-                          isCompleted: (FFAppState().userSelected.nameUser !=
-                                      null &&
-                                  FFAppState().userSelected.nameUser != '') &&
-                              (FFAppState().userSelected.nameUser != null &&
-                                  FFAppState().userSelected.nameUser != ''),
+                          isCompleted:
+                              FFAppState().userSelected.nameUser != '',
                           onTap: () async {
                             HapticFeedback.vibrate();
                             context.pushNamed(
                               UsersPageWidget.routeName,
                               extra: <String, dynamic>{
-                                kTransitionInfoKey: TransitionInfo(
+                                kTransitionInfoKey: const TransitionInfo(
                                   hasTransition: true,
                                   transitionType: PageTransitionType.fade,
                                   duration: Duration(milliseconds: 1000),
@@ -274,7 +258,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           },
                         ),
 
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
                         // 2. Seleccionar Actividad
                         _buildStepCard(
@@ -291,7 +275,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                             context.pushNamed(
                               ActivitiesPageWidget.routeName,
                               extra: <String, dynamic>{
-                                kTransitionInfoKey: TransitionInfo(
+                                kTransitionInfoKey: const TransitionInfo(
                                   hasTransition: true,
                                   transitionType: PageTransitionType.fade,
                                   duration: Duration(milliseconds: 1000),
@@ -301,7 +285,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           },
                         ),
 
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
                         // 3. Seleccionar Lotes (solo si tracking_headquarter es true)
                         if (() {
@@ -318,24 +302,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                             context,
                             stepNumber: '3',
                             icon: 'assets/images/HugeiconsGrid_2.png',
-                            title: () {
-                              if (FFAppState().headquartersSelectedList.length !=
-                                  0) {
-                                return functions.concatHeadquartersNames(
+                            title: FFAppState()
+                                    .headquartersSelectedList
+                                    .isNotEmpty
+                                ? functions.concatHeadquartersNames(
                                     FFAppState()
                                         .headquartersSelectedList
-                                        .toList());
-                              } else if (FFAppState()
-                                  .headquartersSelectedList
-                                  .isNotEmpty) {
-                                return functions.concatHeadquartersNames(
-                                    FFAppState()
-                                        .headquartersSelectedList
-                                        .toList());
-                              } else {
-                                return 'Seleccione los lotes a trabajar';
-                              }
-                            }(),
+                                        .toList())
+                                : 'Seleccione los lotes a trabajar',
                             isCompleted:
                                 FFAppState().headquartersSelectedList.isNotEmpty,
                             onTap: () async {
@@ -343,7 +317,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               context.pushNamed(
                                 HeadquartersPageWidget.routeName,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.fade,
                                     duration: Duration(milliseconds: 1000),
@@ -353,7 +327,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                             },
                           ),
 
-                        SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
                         // Botón grande: Realizar Visitas
                         Builder(
@@ -370,7 +344,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -379,14 +353,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Espere a que el sistema GPS se estabilice',
                                           ),
@@ -398,9 +372,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                 return;
                               }
 
-                              if (FFAppState().userSelected == null ||
-                                  FFAppState().userSelected.nameUser == null ||
-                                  FFAppState().userSelected.nameUser == '') {
+                              if (FFAppState().userSelected.nameUser == '') {
                                 await showDialog(
                                   context: context,
                                   builder: (dialogContext) {
@@ -408,7 +380,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -417,14 +389,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Debe seleccionar un operador',
                                           ),
@@ -444,7 +416,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -453,14 +425,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Debe seleccionar una actividad a realizar',
                                           ),
@@ -485,7 +457,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -494,14 +466,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Debe seleccionar al menos un lote para trabajar',
                                           ),
@@ -530,7 +502,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                 shouldPerformAdvancedSync = await showDialog<bool>(
                                   context: context,
                                   barrierDismissible: false,
-                                  barrierColor: Colors.black.withOpacity(0.8),
+                                  barrierColor: Colors.black.withValues(alpha: 0.8),
                                   builder: (dialogContext) {
                                     return AdvancedSyncDialogWidget(
                                       onSyncNow: () async {
@@ -544,12 +516,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                                         if (authToken == null || authToken.isEmpty) {
                                           debugPrint('❌ No se encontró token de autenticación');
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Error: No se encontró token de autenticación'),
-                                              backgroundColor: Colors.red,
-                                            ),
-                                          );
+                                          if (mounted) {
+                                            ScaffoldMessenger.of(this.context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Error: No se encontró token de autenticación'),
+                                                backgroundColor: Colors.red,
+                                              ),
+                                            );
+                                          }
                                           return;
                                         }
 
@@ -558,12 +532,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                         int syncedCount = 0;
 
                                         for (final headquarter in FFAppState().headquartersSelectedList) {
-                                          final int? headquarterId = headquarter.idHeadquarter;
-
-                                          if (headquarterId == null) {
-                                            debugPrint('⚠️ Lote sin ID, omitiendo...');
-                                            continue;
-                                          }
+                                          final int headquarterId = headquarter.idHeadquarter;
 
                                           debugPrint('📥 Sincronizando lote ID: $headquarterId');
 
@@ -625,15 +594,15 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                                         // Mostrar resultado
                                         if (mounted) {
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          ScaffoldMessenger.of(this.context).showSnackBar(
                                             SnackBar(
                                               content: Text(
                                                 allSynced
                                                     ? '✓ Sincronización completa exitosa ($syncedCount lotes)'
                                                     : '⚠ Sincronización parcial ($syncedCount/${FFAppState().headquartersSelectedList.length} lotes)',
                                               ),
-                                              backgroundColor: allSynced ? Color(0xFF00a86b) : Colors.orange,
-                                              duration: Duration(seconds: 3),
+                                              backgroundColor: allSynced ? const Color(0xFF00a86b) : Colors.orange,
+                                              duration: const Duration(seconds: 3),
                                             ),
                                           );
                                         }
@@ -670,7 +639,8 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               final bool isMapEnabled =
                                   shouldPerformAdvancedSync == true;
 
-                              await Navigator.of(context).push(
+                              if (!mounted) return;
+                              await Navigator.of(this.context).push(
                                 MaterialPageRoute(
                                   builder: (context) => VisitsWithMapPageWidget(
                                     isMapEnabled: isMapEnabled,
@@ -693,7 +663,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -702,14 +672,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Espere a que el sistema GPS se estabilice',
                                           ),
@@ -721,9 +691,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                 return;
                               }
 
-                              if (FFAppState().userSelected == null ||
-                                  FFAppState().userSelected.nameUser == null ||
-                                  FFAppState().userSelected.nameUser == '') {
+                              if (FFAppState().userSelected.nameUser == '') {
                                 await showDialog(
                                   context: context,
                                   builder: (dialogContext) {
@@ -731,7 +699,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -740,14 +708,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Debe seleccionar un operador',
                                           ),
@@ -767,7 +735,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -776,14 +744,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Debe seleccionar una actividad a realizar',
                                           ),
@@ -808,7 +776,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -817,14 +785,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.4,
                                           width:
                                               MediaQuery.sizeOf(context).width *
                                                   0.9,
-                                          child: InfoDialogWidget(
+                                          child: const InfoDialogWidget(
                                             info:
                                                 'Debe seleccionar al menos un lote para trabajar',
                                           ),
@@ -840,7 +808,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               final bool? shouldPerformAdvancedSyncLongPress = await showDialog<bool>(
                                 context: context,
                                 barrierDismissible: false,
-                                barrierColor: Colors.black.withOpacity(0.8),
+                                barrierColor: Colors.black.withValues(alpha: 0.8),
                                 builder: (dialogContext) {
                                   return AdvancedSyncDialogWidget(
                                     onSyncNow: () async {
@@ -854,12 +822,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                                       if (authToken == null || authToken.isEmpty) {
                                         debugPrint('❌ No se encontró token de autenticación');
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Error: No se encontró token de autenticación'),
-                                            backgroundColor: Colors.red,
-                                          ),
-                                        );
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(this.context).showSnackBar(
+                                            const SnackBar(
+                                              content: Text('Error: No se encontró token de autenticación'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
                                         return;
                                       }
 
@@ -868,12 +838,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       int syncedCount = 0;
 
                                       for (final headquarter in FFAppState().headquartersSelectedList) {
-                                        final int? headquarterId = headquarter.idHeadquarter;
-
-                                        if (headquarterId == null) {
-                                          debugPrint('⚠️ Lote sin ID, omitiendo...');
-                                          continue;
-                                        }
+                                        final int headquarterId = headquarter.idHeadquarter;
 
                                         debugPrint('📥 Sincronizando lote ID: $headquarterId');
 
@@ -894,15 +859,15 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                                       // Mostrar resultado
                                       if (mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(
+                                        ScaffoldMessenger.of(this.context).showSnackBar(
                                           SnackBar(
                                             content: Text(
                                               allSynced
                                                   ? '✓ Sincronización completa exitosa ($syncedCount lotes)'
                                                   : '⚠ Sincronización parcial ($syncedCount/${FFAppState().headquartersSelectedList.length} lotes)',
                                             ),
-                                            backgroundColor: allSynced ? Color(0xFF00a86b) : Colors.orange,
-                                            duration: Duration(seconds: 3),
+                                            backgroundColor: allSynced ? const Color(0xFF00a86b) : Colors.orange,
+                                            duration: const Duration(seconds: 3),
                                           ),
                                         );
                                       }
@@ -938,7 +903,8 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                               final bool isMapEnabled = shouldPerformAdvancedSyncLongPress == true;
 
-                              await Navigator.of(context).push(
+                              if (!mounted) return;
+                              await Navigator.of(this.context).push(
                                 MaterialPageRoute(
                                   builder: (context) => VisitsWithMapPageWidget(
                                     isMapEnabled: isMapEnabled,
@@ -954,11 +920,11 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: FFAppState().isStabilized
-                                      ? [
+                                      ? const [
                                           Color(0xFF003420),
                                           Color(0xFF00a86b),
                                         ]
-                                      : [
+                                      : const [
                                           Color(0xFFFF6B6B),
                                           Color(0xFFFFB3B3),
                                         ],
@@ -968,10 +934,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                   BoxShadow(
                                     blurRadius: 20,
                                     color: (FFAppState().isStabilized
-                                            ? Color(0xFF00a86b)
-                                            : Color(0xFFFF6B6B))
-                                        .withOpacity(0.4),
-                                    offset: Offset(0, 10),
+                                            ? const Color(0xFF00a86b)
+                                            : const Color(0xFFFF6B6B))
+                                        .withValues(alpha: 0.4),
+                                    offset: const Offset(0, 10),
                                     spreadRadius: 2,
                                   ),
                                 ],
@@ -983,16 +949,16 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                     width: 50,
                                     height: 50,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
+                                      color: Colors.white.withValues(alpha: 0.2),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(
+                                    child: const Icon(
                                       Icons.location_on_rounded,
                                       color: Colors.white,
                                       size: 28,
                                     ),
                                   ),
-                                  SizedBox(width: 16),
+                                  const SizedBox(width: 16),
                                   Text(
                                     'Realizar visitas',
                                     style: TextStyle(fontFamily: 'Roboto',
@@ -1002,7 +968,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       color: Colors.white,
                                       shadows: [
                                         Shadow(
-                                          color: Colors.black.withOpacity(0.3),
+                                          color: Colors.black.withValues(alpha: 0.3),
                                           blurRadius: 8,
                                         ),
                                       ],
@@ -1014,7 +980,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           ),
                         ),
 
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
                         // Indicador de estado GPS en tiempo real (tappable → abre monitor)
                         GestureDetector(
@@ -1025,17 +991,17 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               final isStabilized = FFAppState().isStabilized;
                               return AnimatedContainer(
                                 duration: const Duration(milliseconds: 300),
-                                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                                margin: EdgeInsets.symmetric(horizontal: 20),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                                margin: const EdgeInsets.symmetric(horizontal: 20),
                                 decoration: BoxDecoration(
                                   color: isStabilized
-                                      ? Color(0xFF00a86b).withOpacity(0.15)
-                                      : Color(0xFFFF6B6B).withOpacity(0.15 * _pulseAnimation.value),
+                                      ? const Color(0xFF00a86b).withValues(alpha: 0.15)
+                                      : const Color(0xFFFF6B6B).withValues(alpha: 0.15 * _pulseAnimation.value),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
                                     color: isStabilized
-                                        ? Color(0xFF00a86b).withOpacity(0.4)
-                                        : Color(0xFFFF6B6B).withOpacity(0.4 * _pulseAnimation.value),
+                                        ? const Color(0xFF00a86b).withValues(alpha: 0.4)
+                                        : const Color(0xFFFF6B6B).withValues(alpha: 0.4 * _pulseAnimation.value),
                                     width: 1,
                                   ),
                                 ),
@@ -1051,12 +1017,12 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                             ? Icons.gps_fixed_rounded
                                             : Icons.gps_not_fixed_rounded,
                                         color: isStabilized
-                                            ? Color(0xFF00ff9f)
-                                            : Color(0xFFFF6B6B),
+                                            ? const Color(0xFF00ff9f)
+                                            : const Color(0xFFFF6B6B),
                                         size: 18,
                                       ),
                                     ),
-                                    SizedBox(width: 8),
+                                    const SizedBox(width: 8),
                                     // Texto del estado
                                     Text(
                                       isStabilized
@@ -1067,21 +1033,21 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                         fontSize: 13,
                                         fontWeight: FontWeight.w600,
                                         color: isStabilized
-                                            ? Color(0xFF00ff9f)
-                                            : Color(0xFFFF6B6B),
+                                            ? const Color(0xFF00ff9f)
+                                            : const Color(0xFFFF6B6B),
                                         letterSpacing: 0.3,
                                       ),
                                     ),
                                     // Indicador de carga cuando no está estabilizado
                                     if (!isStabilized) ...[
-                                      SizedBox(width: 10),
+                                      const SizedBox(width: 10),
                                       SizedBox(
                                         width: 14,
                                         height: 14,
                                         child: CircularProgressIndicator(
                                           strokeWidth: 2,
                                           valueColor: AlwaysStoppedAnimation<Color>(
-                                            Color(0xFFFF6B6B).withOpacity(_pulseAnimation.value),
+                                            const Color(0xFFFF6B6B).withValues(alpha: _pulseAnimation.value),
                                           ),
                                         ),
                                       ),
@@ -1093,26 +1059,26 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           ),
                         ),
 
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
 
                         // Hint para long press
                         Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
                                 Icons.touch_app_rounded,
-                                color: Color(0xFF00ff9f).withOpacity(0.6),
+                                color: const Color(0xFF00ff9f).withValues(alpha: 0.6),
                                 size: 16,
                               ),
-                              SizedBox(width: 6),
+                              const SizedBox(width: 6),
                               Text(
                                 'Mantén presionado para opciones avanzadas',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   letterSpacing: 0.3,
                                 ),
                               ),
@@ -1120,7 +1086,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           ),
                         ),
 
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Información y sincronización
                         InkWell(
@@ -1133,7 +1099,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                             context.pushNamed(
                               InformationPageWidget.routeName,
                               extra: <String, dynamic>{
-                                kTransitionInfoKey: TransitionInfo(
+                                kTransitionInfoKey: const TransitionInfo(
                                   hasTransition: true,
                                   transitionType:
                                       PageTransitionType.bottomToTop,
@@ -1144,43 +1110,39 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           },
                           child: Container(
                             width: double.infinity,
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 16.0, 16.0, 16.0, 16.0),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
-                                colors: (FFAppState().visitsAdd.length > 0) ||
-                                        (FFAppState().productsAdd.length > 0) ||
-                                        (FFAppState().newsSelected.length > 0)
+                                colors: FFAppState().visitsAdd.isNotEmpty ||
+                                        FFAppState().productsAdd.isNotEmpty ||
+                                        FFAppState().newsSelected.isNotEmpty
                                     ? [
                                         FlutterFlowTheme.of(context).orange,
                                         FlutterFlowTheme.of(context)
                                             .orange
-                                            .withOpacity(0.7),
+                                            .withValues(alpha: 0.7),
                                       ]
                                     : [
                                         FlutterFlowTheme.of(context).primary,
                                         FlutterFlowTheme.of(context)
                                             .primary
-                                            .withOpacity(0.7),
+                                            .withValues(alpha: 0.7),
                                       ],
                               ),
                               boxShadow: [
                                 BoxShadow(
                                   blurRadius: 20,
-                                  color: ((FFAppState().visitsAdd.length > 0) ||
-                                              (FFAppState().productsAdd.length >
-                                                  0) ||
-                                              (FFAppState()
-                                                      .newsSelected
-                                                      .length >
-                                                  0)
+                                  color: (FFAppState().visitsAdd.isNotEmpty ||
+                                              FFAppState().productsAdd.isNotEmpty ||
+                                              FFAppState().newsSelected.isNotEmpty
                                           ? FlutterFlowTheme.of(context).orange
                                           : FlutterFlowTheme.of(context)
                                               .primary)
-                                      .withOpacity(0.4),
-                                  offset: Offset(0, 8),
+                                      .withValues(alpha: 0.4),
+                                  offset: const Offset(0, 8),
                                   spreadRadius: 2,
                                 )
                               ],
@@ -1193,16 +1155,16 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                   width: 50,
                                   height: 50,
                                   decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
+                                    color: Colors.white.withValues(alpha: 0.2),
                                     shape: BoxShape.circle,
                                   ),
-                                  child: Icon(
+                                  child: const Icon(
                                     Icons.sync_rounded,
                                     color: Colors.white,
                                     size: 26,
                                   ),
                                 ),
-                                SizedBox(width: 16),
+                                const SizedBox(width: 16),
                                 Expanded(
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
@@ -1214,7 +1176,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                         style: FlutterFlowTheme.of(context)
                                             .bodyMedium
                                             .override(
-                                              font: TextStyle(fontFamily: 'Roboto',
+                                              font: const TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.bold,
                                               ),
                                               color: Colors.white,
@@ -1222,23 +1184,20 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                               letterSpacing: 0.5,
                                             ),
                                       ),
-                                      SizedBox(height: 4),
+                                      const SizedBox(height: 4),
                                       Text(
-                                        (FFAppState().visitsAdd.length > 0) ||
-                                                (FFAppState()
-                                                        .productsAdd
-                                                        .length >
-                                                    0)
+                                        FFAppState().visitsAdd.isNotEmpty ||
+                                                FFAppState().productsAdd.isNotEmpty
                                             ? 'Hay información pendiente por sincronizar'
                                             : 'Sin información pendiente por sincronizar',
                                         style: FlutterFlowTheme.of(context)
                                             .bodyMedium
                                             .override(
-                                              font: TextStyle(fontFamily: 'Roboto',
+                                              font: const TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               color:
-                                                  Colors.white.withOpacity(0.9),
+                                                  Colors.white.withValues(alpha: 0.9),
                                               fontSize: 12,
                                               letterSpacing: 0.3,
                                             ),
@@ -1278,7 +1237,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
       onTap: onTap,
       child: Container(
         width: double.infinity,
-        padding: EdgeInsetsDirectional.fromSTEB(16.0, 14.0, 16.0, 14.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(16.0, 14.0, 16.0, 14.0),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -1286,11 +1245,11 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
             colors: isCompleted
                 ? [
                     FlutterFlowTheme.of(context).primary,
-                    FlutterFlowTheme.of(context).primary.withOpacity(0.7),
+                    FlutterFlowTheme.of(context).primary.withValues(alpha: 0.7),
                   ]
                 : [
                     FlutterFlowTheme.of(context).orange,
-                    FlutterFlowTheme.of(context).orange.withOpacity(0.7),
+                    FlutterFlowTheme.of(context).orange.withValues(alpha: 0.7),
                   ],
           ),
           borderRadius: BorderRadius.circular(18),
@@ -1300,8 +1259,8 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
               color: (isCompleted
                       ? FlutterFlowTheme.of(context).primary
                       : FlutterFlowTheme.of(context).orange)
-                  .withOpacity(0.3),
-              offset: Offset(0, 6),
+                  .withValues(alpha: 0.3),
+              offset: const Offset(0, 6),
               spreadRadius: 0,
             ),
           ],
@@ -1313,13 +1272,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.25),
+                color: Colors.white.withValues(alpha: 0.25),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: Text(
                   stepNumber,
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(fontFamily: 'Roboto',
                     fontSize: 20,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
@@ -1327,14 +1286,14 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                 ),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             // Icono
             Container(
               width: 40,
               height: 40,
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Image.asset(
@@ -1343,13 +1302,13 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                 color: Colors.white,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             // Título
             Expanded(
               child: Text(
                 title,
                 style: FlutterFlowTheme.of(context).bodyMedium.override(
-                      font: TextStyle(fontFamily: 'Roboto',
+                      font: const TextStyle(fontFamily: 'Roboto',
                         fontWeight: FontWeight.bold,
                       ),
                       color: Colors.white,

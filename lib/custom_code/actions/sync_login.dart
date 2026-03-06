@@ -11,7 +11,37 @@ import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+
+// ============================================================================
+// FLAG: SINCRONIZACIÓN INCOMPLETA
+// Si por cualquier motivo falla la inserción de datos básicos a SQLite,
+// este flag persiste entre sesiones para forzar una re-sincronización completa
+// en el próximo login (llamada al API en vez de usar datos cacheados).
+// ============================================================================
+const String _kSyncLoginIncompleteKey = 'sync_login_incomplete';
+
+Future<bool> _isSyncLoginIncomplete() async {
+  final prefs = await SharedPreferences.getInstance();
+  final incomplete = prefs.getBool(_kSyncLoginIncompleteKey) ?? false;
+  if (incomplete) {
+    debugPrint('⚠️ FLAG ACTIVO: La sincronización anterior falló. Forzando re-sync completo desde la API.');
+  }
+  return incomplete;
+}
+
+Future<void> _setSyncLoginIncomplete() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(_kSyncLoginIncompleteKey, true);
+  debugPrint('🚩 FLAG SET: sync_login_incomplete=true — El próximo login forzará re-sync completo.');
+}
+
+Future<void> _clearSyncLoginIncomplete() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.remove(_kSyncLoginIncompleteKey);
+  debugPrint('✅ FLAG CLEARED: sync_login_incomplete eliminado — Sincronización exitosa.');
+}
 
 /// Sincroniza los datos del endpoint Login hacia SQLite
 /// Estrategia: DELETE+INSERT para garantizar sincronización exacta con el servidor
@@ -38,8 +68,12 @@ Future<bool> syncLogin(
     Map<String, dynamic>? loginData;
     String? authToken;
 
+    // 0. Verificar flag de sincronización incompleta anterior
+    final forceFreshSync = await _isSyncLoginIncomplete();
+
     // 1. Validar si se proporcionó loginResponseJson
-    if (loginResponseJson != null) {
+    //    Si el flag está activo, ignorar el JSON cacheado y forzar llamada al API
+    if (!forceFreshSync && loginResponseJson != null) {
       debugPrint('📦 JSON de Login proporcionado, validando...');
       loginData = _validateAndParseLoginJson(loginResponseJson);
 
@@ -55,6 +89,8 @@ Future<bool> syncLogin(
         debugPrint(
             '⚠️ JSON de Login inválido o vacío, llamando al endpoint...');
       }
+    } else if (forceFreshSync) {
+      debugPrint('🔄 Re-sync forzado: ignorando JSON cacheado, llamando al API...');
     } else {
       debugPrint('📡 No se proporcionó JSON, llamando al endpoint...');
     }
@@ -116,8 +152,11 @@ Future<bool> syncLogin(
       debugPrint('❌ ERROR en sincronización a SQLite');
       debugPrint('❌ ========================================');
       debugPrint('');
+      await _setSyncLoginIncomplete();
       return false;
     }
+
+    await _clearSyncLoginIncomplete();
 
     debugPrint('');
     debugPrint('═══════════════════════════════════════════════════════════');
@@ -128,6 +167,7 @@ Future<bool> syncLogin(
   } catch (e, stackTrace) {
     debugPrint('❌ EXCEPCIÓN en syncLogin: $e');
     debugPrint('Stack trace: $stackTrace');
+    await _setSyncLoginIncomplete();
     return false;
   }
 }
@@ -921,7 +961,7 @@ Future<void> _insertHeadquartersWeights(
         'Id_company': weight['id_company'],
         'Date_year': weight['date_year'],
         'Date_month': weight['date_month'],
-        'Weight': weight['weight'],
+        'Weight': (weight['weight'] ?? 0).toDouble(),
         'Created_at': weight['created_at'],
         'Modified_at': weight['modified_at'],
       },

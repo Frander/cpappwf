@@ -892,6 +892,8 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
   List<CoordinateData> _coordinates = []; // Del headquarter activo
   Map<int, List<CoordinateData>> _coordinatesByHeadquarter = {};
 
+  int? _activeHeadquarterId; // ID del lote activo en el selector de lotes
+
   // Simulación de recorrido
   List<SimulatedLocationPoint> _simulatedRoute = [];
   bool _showSimulatedRoute = false;
@@ -1800,6 +1802,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
         // Establecer el primer headquarter como activo
         if (_headquarters.isNotEmpty) {
           final firstHqId = widget.headquarters!.first.idHeadquarter;
+          _activeHeadquarterId = firstHqId;
           _headquarter = _headquarters[firstHqId];
           _virtualPoints = _virtualPointsByHeadquarter[firstHqId] ?? [];
           _polygonPoints = _polygonsByHeadquarter[firstHqId] ?? [];
@@ -5278,6 +5281,9 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           // Label de tiempo total del recorrido (superior centro)
           if (_simulatedRoute.isNotEmpty) _buildTotalTimeLabel(),
 
+          // Selector de lote activo (superior centro, solo con múltiples lotes)
+          if ((widget.headquarters?.length ?? 0) > 1) _buildHeadquarterSelector(),
+
           // Tarjeta de navegación estilo Waze (bottom-center)
           if (_showNavigationCard && _currentNavigationEvent != null)
             _buildBottomNavigationCard(),
@@ -5409,9 +5415,9 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
   Widget _buildLayerLegends() {
     // Posicionar justo debajo del control de tiempo/distancia
     // Control de tiempo está en top: 16, con altura aproximada de 50-60px cuando expandido
-    double topPosition = _isTotalTimeCollapsed
-        ? 54.0
-        : 78.0; // 16 + altura del control + espacio
+    double topPosition = _isTotalTimeCollapsed ? 54.0 : 78.0;
+    // Si hay múltiples lotes, desplazar hacia abajo para dejar espacio al selector (top:70 + 42px + 8px margen)
+    if ((widget.headquarters?.length ?? 0) > 1) topPosition += 54.0;
 
     return Positioned(
       top: topPosition,
@@ -8588,6 +8594,119 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           ),
         );
       },
+    );
+  }
+
+  /// Cambia el lote activo en el mapa y actualiza todas las capas
+  void _switchToHeadquarter(int hqId) {
+    setState(() {
+      _activeHeadquarterId = hqId;
+      _headquarter = _headquarters[hqId];
+      _virtualPoints = _virtualPointsByHeadquarter[hqId] ?? [];
+      _polygonPoints = _polygonsByHeadquarter[hqId] ?? [];
+      _products = _productsByHeadquarter[hqId] ?? [];
+      _coordinates = _coordinatesByHeadquarter[hqId] ?? [];
+    });
+    debugPrint('🗺️ Lote activo cambiado a ID=$hqId: "${_headquarter?.name}"');
+    Future.microtask(() => _fitAllBounds());
+  }
+
+  /// Selector de lote activo — aparece solo cuando hay múltiples lotes cargados
+  Widget _buildHeadquarterSelector() {
+    final hqList = widget.headquarters ?? [];
+    if (hqList.length <= 1) return const SizedBox.shrink();
+
+    return Positioned(
+      top: 70,
+      left: 16,
+      right: 16,
+      child: Container(
+        height: 42,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.93),
+          borderRadius: BorderRadius.circular(21),
+          border: Border.all(
+            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.18),
+            width: 1.2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.12),
+              blurRadius: 14,
+              spreadRadius: 0,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(21),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: hqList.map((hq) {
+                final isActive = hq.idHeadquarter == _activeHeadquarterId;
+                final primaryColor = FlutterFlowTheme.of(context).primary;
+                return GestureDetector(
+                  onTap: () => _switchToHeadquarter(hq.idHeadquarter),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeInOut,
+                    margin: const EdgeInsets.symmetric(horizontal: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      gradient: isActive
+                          ? LinearGradient(
+                              colors: [primaryColor, primaryColor.withValues(alpha: 0.8)],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
+                      color: isActive ? null : Colors.transparent,
+                      borderRadius: BorderRadius.circular(17),
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: primaryColor.withValues(alpha: 0.35),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isActive) ...[
+                          Icon(
+                            Icons.layers_rounded,
+                            size: 13,
+                            color: Colors.white,
+                          ),
+                          const SizedBox(width: 5),
+                        ],
+                        Text(
+                          hq.nameHeadquarter,
+                          style: TextStyle(
+                            color: isActive ? Colors.white : primaryColor,
+                            fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
+                            fontSize: 12.5,
+                            letterSpacing: 0.15,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

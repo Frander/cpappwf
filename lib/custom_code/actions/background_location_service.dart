@@ -407,26 +407,55 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
       addToWindow(altWindow, measAlt, LocationConfig.medianWindowSize);
       addToWindow(speedWindow, ukfSpeed, LocationConfig.medianWindowSize);
 
-      // Mediana
+      // Buffer pre-alocado para getMedian: evita toList()/sublist() en cada ciclo GPS.
+      // Tamaño fijo = medianWindowSize (máximo de elementos posibles).
+      final medianSortBuf =
+          List<double>.filled(LocationConfig.medianWindowSize, 0.0);
+
+      // Insertion sort in-place sobre los primeros `count` elementos del buffer.
+      // O(n²) pero n ≤ 12 → más rápido que List.sort() con overhead de FFI para n pequeño.
+      void insertionSort(int count) {
+        for (int i = 1; i < count; i++) {
+          final key = medianSortBuf[i];
+          int j = i - 1;
+          while (j >= 0 && medianSortBuf[j] > key) {
+            medianSortBuf[j + 1] = medianSortBuf[j];
+            j--;
+          }
+          medianSortBuf[j + 1] = key;
+        }
+      }
+
+      // Mediana — zero heap allocations por llamada.
       double getMedian(Queue<double> window, {int? customSize}) {
         if (window.isEmpty) return 0.0;
 
-        final elementsToUse = customSize != null && customSize < window.length
-            ? window.toList().sublist(window.length - customSize)
-            : window.toList();
-
-        elementsToUse.sort();
-        final len = elementsToUse.length;
-
-        if (len == 1) return elementsToUse[0];
-
-        final medianIndex = len ~/ 2;
-        if (len.isOdd) {
-          return elementsToUse[medianIndex];
-        } else {
-          return (elementsToUse[medianIndex - 1] + elementsToUse[medianIndex]) /
-              2;
+        final len = window.length;
+        int count = len;
+        int skip = 0;
+        if (customSize != null && customSize < len) {
+          count = customSize;
+          skip = len - customSize;
         }
+
+        // Copiar elementos relevantes al buffer pre-alocado
+        int bufIdx = 0;
+        int skipLeft = skip;
+        for (final v in window) {
+          if (skipLeft > 0) {
+            skipLeft--;
+            continue;
+          }
+          medianSortBuf[bufIdx++] = v;
+        }
+
+        insertionSort(count);
+
+        if (count == 1) return medianSortBuf[0];
+        final mid = count ~/ 2;
+        return count.isOdd
+            ? medianSortBuf[mid]
+            : (medianSortBuf[mid - 1] + medianSortBuf[mid]) / 2;
       }
 
       final adaptiveWindowSize = imuIntegrator.isBrushChange
@@ -599,11 +628,13 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
     debugPrint(
         '⏱️ Watchdog de estabilización iniciado: ${maxStabilizationSeconds}s');
 
-    // Mantener el servicio vivo
-    while (service is AndroidServiceInstance &&
-        await service.isForegroundService()) {
-      await Future.delayed(const Duration(seconds: 1));
-    }
+    // Mantener el servicio vivo con un Completer en lugar de polling cada segundo.
+    // Evita ~28.800 llamadas a isForegroundService() (platform channel) por cada 8h.
+    final keepAlive = Completer<void>();
+    service.on('stopService').listen((_) {
+      if (!keepAlive.isCompleted) keepAlive.complete();
+    });
+    await keepAlive.future;
   } catch (e) {
     debugPrint('❌ Error en servicio de segundo plano: $e');
   } finally {

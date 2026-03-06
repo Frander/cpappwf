@@ -592,12 +592,15 @@ class MultipathDetector {
 
     // 3. Analizar varianza de precisión (multipath causa oscilación)
     if (accuracyHistory.length >= 5) {
-      final mean =
-          accuracyHistory.reduce((a, b) => a + b) / accuracyHistory.length;
-      final variance =
-          accuracyHistory.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
-              accuracyHistory.length;
-      final stdDev = sqrt(variance);
+      double sumAcc = 0.0;
+      for (final v in accuracyHistory) { sumAcc += v; }
+      final mean = sumAcc / accuracyHistory.length;
+      double sumSq = 0.0;
+      for (final v in accuracyHistory) {
+        final d = v - mean;
+        sumSq += d * d;
+      }
+      final stdDev = sqrt(sumSq / accuracyHistory.length);
 
       // Si la desviación estándar es > 50% de la media, hay inestabilidad
       if (stdDev > mean * 0.5 && currentAccuracy > mean * 1.3) {
@@ -663,10 +666,15 @@ class MovementDetector {
     }
 
     if (accelHistory.length >= 5) {
-      final mean = accelHistory.reduce((a, b) => a + b) / accelHistory.length;
-      accelVariance =
-          accelHistory.map((x) => pow(x - mean, 2)).reduce((a, b) => a + b) /
-              accelHistory.length;
+      double sum = 0.0;
+      for (final v in accelHistory) { sum += v; }
+      final mean = sum / accelHistory.length;
+      double sumSq = 0.0;
+      for (final v in accelHistory) {
+        final d = v - mean;
+        sumSq += d * d;
+      }
+      accelVariance = sumSq / accelHistory.length;
       accelMagnitude = mean;
 
       // Estado estático más sofisticado
@@ -851,266 +859,269 @@ class AdaptiveProcessNoise {
 
 /// Unscented Kalman Filter (UKF) para fusión GPS + IMU
 /// Estado: [x, y, vx, vy, ax, ay] (posición, velocidad, aceleración en UTM)
+///
+/// OPTIMIZACIÓN: todos los buffers de trabajo se pre-alocan en el constructor
+/// y se reutilizan en cada ciclo (zero heap allocations por predict/update).
 class UnscentedKalmanFilter {
   // Estado del sistema: [x, y, vx, vy, ax, ay]
-  List<double> state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+  final List<double> state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
 
-  // Matriz de covarianza del estado (6x6)
-  List<List<double>> covariance = List.generate(
+  // Matriz de covarianza del estado (6x6) — se modifica in-place
+  final List<List<double>> covariance = List.generate(
     6,
     (i) => List.generate(6, (j) => i == j ? 15.0 : 0.0),
   );
 
   // Parámetros UKF
-  static const double alpha = 0.001; // Spread de sigma points
-  static const double beta = 2.0; // Prior distribution (Gaussian)
-  static const double kappa = 0.0; // Secondary scaling
-  static const int stateDim = 6; // Dimensión del estado
+  static const double alpha = 0.001;
+  static const double beta = 2.0;
+  static const double kappa = 0.0;
+  static const int stateDim = 6;
+  static const int _numSigma = 2 * stateDim + 1; // = 13
 
-  // Lambda y pesos calculados una vez
   late final double lambda;
-  late final List<double> weightsM; // Pesos para media
-  late final List<double> weightsC; // Pesos para covarianza
+  late final List<double> weightsM;
+  late final List<double> weightsC;
+
+  // ── Buffers pre-alocados (nunca se reasignan después del constructor) ────
+  // Sigma points y puntos propagados
+  late final List<List<double>> _sigmaPoints;    // [13][6]
+  late final List<List<double>> _propagated;     // [13][6]
+  // Predict intermedios
+  late final List<double> _predMean;             // [6]
+  late final List<List<double>> _predCov;        // [6][6]
+  late final List<double> _diffBuf;              // [6]  (reutilizado por iteración)
+  // Cholesky
+  late final List<List<double>> _choleskyL;      // [6][6]
+  // Update intermedios — espacio de medición [x, y]
+  late final List<List<double>> _measPts;        // [13][2]
+  late final List<double> _predMeas;             // [2]
+  late final List<List<double>> _innovCov;       // [2][2]
+  late final List<List<double>> _crossCov;       // [6][2]
+  late final List<List<double>> _kalmanGain;     // [6][2]
+  late final List<List<double>> _invInnovCov;    // [2][2]
+  late final List<double> _diffMBuf;             // [2]
+  late final List<double> _diffSBuf;             // [6]
+  late final List<double> _innovBuf;             // [2]
 
   UnscentedKalmanFilter() {
     lambda = alpha * alpha * (stateDim + kappa) - stateDim;
 
-    // Calcular pesos (2*stateDim + 1 sigma points)
-    weightsM = List.filled(2 * stateDim + 1, 0.0);
-    weightsC = List.filled(2 * stateDim + 1, 0.0);
-
+    weightsM = List.filled(_numSigma, 0.0);
+    weightsC = List.filled(_numSigma, 0.0);
     weightsM[0] = lambda / (stateDim + lambda);
     weightsC[0] = lambda / (stateDim + lambda) + (1 - alpha * alpha + beta);
-
-    for (int i = 1; i < 2 * stateDim + 1; i++) {
+    for (int i = 1; i < _numSigma; i++) {
       weightsM[i] = 1.0 / (2.0 * (stateDim + lambda));
       weightsC[i] = weightsM[i];
     }
+
+    // Pre-alocar todos los buffers de trabajo
+    _sigmaPoints  = List.generate(_numSigma, (_) => List.filled(stateDim, 0.0));
+    _propagated   = List.generate(_numSigma, (_) => List.filled(stateDim, 0.0));
+    _predMean     = List.filled(stateDim, 0.0);
+    _predCov      = List.generate(stateDim, (_) => List.filled(stateDim, 0.0));
+    _diffBuf      = List.filled(stateDim, 0.0);
+    _choleskyL    = List.generate(stateDim, (_) => List.filled(stateDim, 0.0));
+    _measPts      = List.generate(_numSigma, (_) => List.filled(2, 0.0));
+    _predMeas     = List.filled(2, 0.0);
+    _innovCov     = List.generate(2, (_) => List.filled(2, 0.0));
+    _crossCov     = List.generate(stateDim, (_) => List.filled(2, 0.0));
+    _kalmanGain   = List.generate(stateDim, (_) => List.filled(2, 0.0));
+    _invInnovCov  = List.generate(2, (_) => List.filled(2, 0.0));
+    _diffMBuf     = List.filled(2, 0.0);
+    _diffSBuf     = List.filled(stateDim, 0.0);
+    _innovBuf     = List.filled(2, 0.0);
   }
 
-  /// Generar sigma points
-  List<List<double>> _generateSigmaPoints() {
-    final sigmaPoints = <List<double>>[];
+  // ── Helpers internos (sin allocations) ──────────────────────────────────
 
-    // Calcular raíz cuadrada de la matriz de covarianza
-    final sqrtCov = _choleskyDecomposition(covariance, stateDim + lambda);
-
-    // Sigma point 0: estado actual
-    sigmaPoints.add(List.from(state));
-
-    // Sigma points 1 a stateDim: estado + sqrt((n+λ)P)
+  /// Cholesky in-place: escribe en _choleskyL, escala la matriz por `scale`.
+  void _cholesky(double scale) {
     for (int i = 0; i < stateDim; i++) {
-      final point = List<double>.from(state);
-      for (int j = 0; j < stateDim; j++) {
-        point[j] += sqrtCov[j][i];
-      }
-      sigmaPoints.add(point);
+      for (int j = 0; j < stateDim; j++) { _choleskyL[i][j] = 0.0; }
     }
-
-    // Sigma points stateDim+1 a 2*stateDim: estado - sqrt((n+λ)P)
     for (int i = 0; i < stateDim; i++) {
-      final point = List<double>.from(state);
-      for (int j = 0; j < stateDim; j++) {
-        point[j] -= sqrtCov[j][i];
-      }
-      sigmaPoints.add(point);
-    }
-
-    return sigmaPoints;
-  }
-
-  /// Descomposición de Cholesky para raíz de matriz
-  List<List<double>> _choleskyDecomposition(
-      List<List<double>> matrix, double scale) {
-    final n = matrix.length;
-    final L = List.generate(n, (i) => List.filled(n, 0.0));
-
-    for (int i = 0; i < n; i++) {
       for (int j = 0; j <= i; j++) {
         double sum = 0.0;
-        for (int k = 0; k < j; k++) {
-          sum += L[i][k] * L[j][k];
-        }
-
+        for (int k = 0; k < j; k++) { sum += _choleskyL[i][k] * _choleskyL[j][k]; }
         if (i == j) {
-          final val = matrix[i][i] * scale - sum;
-          L[i][j] = val > 0 ? sqrt(val) : 0.0;
+          final val = covariance[i][i] * scale - sum;
+          _choleskyL[i][j] = val > 0 ? sqrt(val) : 0.0;
         } else {
-          L[i][j] =
-              L[j][j] > 0 ? ((matrix[i][j] * scale - sum) / L[j][j]) : 0.0;
+          _choleskyL[i][j] = _choleskyL[j][j] > 0
+              ? ((covariance[i][j] * scale - sum) / _choleskyL[j][j])
+              : 0.0;
         }
       }
     }
-
-    return L;
   }
 
-  /// Modelo de proceso: predice el siguiente estado
-  List<double> _processModel(List<double> s, double dt) {
-    final x = s[0], y = s[1];
-    final vx = s[2], vy = s[3];
-    final ax = s[4], ay = s[5];
-
-    // Ecuaciones de movimiento (aceleración constante)
-    return [
-      x + vx * dt + 0.5 * ax * dt * dt, // x_new
-      y + vy * dt + 0.5 * ay * dt * dt, // y_new
-      vx + ax * dt, // vx_new
-      vy + ay * dt, // vy_new
-      ax * 0.95, // ax_new (decay para evitar deriva)
-      ay * 0.95, // ay_new
-    ];
-  }
-
-  /// Predicción UKF
-  void predict(double dt, double processNoise) {
-    // 1. Generar sigma points
-    final sigmaPoints = _generateSigmaPoints();
-
-    // 2. Propagar cada sigma point a través del modelo de proceso
-    final predictedPoints =
-        sigmaPoints.map((point) => _processModel(point, dt)).toList();
-
-    // 3. Calcular media ponderada
-    final predictedMean = List.filled(stateDim, 0.0);
-    for (int i = 0; i < predictedPoints.length; i++) {
+  /// Genera sigma points en _sigmaPoints (in-place, sin allocations).
+  void _generateSigmaPoints() {
+    _cholesky(stateDim + lambda);
+    // Sigma point 0: estado actual
+    for (int j = 0; j < stateDim; j++) { _sigmaPoints[0][j] = state[j]; }
+    // Sigma points 1..n y n+1..2n: ±columna i de L
+    for (int i = 0; i < stateDim; i++) {
       for (int j = 0; j < stateDim; j++) {
-        predictedMean[j] += weightsM[i] * predictedPoints[i][j];
+        _sigmaPoints[i + 1][j]          = state[j] + _choleskyL[j][i];
+        _sigmaPoints[i + 1 + stateDim][j] = state[j] - _choleskyL[j][i];
       }
     }
-
-    // 4. Calcular covarianza ponderada
-    final predictedCov =
-        List.generate(stateDim, (_) => List.filled(stateDim, 0.0));
-    for (int i = 0; i < predictedPoints.length; i++) {
-      final diff = List.generate(
-          stateDim, (j) => predictedPoints[i][j] - predictedMean[j]);
-
-      for (int row = 0; row < stateDim; row++) {
-        for (int col = 0; col < stateDim; col++) {
-          predictedCov[row][col] += weightsC[i] * diff[row] * diff[col];
-        }
-      }
-    }
-
-    // 5. Agregar ruido de proceso
-    for (int i = 0; i < stateDim; i++) {
-      predictedCov[i][i] += processNoise;
-    }
-
-    // 6. Actualizar estado
-    state = predictedMean;
-    covariance = predictedCov;
   }
 
-  /// Actualización con medición GPS
+  /// Modelo de proceso in-place: escribe en `out` (sin allocations).
+  void _processModel(List<double> s, double dt, List<double> out) {
+    final vx = s[2], vy = s[3], ax = s[4], ay = s[5];
+    out[0] = s[0] + vx * dt + 0.5 * ax * dt * dt;
+    out[1] = s[1] + vy * dt + 0.5 * ay * dt * dt;
+    out[2] = vx + ax * dt;
+    out[3] = vy + ay * dt;
+    out[4] = ax * 0.95;
+    out[5] = ay * 0.95;
+  }
+
+  /// Invierte matriz 2×2 en `out` (in-place, sin allocations).
+  void _invert2x2(List<List<double>> m, List<List<double>> out) {
+    final det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
+    if (det.abs() < 1e-10) {
+      out[0][0] = 1.0; out[0][1] = 0.0;
+      out[1][0] = 0.0; out[1][1] = 1.0;
+      return;
+    }
+    final inv = 1.0 / det;
+    out[0][0] =  m[1][1] * inv; out[0][1] = -m[0][1] * inv;
+    out[1][0] = -m[1][0] * inv; out[1][1] =  m[0][0] * inv;
+  }
+
+  // ── API pública ──────────────────────────────────────────────────────────
+
+  /// Predicción UKF (zero allocations).
+  void predict(double dt, double processNoise) {
+    _generateSigmaPoints();
+
+    // Propagar sigma points a través del modelo
+    for (int i = 0; i < _numSigma; i++) {
+      _processModel(_sigmaPoints[i], dt, _propagated[i]);
+    }
+
+    // Media ponderada → _predMean
+    for (int j = 0; j < stateDim; j++) { _predMean[j] = 0.0; }
+    for (int i = 0; i < _numSigma; i++) {
+      final w = weightsM[i];
+      for (int j = 0; j < stateDim; j++) { _predMean[j] += w * _propagated[i][j]; }
+    }
+
+    // Covarianza ponderada → _predCov
+    for (int r = 0; r < stateDim; r++) {
+      for (int c = 0; c < stateDim; c++) { _predCov[r][c] = 0.0; }
+    }
+    for (int i = 0; i < _numSigma; i++) {
+      final wc = weightsC[i];
+      for (int j = 0; j < stateDim; j++) {
+        _diffBuf[j] = _propagated[i][j] - _predMean[j];
+      }
+      for (int r = 0; r < stateDim; r++) {
+        for (int c = 0; c < stateDim; c++) {
+          _predCov[r][c] += wc * _diffBuf[r] * _diffBuf[c];
+        }
+      }
+    }
+    for (int i = 0; i < stateDim; i++) { _predCov[i][i] += processNoise; }
+
+    // Copiar al estado principal (in-place)
+    for (int j = 0; j < stateDim; j++) { state[j] = _predMean[j]; }
+    for (int r = 0; r < stateDim; r++) {
+      for (int c = 0; c < stateDim; c++) { covariance[r][c] = _predCov[r][c]; }
+    }
+  }
+
+  /// Actualización con medición GPS (zero allocations).
   void update(double measX, double measY, double measNoise, Vector3? imuAccel) {
-    // 1. Generar sigma points
-    final sigmaPoints = _generateSigmaPoints();
+    _generateSigmaPoints();
 
-    // 2. Mapear sigma points al espacio de medición [x, y]
-    final measurementPoints =
-        sigmaPoints.map((point) => [point[0], point[1]]).toList();
-
-    // 3. Calcular media de medición predicha
-    final predictedMeas = [0.0, 0.0];
-    for (int i = 0; i < measurementPoints.length; i++) {
-      predictedMeas[0] += weightsM[i] * measurementPoints[i][0];
-      predictedMeas[1] += weightsM[i] * measurementPoints[i][1];
+    // Mapear sigma points al espacio de medición [x, y]
+    for (int i = 0; i < _numSigma; i++) {
+      _measPts[i][0] = _sigmaPoints[i][0];
+      _measPts[i][1] = _sigmaPoints[i][1];
     }
 
-    // 4. Calcular covarianza de innovación
-    final innovationCov = [
-      [0.0, 0.0],
-      [0.0, 0.0]
-    ];
-    for (int i = 0; i < measurementPoints.length; i++) {
-      final diffM = [
-        measurementPoints[i][0] - predictedMeas[0],
-        measurementPoints[i][1] - predictedMeas[1],
-      ];
+    // Media de medición predicha
+    _predMeas[0] = 0.0; _predMeas[1] = 0.0;
+    for (int i = 0; i < _numSigma; i++) {
+      _predMeas[0] += weightsM[i] * _measPts[i][0];
+      _predMeas[1] += weightsM[i] * _measPts[i][1];
+    }
 
-      for (int row = 0; row < 2; row++) {
-        for (int col = 0; col < 2; col++) {
-          innovationCov[row][col] += weightsC[i] * diffM[row] * diffM[col];
-        }
+    // Covarianza de innovación
+    _innovCov[0][0] = 0.0; _innovCov[0][1] = 0.0;
+    _innovCov[1][0] = 0.0; _innovCov[1][1] = 0.0;
+    for (int i = 0; i < _numSigma; i++) {
+      _diffMBuf[0] = _measPts[i][0] - _predMeas[0];
+      _diffMBuf[1] = _measPts[i][1] - _predMeas[1];
+      final wc = weightsC[i];
+      _innovCov[0][0] += wc * _diffMBuf[0] * _diffMBuf[0];
+      _innovCov[0][1] += wc * _diffMBuf[0] * _diffMBuf[1];
+      _innovCov[1][0] += wc * _diffMBuf[1] * _diffMBuf[0];
+      _innovCov[1][1] += wc * _diffMBuf[1] * _diffMBuf[1];
+    }
+    _innovCov[0][0] += measNoise;
+    _innovCov[1][1] += measNoise;
+
+    // Covarianza cruzada estado × medición
+    for (int r = 0; r < stateDim; r++) {
+      _crossCov[r][0] = 0.0; _crossCov[r][1] = 0.0;
+    }
+    for (int i = 0; i < _numSigma; i++) {
+      for (int j = 0; j < stateDim; j++) {
+        _diffSBuf[j] = _sigmaPoints[i][j] - state[j];
+      }
+      _diffMBuf[0] = _measPts[i][0] - _predMeas[0];
+      _diffMBuf[1] = _measPts[i][1] - _predMeas[1];
+      final wc = weightsC[i];
+      for (int r = 0; r < stateDim; r++) {
+        _crossCov[r][0] += wc * _diffSBuf[r] * _diffMBuf[0];
+        _crossCov[r][1] += wc * _diffSBuf[r] * _diffMBuf[1];
       }
     }
 
-    // Agregar ruido de medición
-    innovationCov[0][0] += measNoise;
-    innovationCov[1][1] += measNoise;
-
-    // 5. Calcular covarianza cruzada
-    final crossCov = List.generate(stateDim, (_) => [0.0, 0.0]);
-    for (int i = 0; i < sigmaPoints.length; i++) {
-      final diffS =
-          List.generate(stateDim, (j) => sigmaPoints[i][j] - state[j]);
-      final diffM = [
-        measurementPoints[i][0] - predictedMeas[0],
-        measurementPoints[i][1] - predictedMeas[1],
-      ];
-
-      for (int row = 0; row < stateDim; row++) {
-        for (int col = 0; col < 2; col++) {
-          crossCov[row][col] += weightsC[i] * diffS[row] * diffM[col];
-        }
-      }
-    }
-
-    // 6. Calcular ganancia de Kalman (K = Pxy * inv(Pyy))
-    final invInnovationCov = _invert2x2(innovationCov);
-    final kalmanGain = List.generate(stateDim, (_) => [0.0, 0.0]);
+    // Ganancia de Kalman: K = Pxy × Pyy⁻¹
+    _invert2x2(_innovCov, _invInnovCov);
     for (int i = 0; i < stateDim; i++) {
-      for (int j = 0; j < 2; j++) {
-        for (int k = 0; k < 2; k++) {
-          kalmanGain[i][j] += crossCov[i][k] * invInnovationCov[k][j];
-        }
-      }
+      _kalmanGain[i][0] = _crossCov[i][0] * _invInnovCov[0][0]
+                        + _crossCov[i][1] * _invInnovCov[1][0];
+      _kalmanGain[i][1] = _crossCov[i][0] * _invInnovCov[0][1]
+                        + _crossCov[i][1] * _invInnovCov[1][1];
     }
 
-    // 7. Actualizar estado
-    final innovation = [measX - predictedMeas[0], measY - predictedMeas[1]];
+    // Actualizar estado: x = x + K × (z - z_pred)
+    _innovBuf[0] = measX - _predMeas[0];
+    _innovBuf[1] = measY - _predMeas[1];
     for (int i = 0; i < stateDim; i++) {
-      state[i] +=
-          kalmanGain[i][0] * innovation[0] + kalmanGain[i][1] * innovation[1];
+      state[i] += _kalmanGain[i][0] * _innovBuf[0]
+                + _kalmanGain[i][1] * _innovBuf[1];
     }
 
-    // 8. Si tenemos IMU, actualizar aceleración directamente
+    // Fusión IMU para aceleración
     if (imuAccel != null) {
       state[4] = imuAccel.x * 0.7 + state[4] * 0.3;
       state[5] = imuAccel.y * 0.7 + state[5] * 0.3;
     }
 
-    // 9. Actualizar covarianza
+    // Actualizar covarianza: P = P - K × Pyy × Kᵀ
     for (int i = 0; i < stateDim; i++) {
       for (int j = 0; j < stateDim; j++) {
         for (int k = 0; k < 2; k++) {
           covariance[i][j] -=
-              kalmanGain[i][k] * innovationCov[k][0] * kalmanGain[j][0] +
-                  kalmanGain[i][k] * innovationCov[k][1] * kalmanGain[j][1];
+              _kalmanGain[i][k] * _innovCov[k][0] * _kalmanGain[j][0]
+            + _kalmanGain[i][k] * _innovCov[k][1] * _kalmanGain[j][1];
         }
       }
     }
   }
 
-  /// Invertir matriz 2x2
-  List<List<double>> _invert2x2(List<List<double>> m) {
-    final det = m[0][0] * m[1][1] - m[0][1] * m[1][0];
-    if (det.abs() < 1e-10) {
-      return [
-        [1.0, 0.0],
-        [0.0, 1.0]
-      ]; // Identidad si singular
-    }
-    final invDet = 1.0 / det;
-    return [
-      [m[1][1] * invDet, -m[0][1] * invDet],
-      [-m[1][0] * invDet, m[0][0] * invDet],
-    ];
-  }
-
-  /// Obtener posición estimada
+  /// Obtener posición estimada.
   Map<String, double> getPosition() {
     return {
       'x': state[0],
@@ -1122,27 +1133,24 @@ class UnscentedKalmanFilter {
     };
   }
 
-  /// Obtener error estimado
   double getPositionError() {
     return sqrt((covariance[0][0] + covariance[1][1]) / 2.0);
   }
 
-  /// Incrementar incertidumbre del filtro (útil después de rechazos consecutivos)
   void increaseUncertainty(double factor) {
-    for (int i = 0; i < covariance.length; i++) {
-      for (int j = 0; j < covariance[i].length; j++) {
-        covariance[i][j] *= factor;
-      }
+    for (int i = 0; i < stateDim; i++) {
+      for (int j = 0; j < stateDim; j++) { covariance[i][j] *= factor; }
     }
   }
 
-  /// Reiniciar completamente el filtro UKF a su estado inicial
+  /// Reinicia el filtro a su estado inicial (in-place, sin allocations).
   void reset() {
-    state = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-    covariance = List.generate(
-      6,
-      (i) => List.generate(6, (j) => i == j ? 15.0 : 0.0),
-    );
+    for (int i = 0; i < stateDim; i++) {
+      state[i] = 0.0;
+      for (int j = 0; j < stateDim; j++) {
+        covariance[i][j] = i == j ? 15.0 : 0.0;
+      }
+    }
   }
 }
 
