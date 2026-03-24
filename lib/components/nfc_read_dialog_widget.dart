@@ -35,8 +35,10 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
-  // Estado para modo tag-transfer cuando el tag está vacío o inválido
+  // Estado para modo tag-transfer cuando el tag está vacío, inválido o con error específico
   bool _isTagEmptyOrInvalid = false;
+  String? _tagErrorTitle;       // Título específico del error (null = mensaje genérico)
+  String? _tagErrorSubtitle;    // Subtítulo específico del error
 
   @override
   void setState(VoidCallback callback) {
@@ -82,22 +84,66 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       _model.errorMessage = null;
       _model.parsedRecords = [];
       _isTagEmptyOrInvalid = false;
+      _tagErrorTitle = null;
+      _tagErrorSubtitle = null;
     });
 
     try {
-      final nfcData = await actions.readNFC(context);
+      // autoClose: false porque el diálogo maneja su propio cierre (Navigator.pop 800ms abajo)
+      // Con autoClose: true, readNFC haría un primer pop (cerrando el diálogo) y luego
+      // el pop de 800ms haría un segundo pop cerrando la página debajo del diálogo.
+      final nfcData = await actions.readNFC(
+        context,
+        autoClose: false,
+        clearAfterRead: widget.isTagTransferMode,
+      );
 
       if (nfcData != null && nfcData.isNotEmpty) {
         // Para modo tag-transfer, validar que tenga contenido válido con visitas
         if (widget.isTagTransferMode) {
-          final isValidForTransfer = _isValidForTagTransfer(nfcData);
-
-          if (!isValidForTransfer) {
-            // Tag vacío o inválido - mostrar mensaje y botón reintentar
+          // Detectar errores específicos del RFID antes de validar el formato
+          if (nfcData.startsWith('ERROR:PRODUCTO_NO_ENCONTRADO:')) {
+            final requiredType = nfcData.split(':').length > 2 ? nfcData.split(':')[2] : '';
             setState(() {
               _model.isReading = false;
               _model.isSuccess = false;
               _isTagEmptyOrInvalid = true;
+              _tagErrorTitle = 'TAG NO REGISTRADO';
+              _tagErrorSubtitle = requiredType.isNotEmpty
+                  ? 'Este TAG no fue encontrado en los productos guardados como "$requiredType".\n\nVerifica que hayas sincronizado los datos del lote.'
+                  : 'Este TAG no fue encontrado en los productos guardados.\n\nVerifica que hayas sincronizado los datos del lote.';
+            });
+            HapticFeedback.vibrate();
+            return;
+          }
+
+          if (nfcData.startsWith('ERROR:TIPO_INCORRECTO:')) {
+            final parts = nfcData.split(':');
+            final required = parts.length > 2 ? parts[2] : '';
+            final found = parts.length > 3 ? parts[3] : '';
+            setState(() {
+              _model.isReading = false;
+              _model.isSuccess = false;
+              _isTagEmptyOrInvalid = true;
+              _tagErrorTitle = 'TIPO DE PRODUCTO INCORRECTO';
+              _tagErrorSubtitle = found.isNotEmpty && required.isNotEmpty
+                  ? 'Este TAG es de tipo "$found", pero se esperaba "$required".\n\nAcerca el TAG correcto.'
+                  : 'El tipo de producto del TAG no coincide con el requerido.';
+            });
+            HapticFeedback.vibrate();
+            return;
+          }
+
+          final isValidForTransfer = _isValidForTagTransfer(nfcData);
+
+          if (!isValidForTransfer) {
+            // Tag vacío o formato inválido - mostrar mensaje genérico y botón reintentar
+            setState(() {
+              _model.isReading = false;
+              _model.isSuccess = false;
+              _isTagEmptyOrInvalid = true;
+              _tagErrorTitle = null;
+              _tagErrorSubtitle = null;
             });
             HapticFeedback.vibrate();
             return; // No cerrar el diálogo, quedarse para reintentar
@@ -907,7 +953,9 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
           ),
           SizedBox(height: 12),
           Text(
-            'Mantenga el dispositivo cerca del tag NFC',
+            widget.isTagTransferMode
+                ? 'Mantenga el tag cerca — se leerá y limpiará en un solo paso'
+                : 'Mantenga el dispositivo cerca del tag NFC',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
@@ -1139,69 +1187,93 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
     );
   }
 
-  /// Estado cuando el tag está vacío o tiene formato inválido (solo para tag-transfer)
+  /// Estado cuando el tag está vacío, inválido, o con un error específico de RFID/tipo
   Widget _buildTagEmptyOrInvalidState() {
+    final bool hasSpecificError = _tagErrorTitle != null;
+
+    // Colores según tipo de error
+    final Color iconColor = hasSpecificError ? Colors.redAccent : Colors.orange;
+    final Color iconBgColor = hasSpecificError
+        ? Colors.redAccent.withValues(alpha: 0.2)
+        : Colors.orange.withValues(alpha: 0.3);
+    final IconData iconData = hasSpecificError
+        ? Icons.nfc_rounded
+        : Icons.warning_amber_rounded;
+
+    final String title = _tagErrorTitle ?? 'TAG VACÍO O INVÁLIDO';
+    final String subtitle = _tagErrorSubtitle ??
+        'El TAG no tiene el formato correcto o está limpio';
+    final String hint = hasSpecificError
+        ? 'Acerque el TAG correcto para reintentar'
+        : 'Acerque un TAG con visitas guardadas';
+
     return Center(
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Icono de advertencia
+            // Icono
             Container(
               width: 100,
               height: 100,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.orange.withOpacity(0.3),
-                    Colors.amber.withOpacity(0.3),
+                    iconBgColor,
+                    iconColor.withValues(alpha: 0.15),
                   ],
                 ),
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: iconColor.withValues(alpha: 0.4),
+                  width: 2,
+                ),
               ),
               child: Icon(
-                Icons.warning_amber_rounded,
-                color: Colors.orange,
-                size: 60,
+                iconData,
+                color: iconColor,
+                size: 54,
               ),
             ),
             SizedBox(height: 24),
 
             // Título
             Text(
-              'TAG VACÍO O INVÁLIDO',
+              title,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
+                letterSpacing: 0.5,
               ),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 14),
 
-            // Mensaje descriptivo
+            // Mensaje descriptivo (puede ser multi-línea)
             Text(
-              'El TAG no tiene el formato correcto o está limpio',
+              subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withOpacity(0.85),
+                height: 1.5,
               ),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: 10),
 
-            // Subtítulo con instrucción
+            // Hint
             Text(
-              'Acerque un TAG con visitas guardadas',
+              hint,
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontFamily: 'Roboto',
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                fontSize: 13,
+                color: Colors.white.withOpacity(0.55),
               ),
             ),
             SizedBox(height: 32),

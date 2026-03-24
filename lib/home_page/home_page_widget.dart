@@ -892,7 +892,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
       ),
       child: InkWell(
         onTap: () async {
-          context.pushNamed('UsersPage');
+          context.pushNamed(
+            'LoginPage',
+            queryParameters: {
+              'forceSelection': serializeParam(true, ParamType.bool),
+            },
+          );
         },
         splashColor: const Color(0xFF00a86b).withValues(alpha: 0.3),
         highlightColor: Colors.transparent,

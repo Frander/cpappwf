@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
+import 'dart:convert';
 
 // ============================================================================
 // FLAG: SINCRONIZACIÓN INCOMPLETA
@@ -118,25 +119,134 @@ Future<bool> syncLogin(
 
     // 3. Llamar al endpoint TypesPoints con timeout
     debugPrint('📡 Llamando a GET /TypesPoints...');
-    final typesPointsData = await _callTypesPointsAPI(authToken).timeout(
+    final statusRef = [0];
+    List<Map<String, dynamic>>? typesPointsData =
+        await _callTypesPointsAPI(authToken, statusRef).timeout(
       const Duration(seconds: 30),
       onTimeout: () {
         debugPrint('⏱️ Timeout al obtener TypesPoints (30s)');
         return null;
       },
     );
+
+    // Si el token es inválido/expirado (401), intentar recuperación en dos pasos:
+    // Paso A: RenewToken (más rápido, no requiere re-login completo)
+    // Paso B: Re-login completo (si RenewToken no es suficiente para TypesPoints)
+    if (typesPointsData == null && statusRef[0] == 401) {
+      debugPrint('🔑 TypesPoints devolvió 401. Intentando recuperación...');
+
+      // --- Paso A: RenewToken ---
+      debugPrint('   [Paso A] Intentando RenewToken...');
+      final renewedToken = await _renewAuthToken(username, password);
+      if (renewedToken != null) {
+        authToken = renewedToken;
+        loginData['token'] = renewedToken;
+        final statusRefA = [0];
+        typesPointsData = await _callTypesPointsAPI(renewedToken, statusRefA).timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            debugPrint('⏱️ Timeout TypesPoints tras RenewToken');
+            return null;
+          },
+        );
+        if (typesPointsData != null) {
+          debugPrint('   ✅ TypesPoints OK tras RenewToken');
+        } else {
+          debugPrint('   ❌ TypesPoints sigue fallando tras RenewToken (status: ${statusRefA[0]})');
+          debugPrint('   ℹ️ RenewToken puede no ser suficiente para este endpoint.');
+
+          // --- Paso B: Re-login completo ---
+          debugPrint('   [Paso B] Intentando re-login completo con /Users/Login...');
+          final freshLoginData = await _callLoginAPI(username, password);
+          if (freshLoginData != null) {
+            final freshToken = freshLoginData['token'] as String?;
+            if (freshToken != null && freshToken.isNotEmpty) {
+              debugPrint('   ✅ Re-login exitoso. Reintentando TypesPoints...');
+              authToken = freshToken;
+              // Preservar datos de loginData pero actualizar el token
+              loginData['token'] = freshToken;
+              typesPointsData = await _callTypesPointsAPI(freshToken).timeout(
+                const Duration(seconds: 30),
+                onTimeout: () {
+                  debugPrint('⏱️ Timeout TypesPoints tras re-login');
+                  return null;
+                },
+              );
+              if (typesPointsData != null) {
+                debugPrint('   ✅ TypesPoints OK tras re-login completo');
+              } else {
+                debugPrint('   ❌ TypesPoints sigue fallando tras re-login. Posible problema del servidor.');
+              }
+            }
+          } else {
+            debugPrint('   ❌ Re-login falló. El servidor puede no estar accesible.');
+          }
+        }
+      }
+    }
+
     if (typesPointsData == null) {
-      debugPrint('❌ Error: No se pudo obtener TypesPoints');
+      debugPrint('❌ Error: No se pudo obtener TypesPoints tras todos los intentos');
       return false;
     }
     debugPrint('✅ TypesPoints obtenidos: ${typesPointsData.length} tipos');
 
-    // 4. Sincronizar en SQLite con transacción y timeout
+    // 4. Extraer IDs para los endpoints de listas
+    final idCompany = loginData['company']?['id_company'];
+    final idDevice  = loginData['device']?['id_device'] ?? 0;
+    final syncNow   = DateTime.now();
+
+    if (idCompany == null) {
+      debugPrint('❌ Error: id_company no encontrado en loginData');
+      return false;
+    }
+    debugPrint('🏢 Company ID: $idCompany | Device ID: $idDevice');
+
+    // 5. Fetch en paralelo de las listas con GZIP
+    debugPrint('');
+    debugPrint('📡 ========================================');
+    debugPrint('📡 PASO 5: Fetching listas en paralelo...');
+    debugPrint('📡 ========================================');
+
+    final listResults = await Future.wait([
+      _fetchLoginDataList('activities',           authToken, {'idCompany': idCompany.toString(), 'idDevice': idDevice.toString()}),
+      _fetchLoginDataList('users',                authToken, {'idCompany': idCompany.toString(), 'idDevice': idDevice.toString()}),
+      _fetchLoginDataList('headquarters',         authToken, {'idCompany': idCompany.toString()}),
+      _fetchLoginDataList('zones',                authToken, {'idCompany': idCompany.toString()}),
+      _fetchLoginDataList('news',                 authToken, {'idCompany': idCompany.toString()}),
+      _fetchLoginDataList('headquarters-weights', authToken, {'idCompany': idCompany.toString(), 'year': syncNow.year.toString(), 'month': syncNow.month.toString()}),
+    ]);
+
+    final List<dynamic>? activitiesData   = listResults[0];
+    final List<dynamic>? usersData        = listResults[1];
+    final List<dynamic>? headquartersData = listResults[2];
+    final List<dynamic>? zonesData        = listResults[3];
+    final List<dynamic>? newsData         = listResults[4];
+    final List<dynamic>? hqWeightsData    = listResults[5];
+
+    debugPrint('📊 Resultados del fetch paralelo:');
+    debugPrint('   Activities:   ${activitiesData?.length ?? "❌ Error"}');
+    debugPrint('   Users:        ${usersData?.length ?? "❌ Error"}');
+    debugPrint('   Headquarters: ${headquartersData?.length ?? "❌ Error"}');
+    debugPrint('   Zones:        ${zonesData?.length ?? "❌ Error"}');
+    debugPrint('   News:         ${newsData?.length ?? "❌ Error"}');
+    debugPrint('   HQ Weights:   ${hqWeightsData?.length ?? "❌ Error"}');
+
+    // 6. Sincronizar en SQLite con transacción y timeout
     debugPrint('');
     debugPrint('💾 ========================================');
-    debugPrint('💾 PASO 4: Sincronizando datos en SQLite');
+    debugPrint('💾 PASO 6: Sincronizando datos en SQLite');
     debugPrint('💾 ========================================');
-    final syncSuccess = await _syncLoginDataToSQLite(loginData, typesPointsData).timeout(
+    final syncSuccess = await _syncLoginDataToSQLite(
+      loginData,
+      typesPointsData,
+      activitiesData: activitiesData,
+      usersData: usersData,
+      headquartersData: headquartersData,
+      zonesData: zonesData,
+      newsData: newsData,
+      hqWeightsData: hqWeightsData,
+    ).timeout(
       const Duration(seconds: 60),
       onTimeout: () {
         debugPrint('');
@@ -282,25 +392,6 @@ Map<String, dynamic>? _validateLoginDataStructure(
     debugPrint('   - User: ${user['name_user'] ?? 'N/A'}');
     debugPrint('   - Device: ${device['device_name'] ?? 'N/A'}');
 
-    // Validar campos opcionales (advertir si faltan pero no rechazar)
-    if (loginData['headquarters'] == null ||
-        (loginData['headquarters'] is List &&
-            (loginData['headquarters'] as List).isEmpty)) {
-      debugPrint('⚠️ Advertencia: "headquarters" vacío o nulo');
-    }
-
-    if (loginData['products'] == null ||
-        (loginData['products'] is List &&
-            (loginData['products'] as List).isEmpty)) {
-      debugPrint('⚠️ Advertencia: "products" vacío o nulo');
-    }
-
-    if (loginData['activities'] == null ||
-        (loginData['activities'] is List &&
-            (loginData['activities'] as List).isEmpty)) {
-      debugPrint('⚠️ Advertencia: "activities" vacío o nulo');
-    }
-
     return loginData;
   } catch (e) {
     debugPrint('⚠️ Error validando estructura de loginData: $e');
@@ -336,6 +427,12 @@ Future<Map<String, dynamic>?> _callLoginAPI(
         'Content-Type': 'application/json',
       },
       body: jsonEncode(requestBody),
+    ).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        debugPrint('⏱️ Timeout en _callLoginAPI (30s)');
+        throw Exception('Login timeout');
+      },
     );
 
     debugPrint('📥 Login Response Status: ${response.statusCode}');
@@ -355,9 +452,64 @@ Future<Map<String, dynamic>?> _callLoginAPI(
   }
 }
 
-/// Llama al endpoint GET /TypesPoints
+/// Renueva el token usando POST /Users/RenewToken.
+/// Retorna el nuevo token, o null si falla.
+/// [username] es el IMEI del dispositivo.
+/// [password] es la contraseña usada en el login (vacía para login tipo IMEI).
+Future<String?> _renewAuthToken(String username, [String password = '']) async {
+  try {
+    const String url = 'https://api.clickpalm.com/Users/RenewToken';
+    debugPrint('🔑 Llamando a POST /Users/RenewToken...');
+    debugPrint('   Type_login: IMEI');
+    debugPrint('   Username: $username');
+    debugPrint('   Password length: ${password.length}');
+
+    final requestBody = {
+      'Type_login': 'IMEI',
+      'Username': username,
+      'Password': password,
+    };
+    debugPrint('   Request body: ${jsonEncode(requestBody)}');
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode(requestBody),
+    ).timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        debugPrint('⏱️ Timeout en _renewAuthToken (30s)');
+        throw Exception('RenewToken timeout');
+      },
+    );
+
+    debugPrint('📥 RenewToken Status: ${response.statusCode}');
+    debugPrint('   Response body: ${response.body}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      debugPrint('   Response keys: ${data.keys.toList()}');
+      final newToken = data['token'] as String?;
+      if (newToken != null && newToken.isNotEmpty) {
+        debugPrint('✅ Token renovado: ${newToken.substring(0, newToken.length > 30 ? 30 : newToken.length)}...');
+        return newToken;
+      }
+      debugPrint('❌ RenewToken: campo "token" vacío o ausente en la respuesta');
+    }
+
+    debugPrint('❌ Error al renovar token: ${response.statusCode}');
+    return null;
+  } catch (e) {
+    debugPrint('⚠️ Excepción en _renewAuthToken: $e');
+    return null;
+  }
+}
+
+/// Llama al endpoint GET /TypesPoints.
+/// Retorna los datos, o null si falla.
+/// [statusRef] es un contenedor de un elemento para exponer el HTTP status code al caller.
 Future<List<Map<String, dynamic>>?> _callTypesPointsAPI(
-    String authToken) async {
+    String authToken, [List<int>? statusRef]) async {
   try {
     const String url = 'https://api.clickpalm.com/TypesPoints';
 
@@ -369,6 +521,7 @@ Future<List<Map<String, dynamic>>?> _callTypesPointsAPI(
     );
 
     debugPrint('📥 TypesPoints Response Status: ${response.statusCode}');
+    statusRef?[0] = response.statusCode;
 
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -385,14 +538,61 @@ Future<List<Map<String, dynamic>>?> _callTypesPointsAPI(
 }
 
 // ============================================================================
+// FETCH LISTAS CON GZIP
+// ============================================================================
+
+/// Llama a GET /Users/login-data/{endpoint}, descomprime la respuesta GZIP
+/// y retorna la lista de elementos. Retorna null si falla (timeout, error HTTP,
+/// error de descompresión). El fallo de un endpoint no aborta el sync completo.
+Future<List<dynamic>?> _fetchLoginDataList(
+  String endpoint,
+  String authToken,
+  Map<String, String> queryParams,
+) async {
+  try {
+    final uri = Uri.parse('https://api.clickpalm.com/Users/login-data/$endpoint')
+        .replace(queryParameters: queryParams);
+
+    debugPrint('📡 GET /Users/login-data/$endpoint ...');
+    final response = await http
+        .get(uri, headers: {'Authorization': 'Bearer $authToken'})
+        .timeout(const Duration(seconds: 45));
+
+    debugPrint('   → HTTP ${response.statusCode} | ${response.bodyBytes.length} bytes comprimidos');
+
+    if (response.statusCode == 200) {
+      final data = _decodeGzipList(response.bodyBytes);
+      if (data != null) {
+        debugPrint('   ✅ $endpoint: ${data.length} elementos');
+        return data;
+      }
+      debugPrint('   ⚠️ $endpoint: la respuesta no es una lista');
+      return null;
+    }
+
+    debugPrint('   ❌ $endpoint → HTTP ${response.statusCode}');
+    return null;
+  } catch (e) {
+    debugPrint('   ❌ Error en $endpoint: $e');
+    return null;
+  }
+}
+
+// ============================================================================
 // SINCRONIZACIÓN A SQLITE
 // ============================================================================
 
 /// Sincroniza los datos del Login a SQLite usando una transacción
 Future<bool> _syncLoginDataToSQLite(
   Map<String, dynamic> loginData,
-  List<Map<String, dynamic>> typesPointsData,
-) async {
+  List<Map<String, dynamic>> typesPointsData, {
+  List<dynamic>? activitiesData,
+  List<dynamic>? usersData,
+  List<dynamic>? headquartersData,
+  List<dynamic>? zonesData,
+  List<dynamic>? newsData,
+  List<dynamic>? hqWeightsData,
+}) async {
   try {
     final String dbPath = await _getDatabasePath();
     final Database db = await openDatabase(dbPath);
@@ -411,20 +611,22 @@ Future<bool> _syncLoginDataToSQLite(
       await _insertCompany(txn, loginData['company']);
 
       // PASO 4: Insertar Zones + Zones_polygons
-      if (loginData['zones'] != null) {
-        await _insertZones(txn, loginData['zones']);
+      if (zonesData != null) {
+        await _insertZones(txn, zonesData);
       }
 
       // PASO 5: Insertar Users (marcar default)
-      if (loginData['users'] != null) {
+      if (usersData != null) {
         await _insertUsers(
           txn,
-          loginData['users'],
+          usersData,
           loginData['user']?['id_user'],
         );
       }
 
       // PASO 6: Insertar Devices (marcar default)
+      // Los dispositivos ya no vienen en el payload del login.
+      // El dispositivo activo queda registrado en Login_sessions.
       if (loginData['devices'] != null) {
         await _insertDevices(
           txn,
@@ -434,32 +636,30 @@ Future<bool> _syncLoginDataToSQLite(
       }
 
       // PASO 7: Insertar Activities + Steps + Status (marcar default)
-      if (loginData['activities'] != null) {
+      if (activitiesData != null) {
         await _insertActivities(
           txn,
-          loginData['activities'],
+          activitiesData,
           loginData['activity']?['id_activity'],
         );
       }
 
       // PASO 8: MERGE Headquarters + Polygons (preservar datos locales)
-      if (loginData['headquarters'] != null) {
-        await _mergeHeadquarters(txn, loginData['headquarters']);
+      if (headquartersData != null) {
+        await _mergeHeadquarters(txn, headquartersData);
       }
 
-      // PASO 8.1: Insertar Headquarters_weights desde objeto principal del JSON
-      if (loginData['headquarters_weights'] != null) {
-        await _insertHeadquartersWeights(txn, loginData['headquarters_weights']);
+      // PASO 8.1: Insertar Headquarters_weights
+      if (hqWeightsData != null) {
+        await _insertHeadquartersWeights(txn, hqWeightsData);
       }
 
-      // PASO 9: Insertar Products + Coordinates
-      if (loginData['products'] != null) {
-        await _insertProducts(txn, loginData['products']);
-      }
+      // PASO 9: Products y Products_coordinates — NO se tocan en login.
+      // sync_install_module es el dueño de estos datos.
 
       // PASO 10: Insertar News
-      if (loginData['news'] != null) {
-        await _insertNews(txn, loginData['news']);
+      if (newsData != null) {
+        await _insertNews(txn, newsData);
       }
 
       // PASO 11: Insertar Login_sessions (tracking)
@@ -468,9 +668,21 @@ Future<bool> _syncLoginDataToSQLite(
       debugPrint('✅ Transacción completada exitosamente');
     });
 
+    // PASO 12: Cargar Headquarters desde SQLite al AppState ANTES de cerrar la DB
+    await _loadHeadquartersToAppState(db);
+
     await db.close();
 
-    // PASO 12: Actualizar AppState
+    // PASO 13: Guardar activitiesJSON directamente desde el response GZIP
+    // Normaliza la estructura para que el formulario pueda leerla:
+    //   - Step level: 'activities_status' → alias como 'activity_status'
+    //   - Status level: 'activities_status_childs' → alias como 'status_childs'
+    if (activitiesData != null) {
+      FFAppState().activitiesJSON = _normalizeActivitiesForForm(activitiesData);
+      debugPrint('✅ activitiesJSON actualizado: ${activitiesData.length} actividades (normalizado)');
+    }
+
+    // PASO 14: Actualizar AppState (company, device, etc.)
     _updateAppState(loginData);
 
     return true;
@@ -836,6 +1048,11 @@ Future<void> _mergeHeadquarters(
   List<dynamic> headquarters,
 ) async {
   debugPrint('📝 Haciendo MERGE de Headquarters con Batch...');
+  debugPrint('   📊 Registros recibidos del API: ${headquarters.length}');
+  if (headquarters.isNotEmpty) {
+    debugPrint('   🔍 Keys del primer HQ: ${(headquarters.first as Map).keys.toList()}');
+    debugPrint('   🔍 Primer HQ: ${headquarters.first}');
+  }
 
   // Recolectar datos
   final List<Map<String, dynamic>> hqData = [];
@@ -843,7 +1060,11 @@ Future<void> _mergeHeadquarters(
   final Set<int> hqIdsToDeletePolygons = {};
 
   for (final hq in headquarters) {
-    final hqId = hq['id_headquarter'];
+    final hqId = (hq['id_headquarter'] as num?)?.toInt();
+    if (hqId == null) {
+      debugPrint('   ⚠️ HQ sin id_headquarter, se omite. Keys: ${(hq as Map).keys.toList()}');
+      continue;
+    }
 
     // Agregar headquarters
     hqData.add({
@@ -863,11 +1084,10 @@ Future<void> _mergeHeadquarters(
     hqIdsToDeletePolygons.add(hqId);
 
     // Recolectar polígonos válidos
-    // Fuente 1: Lista headquarters_polygons
+    // Fuente 1: lista headquarters_polygons
     final hqPolygons = hq['headquarters_polygons'] as List<dynamic>?;
 
     if (hqPolygons != null && hqPolygons.isNotEmpty) {
-      // Usar la lista de polígonos del API
       for (final polygon in hqPolygons) {
         if (polygon['latitude'] != null && polygon['longitude'] != null) {
           polygonsData.add({
@@ -880,7 +1100,7 @@ Future<void> _mergeHeadquarters(
         }
       }
     } else if (hq['polygon'] != null && (hq['polygon'] as String).isNotEmpty) {
-      // Fuente 2 (fallback): Parsear el campo string 'polygon'
+      // Fuente 2 (fallback): parsear el campo string 'polygon'
       // Formato: [{"LAT":1.445,"LON":-78.689},...]
       try {
         final polygonString = hq['polygon'] as String;
@@ -974,63 +1194,6 @@ Future<void> _insertHeadquartersWeights(
   debugPrint('   ✅ Insertados ${weights.length} pesos de lotes (headquarters_weights)');
 }
 
-/// Inserta Products + Coordinates usando Batch
-Future<void> _insertProducts(
-  Transaction txn,
-  List<dynamic> products,
-) async {
-  debugPrint('📝 Insertando Products con Batch...');
-
-  final List<Map<String, dynamic>> productsData = [];
-  final List<Map<String, dynamic>> coordinatesData = [];
-
-  for (final product in products) {
-    productsData.add({
-      'Id_product': product['id_product'],
-      'Id_headquarter': product['id_headquarter'],
-      'Id_company': product['id_company'],
-      'Id_type': product['id_type'],
-      'Created_at': product['created_at'],
-      'Modified_at': product['modified_at'],
-      'Type_product': product['type_product'],
-      'Name_product': product['name_product'],
-      'Rfid': product['rfid'],
-      'State_product': product['state_product'],
-      'Description_product': product['description_product'],
-      'Location_raw': product['location_raw'],
-      'Line': product['line'],
-      'Palm': product['palm'],
-    });
-
-    // Recolectar coordenadas del producto
-    if (product['products_coordinates'] != null) {
-      for (final coord in product['products_coordinates']) {
-        coordinatesData.add({
-          'Id_product_coordenate': coord['id_product_coordinate'],
-          'Id_product': coord['id_product'],
-          'Latitude': coord['latitude'],
-          'Longitude': coord['longitude'],
-        });
-      }
-    }
-  }
-
-  // Insertar todo con Batch
-  final batch = txn.batch();
-
-  for (final data in productsData) {
-    batch.insert('Products', data, conflictAlgorithm: ConflictAlgorithm.ignore);
-  }
-
-  for (final data in coordinatesData) {
-    batch.insert('Products_coordinates', data, conflictAlgorithm: ConflictAlgorithm.ignore);
-  }
-
-  await batch.commit(noResult: true);
-
-  debugPrint('   ✅ Insertados ${productsData.length} productos');
-  debugPrint('   ✅ Insertadas ${coordinatesData.length} coordenadas de productos');
-}
 
 /// Inserta News usando Batch
 Future<void> _insertNews(
@@ -1078,6 +1241,70 @@ Future<void> _insertLoginSession(
 // ACTUALIZAR APPSTATE
 // ============================================================================
 
+/// Lee las Headquarters desde SQLite y las asigna a FFAppState().headquartersList.
+/// Se llama después de la transacción, con la DB aún abierta.
+Future<void> _loadHeadquartersToAppState(Database db) async {
+  try {
+    // Diagnóstico: total real en tabla
+    final countResult = await db.rawQuery('SELECT COUNT(*) as cnt FROM Headquarters');
+    final totalInTable = (countResult.first['cnt'] as int?) ?? 0;
+    debugPrint('🔍 [loadHQ] Filas en tabla Headquarters: $totalInTable');
+
+    if (totalInTable == 0) {
+      debugPrint('⚠️ [loadHQ] Tabla Headquarters vacía — verifica que _mergeHeadquarters recibió datos');
+      FFAppState().headquartersList = [];
+      return;
+    }
+
+    final rows = await db.query(
+      'Headquarters',
+      columns: [
+        'Id_headquarter',
+        'Id_zone',
+        'Created_at',
+        'Name_headquarter',
+        'Density_headquarter',
+        'Seed_time',
+        'State_headquarter',
+        'Area_headquarter',
+        'Polygon',
+      ],
+      orderBy: 'Name_headquarter ASC',
+    );
+
+    debugPrint('🔍 [loadHQ] Filas leídas por query: ${rows.length}');
+    if (rows.isNotEmpty) {
+      debugPrint('🔍 [loadHQ] Primera fila keys: ${rows.first.keys.toList()}');
+      debugPrint('🔍 [loadHQ] Primera fila: ${rows.first}');
+    }
+
+    final list = rows.map((row) => HeadquartersStruct(
+      idHeadquarter: row['Id_headquarter'] as int?,
+      idZone:        row['Id_zone'] as int?,
+      createdAt:     row['Created_at'] as String?,
+      nameHeadquarter: row['Name_headquarter'] as String?,
+      densityHeadquarter: row['Density_headquarter'] != null
+          ? (row['Density_headquarter'] as num).toInt()
+          : null,
+      seedTime:      row['Seed_time'] as String?,
+      stateHeadquarter: row['State_headquarter'] as String?,
+      areaHeadquarter: row['Area_headquarter'] != null
+          ? (row['Area_headquarter'] as num).toDouble()
+          : null,
+      polygon:       row['Polygon'] as String?,
+    )).toList();
+
+    FFAppState().headquartersList = list;
+    debugPrint('✅ [loadHQ] headquartersList → ${list.length} lotes cargados al AppState');
+    if (list.isNotEmpty) {
+      debugPrint('   Primer lote: ${list.first.nameHeadquarter} (id: ${list.first.idHeadquarter})');
+    }
+  } catch (e, st) {
+    debugPrint('❌ [loadHQ] Error: $e');
+    debugPrint('   Stack: $st');
+  }
+}
+
 /// Actualiza AppState con los datos del Login
 void _updateAppState(Map<String, dynamic> loginData) {
   debugPrint('🔄 Actualizando AppState...');
@@ -1087,16 +1314,11 @@ void _updateAppState(Map<String, dynamic> loginData) {
       // Guardar respuesta completa del Login
       FFAppState().loginResponse = loginData;
 
-      // Usuario por defecto
-      if (loginData['user'] != null) {
-        try {
-          FFAppState().userSelected = UsersStruct.fromMap(loginData['user']);
-          debugPrint(
-              '   ✅ Usuario seleccionado: ${loginData['user']['name_user']}');
-        } catch (e) {
-          debugPrint('   ⚠️ Error al parsear userSelected: $e');
-        }
-      }
+      // userSelected NO se asigna automáticamente desde el API.
+      // El usuario debe seleccionarlo manualmente en LoginPage.
+      // (loginData['user'] contiene el user_default del servidor, pero
+      //  sobreescribirlo aquí causaba que LoginPage saltara la selección manual)
+      debugPrint('   ℹ️  userSelected NO se modifica (debe seleccionarse manualmente en LoginPage)');
 
       // Company por defecto
       if (loginData['company'] != null) {
@@ -1141,6 +1363,89 @@ void _updateAppState(Map<String, dynamic> loginData) {
   } catch (e) {
     debugPrint('⚠️ Error actualizando AppState: $e');
   }
+}
+
+// ============================================================================
+// GZIP HELPERS
+// ============================================================================
+
+/// Detecta si los bytes corresponden a datos GZIP por magic bytes (0x1F 0x8B).
+/// El cliente HTTP de Flutter (dart:io) descomprime automáticamente cuando
+/// recibe Content-Encoding: gzip, por lo que bodyBytes puede llegar ya
+/// descomprimido. Esta función evita el error "Filter error, bad data"
+/// que ocurre al intentar descomprimir datos que ya son JSON plano.
+bool _isGzip(List<int> bytes) =>
+    bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
+
+/// Decodifica bodyBytes que puede ser GZIP o JSON plano, retornando una List.
+/// Retorna null si el JSON resultante no es una lista.
+List<dynamic>? _decodeGzipList(List<int> bodyBytes) {
+  final List<int> jsonBytes = _isGzip(bodyBytes)
+      ? gzip.decode(bodyBytes)
+      : bodyBytes;
+  final data = jsonDecode(utf8.decode(jsonBytes));
+  return data is List ? data : null;
+}
+
+// ============================================================================
+// NORMALIZACIÓN DE ACTIVITIES PARA EL FORMULARIO
+// ============================================================================
+
+/// El formulario lee los status de cada step como `activity_status` (singular),
+/// pero el API devuelve `activities_status` (plural). También usa `status_childs`
+/// pero el API devuelve `activities_status_childs`. Esta función añade alias
+/// para que ambas convenciones funcionen sin tocar el formulario.
+List<dynamic> _normalizeActivitiesForForm(List<dynamic> activities) {
+  return activities.map((activity) {
+    if (activity is! Map) return activity;
+    final act = Map<String, dynamic>.from(activity as Map);
+
+    final steps = act['activity_steps'];
+    if (steps is List) {
+      act['activity_steps'] = steps.map((step) {
+        if (step is! Map) return step;
+        final s = Map<String, dynamic>.from(step as Map);
+
+        // Normalizar la lista de status del step (puede venir como 'activities_status' o 'activity_status')
+        final raw = s['activities_status'] ?? s['activity_status'];
+        final normalized = (raw is List) ? raw.map(_normalizeStatus).toList() : <dynamic>[];
+
+        // El formulario usa AMBAS claves en distintas funciones — exponer las dos
+        s['activities_status'] = normalized; // usado por _buildStepWidget (line 997)
+        s['activity_status']   = normalized; // usado por _initializeDateTimeDefaults (line 718)
+
+        return s;
+      }).toList();
+    }
+
+    // Normalizar status raíz de la actividad
+    final rootStatus = act['activity_status'];
+    if (rootStatus is List) {
+      act['activity_status'] = rootStatus.map(_normalizeStatus).toList();
+    }
+
+    return act;
+  }).toList();
+}
+
+/// Añade alias `status_childs` → `activities_status_childs` en cada status
+/// y aplica la normalización recursivamente a los hijos.
+Map<String, dynamic> _normalizeStatus(dynamic status) {
+  if (status is! Map) return {};
+  final s = Map<String, dynamic>.from(status as Map);
+
+  // Normalizar hijos recursivamente (el formulario usa ambas claves)
+  final childs = s['activities_status_childs'] ?? s['status_childs'];
+  if (childs is List) {
+    final normalized = childs.map(_normalizeStatus).toList();
+    s['activities_status_childs'] = normalized;
+    s['status_childs']            = normalized; // alias para el formulario
+  } else {
+    s['activities_status_childs'] = <dynamic>[];
+    s['status_childs']            = <dynamic>[];
+  }
+
+  return s;
 }
 
 // ============================================================================

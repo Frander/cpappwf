@@ -11,48 +11,38 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as path;
+import 'persistent_id_paths.dart';
 
-// ============================================================================
-// ACCIÓN: DETECTAR SI ES UN DISPOSITIVO NUEVO
-// ============================================================================
-
-/// Detecta si el dispositivo es nuevo (no existe persistent_id.txt)
+/// Detecta si el dispositivo es nuevo (no existe persistent_id.txt en ninguna ruta).
+/// Usa las mismas rutas que get/save_persistent_id para coherencia total.
 Future<bool> isNewDevice() async {
+  if (!Platform.isAndroid) return false;
+
+  const fileName = 'persistent_id.txt';
+
   try {
-    const String fileName = 'persistent_id.txt';
+    final paths = await discoverWritablePaths();
 
-    if (!Platform.isAndroid) {
-      return false;
-    }
-
-    // Verificar permisos
-    final storageDir = await getApplicationDocumentsDirectory();
-
-    // Ubicaciones a verificar (orden de prioridad)
-    final locations = [
-      path.join(storageDir.path, fileName),
-      path.join('/storage/emulated/0', fileName),
-      path.join('/storage/emulated/0/Documents', fileName),
-    ];
-
-    // Si el archivo existe en CUALQUIER ubicación, NO es nuevo dispositivo
-    for (var location in locations) {
-      final file = File(location);
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        if (content.trim().isNotEmpty) {
-          debugPrint('✅ Dispositivo EXISTENTE - ID encontrado en: $location');
-          return false;
+    for (final entry in paths.entries) {
+      final filePath = '${entry.value}/$fileName';
+      try {
+        final file = File(filePath);
+        if (await file.exists()) {
+          final content = (await file.readAsString()).trim();
+          if (content.isNotEmpty) {
+            debugPrint('✅ [isNewDevice] Dispositivo EXISTENTE — ID en ${entry.key}: $content');
+            return false;
+          }
         }
+      } catch (e) {
+        debugPrint('⚠️ [isNewDevice] Error leyendo ${entry.key}: $e');
       }
     }
 
-    debugPrint('🆕 DISPOSITIVO NUEVO - No se encontró persistent_id.txt');
+    debugPrint('🆕 [isNewDevice] DISPOSITIVO NUEVO — persistent_id.txt no encontrado');
     return true;
   } catch (e) {
-    debugPrint('⚠️ Error detectando si es dispositivo nuevo: $e');
+    debugPrint('⚠️ [isNewDevice] Error en detección: $e');
     return false;
   }
 }

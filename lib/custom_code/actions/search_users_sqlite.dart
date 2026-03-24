@@ -13,12 +13,13 @@ import 'package:flutter/material.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 
 Future<List<UsersStruct>> searchUsersSqlite(String searchText) async {
-  // Usa el singleton global en lugar de abrir conexión aislada
   return await globalDb.executeOperation((db) async {
+    // Asegurar que la columna last_used existe (migración automática)
+    await globalDb.ensureUsersLastUsedColumn();
+
     final List<Map<String, dynamic>> queryResult;
 
     if (searchText.trim().isEmpty) {
-      // Si el texto de búsqueda está vacío, retornar todos los usuarios
       queryResult = await db.rawQuery('''
         SELECT
           Id_user as id_user,
@@ -29,12 +30,10 @@ Future<List<UsersStruct>> searchUsersSqlite(String searchText) async {
           Created_at as created_at,
           Modified_at as modifiedAt
         FROM Users
-        ORDER BY Name_user ASC
+        ORDER BY last_used DESC, Name_user ASC
       ''');
     } else {
-      // Construir la consulta SQL para buscar por nombre o operID
       final searchPattern = '%${searchText.trim()}%';
-
       queryResult = await db.rawQuery('''
         SELECT
           Id_user as id_user,
@@ -46,15 +45,11 @@ Future<List<UsersStruct>> searchUsersSqlite(String searchText) async {
           Modified_at as modifiedAt
         FROM Users
         WHERE Name_user LIKE ? OR Oper_id LIKE ?
-        ORDER BY Name_user ASC
+        ORDER BY last_used DESC, Name_user ASC
         LIMIT 50
       ''', [searchPattern, searchPattern]);
     }
 
-    // Mapear los resultados a una lista de UsersStruct
-    final List<UsersStruct> usersList =
-        queryResult.map((map) => UsersStruct.fromMap(map)).toList();
-
-    return usersList;
+    return queryResult.map((map) => UsersStruct.fromMap(map)).toList();
   });
 }

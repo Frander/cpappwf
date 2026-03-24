@@ -26,7 +26,15 @@
       "Bash(python3:*)",
       "Bash(dart run:*)",
       "Bash(node --version:*)",
-      "Bash(git stash:*)"
+      "Bash(git stash:*)",
+      "Bash(find e:RepositoriosFixClickPalmAPP -type f \\\\\\(-name *.db -o -name *.sql -o -name *schema* -o -name *database* \\\\\\))",
+      "Bash(find e:/RepositoriosFix/ClickPalmAPP -name *.db -o -name *sqlite* -type f)",
+      "Bash(find e:/RepositoriosFix/ClickPalmAPP -type f \\\\\\(-name *.sql -o -name *schema* -o -name *migration* \\\\\\))",
+      "Bash(find e:RepositoriosFixClickPalmAPP -name *sqlite*manager* -o -name *database*)",
+      "Read(//_parseNfcTagContentByHeadquarter/**)",
+      "Read(//c/Users/Juan_Diego_Duque/.pub-cache/**)",
+      "Read(//c/Users/Juan_Diego_Duque/**)",
+      "Read(//e/Usuario_JUAN_DIEGO/Escritorio/DESARROLLO/CLICKPALM/CONSULTAS/**)"
     ],
     "deny": [],
     "ask": []

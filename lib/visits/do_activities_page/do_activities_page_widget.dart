@@ -4,6 +4,7 @@ import '/components/gps_stabilization_monitor_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/actions/index.dart' as actions;
+import '/custom_code/actions/hq_sync_tracker.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import '/backend/schema/structs/index.dart';
@@ -38,6 +39,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
   late DoActivitiesPageModel _model;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // ID de la actividad para la que se guardó la preferencia de sincronización.
+  // Si cambia la actividad, se ignora el caché y se vuelve a mostrar el diálogo.
+  int? _syncPreferenceActivityId;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -246,7 +251,10 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           onTap: () async {
                             HapticFeedback.vibrate();
                             context.pushNamed(
-                              UsersPageWidget.routeName,
+                              LoginPageWidget.routeName,
+                              queryParameters: {
+                                'forceSelection': serializeParam(true, ParamType.bool),
+                              },
                               extra: <String, dynamic>{
                                 kTransitionInfoKey: const TransitionInfo(
                                   hasTransition: true,
@@ -487,17 +495,34 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                               final bool? shouldPerformAdvancedSync;
 
-                              // 🔍 Verificar si la sincronización es obligatoria (usando is_sync_full)
-                              final isSyncMandatory = FFAppState().activitySelected.hasNameActivity() &&
-                                  FFAppState().activitySelected.isSyncFull;
+                              // 🔍 Fuente única de verdad: is_sync_full del activitySelectedJSON
+                              final activityJSONLocal = FFAppState().activitySelectedJSON;
+                              final isSyncMandatory = activityJSONLocal != null &&
+                                  (getJsonField(activityJSONLocal, r'''$.is_sync_full''') == true ||
+                                      getJsonField(activityJSONLocal, r'''$.is_sync_full''') == 1);
 
                               // Si es obligatorio, SIEMPRE mostrar el diálogo (ignorar preferencia guardada)
-                              // Si NO es obligatorio, verificar si hay preferencia guardada
-                              if (!isSyncMandatory && FFAppState().shouldGenerateOptimalRoute != null) {
-                                // Usar la preferencia guardada sin mostrar el diálogo (solo si NO es obligatorio)
+                              // Si NO es obligatorio, verificar si hay preferencia guardada Y la actividad no cambió
+                              final currentActivityId = FFAppState().activitySelected.idActivity;
+                              final sameActivity = _syncPreferenceActivityId != null &&
+                                  _syncPreferenceActivityId == currentActivityId;
+
+                              if (!isSyncMandatory && FFAppState().shouldGenerateOptimalRoute != null && sameActivity) {
+                                // Usar la preferencia guardada sin mostrar el diálogo (misma actividad, no obligatorio)
                                 shouldPerformAdvancedSync =
                                     FFAppState().shouldGenerateOptimalRoute;
                               } else {
+                                // Cargar última fecha de sync por lote para mostrar en el diálogo
+                                String? lastSyncInfo;
+                                if (FFAppState().headquartersSelectedList.isNotEmpty) {
+                                  final infoLines = <String>[];
+                                  for (final hq in FFAppState().headquartersSelectedList) {
+                                    final date = await getHqSyncDate(hq.idHeadquarter);
+                                    infoLines.add('${hq.nameHeadquarter}: ${formatHqSyncDate(date)}');
+                                  }
+                                  lastSyncInfo = infoLines.join('\n');
+                                }
+
                                 // Mostrar el diálogo (si es obligatorio o no hay preferencia guardada)
                                 shouldPerformAdvancedSync = await showDialog<bool>(
                                   context: context,
@@ -505,6 +530,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                   barrierColor: Colors.black.withValues(alpha: 0.8),
                                   builder: (dialogContext) {
                                     return AdvancedSyncDialogWidget(
+                                      lastSyncInfo: lastSyncInfo,
                                       onSyncNow: () async {
                                         debugPrint('🔄 Iniciando sincronización completa...');
 
@@ -544,6 +570,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
 
                                           if (syncResult) {
                                             syncedCount++;
+                                            await saveHqSyncDate(headquarterId);
                                             debugPrint('✅ Lote $headquarterId sincronizado exitosamente');
                                           } else {
                                             allSynced = false;
@@ -616,10 +643,11 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                   },
                                 );
 
-                                // Guardar la preferencia para futuras interacciones en esta sesión (solo si NO es obligatorio)
+                                // Guardar la preferencia junto con el ID de actividad (solo si NO es obligatorio)
                                 if (!isSyncMandatory && shouldPerformAdvancedSync != null) {
                                   FFAppState().shouldGenerateOptimalRoute =
                                       shouldPerformAdvancedSync;
+                                  _syncPreferenceActivityId = currentActivityId;
                                 }
                               }
 
@@ -888,6 +916,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               // Actualizar la preferencia guardada con la nueva elección (solo si NO es obligatorio)
                               if (!isSyncMandatoryLongPress && shouldPerformAdvancedSyncLongPress != null) {
                                 FFAppState().shouldGenerateOptimalRoute = shouldPerformAdvancedSyncLongPress;
+                                _syncPreferenceActivityId = FFAppState().activitySelected.idActivity;
                                 debugPrint('✅ Preferencia actualizada: $shouldPerformAdvancedSyncLongPress');
                               }
 

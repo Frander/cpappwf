@@ -218,7 +218,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
           vp.Point_number,
           vp.Latitude,
           vp.Longitude,
-          vp.Description
+          vp.Description_virtual_point AS Description
         FROM Virtual_points vp
       ''';
 

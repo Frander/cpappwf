@@ -99,10 +99,13 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   // Datos del formulario
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _searchHQController = TextEditingController();
 
   // Listas cargadas desde SQLite
   List<Map<String, dynamic>> _zones = [];
   List<Map<String, dynamic>> _nearbyHeadquarters = [];
+  List<Map<String, dynamic>> _allHeadquartersInZone = [];
+  String _searchHQQuery = '';
 
   // Ubicación actual
   double? _currentLatitude;
@@ -133,6 +136,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
     _slideController.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
+    _searchHQController.dispose();
     super.dispose();
   }
 
@@ -154,6 +158,18 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
         _slideController.forward();
       });
     }
+  }
+
+  /// Lista activa del paso 4: búsqueda por nombre o top 5 cercanos
+  List<Map<String, dynamic>> get _activeHeadquarters {
+    if (_searchHQQuery.isEmpty) return _nearbyHeadquarters;
+    final query = _searchHQQuery.toLowerCase();
+    return _allHeadquartersInZone
+        .where((hq) =>
+            (hq['Name_headquarter'] as String? ?? '')
+                .toLowerCase()
+                .contains(query))
+        .toList();
   }
 
   /// Obtiene la ruta de la base de datos
@@ -448,10 +464,14 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           (a['distance'] as double).compareTo(b['distance'] as double));
 
       setState(() {
+        _allHeadquartersInZone = headquartersWithDistance;
         _nearbyHeadquarters = headquartersWithDistance.take(5).toList();
+        _searchHQQuery = '';
+        _searchHQController.clear();
       });
 
       debugPrint('Headquarters cercanos cargados: ${_nearbyHeadquarters.length}');
+      debugPrint('Total headquarters en zona: ${_allHeadquartersInZone.length}');
     } catch (e) {
       debugPrint('Error cargando headquarters: $e');
     }
@@ -562,7 +582,8 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
+      height: MediaQuery.of(context).size.height * 0.9 -
+          MediaQuery.of(context).viewInsets.bottom,
       decoration: BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
@@ -1255,53 +1276,83 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           _buildStepHeader(
             icon: Icons.location_on,
             title: 'Paso 4: Seleccionar Lote',
-            subtitle: 'Top 5 lotes más cercanos a tu ubicación',
+            subtitle: _searchHQQuery.isEmpty
+                ? 'Top 5 lotes más cercanos a tu ubicación'
+                : '${_activeHeadquarters.length} coincidencias encontradas',
             color: Color(0xFF10B981),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
-          // Info de ubicación actual
-          if (_currentLatitude != null && _currentLongitude != null)
-            Container(
-              padding: EdgeInsets.all(12),
-              margin: EdgeInsets.only(bottom: 16),
-              decoration: BoxDecoration(
-                color: Color(0xFF3B82F6).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Color(0xFF3B82F6).withOpacity(0.3)),
+          // Buscador de lote por nombre
+          TextField(
+            controller: _searchHQController,
+            style: const TextStyle(color: Colors.white, fontFamily: 'Roboto'),
+            decoration: InputDecoration(
+              hintText: 'Buscar lote por nombre...',
+              hintStyle: const TextStyle(color: Colors.white38),
+              prefixIcon: const Icon(Icons.search, color: Colors.white38),
+              suffixIcon: _searchHQQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: Colors.white38),
+                      onPressed: () => setState(() {
+                        _searchHQController.clear();
+                        _searchHQQuery = '';
+                      }),
+                    )
+                  : null,
+              filled: true,
+              fillColor: const Color(0xFF374151),
+              contentPadding: const EdgeInsets.symmetric(vertical: 14),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF4B5563)),
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.my_location, color: Color(0xFF3B82F6), size: 18),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Tu ubicación: ${_currentLatitude!.toStringAsFixed(6)}, ${_currentLongitude!.toStringAsFixed(6)}',
-                      style: TextStyle(
-                        fontFamily: 'Roboto Mono',
-                        fontSize: 11,
-                        color: Colors.white70,
-                      ),
-                    ),
-                  ),
-                ],
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF4B5563)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Color(0xFF10B981), width: 2),
               ),
             ),
+            onChanged: (value) => setState(() => _searchHQQuery = value.trim()),
+          ),
+          const SizedBox(height: 16),
 
           if (_nearbyHeadquarters.isEmpty)
             Container(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Color(0xFF374151),
+                color: const Color(0xFF374151),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Column(
                 children: [
                   const RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFF10B981))),
-                  SizedBox(height: 16),
-                  Text(
+                  const SizedBox(height: 16),
+                  const Text(
                     'Buscando lotes cercanos...',
                     style: TextStyle(color: Colors.white60),
+                  ),
+                ],
+              ),
+            )
+          else if (_activeHeadquarters.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF374151),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.search_off, color: Colors.white38, size: 40),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Sin resultados para "$_searchHQQuery"',
+                    style: const TextStyle(color: Colors.white60),
+                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
@@ -1310,10 +1361,10 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             ListView.separated(
               shrinkWrap: true,
               physics: NeverScrollableScrollPhysics(),
-              itemCount: _nearbyHeadquarters.length,
+              itemCount: _activeHeadquarters.length,
               separatorBuilder: (_, __) => SizedBox(height: 12),
               itemBuilder: (context, index) => _buildHeadquarterCard(
-                _nearbyHeadquarters[index],
+                _activeHeadquarters[index],
                 index + 1,
               ),
             ),

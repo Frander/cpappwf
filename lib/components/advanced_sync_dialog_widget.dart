@@ -22,10 +22,15 @@ class AdvancedSyncDialogWidget extends StatefulWidget {
     super.key,
     required this.onSyncNow,
     required this.onSkip,
+    this.lastSyncInfo,
   });
 
   final Future<void> Function() onSyncNow;
   final VoidCallback onSkip;
+
+  /// Texto con la última fecha de sincronización por lote.
+  /// Ejemplo: "QA10: hace 2 días\nQA28: Nunca sincronizado"
+  final String? lastSyncInfo;
 
   @override
   State<AdvancedSyncDialogWidget> createState() =>
@@ -56,16 +61,11 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
 
   @override
   Widget build(BuildContext context) {
-    // Evaluar si la sincronización es obligatoria según el campo is_sync_full de la actividad
-    final isSyncMandatory = () {
-      final activityJSON = context.watch<FFAppState>().activitySelectedJSON;
-      if (activityJSON != null) {
-        final isSyncFull = getJsonField(activityJSON, r'''$.is_sync_full''');
-        // Si is_sync_full es true (1 en SQLite), la sincronización es obligatoria
-        return isSyncFull == true || isSyncFull == 1;
-      }
-      return false; // Por defecto, no es obligatoria
-    }();
+    // Fuente única de verdad: campo is_sync_full del activitySelectedJSON
+    final activityJSON = context.watch<FFAppState>().activitySelectedJSON;
+    final isSyncMandatory = activityJSON != null &&
+        (getJsonField(activityJSON, r'''$.is_sync_full''') == true ||
+            getJsonField(activityJSON, r'''$.is_sync_full''') == 1);
 
     return Dialog(
       elevation: 0,
@@ -263,6 +263,62 @@ class _AdvancedSyncDialogWidgetState extends State<AdvancedSyncDialogWidget>
                   ),
 
                   SizedBox(height: 12),
+
+                  // Última sincronización por lote (solo cuando se provee)
+                  if (widget.lastSyncInfo != null) ...[
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Color(0xFF1E3A5F).withOpacity(0.7),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: Color(0xFF3B82F6).withOpacity(0.4),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.history_rounded,
+                              color: Color(0xFF60A5FA),
+                              size: 15,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'ÚLTIMA SINCRONIZACIÓN',
+                                    style: TextStyle(fontFamily: 'Roboto',
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: Color(0xFF60A5FA),
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  SizedBox(height: 3),
+                                  Text(
+                                    widget.lastSyncInfo!,
+                                    style: TextStyle(fontFamily: 'Roboto',
+                                      fontSize: 11,
+                                      color: Color(0xFFBFDBFE),
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: 10),
+                  ],
 
                   // Advertencia compacta
                   Padding(

@@ -83,14 +83,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
-          name: UsersPageWidget.routeName,
-          path: UsersPageWidget.routePath,
-          builder: (context, params) => UsersPageWidget(),
-        ),
-        FFRoute(
           name: LoginPageWidget.routeName,
           path: LoginPageWidget.routePath,
-          builder: (context, params) => LoginPageWidget(),
+          builder: (context, params) => LoginPageWidget(
+            forceSelection: params.getParam('forceSelection', ParamType.bool) ?? false,
+          ),
         ),
         FFRoute(
           name: HeadquartersPageWidget.routeName,

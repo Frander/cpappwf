@@ -10,9 +10,6 @@ import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import '/custom_code/actions/index.dart';
-import '/flutter_flow/custom_functions.dart';
-
 import 'dart:io';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -45,7 +42,7 @@ Future<bool> syncInstallModule(
 ) async {
   final String baseUrl = 'https://api.clickpalm.com';
   final String endpoint =
-      '$baseUrl/Headquarters/$headquarterId/with-all-relations';
+      '$baseUrl/Headquarters/$headquarterId/with-all-relations-compressed';
 
   try {
     debugPrint('=== Iniciando sincronización de módulo de instalación ===');
@@ -70,10 +67,9 @@ Future<bool> syncInstallModule(
       return false;
     }
 
-    // 2. PARSEAR JSON
-    debugPrint('🔄 Parseando JSON...');
-    final Map<String, dynamic> data = jsonDecode(response.body);
-    debugPrint('✅ JSON parseado exitosamente');
+    // 2. PARSEAR RESPUESTA (con detección automática de compresión GZIP)
+    final Map<String, dynamic> data = _decodeGzipResponse(response.bodyBytes);
+    debugPrint('✅ JSON parseado exitosamente (${response.bodyBytes.length} bytes recibidos)');
 
     // DEBUG: Mostrar todas las keys del JSON
     debugPrint('🔍 Keys disponibles en JSON de respuesta:');
@@ -93,6 +89,12 @@ Future<bool> syncInstallModule(
     final String dbPath = await _getDatabasePath();
     final Database db = await openDatabase(dbPath);
     debugPrint('🔗 Conexión SQLite abierta: ${db.hashCode}');
+
+    // PRAGMAs de rendimiento para inserción masiva
+    // sqflite requiere rawQuery para PRAGMAs (retornan filas)
+    await db.rawQuery('PRAGMA journal_mode = WAL;');
+    await db.rawQuery('PRAGMA synchronous = NORMAL;');
+    await db.rawQuery('PRAGMA cache_size = -65536;'); // 64 MB cache
 
     // 4. INSERTAR DATOS EN TRANSACCIÓN
     debugPrint('💾 Insertando datos en SQLite...');
@@ -187,9 +189,9 @@ Future<void> _insertHeadquarter(
         'Horizontal_palm_distance': data['horizontal_palm_distance'],
         'Vertical_palm_distance': data['vertical_palm_distance'],
         'Magnetic_declination': data['magnetic_declination'],
-        'CustomOriginLatitude': data['customOriginLatitude'],
-        'CustomOriginLongitude': data['customOriginLongitude'],
-        'Has_plants': (data['has_plants'] == true) ? 1 : 0,
+        'CustomOriginLatitude': data['custom_origin_latitude'],
+        'CustomOriginLongitude': data['custom_origin_longitude'],
+        'Has_plants': (data['has_plants'] == true || data['has_plants'] == 1) ? 1 : 0,
       },
       conflictAlgorithm:
           ConflictAlgorithm.replace, // ✅ REPLACE para actualizar todo
@@ -221,8 +223,7 @@ Future<void> _insertHeadquartersPolygons(
             'Id_headquarter': headquarterId,
             'Latitude': polygon['latitude'],
             'Longitude': polygon['longitude'],
-            'Created_at':
-                polygon['created_at'] ?? DateTime.now().toIso8601String(),
+            'Created_at': polygon['created_at'] ?? DateTime.now().toIso8601String(),
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
@@ -314,60 +315,110 @@ Future<void> _insertHeadquartersCoordinates(
 Future<void> _insertProducts(
     Transaction txn, List<dynamic> products, int headquarterId) async {
   try {
-    debugPrint('   📝 Insertando ${products.length} productos...');
+    debugPrint('   📝 Preparando inserción de ${products.length} productos...');
 
-    int coordinatesCount = 0;
+    // ── Límite SQLite: 999 bind params por statement ──────────────────────────
+    const int productFields = 14;
+    const int coordFields   = 4;
+    const int productChunk  = 999 ~/ productFields; // 71 filas por statement
+    const int coordChunk    = 999 ~/ coordFields;   // 249 filas por statement
 
-    for (var product in products) {
-      // Insertar producto con TODOS los campos
-      await txn.insert(
-        'Products',
-        {
-          'Id_product': product['id_product'],
-          'Id_headquarter': headquarterId,
-          'Id_company': product['id_company'] ?? 0,
-          'Id_type': product['id_type'] ?? 0,
-          'Created_at':
-              product['created_at'] ?? DateTime.now().toIso8601String(),
-          'Modified_at':
-              product['modified_at'] ?? DateTime.now().toIso8601String(),
-          'Type_product': product['type_product'],
-          'Name_product': product['name_product'],
-          'Rfid': product['rfid'],
-          'State_product': product['state_product'],
-          'Description_product': product['description_product'],
-          'Location_raw': product['location_raw'],
-          'Line': product['line'],
-          'Palm': product['palm'],
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
+    // ── 1. Separar datos en listas planas (un solo recorrido del JSON) ─────────
+    final List<List<dynamic>> productRows = [];
+    final List<List<dynamic>> coordRows   = [];
+    final String now = DateTime.now().toIso8601String();
 
-      // Insertar coordenadas del producto (nota el typo 'coordenates' del API)
-      if (product['coordenates'] != null && product['coordenates'] is List) {
-        for (var coord in product['coordenates']) {
-          // Solo insertar si latitude y longitude no son null
+    for (final product in products) {
+      productRows.add([
+        product['id_product'],
+        headquarterId,
+        product['id_company'] ?? 0,
+        product['id_type'] ?? 0,
+        product['created_at'] ?? now,
+        product['modified_at'] ?? now,
+        product['type_product'],
+        product['name_product'],
+        product['rfid'],
+        product['state_product'],
+        product['description_product'],
+        product['location_raw'],
+        product['line'],
+        product['palm'],
+      ]);
+
+      if (product['coordenates'] is List) {
+        for (final coord in product['coordenates']) {
           final lat = coord['latitude'];
           final lon = coord['longitude'];
           if (lat != null && lon != null) {
-            await txn.insert(
-              'Products_coordinates',
-              {
-                'Id_product_coordenate': coord['id_product_coordenate'],
-                'Id_product': product['id_product'],
-                'Latitude': lat,
-                'Longitude': lon,
-              },
-              conflictAlgorithm: ConflictAlgorithm.replace,
-            );
-            coordinatesCount++;
+            coordRows.add([
+              coord['id_product_coordenate'],
+              product['id_product'],
+              lat,
+              lon,
+            ]);
           }
         }
       }
     }
 
-    debugPrint(
-        '   ✅ ${products.length} productos insertados con $coordinatesCount coordenadas');
+    // ── 2. DELETE previo: elimina registros del HQ sin overhead de conflictos ──
+    await txn.rawDelete(
+      'DELETE FROM Products_coordinates '
+      'WHERE Id_product IN (SELECT Id_product FROM Products WHERE Id_headquarter = ?)',
+      [headquarterId],
+    );
+    await txn.rawDelete(
+      'DELETE FROM Products WHERE Id_headquarter = ?',
+      [headquarterId],
+    );
+
+    // ── 3. INSERT Products en chunks de $productChunk filas ───────────────────
+    const String productCols =
+        'Id_product, Id_headquarter, Id_company, Id_type, '
+        'Created_at, Modified_at, Type_product, Name_product, '
+        'Rfid, State_product, Description_product, Location_raw, Line, Palm';
+    final String productPlaceholder =
+        '(${List.filled(productFields, '?').join(',')})';
+
+    int productStatements = 0;
+    for (int i = 0; i < productRows.length; i += productChunk) {
+      final int end = i + productChunk < productRows.length
+          ? i + productChunk
+          : productRows.length;
+      final chunk  = productRows.sublist(i, end);
+      final params = chunk.expand((r) => r).toList();
+      await txn.rawInsert(
+        'INSERT INTO Products ($productCols) VALUES '
+        '${List.filled(chunk.length, productPlaceholder).join(',')}',
+        params,
+      );
+      productStatements++;
+    }
+
+    // ── 4. INSERT Products_coordinates en chunks de $coordChunk filas ─────────
+    int coordStatements = 0;
+    if (coordRows.isNotEmpty) {
+      const String coordCols =
+          'Id_product_coordenate, Id_product, Latitude, Longitude';
+
+      for (int i = 0; i < coordRows.length; i += coordChunk) {
+        final int end = i + coordChunk < coordRows.length
+            ? i + coordChunk
+            : coordRows.length;
+        final chunk  = coordRows.sublist(i, end);
+        final params = chunk.expand((r) => r).toList();
+        await txn.rawInsert(
+          'INSERT INTO Products_coordinates ($coordCols) VALUES '
+          '${List.filled(chunk.length, '(?,?,?,?)').join(',')}',
+          params,
+        );
+        coordStatements++;
+      }
+    }
+
+    debugPrint('   ✅ ${productRows.length} productos  → $productStatements statements');
+    debugPrint('   ✅ ${coordRows.length} coordenadas → $coordStatements statements');
   } catch (e) {
     debugPrint('   ❌ Error insertando productos: $e');
     rethrow;
@@ -385,13 +436,14 @@ Future<void> _insertAllTypesPoints(
     int totalInserted = 0;
 
     // Extraer type_point de virtual_points
-    if (data['virtual_points'] != null && data['virtual_points'] is List) {
-      for (var point in data['virtual_points']) {
-        if (point['type_point'] != null && point['type_point'] is Map) {
-          final typePoint = point['type_point'] as Map<String, dynamic>;
+    final virtualPoints = data['virtual_points'];
+    if (virtualPoints is List) {
+      for (var point in virtualPoints) {
+        final typePoint = point['type_point'];
+        if (typePoint is Map) {
           final id = typePoint['id_type_point'];
           if (id != null && !insertedTypePointIds.contains(id)) {
-            await _insertTypePoint(txn, typePoint);
+            await _insertTypePoint(txn, typePoint.cast<String, dynamic>());
             insertedTypePointIds.add(id);
             totalInserted++;
           }
@@ -400,14 +452,14 @@ Future<void> _insertAllTypesPoints(
     }
 
     // Extraer type_point de headquarters_coordinates
-    if (data['headquarters_coordinates'] != null &&
-        data['headquarters_coordinates'] is List) {
-      for (var coord in data['headquarters_coordinates']) {
-        if (coord['type_point'] != null && coord['type_point'] is Map) {
-          final typePoint = coord['type_point'] as Map<String, dynamic>;
+    final hqCoordinates = data['headquarters_coordinates'];
+    if (hqCoordinates is List) {
+      for (var coord in hqCoordinates) {
+        final typePoint = coord['type_point'];
+        if (typePoint is Map) {
           final id = typePoint['id_type_point'];
           if (id != null && !insertedTypePointIds.contains(id)) {
-            await _insertTypePoint(txn, typePoint);
+            await _insertTypePoint(txn, typePoint.cast<String, dynamic>());
             insertedTypePointIds.add(id);
             totalInserted++;
           }
@@ -416,13 +468,14 @@ Future<void> _insertAllTypesPoints(
     }
 
     // Extraer type_point de products
-    if (data['products'] != null && data['products'] is List) {
-      for (var product in data['products']) {
-        if (product['type_point'] != null && product['type_point'] is Map) {
-          final typePoint = product['type_point'] as Map<String, dynamic>;
+    final products = data['products'];
+    if (products is List) {
+      for (var product in products) {
+        final typePoint = product['type_point'];
+        if (typePoint is Map) {
           final id = typePoint['id_type_point'];
           if (id != null && !insertedTypePointIds.contains(id)) {
-            await _insertTypePoint(txn, typePoint);
+            await _insertTypePoint(txn, typePoint.cast<String, dynamic>());
             insertedTypePointIds.add(id);
             totalInserted++;
           }
@@ -498,6 +551,23 @@ Future<void> _insertHeadquartersWeights(
 // ============================================================================
 // FUNCIONES AUXILIARES
 // ============================================================================
+
+/// Decodifica una respuesta que puede estar comprimida con GZIP o ser JSON plano.
+///
+/// El cliente HTTP de Flutter (dart:io HttpClient) descomprime automáticamente
+/// cuando recibe Content-Encoding: gzip, por lo que response.bodyBytes puede
+/// llegar ya descomprimido. Esta función detecta por magic bytes (0x1F 0x8B)
+/// si los datos siguen siendo GZIP y los descomprime solo si es necesario.
+Map<String, dynamic> _decodeGzipResponse(List<int> bodyBytes) {
+  final List<int> jsonBytes = _isGzip(bodyBytes)
+      ? gzip.decode(bodyBytes)
+      : bodyBytes;
+  return jsonDecode(utf8.decode(jsonBytes)) as Map<String, dynamic>;
+}
+
+/// Detecta si los bytes corresponden a datos GZIP por magic bytes (0x1F 0x8B).
+bool _isGzip(List<int> bytes) =>
+    bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
 
 Future<String> _getDatabasePath() async {
   final Directory? externalDir = await getExternalStorageDirectory();

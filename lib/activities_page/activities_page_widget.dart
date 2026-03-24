@@ -12,6 +12,152 @@ import '/backend/schema/structs/index.dart';
 import 'activities_page_model.dart';
 export 'activities_page_model.dart';
 
+// ─── Fallback: reconstruye currentActivity desde SQLite cuando activitiesJSON es null ───
+
+/// Convierte una fila de Activities_status en el mapa JSON que espera el formulario.
+Map<String, dynamic> _statusRowToJson(Map<String, dynamic> row) {
+  return {
+    'id_activity_status':     row['Id_activity_status'],
+    'id_activity':            row['Id_activity'],
+    'id_activity_step_parent': row['Id_activity_step_parent'],
+    'id_activity_status_parent': row['Id_activity_status_parent'],
+    'type_status':    row['Type_status'],
+    'order_status':   row['Order_status'],
+    'default_status': row['Default_status'],
+    'status_name':    row['Status_name'],
+    'color':          row['Color'],
+    'peso':           row['Peso'],
+    'castigo':        row['Castigo'],
+    'boton':          row['Boton'],
+    'factor':         row['Factor'],
+    'status':         row['Status'],
+    'remember_status': false, // no almacenado en SQLite
+    'status_childs':  <dynamic>[],
+    'activities_status_childs': <dynamic>[],
+  };
+}
+
+/// Carga una actividad desde SQLite y reconstruye la estructura jerárquica
+/// que el formulario necesita (activity_steps + activity_status anidados).
+Future<Map<String, dynamic>?> _loadActivityFromSQLite(int activityId) async {
+  try {
+    final db = await GlobalDbSingleton().database;
+
+    // 1. Actividad principal
+    final actRows = await db.query(
+      'Activities', where: 'Id_activity = ?', whereArgs: [activityId]);
+    if (actRows.isEmpty) {
+      debugPrint('⚠️ [SQLite fallback] Activity $activityId no encontrada');
+      return null;
+    }
+    final actRow = actRows.first;
+
+    // 2. Steps ordenados
+    final stepsRows = await db.query(
+      'Activities_steps',
+      where: 'Id_activity = ?',
+      whereArgs: [activityId],
+      orderBy: 'Order_step ASC',
+    );
+
+    // 3. Todos los status de esta actividad (flat)
+    final statusRows = await db.query(
+      'Activities_status',
+      where: 'Id_activity = ?',
+      whereArgs: [activityId],
+      orderBy: 'Order_status ASC',
+    );
+
+    // Mapa id → json mutable para construir árbol de hijos
+    final statusById = <int, Map<String, dynamic>>{};
+    for (final row in statusRows) {
+      final id = row['Id_activity_status'] as int;
+      statusById[id] = _statusRowToJson(row);
+    }
+
+    // Construir hijos de status
+    for (final row in statusRows) {
+      final parentId = row['Id_activity_status_parent'];
+      if (parentId != null && (parentId as int) != 0 && statusById.containsKey(parentId)) {
+        final childId = row['Id_activity_status'] as int;
+        final parent = statusById[parentId]!;
+        (parent['status_childs'] as List).add(statusById[childId]!);
+        (parent['activities_status_childs'] as List).add(statusById[childId]!);
+      }
+    }
+
+    // Helper: status raíz de un step (padre de status = 0/null y padre de step = stepId)
+    List<Map<String, dynamic>> rootStatusForStep(int stepId) => statusRows
+      .where((r) {
+        final sp = r['Id_activity_step_parent'];
+        final sap = r['Id_activity_status_parent'];
+        return sp == stepId && (sap == null || (sap as int) == 0);
+      })
+      .map((r) => statusById[r['Id_activity_status'] as int]!)
+      .toList();
+
+    // 4. Steps con sus status
+    final stepsJson = stepsRows.map((step) {
+      final stepId    = step['Id_activity_step'] as int;
+      final stepSts   = rootStatusForStep(stepId);
+      return {
+        'id_activity_step': stepId,
+        'id_activity':      step['Id_activity'],
+        'type_step':        step['Type_step'],
+        'order_step':       step['Order_step'],
+        'default_value':    step['Default_value'],
+        'unity':            step['Unity'],
+        'calculation':      step['Calculation'],
+        'name_step':        step['Name_step'],
+        'status':           step['Status'],
+        'is_required':      step['Is_required'] == 1,
+        // Exponer con AMBAS claves: la form usa ambas en distintos lugares
+        'activity_status':   stepSts, // usado por _initializeDateTimeDefaults
+        'activities_status': stepSts, // usado por _buildStepWidget
+      };
+    }).toList();
+
+    // 5. Status raíz (sin step parent)
+    final rootStatus = statusRows
+      .where((r) {
+        final sp  = r['Id_activity_step_parent'];
+        final sap = r['Id_activity_status_parent'];
+        return (sp == null || (sp as int) == 0) && (sap == null || (sap as int) == 0);
+      })
+      .map((r) => statusById[r['Id_activity_status'] as int]!)
+      .toList();
+
+    debugPrint(
+      '✅ [SQLite fallback] Activity $activityId: '
+      '${stepsJson.length} steps, ${rootStatus.length} root status');
+
+    return {
+      'id_activity':         actRow['Id_activity'],
+      'id_company':          actRow['Id_company'],
+      'id_activity_parent':  actRow['Id_activity_parent'],
+      'name_activity':       actRow['Name_activity'],
+      'group_activity':      actRow['Group_activity'],
+      'unity':               actRow['Unity'],
+      'type_activity':       actRow['Type_activity'],
+      'type_effectivity':    actRow['Type_effectivity'],
+      'cycle':               actRow['Cycle'],
+      'effectivity_unitys':  actRow['Effectivity_unitys'],
+      'effectivity_visits':  actRow['Effectivity_visits'],
+      'module_activity':     actRow['Module_activity'],
+      'description_activity': actRow['Description_activity'],
+      'created_at':          actRow['Created_at'],
+      'is_default':          actRow['Is_default'] == 1,
+      'read_default':        actRow['Read_default'],
+      'is_sync_full':        false, // no almacenado en SQLite
+      'activity_steps':      stepsJson,
+      'activity_status':     rootStatus,
+    };
+  } catch (e) {
+    debugPrint('❌ [SQLite fallback] Error cargando actividad $activityId: $e');
+    return null;
+  }
+}
+
 class ActivitiesPageWidget extends StatefulWidget {
   const ActivitiesPageWidget({super.key});
 
@@ -505,20 +651,18 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
         // Guardar actividad seleccionada como STRUCT
         FFAppState().activitySelected = activityItem;
 
-        // Buscar la actividad completa en activitiesJSON usando el id_activity
+        dynamic activityJSON;
+
+        // 1. Buscar en activitiesJSON (cargado del endpoint GZIP en login)
         final activitiesJSON = FFAppState().activitiesJSON;
         if (activitiesJSON != null) {
           try {
             final activitiesList = activitiesJSON is List ? activitiesJSON : [];
-            final activityJSON = activitiesList.firstWhere(
+            activityJSON = activitiesList.firstWhere(
               (activity) => getJsonField(activity, r'''$.id_activity''') == activityItem.idActivity,
               orElse: () => null,
             );
-
             if (activityJSON != null) {
-              // Guardar el JSON completo de la actividad (con activity_steps y activity_status)
-              FFAppState().activitySelectedJSON = activityJSON;
-              FFAppState().currentActivity = activityJSON;
               debugPrint('✅ Actividad encontrada en activitiesJSON: ${activityItem.nameActivity}');
             } else {
               debugPrint('⚠️ Actividad no encontrada en activitiesJSON, id_activity: ${activityItem.idActivity}');
@@ -527,11 +671,24 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
             debugPrint('❌ Error buscando actividad en activitiesJSON: $e');
           }
         } else {
-          debugPrint('⚠️ activitiesJSON es null, no se pudo cargar la actividad completa');
+          debugPrint('⚠️ activitiesJSON es null — usando fallback SQLite');
+        }
+
+        // 2. Fallback: reconstruir desde SQLite si activitiesJSON no aportó datos
+        if (activityJSON == null) {
+          debugPrint('🔄 Cargando actividad ${activityItem.idActivity} desde SQLite...');
+          activityJSON = await _loadActivityFromSQLite(activityItem.idActivity);
+        }
+
+        if (activityJSON != null) {
+          FFAppState().activitySelectedJSON = activityJSON;
+          FFAppState().currentActivity = activityJSON;
+        } else {
+          debugPrint('❌ No se pudo cargar el JSON de la actividad: ${activityItem.nameActivity}');
         }
 
         FFAppState().update(() {});
-        context.safePop();
+        if (context.mounted) context.safePop();
       },
       child: Container(
         width: double.infinity,

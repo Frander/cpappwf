@@ -62,6 +62,9 @@ Future<bool> syncVisitsv2(
         'id_device': map['id_device'] ?? map['idDevice'],
         'id_user': map['id_user'] ?? map['idUser'],
         'created_at': (visitNews.createdAt != null)
+            ? visitNews.createdAt!.toUtc().toIso8601String()
+            : DateTime.now().toUtc().toIso8601String(),
+        'created_at_local': (visitNews.createdAt != null)
             ? visitNews.createdAt!.toIso8601String()
             : DateTime.now().toIso8601String(),
         'descripcion_new':
@@ -78,7 +81,7 @@ Future<bool> syncVisitsv2(
 
     // 4. CREAR JSON PARA SYNC
     final syncData = {
-      'created_at': DateTime.now().toIso8601String(),
+      'created_at': DateTime.now().toUtc().toIso8601String(),
       'ids_headquarters': idsHeadquarters,
       'imei': imei,
       'id_user': FFAppState().userSelected.idUser, // ID del usuario seleccionado
@@ -90,42 +93,81 @@ Future<bool> syncVisitsv2(
     debugPrint('   - news_add: ${newsAddJson.length} registros');
     debugPrint('   - visits_add: ${visitsAddJson.length} registros');
 
-    // ==========================================================================
-    // ESTRATEGIA 1: ENDPOINT JSON SIMPLE (PRINCIPAL)
-    // ==========================================================================
-    debugPrint('');
-    debugPrint('📤 Intento 1: Usando endpoint simple JSON (SyncVisitsAdd)');
-
-    final bool jsonSuccess = await _syncWithSimpleJson(
-      syncData,
-      authToken,
-      newsAddJson.length,
-      visitsAddJson.length,
-    );
-
-    if (jsonSuccess) {
-      debugPrint('✅ Sincronización JSON exitosa');
-      await _cleanupSQLiteDataAfterSync();
-      return true;
-    }
+    // Token mutable para permitir renovación en caso de 401
+    String currentToken = authToken;
+    bool tokenRenewed = false;
 
     // ==========================================================================
-    // ESTRATEGIA 2: ENDPOINT MULTIPART CON ARCHIVOS COMPRIMIDOS (FALLBACK)
+    // ESTRATEGIA 1: ENDPOINT MULTIPART CON ARCHIVOS COMPRIMIDOS (PRINCIPAL)
     // ==========================================================================
     debugPrint('');
-    debugPrint('! Endpoint simple JSON falló, iniciando FALLBACK multipart...');
-    debugPrint('📤 Intento 2: Usando endpoint multipart con compresión');
+    debugPrint('📤 Intento 1: Usando endpoint multipart (SyncVisitsAddMultipart)');
 
-    final bool multipartSuccess = await _syncWithMultipart(
+    int multipartStatus = await _syncWithMultipart(
       syncData,
-      authToken,
+      currentToken,
       idCompany,
       newsAddJson.length,
       visitsAddJson.length,
     );
 
-    if (multipartSuccess) {
+    // Si recibimos 401, renovar token y reintentar
+    if (multipartStatus == 401) {
+      debugPrint('🔑 Token expirado (401) en estrategia 1. Renovando token...');
+      final newToken = await _renewAuthToken(imei);
+      if (newToken != null) {
+        currentToken = newToken;
+        tokenRenewed = true;
+        debugPrint('🔁 Reintentando estrategia 1 con token renovado...');
+        multipartStatus = await _syncWithMultipart(
+          syncData,
+          currentToken,
+          idCompany,
+          newsAddJson.length,
+          visitsAddJson.length,
+        );
+      }
+    }
+
+    if (multipartStatus == 200 || multipartStatus == 202) {
       debugPrint('✅ Sincronización multipart exitosa');
+      await _cleanupSQLiteDataAfterSync();
+      return true;
+    }
+
+    // ==========================================================================
+    // ESTRATEGIA 2: ENDPOINT JSON SIMPLE (FALLBACK)
+    // ==========================================================================
+    debugPrint('');
+    debugPrint('⚠️ Endpoint multipart falló, iniciando FALLBACK JSON simple...');
+    debugPrint('📤 Intento 2: Usando endpoint simple JSON (SyncVisitsAdd)');
+
+    int jsonStatus = await _syncWithSimpleJson(
+      syncData,
+      currentToken,
+      newsAddJson.length,
+      visitsAddJson.length,
+    );
+
+    // Si recibimos 401 y aún no renovamos el token, renovar y reintentar
+    if (jsonStatus == 401 && !tokenRenewed) {
+      debugPrint('🔑 Token expirado (401) en estrategia 2. Renovando token...');
+      final newToken = await _renewAuthToken(imei);
+      if (newToken != null) {
+        currentToken = newToken;
+        tokenRenewed = true;
+        debugPrint('🔁 Reintentando estrategia 2 con token renovado...');
+        jsonStatus = await _syncWithSimpleJson(
+          syncData,
+          currentToken,
+          newsAddJson.length,
+          visitsAddJson.length,
+        );
+      }
+    }
+
+    if (jsonStatus == 200 || jsonStatus == 202) {
+      debugPrint('✅ Sincronización JSON exitosa');
       await _cleanupSQLiteDataAfterSync();
       return true;
     }
@@ -140,8 +182,52 @@ Future<bool> syncVisitsv2(
   }
 }
 
-/// Sincronización con endpoint JSON simple (SIN archivos comprimidos)
-Future<bool> _syncWithSimpleJson(
+/// Renueva el token usando POST /Users/RenewToken.
+/// Retorna el nuevo token, o null si falla.
+Future<String?> _renewAuthToken(String imei) async {
+  try {
+    const String url = 'https://api.clickpalm.com/Users/RenewToken';
+    debugPrint('🔑 Llamando a POST /Users/RenewToken...');
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'Type_login': 'IMEI',
+        'Username': imei,
+        'Password': imei,
+      }),
+    );
+
+    debugPrint('📥 RenewToken Status: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final newToken = data['token'] as String?;
+      if (newToken != null && newToken.isNotEmpty) {
+        debugPrint('✅ Token renovado exitosamente');
+        // Actualizar el token en el estado global
+        final dynamic current = FFAppState().loginResponse;
+        if (current is Map) {
+          final updated = Map<String, dynamic>.from(current);
+          updated['token'] = newToken;
+          FFAppState().loginResponse = updated;
+        }
+        return newToken;
+      }
+    }
+
+    debugPrint('❌ Error al renovar token: ${response.statusCode} - ${response.body}');
+    return null;
+  } catch (e) {
+    debugPrint('⚠️ Excepción en _renewAuthToken: $e');
+    return null;
+  }
+}
+
+/// Sincronización con endpoint JSON simple (SIN archivos comprimidos).
+/// Retorna el HTTP status code, o -1 en caso de excepción.
+Future<int> _syncWithSimpleJson(
   Map<String, dynamic> syncData,
   String authToken,
   int newsCount,
@@ -166,28 +252,28 @@ Future<bool> _syncWithSimpleJson(
         'Content-Type': 'application/json',
       },
       body: jsonBody,
-    );
+    ).timeout(const Duration(seconds: 90));
 
     debugPrint('📥 ===== RESPUESTA DEL API (JSON) =====');
     debugPrint('   - Status Code: ${response.statusCode}');
     debugPrint('   - Body: ${response.body}');
 
-    if (response.statusCode == 200 || response.statusCode == 202) {
-      return true;
-    } else {
+    if (response.statusCode != 200 && response.statusCode != 202) {
       debugPrint('❌ Error en endpoint JSON:');
       debugPrint('   Status: ${response.statusCode}');
       debugPrint('   Response: ${response.body}');
-      return false;
     }
+
+    return response.statusCode;
   } catch (e) {
     debugPrint('⚠️ Excepción en _syncWithSimpleJson: $e');
-    return false;
+    return -1;
   }
 }
 
-/// Sincronización con endpoint multipart (CON archivos comprimidos)
-Future<bool> _syncWithMultipart(
+/// Sincronización con endpoint multipart (CON archivos comprimidos).
+/// Retorna el HTTP status code, o -1 en caso de excepción.
+Future<int> _syncWithMultipart(
   Map<String, dynamic> syncData,
   String authToken,
   int idCompany,
@@ -254,24 +340,23 @@ Future<bool> _syncWithMultipart(
     debugPrint('   - Archivos: ${request.files.length}');
 
     // Enviar request
-    final response = await request.send();
+    final response = await request.send().timeout(const Duration(seconds: 90));
     final responseBody = await response.stream.bytesToString();
 
     debugPrint('📥 ===== RESPUESTA DEL API (MULTIPART) =====');
     debugPrint('   - Status Code: ${response.statusCode}');
     debugPrint('   - Body: $responseBody');
 
-    if (response.statusCode == 200 || response.statusCode == 202) {
-      return true;
-    } else {
+    if (response.statusCode != 200 && response.statusCode != 202) {
       debugPrint('❌ Error en endpoint multipart:');
       debugPrint('   Status: ${response.statusCode}');
       debugPrint('   Response: $responseBody');
-      return false;
     }
+
+    return response.statusCode;
   } catch (e) {
     debugPrint('⚠️ Excepción en _syncWithMultipart: $e');
-    return false;
+    return -1;
   }
 }
 
@@ -369,6 +454,7 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
       if (!visitsMap.containsKey(visitId)) {
         // Parsear y validar created_at
         String createdAt;
+        String createdAtLocal;
         try {
           final rawCreatedAt = row['created_at'];
           if (rawCreatedAt != null && rawCreatedAt.toString().isNotEmpty) {
@@ -376,25 +462,33 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
             final parsedDate = DateTime.tryParse(rawCreatedAt.toString());
             if (parsedDate != null && parsedDate.year > 1900) {
               // Fecha válida
-              createdAt = parsedDate.toIso8601String();
+              createdAt = parsedDate.toUtc().toIso8601String();
+              createdAtLocal = parsedDate.toIso8601String();
             } else {
               // Fecha inválida, usar fecha actual
-              createdAt = DateTime.now().toIso8601String();
+              final now = DateTime.now();
+              createdAt = now.toUtc().toIso8601String();
+              createdAtLocal = now.toIso8601String();
               debugPrint('⚠️ Fecha inválida para visita $visitId, usando fecha actual');
             }
           } else {
             // Campo vacío, usar fecha actual
-            createdAt = DateTime.now().toIso8601String();
+            final now = DateTime.now();
+            createdAt = now.toUtc().toIso8601String();
+            createdAtLocal = now.toIso8601String();
             debugPrint('⚠️ Campo created_at vacío para visita $visitId, usando fecha actual');
           }
         } catch (e) {
           // Error parseando, usar fecha actual
-          createdAt = DateTime.now().toIso8601String();
+          final now = DateTime.now();
+          createdAt = now.toUtc().toIso8601String();
+          createdAtLocal = now.toIso8601String();
           debugPrint('⚠️ Error parseando created_at para visita $visitId: $e, usando fecha actual');
         }
 
         visitsMap[visitId] = {
           'created_at': createdAt,
+          'created_at_local': createdAtLocal,
           'id_visit': row['id_visit'],
           'id_company': row['id_company'],
           'id_activity': row['id_activity'],
@@ -659,6 +753,7 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
       if (!visitsMap.containsKey(visitId)) {
         // Parsear y validar created_at
         String createdAt;
+        String createdAtLocal;
         try {
           final rawCreatedAt = row['created_at'];
           if (rawCreatedAt != null && rawCreatedAt.toString().isNotEmpty) {
@@ -666,25 +761,33 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
             final parsedDate = DateTime.tryParse(rawCreatedAt.toString());
             if (parsedDate != null && parsedDate.year > 1900) {
               // Fecha válida
-              createdAt = parsedDate.toIso8601String();
+              createdAt = parsedDate.toUtc().toIso8601String();
+              createdAtLocal = parsedDate.toIso8601String();
             } else {
               // Fecha inválida, usar fecha actual
-              createdAt = DateTime.now().toIso8601String();
+              final now = DateTime.now();
+              createdAt = now.toUtc().toIso8601String();
+              createdAtLocal = now.toIso8601String();
               debugPrint('⚠️ Fecha inválida para visita $visitId, usando fecha actual');
             }
           } else {
             // Campo vacío, usar fecha actual
-            createdAt = DateTime.now().toIso8601String();
+            final now = DateTime.now();
+            createdAt = now.toUtc().toIso8601String();
+            createdAtLocal = now.toIso8601String();
             debugPrint('⚠️ Campo created_at vacío para visita $visitId, usando fecha actual');
           }
         } catch (e) {
           // Error parseando, usar fecha actual
-          createdAt = DateTime.now().toIso8601String();
+          final now = DateTime.now();
+          createdAt = now.toUtc().toIso8601String();
+          createdAtLocal = now.toIso8601String();
           debugPrint('⚠️ Error parseando created_at para visita $visitId: $e, usando fecha actual');
         }
 
         visitsMap[visitId] = {
           'created_at': createdAt,
+          'created_at_local': createdAtLocal,
           'id_visit': row['id_visit'],
           'id_company': row['id_company'],
           'id_activity': row['id_activity'],
@@ -976,13 +1079,15 @@ Future<void> _cleanupSQLiteDataAfterSync() async {
     final int deletedVirtualPoints = await db.delete('Virtual_points');
     debugPrint('   ✅ Eliminados $deletedVirtualPoints puntos virtuales');
 
-    // 10. Limpiar Headquarters_polygons
-    final int deletedPolygons = await db.delete('Headquarters_polygons');
-    debugPrint('   ✅ Eliminados $deletedPolygons polígonos de lotes');
+    // 10. NO limpiar Headquarters_polygons - sync_login es el dueño de estos datos
+    // Se preservan para que el módulo NFC (Centro de Administración) pueda
+    // mostrar los lotes cercanos en el paso 4 de instalación de TAGs
+    // await db.delete('Headquarters_polygons');
 
-    // 11. Limpiar Headquarters
-    final int deletedHeadquarters = await db.delete('Headquarters');
-    debugPrint('   ✅ Eliminados $deletedHeadquarters lotes (headquarters)');
+    // 11. NO limpiar Headquarters - sync_login es el dueño de estos datos
+    // Se preservan para que el módulo NFC (Centro de Administración) pueda
+    // mostrar los lotes cercanos en el paso 4 de instalación de TAGs
+    // await db.delete('Headquarters');
 
     // 12. Limpiar Exclusion_zones_history (ya sincronizadas)
     final int deletedExclusionHistory =
@@ -1025,7 +1130,7 @@ Future<void> _cleanupSQLiteDataAfterSync() async {
     debugPrint('   📊 Resumen de datos sincronizados y eliminados:');
     debugPrint('      ✅ Visits, Visits_details, Visits_locations');
     debugPrint('      ✅ Exclusion_zones_history (sincronizadas al servidor)');
-    debugPrint('      ✅ Products, Headquarters, Virtual_points');
+    debugPrint('      ✅ Products, Virtual_points (Headquarters PRESERVADO para módulo NFC)');
     debugPrint('      ✅ Optimized_routes, Optimized_route_points');
     debugPrint('      ✅ Location_tracking (todos hasta la sincronización)');
     debugPrint('   ✅ AppState limpiado: visitCount, visitsAdd, visitDetails');

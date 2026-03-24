@@ -8,11 +8,19 @@ import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import '/home_page/home_page_widget.dart';
 import '/custom_code/actions/index.dart' as actions;
+import '/backend/sqlite/global_db_singleton.dart';
 import 'login_page_model.dart';
 export 'login_page_model.dart';
 
 class LoginPageWidget extends StatefulWidget {
-  const LoginPageWidget({super.key});
+  const LoginPageWidget({
+    super.key,
+    this.forceSelection = false,
+  });
+
+  /// Si es true, siempre muestra la lista aunque ya haya un usuario seleccionado.
+  /// Usar al navegar desde la app para cambiar de operador.
+  final bool forceSelection;
 
   static String routeName = 'LoginPage';
   static String routePath = '/loginPage';
@@ -25,7 +33,6 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
   late LoginPageModel _model;
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Variables para optimizar el filtrado
   Timer? _debounceTimer;
   List<UsersStruct> _filteredUsers = [];
   bool _isLoading = false;
@@ -38,15 +45,13 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     _model.textController ??= TextEditingController();
     _model.textFieldFocusNode ??= FocusNode();
 
-    // Verificar si ya existe un usuario seleccionado de sesiones anteriores
     SchedulerBinding.instance.addPostFrameCallback((_) async {
-      _checkAndNavigateIfUserSelected();
+      if (!widget.forceSelection) {
+        _checkAndNavigateIfUserSelected();
+      }
     });
 
-    // Cargar usuarios desde SQLite al iniciar
     _loadUsersFromSqlite();
-
-    // Agregar listener con debouncing al TextEditingController
     _model.textController!.addListener(_onSearchChanged);
   }
 
@@ -58,7 +63,6 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     super.dispose();
   }
 
-  // Cargar todos los usuarios desde SQLite
   Future<void> _loadUsersFromSqlite() async {
     try {
       final users = await actions.searchUsersSqlite('');
@@ -78,7 +82,6 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     }
   }
 
-  // Función de debouncing para el filtrado - busca desde SQLite por nombre Y operID
   void _onSearchChanged() {
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -102,33 +105,20 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
   String _getInitials(String name) {
     final trimmed = name.trim();
     if (trimmed.isEmpty) return '?';
-
     final parts = trimmed.split(' ').where((p) => p.isNotEmpty).toList();
-
     if (parts.isEmpty) return '?';
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    }
+    if (parts.length >= 2) return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
     return parts[0][0].toUpperCase();
   }
 
-  // Verificar si ya existe un usuario seleccionado y navegar si es así
   Future<void> _checkAndNavigateIfUserSelected() async {
     try {
       final userSelected = FFAppState().userSelected;
-      
-      // Si existe un usuario válido, navegar directamente a HomePage
       if (userSelected.idUser != null && userSelected.idUser! > 0 &&
           userSelected.nameUser != null && userSelected.nameUser!.isNotEmpty) {
-        
         debugPrint('✅ Usuario persistente detectado: ${userSelected.nameUser}');
-        debugPrint('🚀 Navegando directamente a HomePage...');
-        
-        // Navegar a HomePage sin mostrar la selección
         if (mounted) {
-          if (Navigator.of(context).canPop()) {
-            context.pop();
-          }
+          if (Navigator.of(context).canPop()) context.pop();
           context.pushNamed(
             HomePageWidget.routeName,
             extra: <String, dynamic>{
@@ -146,21 +136,22 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     }
   }
 
-  // Manejar selección de usuario
   Future<void> _onUserSelected(UsersStruct user) async {
     setState(() => _isLoading = true);
-
     try {
-      // Guardar usuario seleccionado
+      // Guardar last_used en SQLite para ordenar por uso en próximas sesiones
+      await globalDb.executeOperation((db) async {
+        await db.rawUpdate(
+          'UPDATE Users SET last_used = ? WHERE Id_user = ?',
+          [DateTime.now().toIso8601String(), user.idUser],
+        );
+      });
+
       FFAppState().userSelected = user;
       FFAppState().update(() {});
-
       debugPrint('✅ Usuario seleccionado: ${user.nameUser}');
 
-      // Navegar a HomePage
-      if (Navigator.of(context).canPop()) {
-        context.pop();
-      }
+      if (Navigator.of(context).canPop()) context.pop();
       context.pushNamed(
         HomePageWidget.routeName,
         extra: <String, dynamic>{
@@ -174,9 +165,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
     } catch (e) {
       debugPrint('Error en selección de usuario: $e');
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -210,14 +199,39 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
           child: SafeArea(
             child: Column(
               children: [
-                // Header moderno
+                // Header
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
                   child: Column(
                     children: [
-                      // Logo y titulo en una sola fila
                       Row(
                         children: [
+                          if (widget.forceSelection)
+                            InkWell(
+                              onTap: () => context.safePop(),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                margin: const EdgeInsets.only(right: 10),
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.white.withValues(alpha: 0.1),
+                                      Colors.white.withValues(alpha: 0.05),
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.2),
+                                  ),
+                                ),
+                                child: const Icon(
+                                  Icons.arrow_back_ios_new,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            ),
                           SizedBox(
                             width: 100,
                             height: 40,
@@ -250,9 +264,11 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Inicio de sesion',
-                                  style: TextStyle(
+                                Text(
+                                  widget.forceSelection
+                                      ? 'Cambiar operador'
+                                      : 'Inicio de sesion',
+                                  style: const TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 15,
                                     fontWeight: FontWeight.w800,
@@ -277,7 +293,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
 
                       const SizedBox(height: 8),
 
-                      // Barra de busqueda compacta
+                      // Barra de busqueda
                       Container(
                         height: 38,
                         decoration: BoxDecoration(
@@ -314,9 +330,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                               color: Colors.white.withValues(alpha: 0.5),
                               size: 18,
                             ),
-                            prefixIconConstraints: const BoxConstraints(
-                              minWidth: 34,
-                            ),
+                            prefixIconConstraints: const BoxConstraints(minWidth: 34),
                             suffixIcon: ValueListenableBuilder<TextEditingValue>(
                               valueListenable: _model.textController!,
                               builder: (context, value, child) {
@@ -327,9 +341,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                           color: Colors.white.withValues(alpha: 0.5),
                                           size: 16,
                                         ),
-                                        onPressed: () {
-                                          _model.textController?.clear();
-                                        },
+                                        onPressed: () => _model.textController?.clear(),
                                       )
                                     : const SizedBox.shrink();
                               },
@@ -361,9 +373,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                           );
                         }
 
-                        final userItem = _filteredUsers;
-
-                        if (userItem.isEmpty) {
+                        if (_filteredUsers.isEmpty) {
                           return Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -412,9 +422,9 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
 
                         return ListView.builder(
                           padding: const EdgeInsets.only(top: 8, bottom: 16),
-                          itemCount: userItem.length,
+                          itemCount: _filteredUsers.length,
                           itemBuilder: (context, index) {
-                            final user = userItem[index];
+                            final user = _filteredUsers[index];
                             final initials = _getInitials(user.nameUser);
 
                             return Padding(

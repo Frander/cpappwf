@@ -135,6 +135,17 @@ class GlobalDbSingleton {
     throw Exception('GlobalDbSingleton: Operación falló después de $maxRetries intentos');
   }
 
+  /// Asegurar que la columna last_used existe en la tabla Users
+  Future<void> ensureUsersLastUsedColumn() async {
+    final db = await database;
+    final columns = await db.rawQuery('PRAGMA table_info(Users)');
+    final hasLastUsed = columns.any((col) => col['name'] == 'last_used');
+    if (!hasLastUsed) {
+      await db.execute('ALTER TABLE Users ADD COLUMN last_used TEXT');
+      debugPrint('📦 GlobalDbSingleton: Columna last_used agregada a Users');
+    }
+  }
+
   /// Verificar que la tabla Location_tracking existe
   Future<void> ensureLocationTrackingTable() async {
     final db = await database;

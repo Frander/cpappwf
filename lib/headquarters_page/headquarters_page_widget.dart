@@ -12,7 +12,9 @@ import 'headquarters_page_model.dart';
 export 'headquarters_page_model.dart';
 
 class HeadquartersPageWidget extends StatefulWidget {
-  const HeadquartersPageWidget({super.key});
+  const HeadquartersPageWidget({super.key, this.instructions});
+
+  final String? instructions;
 
   static String routeName = 'HeadquartersPage';
   static String routePath = '/headquartersPage';
@@ -285,6 +287,43 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                 ),
 
                 SizedBox(height: 8),
+
+                // Banner de instrucciones contextual (solo cuando se abre desde NFC install)
+                if (widget.instructions != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1E3A5F).withValues(alpha: 0.9),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFF3B82F6).withValues(alpha: 0.6),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.info_outline_rounded,
+                            color: Color(0xFF60A5FA),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              widget.instructions!,
+                              style: const TextStyle(
+                                color: Color(0xFFBFDBFE),
+                                fontSize: 13,
+                                fontFamily: 'Roboto',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 // Contador de lotes seleccionados
                 Padding(

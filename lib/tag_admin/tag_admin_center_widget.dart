@@ -1,6 +1,9 @@
 ﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/headquarters_page/headquarters_page_widget.dart';
+import '/custom_code/actions/index.dart' as actions;
+import '/custom_code/actions/hq_sync_tracker.dart';
 import '/tag_admin/tag_configuration_stepper_widget.dart';
 import '/tag_admin/tag_install_stepper_widget.dart';
 import '/tag_admin/tag_test_writer_dialog_widget.dart';
@@ -390,7 +393,152 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
     );
   }
 
-  void _showInstallStepper() {
+  Future<void> _showInstallStepper() async {
+    // 1. Limpiar selección previa de lotes
+    FFAppState().headquartersSelectedList = [];
+
+    // 2. Navegar a selección de lotes con instrucción contextual
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => const HeadquartersPageWidget(
+          instructions:
+              'Selecciona los lotes donde instalarás los tags NFC. '
+              'Sus productos serán sincronizados antes de iniciar la instalación.',
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+
+    // 3. Si no seleccionó ningún lote, cancelar
+    if (FFAppState().headquartersSelectedList.isEmpty) return;
+
+    // 4. Cargar última fecha de sync por lote seleccionado
+    final syncInfoLines = <String>[];
+    for (final hq in FFAppState().headquartersSelectedList) {
+      final date = await getHqSyncDate(hq.idHeadquarter);
+      syncInfoLines.add('${hq.nameHeadquarter}: ${formatHqSyncDate(date)}');
+    }
+
+    if (!mounted) return;
+
+    // 5. Mostrar diálogo de carga con info de última sync
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        contentPadding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Info de última sync por lote
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.history_rounded, color: Color(0xFF60A5FA), size: 15),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'ÚLTIMA SINCRONIZACIÓN',
+                        style: TextStyle(
+                          color: Color(0xFF60A5FA),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        syncInfoLines.join('\n'),
+                        style: const TextStyle(
+                          color: Color(0xFFBFDBFE),
+                          fontSize: 11,
+                          height: 1.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const Divider(color: Color(0xFF334155), height: 16),
+            // Spinner de progreso
+            const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    color: Color(0xFF10B981),
+                    strokeWidth: 2,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Sincronizando datos de lotes...',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 6. Sync: mismo patrón que do_activities_page_widget.dart
+    final dynamic loginResponse = FFAppState().loginResponse;
+    String authToken = '';
+    if (loginResponse is Map && loginResponse.containsKey('token')) {
+      authToken = loginResponse['token'] as String? ?? '';
+    }
+
+    int syncedCount = 0;
+    bool allSynced = true;
+    if (authToken.isNotEmpty) {
+      for (final hq in FFAppState().headquartersSelectedList) {
+        final int headquarterId = hq.idHeadquarter;
+        if (headquarterId <= 0) continue;
+        final bool result = await actions.syncInstallModule(
+          context,
+          headquarterId,
+          authToken,
+        );
+        if (result) {
+          syncedCount++;
+          await saveHqSyncDate(headquarterId);
+        } else {
+          allSynced = false;
+        }
+      }
+    }
+
+    // 7. Cerrar diálogo de carga
+    if (mounted) Navigator.of(context).pop();
+
+    // 8. SnackBar con resultado
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            allSynced
+                ? '$syncedCount lote${syncedCount != 1 ? 's' : ''} sincronizado${syncedCount != 1 ? 's' : ''} correctamente'
+                : 'Sincronización parcial: $syncedCount de ${FFAppState().headquartersSelectedList.length} lotes',
+          ),
+          backgroundColor:
+              allSynced ? const Color(0xFF10B981) : Colors.orange,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+
+    // 9. Abrir stepper de instalación
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,

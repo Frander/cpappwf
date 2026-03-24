@@ -60,6 +60,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       _updateProgress(1, 'Identificando dispositivo...');
       await Future.delayed(Duration(milliseconds: 500));
 
+      // DIAGNÓSTICO TEMPORAL — quitar cuando ya se confirmen las rutas disponibles
+      if (mounted) await actions.diagnoseStorage(context);
+
       _model.identifierCTR = await actions.getPersistentId(
         context,
       );
@@ -184,6 +187,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             _updateProgress(4, 'Sincronizando información del usuario...');
             await Future.delayed(Duration(milliseconds: 400));
 
+            bool syncLoginOk = false;
             try {
               _model.pathDBSQLite = await actions.validateDbSqlite(
                 context,
@@ -201,86 +205,94 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 ),
               );
               debugPrint('✅ syncLogin completado: ${_model.customSyncLoginResult}');
+              syncLoginOk = true;
             } catch (e, stackTrace) {
               debugPrint('❌ ERROR CRÍTICO en syncLogin: $e');
               debugPrint('Stack trace: $stackTrace');
-              rethrow; // Re-lanzar para que se maneje arriba
             }
-            FFAppState().pathDatabase = _model.pathDBSQLite!;
+
+            if (!mounted) return;
+
+            if (!syncLoginOk) {
+              _updateProgress(4, 'Error al sincronizar. Reintentando...');
+              await Future.delayed(const Duration(seconds: 2));
+              // Reintentar una vez más automáticamente
+              try {
+                _model.customSyncLoginResult = await actions.syncLogin(
+                  context,
+                  loginIdentifier,
+                  loginIdentifier,
+                  getJsonField(
+                    (_model.apiResultLoginDirect?.jsonBody ?? ''),
+                    r'''$''',
+                  ),
+                );
+                debugPrint('✅ syncLogin reintento exitoso');
+                syncLoginOk = true;
+              } catch (e) {
+                debugPrint('❌ syncLogin reintento también falló: $e');
+              }
+
+              if (!mounted) return;
+
+              if (!syncLoginOk) {
+                _updateProgress(4, 'Error de sincronización. Verifica tu conexión.');
+                await showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (dialogContext) => AlertDialog(
+                    title: const Text('Error de sincronización'),
+                    content: const Text(
+                      'No se pudo sincronizar la información del usuario. '
+                      'Verifica tu conexión a internet y vuelve a intentarlo.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(dialogContext);
+                          if (mounted) context.goNamed('StartPage');
+                        },
+                        child: const Text('Reintentar'),
+                      ),
+                    ],
+                  ),
+                );
+                return;
+              }
+            }
+
+            FFAppState().pathDatabase = _model.pathDBSQLite ?? '';
             FFAppState().androidID = loginIdentifier;
             FFAppState().loginResponse = getJsonField(
               (_model.apiResultLoginDirect?.jsonBody ?? ''),
               r'''$''',
             );
-            FFAppState().userSelected =
-                UsersStruct.maybeFromMap(getJsonField(
-              (_model.apiResultLoginDirect?.jsonBody ?? ''),
-              r'''$.user_default''',
-            ))!;
+            // userSelected NO se asigna aquí: el usuario debe seleccionarlo
+            // manualmente desde LoginPage al tocar un ítem de la lista.
+            // companyDefault y deviceDefault los setea syncLogin via _updateAppState.
+            // Las listas (headquarters, zones, users, news, activities) ya no vienen
+            // en el login response — se poblaron en SQLite via syncLogin con endpoints
+            // separados comprimidos. Se inicializan vacías aquí.
             FFAppState().companyDefault =
                 CompaniesStruct.maybeFromMap(getJsonField(
               (_model.apiResultLoginDirect?.jsonBody ?? ''),
               r'''$.company''',
-            ))!;
+            )) ?? CompaniesStruct();
             FFAppState().deviceDefault =
                 DevicesStruct.maybeFromMap(getJsonField(
               (_model.apiResultLoginDirect?.jsonBody ?? ''),
               r'''$.device_default''',
-            ))!;
-            FFAppState().headquartersList = (getJsonField(
-              (_model.apiResultLoginDirect?.jsonBody ?? ''),
-              r'''$.headquarters''',
-              true,
-            )!
-                    .toList()
-                    .map<HeadquartersStruct?>(
-                        HeadquartersStruct.maybeFromMap)
-                    .toList() as Iterable<HeadquartersStruct?>)
-                .withoutNulls
-                .toList()
-                .cast<HeadquartersStruct>();
-            FFAppState().zonesList = (getJsonField(
-              (_model.apiResultLoginDirect?.jsonBody ?? ''),
-              r'''$.zones''',
-              true,
-            )!
-                    .toList()
-                    .map<ZonesStruct?>(ZonesStruct.maybeFromMap)
-                    .toList() as Iterable<ZonesStruct?>)
-                .withoutNulls
-                .toList()
-                .cast<ZonesStruct>();
+            )) ?? DevicesStruct();
+            // headquartersList ya fue cargada desde SQLite por syncLogin — NO limpiar
+            FFAppState().zonesList = [];
             FFAppState().lastSync = getCurrentTimestamp;
             FFAppState().isSync = true;
-            FFAppState().usersList = (getJsonField(
-              (_model.apiResultLoginDirect?.jsonBody ?? ''),
-              r'''$.users''',
-              true,
-            )!
-                    .toList()
-                    .map<UsersStruct?>(UsersStruct.maybeFromMap)
-                    .toList() as Iterable<UsersStruct?>)
-                .withoutNulls
-                .toList()
-                .cast<UsersStruct>();
+            FFAppState().usersList = [];
             FFAppState().headquarterSelected = HeadquartersStruct();
             FFAppState().zoneSelected = ZonesStruct();
-            FFAppState().activitiesJSON = getJsonField(
-              (_model.apiResultLoginDirect?.jsonBody ?? ''),
-              r'''$.activities''',
-            );
+            FFAppState().activitiesJSON = null;
             FFAppState().headquartersSelectedList = [];
-            FFAppState().newsList = (getJsonField(
-              (_model.apiResultLoginDirect?.jsonBody ?? ''),
-              r'''$.news''',
-              true,
-            )!
-                    .toList()
-                    .map<NewsStruct?>(NewsStruct.maybeFromMap)
-                    .toList() as Iterable<NewsStruct?>)
-                .withoutNulls
-                .toList()
-                .cast<NewsStruct>();
+            FFAppState().newsList = [];
             FFAppState().isStabilized = false;
             FFAppState().visitDetails = [];
 
@@ -498,63 +510,56 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               },
                             );
 
+                            // Usar imeI1 como IMEI primario; si está vacío usar serialId como fallback
+                            final deviceImei = (device.imeI1.isNotEmpty)
+                                ? device.imeI1
+                                : device.serialId;
+
+                            // Persistir el IMEI seleccionado antes del login
+                            if (deviceImei.isNotEmpty) {
+                              await actions.savePersistentId(context, deviceImei);
+                              debugPrint('✅ IMEI persistido: $deviceImei');
+                            }
+
                             // Realizar login con el dispositivo seleccionado
                             final loginResult = await APIClickPalmGroup.usersLoginPOSTCall.call(
                               typeLogin: 'IMEI',
-                              username: device.imeI1,
+                              username: deviceImei,
                             );
 
-                            if (loginResult.succeeded ?? false) {
+                            if (loginResult.succeeded) {
                               // Sincronizar datos
+                              if (!mounted) return;
                               final pathDB = await actions.validateDbSqlite(context);
+                              if (!mounted) return;
                               await actions.syncLogin(
                                 context,
-                                device.imeI1!,
-                                device.imeI1!,
+                                deviceImei,
+                                deviceImei,
                                 getJsonField(loginResult.jsonBody ?? '', r'''$'''),
                               );
 
                               // Actualizar FFAppState
-                              FFAppState().pathDatabase = pathDB!;
-                              FFAppState().androidID = device.imeI1!;
+                              // Las listas (headquarters, zones, users, news, activities)
+                              // ya no vienen en el login response — están en SQLite.
+                              FFAppState().pathDatabase = pathDB ?? '';
+                              FFAppState().androidID = deviceImei;
                               FFAppState().loginResponse = getJsonField(loginResult.jsonBody ?? '', r'''$''');
-                              FFAppState().userSelected = UsersStruct.maybeFromMap(
-                                getJsonField(loginResult.jsonBody ?? '', r'''$.user_default'''))!;
+                              // userSelected NO se modifica — persiste de SharedPreferences para retorno o vacío en primera vez
                               FFAppState().companyDefault = CompaniesStruct.maybeFromMap(
-                                getJsonField(loginResult.jsonBody ?? '', r'''$.company'''))!;
+                                getJsonField(loginResult.jsonBody ?? '', r'''$.company''')) ?? CompaniesStruct();
                               FFAppState().deviceDefault = DevicesStruct.maybeFromMap(
-                                getJsonField(loginResult.jsonBody ?? '', r'''$.device_default'''))!;
-                              FFAppState().headquartersList = (getJsonField(
-                                loginResult.jsonBody ?? '', r'''$.headquarters''', true)!
-                                .toList()
-                                .map<HeadquartersStruct?>(HeadquartersStruct.maybeFromMap)
-                                .toList() as Iterable<HeadquartersStruct?>)
-                                .withoutNulls.toList().cast<HeadquartersStruct>();
-                              FFAppState().zonesList = (getJsonField(
-                                loginResult.jsonBody ?? '', r'''$.zones''', true)!
-                                .toList()
-                                .map<ZonesStruct?>(ZonesStruct.maybeFromMap)
-                                .toList() as Iterable<ZonesStruct?>)
-                                .withoutNulls.toList().cast<ZonesStruct>();
+                                getJsonField(loginResult.jsonBody ?? '', r'''$.device_default''')) ?? DevicesStruct();
+                              // headquartersList ya fue cargada desde SQLite por syncLogin — NO limpiar
+                              FFAppState().zonesList = [];
                               FFAppState().lastSync = getCurrentTimestamp;
                               FFAppState().isSync = true;
-                              FFAppState().usersList = (getJsonField(
-                                loginResult.jsonBody ?? '', r'''$.users''', true)!
-                                .toList()
-                                .map<UsersStruct?>(UsersStruct.maybeFromMap)
-                                .toList() as Iterable<UsersStruct?>)
-                                .withoutNulls.toList().cast<UsersStruct>();
+                              FFAppState().usersList = [];
                               FFAppState().headquarterSelected = HeadquartersStruct();
                               FFAppState().zoneSelected = ZonesStruct();
-                              FFAppState().activitiesJSON = getJsonField(
-                                loginResult.jsonBody ?? '', r'''$.activities''');
+                              FFAppState().activitiesJSON = null;
                               FFAppState().headquartersSelectedList = [];
-                              FFAppState().newsList = (getJsonField(
-                                loginResult.jsonBody ?? '', r'''$.news''', true)!
-                                .toList()
-                                .map<NewsStruct?>(NewsStruct.maybeFromMap)
-                                .toList() as Iterable<NewsStruct?>)
-                                .withoutNulls.toList().cast<NewsStruct>();
+                              FFAppState().newsList = [];
                               FFAppState().isStabilized = false;
                               FFAppState().visitDetails = [];
 
@@ -746,11 +751,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         (_model.apiResultLoginRegister?.jsonBody ?? ''),
                         r'''$''',
                       );
-                      FFAppState().userSelected =
-                          UsersStruct.maybeFromMap(getJsonField(
-                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
-                        r'''$.user_default''',
-                      ))!;
+                      // userSelected NO se modifica — persiste de SharedPreferences
                       FFAppState().companyDefault =
                           CompaniesStruct.maybeFromMap(getJsonField(
                         (_model.apiResultLoginRegister?.jsonBody ?? ''),
@@ -761,18 +762,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                         (_model.apiResultLoginRegister?.jsonBody ?? ''),
                         r'''$.device_default''',
                       ))!;
-                      FFAppState().headquartersList = (getJsonField(
-                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
-                        r'''$.headquarters''',
-                        true,
-                      )!
-                              .toList()
-                              .map<HeadquartersStruct?>(
-                                  HeadquartersStruct.maybeFromMap)
-                              .toList() as Iterable<HeadquartersStruct?>)
-                          .withoutNulls
-                          .toList()
-                          .cast<HeadquartersStruct>();
+                      // headquartersList ya fue cargada desde SQLite por syncLogin — NO limpiar
                       FFAppState().usersList = (getJsonField(
                         (_model.apiResultLoginRegister?.jsonBody ?? ''),
                         r'''$.users''',
@@ -784,10 +774,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                           .withoutNulls
                           .toList()
                           .cast<UsersStruct>();
-                      FFAppState().activitiesJSON = getJsonField(
-                        (_model.apiResultLoginRegister?.jsonBody ?? ''),
-                        r'''$.activities''',
-                      );
+                      // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
                       FFAppState().zonesList = (getJsonField(
                         (_model.apiResultLoginRegister?.jsonBody ?? ''),
                         r'''$.zones''',
@@ -820,12 +807,13 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       FFAppState().isStabilized = false;
                       FFAppState().visitDetails = [];
 
+
                       // Cerrar loading y navegar
                       if (Navigator.of(context).canPop()) {
                         Navigator.pop(context);
                       }
 
-                      debugPrint('✅ Registro completado, navegando a HomePage');
+                      debugPrint('✅ Registro completado, navegando a LoginPage para selección de operador');
                       context.pushNamed(
                         LoginPageWidget.routeName,
                         extra: <String, dynamic>{
@@ -1002,11 +990,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                 r'''$''',
               );
-              FFAppState().userSelected =
-                  UsersStruct.maybeFromMap(getJsonField(
-                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                r'''$.user_default''',
-              ))!;
+              // userSelected NO se modifica — persiste de SharedPreferences
               FFAppState().companyDefault =
                   CompaniesStruct.maybeFromMap(getJsonField(
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
@@ -1017,18 +1001,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                 r'''$.device_default''',
               ))!;
-              FFAppState().headquartersList = (getJsonField(
-                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                r'''$.headquarters''',
-                true,
-              )!
-                      .toList()
-                      .map<HeadquartersStruct?>(
-                          HeadquartersStruct.maybeFromMap)
-                      .toList() as Iterable<HeadquartersStruct?>)
-                  .withoutNulls
-                  .toList()
-                  .cast<HeadquartersStruct>();
+              // headquartersList ya fue cargada desde SQLite por syncLogin — NO limpiar
               FFAppState().zonesList = (getJsonField(
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                 r'''$.zones''',
@@ -1055,10 +1028,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                   .cast<UsersStruct>();
               FFAppState().headquarterSelected = HeadquartersStruct();
               FFAppState().zoneSelected = ZonesStruct();
-              FFAppState().activitiesJSON = getJsonField(
-                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                r'''$.activities''',
-              );
+              // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
               FFAppState().headquartersSelectedList = [];
               FFAppState().newsList = (getJsonField(
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
@@ -1213,11 +1183,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                                 r'''$''',
                               );
-                              FFAppState().userSelected =
-                                  UsersStruct.maybeFromMap(getJsonField(
-                                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                                r'''$.user_default''',
-                              ))!;
+                              // userSelected NO se modifica — persiste de SharedPreferences
                               FFAppState().companyDefault =
                                   CompaniesStruct.maybeFromMap(getJsonField(
                                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
@@ -1228,18 +1194,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                                 r'''$.device_default''',
                               ))!;
-                              FFAppState().headquartersList = (getJsonField(
-                                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                                r'''$.headquarters''',
-                                true,
-                              )!
-                                      .toList()
-                                      .map<HeadquartersStruct?>(
-                                          HeadquartersStruct.maybeFromMap)
-                                      .toList() as Iterable<HeadquartersStruct?>)
-                                  .withoutNulls
-                                  .toList()
-                                  .cast<HeadquartersStruct>();
+                              // headquartersList ya fue cargada desde SQLite por syncLogin — NO limpiar
                               FFAppState().zonesList = (getJsonField(
                                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                                 r'''$.zones''',
@@ -1266,10 +1221,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                   .cast<UsersStruct>();
                               FFAppState().headquarterSelected = HeadquartersStruct();
                               FFAppState().zoneSelected = ZonesStruct();
-                              FFAppState().activitiesJSON = getJsonField(
-                                (_model.apiResultLoginDirect?.jsonBody ?? ''),
-                                r'''$.activities''',
-                              );
+                              // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
                               FFAppState().headquartersSelectedList = [];
                               FFAppState().newsList = (getJsonField(
                                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
@@ -1611,12 +1563,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                       ''),
                                   r'''$''',
                                 );
-                                FFAppState().userSelected =
-                                    UsersStruct.maybeFromMap(getJsonField(
-                                  (_model.apiResultLoginRegister?.jsonBody ??
-                                      ''),
-                                  r'''$.user_default''',
-                                ))!;
+                                // userSelected NO se modifica — persiste de SharedPreferences
                                 FFAppState().companyDefault =
                                     CompaniesStruct.maybeFromMap(getJsonField(
                                   (_model.apiResultLoginRegister?.jsonBody ??
@@ -1629,19 +1576,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                       ''),
                                   r'''$.device_default''',
                                 ))!;
-                                FFAppState().headquartersList = (getJsonField(
-                                  (_model.apiResultLoginRegister?.jsonBody ??
-                                      ''),
-                                  r'''$.headquarters''',
-                                  true,
-                                )!
-                                        .toList()
-                                        .map<HeadquartersStruct?>(
-                                            HeadquartersStruct.maybeFromMap)
-                                        .toList() as Iterable<HeadquartersStruct?>)
-                                    .withoutNulls
-                                    .toList()
-                                    .cast<HeadquartersStruct>();
+                                // headquartersList ya fue cargada desde SQLite por syncLogin — NO limpiar
                                 FFAppState().usersList = (getJsonField(
                                   (_model.apiResultLoginRegister?.jsonBody ??
                                       ''),
@@ -1655,11 +1590,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                     .withoutNulls
                                     .toList()
                                     .cast<UsersStruct>();
-                                FFAppState().activitiesJSON = getJsonField(
-                                  (_model.apiResultLoginRegister?.jsonBody ??
-                                      ''),
-                                  r'''$.activities''',
-                                );
+                                // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
                                 FFAppState().zonesList = (getJsonField(
                                   (_model.apiResultLoginRegister?.jsonBody ??
                                       ''),

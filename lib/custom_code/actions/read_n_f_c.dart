@@ -18,12 +18,17 @@ import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager/nfc_manager_android.dart'
     show IsoDepAndroid, NfcAAndroid, MifareClassicAndroid, NfcTagAndroid;
+import 'package:ndef_record/ndef_record.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 
-Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
+Future<String> readNFC(
+  BuildContext context, {
+  bool autoClose = true,
+  bool clearAfterRead = false,
+}) async {
   // Verificar si NFC está disponible y activado usando la nueva función
   bool nfcReady = await checkNfcStatus(context, showAlert: true);
   if (!nfcReady) {
@@ -273,6 +278,9 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
                   debugPrint('   Tipo de origen requerido: $requiredProductType');
 
                   // Buscar el producto en SQLite por RFID
+                  // NOTA: No cerrar la base de datos manualmente — sqflite maneja el pool
+                  // automáticamente. Cerrarla aquí causa database_closed en _saveTagToHistory
+                  // que corre concurrentemente (sin await) en línea 248.
                   try {
                     final dbPath = FFAppState().pathDatabase;
                     if (dbPath.isNotEmpty) {
@@ -281,8 +289,6 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
                       final productResults = await database.rawQuery('''
                         SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
                       ''', [tagId]);
-
-                      await database.close();
 
                       if (productResults.isEmpty) {
                         debugPrint('❌ TAG-TRANSFER: RFID de origen no encontrado: $tagId');
@@ -299,7 +305,7 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
 
                       debugPrint('✅ TAG-TRANSFER: Producto origen encontrado: $productName (Tipo: $productType)');
 
-                      if (productType != requiredProductType) {
+                      if ((productType ?? '').toLowerCase().trim() != requiredProductType.toLowerCase().trim()) {
                         debugPrint('❌ TAG-TRANSFER: Tipo de producto de origen no coincide');
                         debugPrint('   Esperado: $requiredProductType');
                         debugPrint('   Encontrado: $productType');
@@ -328,6 +334,19 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
           FFAppState().nfcRead = tagData;
         });
 
+        // === BORRADO EN SESIÓN (tag-transfer de origen) ===
+        if (clearAfterRead) {
+          debugPrint('🧹 clearAfterRead=true: borrando tag de origen en sesión activa...');
+          try {
+            final erased = await _eraseTagInSession(tag);
+            debugPrint(erased
+                ? '✅ Tag de origen borrado exitosamente (misma sesión NFC)'
+                : '⚠️ No se pudo borrar el tag de origen — continuando con los datos leídos');
+          } catch (eraseError) {
+            debugPrint('⚠️ Error durante borrado en sesión (no crítico): $eraseError');
+          }
+        }
+
         // Cerrar el popup solo cuando se lee exitosamente un tag (si autoClose está habilitado)
         if (autoClose && context.mounted) {
           Navigator.of(context).pop();
@@ -353,6 +372,118 @@ Future<String> readNFC(BuildContext context, {bool autoClose = true}) async {
   return completer.future;
 }
 
+/// Borra un tag NFC dentro de una sesión ya activa.
+/// El objeto [tag] DEBE provenir de un callback onDiscovered activo.
+/// NO llama startSession ni stopSession — el caller maneja la sesión.
+Future<bool> _eraseTagInSession(NfcTag tag) async {
+  debugPrint('🧹 _eraseTagInSession: iniciando borrado en sesión activa...');
+
+  // 1. Intentar como NDEF (tag ya formateado)
+  final ndef = Ndef.from(tag);
+  if (ndef != null) {
+    if (ndef.isWritable) {
+      try {
+        await ndef.write(message: _createMinimalNdefMessage());
+        debugPrint('✅ TAG borrado como NDEF ("0")');
+        return true;
+      } catch (e) {
+        debugPrint('⚠️ Error borrando como NDEF: $e');
+      }
+    } else {
+      debugPrint('⚠️ TAG NDEF de solo lectura — no se puede borrar');
+      return false;
+    }
+  }
+
+  // 2. Intentar como NdefFormatable (tag virgen sin formato NDEF)
+  final ndefFormatable = NdefFormatableAndroid.from(tag);
+  if (ndefFormatable != null) {
+    try {
+      await ndefFormatable.format(_createMinimalNdefMessage());
+      debugPrint('✅ TAG formateado y borrado (NdefFormatable)');
+      return true;
+    } catch (e) {
+      debugPrint('⚠️ Error al formatear NdefFormatable: $e');
+    }
+  }
+
+  // 3. Intentar MifareClassic bajo nivel (sectores 0-3)
+  final mifareClassic = MifareClassicAndroid.from(tag);
+  if (mifareClassic != null) {
+    final key = Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+    final emptyBlock = Uint8List(16);
+    int blocksCleared = 0;
+    bool tagLost = false;
+
+    // Sector 0: bloques 1 y 2 (bloque 0 = fabricante, bloque 3 = trailer de sector)
+    try {
+      await mifareClassic.authenticateSectorWithKeyA(sectorIndex: 0, key: key);
+      for (var b = 1; b <= 2 && !tagLost; b++) {
+        try {
+          await mifareClassic.writeBlock(blockIndex: b, data: emptyBlock);
+          blocksCleared++;
+        } catch (e) {
+          if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
+            tagLost = true;
+          }
+        }
+      }
+    } catch (e) {
+      if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
+        tagLost = true;
+      }
+    }
+
+    // Sectores 1-3: bloques 0, 1, 2 de cada sector (bloque 3 es trailer, no tocar)
+    for (var sector = 1; sector <= 3 && !tagLost; sector++) {
+      try {
+        await mifareClassic.authenticateSectorWithKeyA(sectorIndex: sector, key: key);
+      } catch (e) {
+        if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
+          tagLost = true;
+          break;
+        }
+        continue;
+      }
+      for (var blockInSector = 0; blockInSector <= 2 && !tagLost; blockInSector++) {
+        final blockIndex = (sector * 4) + blockInSector;
+        try {
+          await mifareClassic.writeBlock(blockIndex: blockIndex, data: emptyBlock);
+          blocksCleared++;
+        } catch (e) {
+          if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
+            tagLost = true;
+          }
+        }
+      }
+    }
+
+    debugPrint('MifareClassic: $blocksCleared bloques borrados${tagLost ? " (TAG perdido antes de terminar)" : ""}');
+    return blocksCleared > 0;
+  }
+
+  debugPrint('❌ Tipo de TAG no soportado para borrado en sesión');
+  return false;
+}
+
+/// Crea un mensaje NDEF mínimo con contenido "0"
+/// (Android no permite mensajes completamente vacíos)
+NdefMessage _createMinimalNdefMessage() {
+  const clearContent = '0';
+  const languageCode = 'en';
+  final languageCodeBytes = utf8.encode(languageCode);
+  final textBytes = utf8.encode(clearContent);
+  final statusByte = languageCodeBytes.length;
+  final payload = Uint8List.fromList([statusByte, ...languageCodeBytes, ...textBytes]);
+  final record = NdefRecord(
+    typeNameFormat: TypeNameFormat.wellKnown,
+    type: Uint8List.fromList([84]), // 'T' para Text
+    identifier: Uint8List(0),
+    payload: payload,
+  );
+  return NdefMessage(records: [record]);
+}
+
 /// Guarda la información del TAG en el historial persistente (SQLite)
 Future<void> _saveTagToHistory(String tagId, String tagType, int usedSpace) async {
   if (tagId.isEmpty) return;
@@ -369,8 +500,9 @@ Future<void> _saveTagToHistory(String tagId, String tagType, int usedSpace) asyn
     totalSpace = 1024; // Por defecto 1KB
   }
 
+  // NOTA: No cerrar db manualmente — sqflite maneja el pool automáticamente.
+  // Cerrar aquí causa database_closed en _saveTagToHistory que corre concurrente (sin await).
   try {
-    // Obtener la ruta de la base de datos
     final Directory? externalDir = await getExternalStorageDirectory();
     if (externalDir == null) {
       debugPrint('❌ No se pudo acceder al almacenamiento externo');
@@ -382,72 +514,61 @@ Future<void> _saveTagToHistory(String tagId, String tagType, int usedSpace) asyn
       'clickpalm_database.db',
     );
 
-    // Abrir conexión a la base de datos
     final Database db = await openDatabase(dbPath);
+    final now = DateTime.now().toUtc();
 
-    try {
-      final now = DateTime.now().toUtc();
+    final List<Map<String, dynamic>> existing = await db.query(
+      'Nfc_tags_history',
+      where: 'Tag_id = ?',
+      whereArgs: [tagId],
+    );
 
-      // Verificar si el TAG ya existe
-      final List<Map<String, dynamic>> existing = await db.query(
+    if (existing.isNotEmpty) {
+      final int currentReadCount = existing.first['Read_count'] as int;
+      await db.update(
         'Nfc_tags_history',
+        {
+          'Last_read': now.toIso8601String(),
+          'Read_count': currentReadCount + 1,
+          'Tag_type': tagType,
+          'Total_space': totalSpace,
+          'Used_space': usedSpace,
+        },
         where: 'Tag_id = ?',
         whereArgs: [tagId],
       );
-
-      if (existing.isNotEmpty) {
-        // Actualizar TAG existente
-        final int currentReadCount = existing.first['Read_count'] as int;
-        await db.update(
-          'Nfc_tags_history',
-          {
-            'Last_read': now.toIso8601String(),
-            'Read_count': currentReadCount + 1,
-            'Tag_type': tagType, // Actualizar tipo por si cambió
-            'Total_space': totalSpace,
-            'Used_space': usedSpace,
-          },
-          where: 'Tag_id = ?',
-          whereArgs: [tagId],
-        );
-        debugPrint('📝 TAG actualizado en historial: $tagId (lecturas: ${currentReadCount + 1}, espacio: $usedSpace/$totalSpace bytes)');
-      } else {
-        // Insertar nuevo TAG
-        await db.insert(
-          'Nfc_tags_history',
-          {
-            'Tag_id': tagId,
-            'Tag_type': tagType,
-            'Total_space': totalSpace,
-            'Used_space': usedSpace,
-            'Last_read': now.toIso8601String(),
-            'Read_count': 1,
-            'Created_at': now.toIso8601String(),
-          },
-        );
-        debugPrint('📝 Nuevo TAG agregado al historial: $tagId (espacio: $usedSpace/$totalSpace bytes)');
-      }
-
-      // Opcional: Limitar a los últimos 50 TAGs (eliminar los más antiguos)
-      final List<Map<String, dynamic>> allTags = await db.query(
+      debugPrint('📝 TAG actualizado en historial: $tagId (lecturas: ${currentReadCount + 1}, espacio: $usedSpace/$totalSpace bytes)');
+    } else {
+      await db.insert(
         'Nfc_tags_history',
-        orderBy: 'Last_read DESC',
+        {
+          'Tag_id': tagId,
+          'Tag_type': tagType,
+          'Total_space': totalSpace,
+          'Used_space': usedSpace,
+          'Last_read': now.toIso8601String(),
+          'Read_count': 1,
+          'Created_at': now.toIso8601String(),
+        },
       );
+      debugPrint('📝 Nuevo TAG agregado al historial: $tagId (espacio: $usedSpace/$totalSpace bytes)');
+    }
 
-      if (allTags.length > 50) {
-        // Eliminar los tags más antiguos
-        final tagsToDelete = allTags.skip(50).toList();
-        for (var tag in tagsToDelete) {
-          await db.delete(
-            'Nfc_tags_history',
-            where: 'Id_nfc_tag = ?',
-            whereArgs: [tag['Id_nfc_tag']],
-          );
-        }
-        debugPrint('🧹 Limpiados ${tagsToDelete.length} TAGs antiguos del historial');
+    final List<Map<String, dynamic>> allTags = await db.query(
+      'Nfc_tags_history',
+      orderBy: 'Last_read DESC',
+    );
+
+    if (allTags.length > 50) {
+      final tagsToDelete = allTags.skip(50).toList();
+      for (var tag in tagsToDelete) {
+        await db.delete(
+          'Nfc_tags_history',
+          where: 'Id_nfc_tag = ?',
+          whereArgs: [tag['Id_nfc_tag']],
+        );
       }
-    } finally {
-      await db.close();
+      debugPrint('🧹 Limpiados ${tagsToDelete.length} TAGs antiguos del historial');
     }
   } catch (e) {
     debugPrint('❌ Error guardando TAG en historial SQLite: $e');

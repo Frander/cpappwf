@@ -50,6 +50,7 @@ enum SyncMode {
   optimizedSync,    // Sincronización optimizada (sin compresión - redes lentas)
   visitsOnly,       // Solo visitas
   basicSync,        // Básica (resetea tablas)
+  smartSync,        // Inteligente: detecta qué sincronizar + básica al final
 }
 
 enum SyncStep {
@@ -245,68 +246,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 children: [
                   _buildStatsCard(),
                   const SizedBox(height: 24),
-                  Text(
-                    'Seleccione el tipo de sincronización',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Sincronización Completa - OCULTA
-                  // _buildSyncOptionCard(
-                  //   title: 'Sincronización Completa',
-                  //   description:
-                  //       'Para redes más estables. Comprime visitas y ubicaciones antes de enviar',
-                  //   icon: Icons.cloud_sync_rounded,
-                  //   gradient: LinearGradient(
-                  //     colors: [Color(0xFF00a86b), Color(0xFF00ff9f)],
-                  //   ),
-                  //   onTap: () => _startSync(SyncMode.fullSync),
-                  //   badge: 'RECOMENDADO',
-                  // ),
-                  // const SizedBox(height: 16),
-                  _buildSyncOptionCard(
-                    title: 'Sincronización Optimizada',
-                    description:
-                        'Para redes lentas. Envía datos sin compresión en paquetes más pequeños',
-                    icon: Icons.speed_rounded,
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF8B5CF6), Color(0xFFA78BFA)],
-                    ),
-                    onTap: () => _startSync(SyncMode.optimizedSync),
-                    badge: 'RECOMENDADO',
-                  ),
-                  const SizedBox(height: 20),
-                  // Botones compactos en una fila
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _buildCompactSyncButton(
-                          title: 'Solo Visitas',
-                          icon: Icons.assignment_turned_in_rounded,
-                          gradient: LinearGradient(
-                            colors: [Color(0xFF3B82F6), Color(0xFF60A5FA)],
-                          ),
-                          onTap: () => _startSync(SyncMode.visitsOnly),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _buildCompactSyncButton(
-                          title: 'Básica',
-                          icon: Icons.refresh_rounded,
-                          gradient: LinearGradient(
-                            colors: [Color(0xFFEF4444), Color(0xFFF87171)],
-                          ),
-                          onTap: () => _confirmBasicSync(),
-                          showWarning: true,
-                        ),
-                      ),
-                    ],
-                  ),
+                  _buildSmartSyncButton(),
                 ],
               ),
             ),
@@ -455,220 +395,154 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
     );
   }
 
-  Widget _buildSyncOptionCard({
-    required String title,
-    required String description,
-    required IconData icon,
-    required Gradient gradient,
-    required VoidCallback onTap,
-    bool showWarning = false,
-    String? badge,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.colors.first.withOpacity(0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
+  Widget _buildSmartSyncButton() {
+    final hasPending = _totalVisits > 0 || _totalProducts > 0 || _totalExclusions > 0;
+
+    final List<String> pendingParts = [];
+    if (_totalVisits > 0) pendingParts.add('$_totalVisits visita${_totalVisits != 1 ? 's' : ''}');
+    if (_totalProducts > 0) pendingParts.add('$_totalProducts producto${_totalProducts != 1 ? 's' : ''}');
+    if (_totalExclusions > 0) pendingParts.add('$_totalExclusions exclusión${_totalExclusions != 1 ? 'es' : ''}');
+
+    final description = hasPending
+        ? 'Se sincronizarán: ${pendingParts.join(', ')}. Al finalizar se actualizarán los datos base.'
+        : 'No hay datos pendientes. Se actualizarán los datos base del sistema.';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Sincronización',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: 0.5,
+          ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 28),
+        const SizedBox(height: 16),
+        InkWell(
+          onTap: () => _startSync(SyncMode.smartSync),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: hasPending
+                    ? [Color(0xFF00a86b), Color(0xFF00c07a)]
+                    : [Color(0xFF374151), Color(0xFF4B5563)],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: (hasPending ? Color(0xFF00a86b) : Color(0xFF374151)).withOpacity(0.35),
+                  blurRadius: 24,
+                  offset: const Offset(0, 12),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      if (badge != null) ...[
-                        const SizedBox(height: 4),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.25),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            badge,
+                      child: Icon(
+                        Icons.sync_rounded,
+                        color: Colors.white,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sincronizar Ahora',
                             style: TextStyle(
-                              fontSize: 10,
+                              fontSize: 20,
                               fontWeight: FontWeight.w800,
                               color: Colors.white,
                               letterSpacing: 0.5,
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'INTELIGENTE',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      color: Colors.white.withOpacity(0.7),
+                      size: 22,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withOpacity(0.9),
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline_rounded, color: Colors.white70, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Al finalizar se refrescarán los datos base y deberás iniciar sesión nuevamente.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white70,
+                            height: 1.4,
+                          ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: Colors.white.withOpacity(0.7),
-                  size: 20,
-                ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              description,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.white.withOpacity(0.9),
-                height: 1.4,
-              ),
-            ),
-            if (showWarning) ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Requiere reiniciar sesión',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Colors.white,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  /// Widget de botón compacto para opciones secundarias
-  Widget _buildCompactSyncButton({
-    required String title,
-    required IconData icon,
-    required Gradient gradient,
-    required VoidCallback onTap,
-    bool showWarning = false,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: gradient.colors.first.withOpacity(0.25),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              title,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-                letterSpacing: 0.3,
-              ),
-            ),
-            if (showWarning) ...[
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.warning_amber_rounded,
-                      color: Colors.white,
-                      size: 12,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Reinicia sesión',
-                      style: TextStyle(
-                        fontSize: 9,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   /// Pantalla de progreso de sincronización
   Widget _buildSyncProgressScreen() {
@@ -925,6 +799,14 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           {'icon': Icons.logout_rounded, 'label': 'Cerrar sesión'},
           {'icon': Icons.login_rounded, 'label': 'Redirigir a login'},
         ];
+      case SyncMode.smartSync:
+        return [
+          {'icon': Icons.wifi_rounded, 'label': 'Verificar conexión'},
+          {'icon': Icons.do_not_disturb_on_rounded, 'label': 'Analizar exclusiones'},
+          {'icon': Icons.eco_rounded, 'label': 'Enviar productos'},
+          {'icon': Icons.location_on_rounded, 'label': 'Enviar visitas'},
+          {'icon': Icons.delete_rounded, 'label': 'Cerrar sesión'},
+        ];
       default:
         return [];
     }
@@ -1173,57 +1055,6 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   // LÓGICA DE SINCRONIZACIÓN
   // ============================================================================
 
-  void _confirmBasicSync() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Color(0xFF1E293B),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded, color: Color(0xFFEF4444), size: 32),
-            const SizedBox(width: 12),
-            Text(
-              'Confirmar Acción',
-              style: TextStyle(color: Colors.white),
-            ),
-          ],
-        ),
-        content: Text(
-          'Esta acción eliminará todos los datos base (usuarios, actividades, lotes, etc.) y cerrará tu sesión. Deberás iniciar sesión nuevamente para recargar toda la información.\n\n¿Deseas continuar?',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.9),
-            height: 1.5,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(
-              'Cancelar',
-              style: TextStyle(color: Colors.white.withOpacity(0.7)),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _startSync(SyncMode.basicSync);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFEF4444),
-            ),
-            child: Text(
-              'Continuar',
-              style: TextStyle(color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _startSync(SyncMode mode) {
     setState(() {
       _currentMode = mode;
@@ -1233,7 +1064,6 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       _currentMessage = 'Iniciando sincronización...';
     });
 
-    // Ejecutar la sincronización según el modo
     switch (mode) {
       case SyncMode.fullSync:
         _performFullSync();
@@ -1246,6 +1076,9 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         break;
       case SyncMode.basicSync:
         _performBasicSync();
+        break;
+      case SyncMode.smartSync:
+        _performSmartSync();
         break;
       default:
         break;
@@ -1505,7 +1338,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       await _updateProgress(0.7, 'Enviando visitas (método 2)...');
       debugPrint('📤 Intento 2: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      final jsonSuccess = await _syncVisitsMultipart();
+      final jsonSuccess = await _syncVisitsJsonFallback();
 
       if (jsonSuccess) {
         debugPrint('✅ Sincronización exitosa con endpoint JSON (fallback)');
@@ -1533,6 +1366,157 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         _currentStep = SyncStep.error;
         _errorMessage = 'Error al sincronizar visitas: ${e.toString()}';
       });
+    }
+  }
+
+  /// Sincronización inteligente: detecta qué hay pendiente y lo sincroniza.
+  /// Siempre finaliza ejecutando la sincronización básica (limpieza de datos base + redirect a login).
+  Future<void> _performSmartSync() async {
+    try {
+      // 1. Verificar conexión
+      await _updateProgress(0.05, 'Verificando conexión a internet...');
+      final hasConnection = await _checkInternetConnection();
+      if (!hasConnection) throw Exception('No hay conexión a Internet disponible');
+
+      // 2. Recolectar estadísticas
+      await _updateProgress(0.10, 'Analizando datos pendientes...');
+      final syncStats = SyncStats();
+      await _collectSyncData(syncStats);
+
+      // 3. Zonas de exclusión
+      await _analyzeExclusionZones(syncStats);
+      if (syncStats.hasPendingExclusions) {
+        await _updateProgress(0.20, 'Enviando ${syncStats.totalExclusionZones} zonas de exclusión...');
+        await _syncExclusionZones(syncStats);
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
+
+      // 4. Productos pendientes
+      await _collectProductsData(syncStats);
+      if (syncStats.hasPendingProducts) {
+        await _updateProgress(
+          0.35,
+          'Enviando ${syncStats.getTotalPendingProducts()} productos '
+          '(${syncStats.totalProductsNew} nuevos, ${syncStats.totalProductsUpdated} actualizados)...',
+        );
+        await _syncProducts(syncStats);
+        await Future.delayed(const Duration(milliseconds: 600));
+      }
+
+      // 5. Visitas: solo si hay pendientes
+      bool visitsSuccess = true;
+      if (syncStats.totalVisits > 0) {
+        await _updateProgress(0.50, 'Guardando backup local...');
+        await _saveVisitsBackup();
+
+        await _updateProgress(0.60, 'Enviando ${syncStats.totalVisits} visitas...');
+        visitsSuccess = false;
+        if (mounted) {
+          visitsSuccess = await actions.syncVisitsv2(
+            context,
+            widget.newsAdd,
+            widget.idCompany,
+            widget.idsHeadquarters,
+            widget.imei,
+            widget.authToken,
+          );
+        }
+        if (!visitsSuccess) {
+          debugPrint('⚠️ syncVisitsv2 falló (multipart + JSON), intentando fallback directo...');
+          visitsSuccess = await _syncVisitsJsonFallback();
+        }
+        if (!visitsSuccess) {
+          throw Exception('No se pudieron sincronizar las visitas pendientes');
+        }
+      } else {
+        debugPrint('ℹ️ Sin visitas pendientes, se omite el envío al servidor');
+      }
+
+      // 6. Limpiar AppState de visitas
+      debugPrint('🧹 [SmartSync] Paso 6: Limpiando AppState de visitas...');
+      FFAppState().visitsAdd = [];
+      FFAppState().visitDetails = [];
+      FFAppState().update(() {});
+
+      // 7. SIEMPRE: Sincronización básica (limpia tablas de login + redirect)
+      debugPrint('🗄️ [SmartSync] Paso 7: Limpiando tablas de login en SQLite...');
+      await _updateProgress(0.80, 'Actualizando datos base del sistema...');
+      await Future.delayed(const Duration(milliseconds: 400));
+
+      debugPrint('🗄️ [SmartSync] Abriendo base de datos...');
+      final dbPath = await _getDatabasePath();
+      final db = await openDatabase(dbPath);
+      debugPrint('🗄️ [SmartSync] Base de datos abierta. Iniciando transacción...');
+      await db.transaction((txn) async {
+        for (final table in [
+          'Nfc_tags_history', 'Login_sessions', 'News', 'Headquarters_weights',
+          'Activities_status', 'Activities_steps', 'Activities', 'Devices',
+          'Users', 'Zones_polygons', 'Zones', 'Companies', 'Types_points',
+        ]) {
+          try { await txn.delete(table); } catch (e) {
+            debugPrint('   ⚠️ Error limpiando $table: $e');
+          }
+        }
+      });
+      await db.close();
+      debugPrint('🗄️ [SmartSync] Tablas limpiadas. Limpiando AppState...');
+
+      await _updateProgress(0.90, 'Cerrando sesión...');
+
+      FFAppState().lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
+      FFAppState().isSync = false;
+      FFAppState().usersList = [];
+      FFAppState().zonesList = [];
+      FFAppState().headquartersList = [];
+      FFAppState().productsList = [];
+      FFAppState().newsList = [];
+      FFAppState().newsSelected = [];
+      FFAppState().activitiesStatusSelected = [];
+      FFAppState().newsAdd = [];
+      FFAppState().StatusAdd = [];
+      final currentGeoLocations = FFAppState().geoLocationsList;
+      FFAppState().geoLocationsList = currentGeoLocations.isNotEmpty
+          ? [currentGeoLocations.last]
+          : [];
+      FFAppState().loginResponse = null;
+      FFAppState().userSelected = UsersStruct();
+      FFAppState().companyDefault = CompaniesStruct();
+      FFAppState().activityDefault = ActivitiesStruct();
+      FFAppState().activitiesJSON = null;
+      FFAppState().activityStatusSelectedJSON = null;
+      FFAppState().userSelectedJSON = null;
+      FFAppState().headquarterSelected = HeadquartersStruct();
+      FFAppState().zoneSelected = ZonesStruct();
+      FFAppState().productsAdd = [];
+      FFAppState().activitySelectedJSON = null;
+      FFAppState().codeSupervisor = '';
+      FFAppState().codeOperator = '';
+      FFAppState().codeKeyboard = '';
+      FFAppState().moduleSelected = '';
+      FFAppState().nfcRead = '';
+      FFAppState().qrRead = '';
+      FFAppState().stopVoice = false;
+      FFAppState().idActivityStatus = 0;
+      FFAppState().totalStepsActivity = 0;
+      FFAppState().countStepsActivity = 0;
+      FFAppState().visitCount = 0;
+      FFAppState().formCacheMap = {};
+      FFAppState().update(() {});
+
+      await _updateProgress(1.0, 'Sincronización completada');
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      debugPrint('🚀 [SmartSync] Navegando a StartPage... mounted=$mounted');
+      if (mounted) context.goNamed('StartPage');
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error en sincronización inteligente: $e');
+      debugPrint('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() {
+          _currentStep = SyncStep.error;
+          _errorMessage = 'Error al sincronizar: ${e.toString()}';
+        });
+      }
     }
   }
 
@@ -1700,10 +1684,11 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
     }
   }
 
-  /// Método de fallback que usa el endpoint simple SyncVisitsAdd (JSON POST)
-  Future<bool> _syncVisitsMultipart() async {
+  /// Fallback: envía visitas al endpoint simple JSON SyncVisitsAdd (POST).
+  /// Se usa cuando el endpoint multipart SyncVisitsAddMultipart no está disponible.
+  Future<bool> _syncVisitsJsonFallback() async {
     try {
-      debugPrint('🚀 Iniciando sincronización con endpoint multipart...');
+      debugPrint('🔄 Iniciando fallback: endpoint simple JSON (SyncVisitsAdd)...');
 
       const String url = 'https://api.clickpalm.com/Sync_times/SyncVisitsAdd';
 
@@ -1816,7 +1801,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         return false;
       }
     } catch (e, stackTrace) {
-      debugPrint('❌ EXCEPCIÓN en _syncVisitsMultipart: $e');
+      debugPrint('❌ Error en fallback JSON (SyncVisitsAdd): $e');
       debugPrint('Stack trace: $stackTrace');
       return false;
     }
@@ -2577,8 +2562,9 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           }
 
           // Preparar el payload según ProductsInputDTO del API
+          // Para productos nuevos se envía id_product = 0 para que el servidor asigne el ID real
           final Map<String, dynamic> productPayload = {
-            'id_product': product.idProduct,
+            'id_product': product.syncStatus == 'new' ? 0 : product.idProduct,
             'id_headquarter': product.idHeadquarter,
             'id_company': product.idCompany,
             'name_product': product.nameProduct ?? '',
@@ -2709,7 +2695,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       debugPrint('⚠️ Endpoint multipart falló, iniciando FALLBACK...');
       debugPrint('📤 Intento 2: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      final bool jsonSuccess = await _syncVisitsMultipart();
+      final bool jsonSuccess = await _syncVisitsJsonFallback();
 
       if (jsonSuccess) {
         debugPrint('✅ Sincronización exitosa con endpoint JSON (fallback)');
@@ -2757,7 +2743,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       // INTENTO 1: Endpoint simple JSON (SyncVisitsAdd) - sin compresión
       debugPrint('📤 Intento 1: Usando endpoint simple JSON (SyncVisitsAdd)');
 
-      final bool jsonSuccess = await _syncVisitsMultipart();
+      final bool jsonSuccess = await _syncVisitsJsonFallback();
 
       if (jsonSuccess) {
         debugPrint('✅ Sincronización optimizada exitosa con endpoint JSON');

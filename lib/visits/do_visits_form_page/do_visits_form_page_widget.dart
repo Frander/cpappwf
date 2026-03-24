@@ -129,6 +129,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // headquarterId -> {weight, totalResults, calculatedWeight}
   final Map<int, Map<String, dynamic>> _calculatedHeadquarterWeights = {};
 
+  // Resultados de distribución proporcional de peso (=CALCULATION_DISTRIBUTION)
+  // statusId -> {pesoNeto, factor, grandTotal, lotes, error, ...}
+  final Map<int, Map<String, dynamic>> _calculatedDistributions = {};
+
+  // Estado de expansión del árbol de distribución: 'DIST_{statusId}_{hqId}' → bool
+  final Map<String, bool> _distributionExpansionState = {};
+
   // Map para almacenar distancias calculadas por statusId (OPCIÓN 1: desde TAG)
   final Map<int, double> _calculatedDistances = {};
 
@@ -1623,38 +1630,30 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 });
 
                 debugPrint(
-                    '✅ TAG-TRANSFER: Tag de origen guardado correctamente');
+                    '✅ TAG-TRANSFER: Tag de origen guardado y limpiado correctamente');
 
-                // TODO: Limpieza de TAG deshabilitada temporalmente por problemas de TagLostException
-                // // Limpiar el tag de origen después de leer exitosamente
-                // debugPrint('🧹 TAG-TRANSFER: Limpiando tag de origen...');
-                // if (!mounted) return;
-                // final clearSuccess = await actions.clearNFCTag(context);
-                // if (clearSuccess) {
-                //   debugPrint('✅ TAG-TRANSFER: Tag de origen limpiado exitosamente');
-                //   if (mounted) {
-                //     ScaffoldMessenger.of(context).showSnackBar(
-                //       const SnackBar(
-                //         content: Row(
-                //           children: [
-                //             Icon(Icons.cleaning_services, color: Colors.white),
-                //             SizedBox(width: 12),
-                //             Expanded(
-                //               child: Text(
-                //                 'Tag de origen leído y limpiado correctamente',
-                //                 style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w600),
-                //               ),
-                //             ),
-                //           ],
-                //         ),
-                //         backgroundColor: Color(0xFF00a86b),
-                //         duration: Duration(seconds: 3),
-                //       ),
-                //     );
-                //   }
-                // } else {
-                //   debugPrint('⚠️ TAG-TRANSFER: No se pudo limpiar el tag de origen');
-                // }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Row(
+                        children: [
+                          Icon(Icons.cleaning_services, color: Colors.white),
+                          SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Tag de origen leído y limpiado correctamente',
+                              style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Color(0xFF00a86b),
+                      duration: Duration(seconds: 3),
+                    ),
+                  );
+                }
 
                 debugPrint(
                     '💡 TAG-TRANSFER: Ahora el usuario puede presionar "Transferir ahora"');
@@ -2318,6 +2317,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildHeadquarterWeightsDisplay(statusId),
+                            ),
+                          // Distribución proporcional de peso - DEBAJO
+                          if (isHeadquarterWeightType &&
+                              _isDistributionCalculation(
+                                  getJsonField(status, r'''$.default_status''')?.toString() ?? ''))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildDistributionDisplay(statusId),
                             ),
                           // Cajones numéricos del 1 al 5 (solo para tipo number) - DEBAJO
                           if (typeStatus.toLowerCase() == 'number')
@@ -3104,6 +3111,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildHeadquarterWeightsDisplay(statusId),
+                        ),
+                      // Distribución proporcional de peso - DEBAJO
+                      if (isHeadquarterWeightType &&
+                          _isDistributionCalculation(
+                              getJsonField(status, r'''$.default_status''')?.toString() ?? ''))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildDistributionDisplay(statusId),
                         ),
                       // Cajones numéricos del 1 al 5
                       if (isNumberType)
@@ -7637,6 +7652,90 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
   }
 
+  // ===== PERSISTENCIA DE RESULTADOS DE headquarter-weight =====
+
+  /// Persiste el resultado de un campo headquarter-weight en FFAppState().visitDetails.
+  /// Se llama desde los tres tipos de cálculo (traditional, formula, distribution)
+  /// justo después de que el resultado es almacenado en el mapa en memoria.
+  ///
+  /// [statusId]   ID del activity_status del campo headquarter-weight.
+  /// [statusName] Nombre del campo (statusOption).
+  /// [resultJson] Mapa ya serializable con los datos del cálculo.
+  void _saveHqWeightToVisitDetails(
+    int statusId,
+    String statusName,
+    Map<String, dynamic> resultJson,
+  ) {
+    try {
+      final String jsonString = jsonEncode(resultJson);
+
+      // Buscar parentStepId desde la definición de la actividad
+      int parentStepId = 0;
+      try {
+        final activityStepsRaw =
+            getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+        if (activityStepsRaw != null) {
+          final activitySteps = activityStepsRaw.toList();
+          outer:
+          for (var step in activitySteps) {
+            final stepId = getJsonField(step, r'''$.id_activity_step''');
+            final statusListRaw = getJsonField(step, r'''$.activity_status''');
+            if (statusListRaw == null) continue;
+            for (var s in statusListRaw.toList()) {
+              if (getJsonField(s, r'''$.id_activity_status''') == statusId) {
+                parentStepId = stepId;
+                break outer;
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Buscar si ya existe una entrada para este statusId
+      final int existingIndex = FFAppState()
+          .visitDetails
+          .indexWhere((d) => d.idActivityStatus == statusId);
+
+      if (existingIndex >= 0) {
+        final detail = FFAppState().visitDetails[existingIndex];
+        FFAppState().updateVisitDetailsAtIndex(
+          existingIndex,
+          (_) => VisitsDetailsStruct(
+            idVisitDetail: detail.idVisitDetail,
+            idVisit: detail.idVisit,
+            idActivityStatus: statusId,
+            statusOption: statusName,
+            statusResponse: jsonString,
+            idStepParent: parentStepId,
+            rememberStatus: detail.rememberStatus,
+            defaultStatus: detail.defaultStatus,
+            typeStatus: 'headquarter-weight',
+            auxStep: parentStepId,
+          ),
+        );
+        debugPrint('   ✅ HQ-Weight persistido en visitDetails[index=$existingIndex]');
+      } else {
+        FFAppState().addToVisitDetails(
+          VisitsDetailsStruct(
+            idVisitDetail: 0,
+            idVisit: 0,
+            idActivityStatus: statusId,
+            statusOption: statusName,
+            statusResponse: jsonString,
+            idStepParent: parentStepId,
+            rememberStatus: false,
+            defaultStatus: '',
+            typeStatus: 'headquarter-weight',
+            auxStep: parentStepId,
+          ),
+        );
+        debugPrint('   ✅ HQ-Weight añadido a visitDetails');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error persistiendo HQ-Weight en visitDetails: $e');
+    }
+  }
+
   // ===== CARGAR WEIGHTS DE HEADQUARTERS DESDE SQLITE =====
 
   /// Carga los weights de headquarters desde SQLite para el mes/año actual
@@ -7745,7 +7844,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   /// Si se proporciona targetStatusId, solo calcula para ese status
   void _calculateHeadquarterWeightResults(
       int tagReaderStatusId, String tagReaderStatusName,
-      {int? targetStatusId}) {
+      {int? targetStatusId, String? targetStatusName}) {
     debugPrint('');
     debugPrint('⚖️ ===== CÁLCULO DE PESO POR HEADQUARTER =====');
     debugPrint('📍 Tag Reader: "$tagReaderStatusName" (ID: $tagReaderStatusId)');
@@ -7872,7 +7971,302 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       'evaluatedFormula': evaluatedFormula, // Fórmula para mostrar INLINE
     };
 
+    // Persistir en visitDetails como JSON
+    final String statusNameForStorage = targetStatusName ?? tagReaderStatusName;
+    final List<Map<String, dynamic>> lotesJson = resultsForThisStatus.entries
+        .map((e) => {
+              'headquarterId': e.key,
+              'headquarterName': e.value['headquarterName'],
+              'totalResults': e.value['totalResults'],
+              'weight': e.value['weight'],
+              'calculatedWeight': e.value['calculatedWeight'],
+            })
+        .toList();
+    _saveHqWeightToVisitDetails(statusIdForStorage, statusNameForStorage, {
+      'calculationType': 'traditional',
+      'grandTotal': grandTotal,
+      'evaluatedFormula': evaluatedFormula,
+      'lotes': lotesJson,
+    });
+
     debugPrint('⚖️ ===== FIN CÁLCULO DE PESO =====');
+    debugPrint('');
+  }
+
+  // ===== DISTRIBUCIÓN PROPORCIONAL DE PESO (=CALCULATION_DISTRIBUTION) =====
+
+  /// Calcula la distribución proporcional del peso neto (TARE - DESTARE) entre
+  /// los lotes y operadores del TAG leído, usando el peso promedio por racimo
+  /// de cada lote como línea base para la proporción.
+  Future<void> _calculateDistributionWeights(int statusId, {String statusName = ''}) async {
+    debugPrint('');
+    debugPrint('📊 ===== INICIO CÁLCULO DE DISTRIBUCIÓN =====');
+    debugPrint('📋 StatusId: $statusId');
+
+    // 1. Extraer TARE (búsqueda exacta, luego fallback contains)
+    var tareDetail = FFAppState().visitDetails.firstWhere(
+          (d) => d.statusOption.toUpperCase() == 'TARE',
+          orElse: () => VisitsDetailsStruct(),
+        );
+    if (tareDetail.statusResponse.isEmpty) {
+      tareDetail = FFAppState().visitDetails.firstWhere(
+            (d) =>
+                d.statusOption.toUpperCase().contains('TARE') &&
+                !d.statusOption.toUpperCase().contains('DESTARE'),
+            orElse: () => VisitsDetailsStruct(),
+          );
+    }
+
+    // 2. Extraer DESTARE (búsqueda exacta, luego fallback contains)
+    var destareDetail = FFAppState().visitDetails.firstWhere(
+          (d) => d.statusOption.toUpperCase() == 'DESTARE',
+          orElse: () => VisitsDetailsStruct(),
+        );
+    if (destareDetail.statusResponse.isEmpty) {
+      destareDetail = FFAppState().visitDetails.firstWhere(
+            (d) => d.statusOption.toUpperCase().contains('DESTARE'),
+            orElse: () => VisitsDetailsStruct(),
+          );
+    }
+
+    final tare = double.tryParse(tareDetail.statusResponse);
+    final destare = double.tryParse(destareDetail.statusResponse);
+
+    if (tare == null || destare == null) {
+      debugPrint('   ⚠️ TARE o DESTARE no configurados o no son numéricos');
+      setState(() {
+        _calculatedDistributions[statusId] = {
+          'error': true,
+          'errorMessage': 'Configure TARE y DESTARE antes de calcular la distribución',
+          'pesoNeto': 0.0,
+          'grandTotal': 0.0,
+        };
+      });
+      debugPrint('📊 ===== FIN CÁLCULO DE DISTRIBUCIÓN (ERROR) =====');
+      debugPrint('');
+      return;
+    }
+
+    final pesoNeto = tare - destare;
+    debugPrint('   💰 TARE: $tare  |  DESTARE: $destare  |  Peso neto: $pesoNeto');
+
+    if (pesoNeto <= 0) {
+      debugPrint('   ⚠️ Peso neto ≤ 0: no se puede distribuir');
+      setState(() {
+        _calculatedDistributions[statusId] = {
+          'error': true,
+          'errorMessage': 'El peso neto (TARE − DESTARE) debe ser mayor a cero',
+          'pesoNeto': pesoNeto,
+          'grandTotal': 0.0,
+        };
+      });
+      debugPrint('📊 ===== FIN CÁLCULO DE DISTRIBUCIÓN (ERROR) =====');
+      debugPrint('');
+      return;
+    }
+
+    // 3. Recolectar todos los registros del TAG
+    final List<Map<String, dynamic>> allTagData = [];
+    for (var entry in _tagReaderData.entries) {
+      allTagData.addAll(entry.value);
+    }
+
+    if (allTagData.isEmpty) {
+      debugPrint('   ⚠️ No hay datos de TAG leídos todavía');
+      debugPrint('📊 ===== FIN CÁLCULO DE DISTRIBUCIÓN (SIN TAG) =====');
+      debugPrint('');
+      return;
+    }
+
+    debugPrint('   📋 Total registros del TAG: ${allTagData.length}');
+
+    // 4. Agrupar resultados por lote (headquarterId)
+    final Map<int, int> resultsByLote = {};
+    for (var record in allTagData) {
+      final hqId = record['headquarterId'] as int? ?? 0;
+      final results = record['results'] as int? ?? 0;
+      if (hqId > 0) {
+        resultsByLote[hqId] = (resultsByLote[hqId] ?? 0) + results;
+      }
+    }
+
+    debugPrint('   📦 Lotes encontrados: ${resultsByLote.length}');
+    for (var e in resultsByLote.entries) {
+      debugPrint('      Lote ${e.key}: ${e.value} racimos');
+    }
+
+    // 5. Cargar pesos promedio para los lotes si no están cargados
+    final loteIds = resultsByLote.keys.toList();
+    await _loadHeadquarterWeights(loteIds);
+
+    // Verificar que todos los lotes tienen peso configurado
+    final List<Map<String, dynamic>> missingWeights = [];
+    for (final hqId in loteIds) {
+      if (!_headquarterWeights.containsKey(hqId)) {
+        String hqName = 'Lote $hqId';
+        try {
+          final hq = FFAppState().headquartersList.firstWhere(
+                (h) => h.idHeadquarter == hqId,
+                orElse: () => HeadquartersStruct(),
+              );
+          if (hq.nameHeadquarter.isNotEmpty) hqName = hq.nameHeadquarter;
+        } catch (_) {}
+        missingWeights.add({'headquarterId': hqId, 'headquarterName': hqName});
+      }
+    }
+
+    if (missingWeights.isNotEmpty) {
+      debugPrint('   ⚠️ ${missingWeights.length} lote(s) sin peso promedio configurado');
+      setState(() {
+        _calculatedDistributions[statusId] = {
+          'error': true,
+          'errorMessage': 'Hay lotes sin peso promedio configurado',
+          'missingWeights': missingWeights,
+          'pesoNeto': pesoNeto,
+          'grandTotal': 0.0,
+        };
+      });
+      debugPrint('📊 ===== FIN CÁLCULO DE DISTRIBUCIÓN (ERROR) =====');
+      debugPrint('');
+      return;
+    }
+
+    // 6–8. Calcular pesos esperados y factor de ajuste
+    double pesoEsperadoTotal = 0.0;
+    final Map<int, double> pesoEsperadoPorLote = {};
+    for (var entry in resultsByLote.entries) {
+      final hqId = entry.key;
+      final racimos = entry.value;
+      final avgWeight = _headquarterWeights[hqId]!;
+      final pe = racimos * avgWeight;
+      pesoEsperadoPorLote[hqId] = pe;
+      pesoEsperadoTotal += pe;
+    }
+
+    if (pesoEsperadoTotal == 0) {
+      debugPrint('   ⚠️ Peso esperado total es cero: no se puede calcular factor');
+      setState(() {
+        _calculatedDistributions[statusId] = {
+          'error': true,
+          'errorMessage': 'El total esperado es cero (sin racimos o sin pesos configurados)',
+          'pesoNeto': pesoNeto,
+          'grandTotal': 0.0,
+        };
+      });
+      debugPrint('📊 ===== FIN CÁLCULO DE DISTRIBUCIÓN (ERROR) =====');
+      debugPrint('');
+      return;
+    }
+
+    final factor = pesoNeto / pesoEsperadoTotal;
+    debugPrint('   🔢 Peso esperado total: $pesoEsperadoTotal  |  Factor: $factor');
+
+    // 9. Peso asignado por lote
+    final Map<int, double> pesoAsignadoPorLote = {};
+    for (var entry in pesoEsperadoPorLote.entries) {
+      pesoAsignadoPorLote[entry.key] = entry.value * factor;
+    }
+
+    // 10. Construir árbol por lote con detalle de operadores
+    double grandTotal = 0.0;
+    final Map<int, Map<String, dynamic>> lotesData = {};
+
+    for (final hqId in loteIds) {
+      final racimosLote = resultsByLote[hqId]!;
+      final avgWeight = _headquarterWeights[hqId]!;
+      final pesoEsperado = pesoEsperadoPorLote[hqId]!;
+      final pesoAsignado = pesoAsignadoPorLote[hqId]!;
+      grandTotal += pesoAsignado;
+
+      String hqName = 'Lote $hqId';
+      try {
+        final hq = FFAppState().headquartersList.firstWhere(
+              (h) => h.idHeadquarter == hqId,
+              orElse: () => HeadquartersStruct(),
+            );
+        if (hq.nameHeadquarter.isNotEmpty) hqName = hq.nameHeadquarter;
+      } catch (_) {}
+
+      debugPrint('   🏢 $hqName: $racimosLote rac. × $avgWeight = $pesoEsperado → asignado: $pesoAsignado kg');
+
+      // Agrupar operadores dentro de este lote
+      final Map<String, Map<String, dynamic>> opGroups = {};
+      for (var record in allTagData) {
+        if ((record['headquarterId'] as int? ?? 0) != hqId) continue;
+        final opId = record['operatorId'] as String? ?? '';
+        final op2Id = record['operator2Id'] as String? ?? '';
+        final results = record['results'] as int? ?? 0;
+        final opKey = op2Id.isNotEmpty ? '${opId}_$op2Id' : opId;
+
+        if (!opGroups.containsKey(opKey)) {
+          opGroups[opKey] = {
+            'operatorId': opId,
+            'operator2Id': op2Id,
+            'operatorName': _getUserName(opId),
+            'operator2Name': op2Id.isNotEmpty ? _getCorterName(op2Id) : '',
+            'results': 0,
+            'pesoOp': 0.0,
+          };
+        }
+        opGroups[opKey]!['results'] = (opGroups[opKey]!['results'] as int) + results;
+      }
+
+      // Calcular peso por operador proporcionalmente
+      for (var opEntry in opGroups.entries) {
+        final opResults = opEntry.value['results'] as int;
+        final pesoOp = racimosLote > 0 ? (opResults / racimosLote) * pesoAsignado : 0.0;
+        opGroups[opEntry.key]!['pesoOp'] = pesoOp;
+        debugPrint('      👤 ${opEntry.value['operatorName']}: $opResults rac. → $pesoOp kg');
+      }
+
+      lotesData[hqId] = {
+        'headquarterName': hqName,
+        'totalResults': racimosLote,
+        'avgWeight': avgWeight,
+        'pesoEsperado': pesoEsperado,
+        'pesoAsignado': pesoAsignado,
+        'operators': opGroups.values.toList(),
+      };
+    }
+
+    debugPrint('   ✅ Total distribuido: $grandTotal kg (peso neto: $pesoNeto kg)');
+
+    setState(() {
+      _calculatedDistributions[statusId] = {
+        'error': false,
+        'pesoNeto': pesoNeto,
+        'factor': factor,
+        'pesoEsperadoTotal': pesoEsperadoTotal,
+        'grandTotal': grandTotal,
+        'lotes': lotesData,
+      };
+    });
+
+    final List<Map<String, dynamic>> lotesJson = lotesData.entries.map((e) {
+      final ops = (e.value['operators'] as List?)
+              ?.map((op) => Map<String, dynamic>.from(op as Map))
+              .toList() ??
+          [];
+      return {
+        'headquarterId': e.key,
+        'headquarterName': e.value['headquarterName'],
+        'totalResults': e.value['totalResults'],
+        'avgWeight': e.value['avgWeight'],
+        'pesoEsperado': e.value['pesoEsperado'],
+        'pesoAsignado': e.value['pesoAsignado'],
+        'operators': ops,
+      };
+    }).toList();
+
+    _saveHqWeightToVisitDetails(statusId, statusName, {
+      'calculationType': 'distribution',
+      'pesoNeto': pesoNeto,
+      'factor': factor,
+      'grandTotal': grandTotal,
+      'lotes': lotesJson,
+    });
+
+    debugPrint('📊 ===== FIN CÁLCULO DE DISTRIBUCIÓN (ÉXITO) =====');
     debugPrint('');
   }
 
@@ -7927,6 +8321,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           debugPrint(
               '      Comparando con: "=tag_reader:${tagReaderName.toLowerCase()}"');
 
+          // DISTRIBUCIÓN PROPORCIONAL: no necesita coincidir con ningún TAG_READER
+          if (_isDistributionCalculation(defaultStatus)) {
+            foundCount++;
+            debugPrint('      📊 Detectado como DISTRIBUCIÓN PROPORCIONAL, calculando...');
+            final List<int> headquarterIds = [];
+            for (var entry in _tagReaderData.entries) {
+              for (var record in entry.value) {
+                final hqId = record['headquarterId'] as int? ?? 0;
+                if (hqId > 0 && !headquarterIds.contains(hqId)) {
+                  headquarterIds.add(hqId);
+                }
+              }
+            }
+            if (headquarterIds.isNotEmpty) {
+              await _loadHeadquarterWeights(headquarterIds);
+            }
+            await _calculateDistributionWeights(statusId, statusName: statusName);
+            return; // no caer en el bloque tagReaderPattern
+          }
+
           // Verificar si este headquarter-weight referencia al tag-reader actual
           final normalizedDefault =
               defaultStatus.trim().toLowerCase().replaceAll(' ', '');
@@ -7950,6 +8364,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 statusId,
                 defaultStatus,
                 tagReaderName,
+                statusName: statusName,
               );
             } else {
               debugPrint(
@@ -7977,6 +8392,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 tagReaderStatusId,
                 tagReaderName,
                 targetStatusId: statusId,
+                targetStatusName: statusName,
               );
             }
           } else {
@@ -8130,13 +8546,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return hasOperators && hasFormVariables;
   }
 
+  /// Detecta si el default_status es el modo de distribución proporcional de peso
+  bool _isDistributionCalculation(String defaultStatus) {
+    return defaultStatus.trim().toUpperCase() == '=CALCULATION_DISTRIBUTION';
+  }
+
   /// Evalúa una fórmula de headquarter-weight
   /// Ejemplo: =(TARE-DESTARE)/TAG_READER:Lectura en TAG
   Future<void> _evaluateHeadquarterWeightFormula(
     int statusId,
     String formula,
-    String tagReaderName,
-  ) async {
+    String tagReaderName, {
+    String statusName = '',
+  }) async {
     try {
       debugPrint('');
       debugPrint('🧮 ===== EVALUANDO FÓRMULA =====');
@@ -8296,6 +8718,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         'evaluatedFormula': displayFormula, // Fórmula formateada para mostrar
       };
 
+      _saveHqWeightToVisitDetails(statusId, statusName, {
+        'calculationType': 'formula',
+        'grandTotal': result,
+        'formula': formula,
+        'evaluatedFormula': displayFormula,
+      });
+
       debugPrint('');
       debugPrint('🧮 ===== FIN EVALUACIÓN (ÉXITO) =====');
       debugPrint('');
@@ -8408,6 +8837,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           final defaultStatus =
               getJsonField(status, r'''$.default_status''')?.toString() ?? '';
 
+          // DISTRIBUCIÓN PROPORCIONAL: se recalcula ante cualquier cambio de TARE/DESTARE
+          if (_isDistributionCalculation(defaultStatus)) {
+            debugPrint('   📊 Recalculando distribución para "$statusName" (ID: $statusId)');
+            await _calculateDistributionWeights(statusId, statusName: statusName);
+            recalculatedCount++;
+            return;
+          }
+
           // Verificar si la fórmula contiene el campo modificado
           final normalizedFormula = defaultStatus.toUpperCase();
           final normalizedFieldName = modifiedFieldName.toUpperCase();
@@ -8438,6 +8875,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   statusId,
                   defaultStatus,
                   tagReaderName,
+                  statusName: statusName,
                 );
                 recalculatedCount++;
               } else {
@@ -9326,67 +9764,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return null;
     }
 
-    // Fallback: Buscar en SQLite si AppState está vacío
-    Future<ReadGeoStruct?> getGeolocationFromSQLite() async {
-      try {
-        final Directory? externalDir = await getExternalStorageDirectory();
-        if (externalDir == null) return null;
-
-        final String pathStr = '${externalDir.path}/ClickPalmData';
-        final dbPath = path.join(pathStr, 'clickpalm_database.db');
-
-        final database = await openDatabase(dbPath);
-
-        // Buscar la ubicación más reciente con buena precisión (≤15m)
-        final List<Map<String, dynamic>> results = await database.rawQuery('''
-          SELECT Latitude, Longitude, Altitude, HorizontalError, CreatedAt
-          FROM Location_tracking
-          WHERE HorizontalError <= 15
-          ORDER BY CreatedAt DESC
-          LIMIT 1
-        ''');
-
-        await database.close();
-
-        if (results.isEmpty) return null;
-
-        final row = results.first;
-        debugPrint('📍 Geolocalización obtenida de SQLite: lat=${row['Latitude']}, lon=${row['Longitude']}');
-
-        return ReadGeoStruct(
-          latitude: (row['Latitude'] as num?)?.toDouble() ?? 0.0,
-          longitude: (row['Longitude'] as num?)?.toDouble() ?? 0.0,
-          altitude: (row['Altitude'] as num?)?.toDouble() ?? 0.0,
-          errorHorizontal: (row['HorizontalError'] as num?)?.toDouble() ?? 0.0,
-          dateHourRead: DateTime.tryParse(row['CreatedAt'] as String? ?? ''),
-        );
-      } catch (e) {
-        debugPrint('⚠️ Error buscando geolocalización en SQLite: $e');
-        return null;
-      }
-    }
-
-    // Intentar obtener inmediatamente de AppState
-    final immediate = getLatestValidGeolocation();
-    if (immediate != null) {
-      debugPrint(
-          '📍 Geolocalización disponible en AppState: ${immediate.latitude}, ${immediate.longitude}');
-      return immediate;
-    }
-
-    // Si AppState está vacío, intentar SQLite como fallback
-    debugPrint('⚠️ AppState vacío, buscando en SQLite...');
-    final fromSQLite = await getGeolocationFromSQLite();
-    if (fromSQLite != null) {
-      debugPrint('✅ Geolocalización obtenida de SQLite');
-      return fromSQLite;
-    }
-
-    // Si no hay geolocalización válida en ningún lado, mostrar diálogo de espera
-    debugPrint('⏳ Esperando geolocalización válida...');
+    // Siempre mostrar el diálogo para que el usuario pueda elegir entre
+    // GPS automático o entrada manual de coordenadas
+    debugPrint('⏳ Mostrando diálogo de geolocalización...');
 
     ReadGeoStruct? result;
     bool cancelled = false;
+
+    // Controladores para entrada manual (creados fuera del builder para no recrearlos)
+    final latController = TextEditingController();
+    final lonController = TextEditingController();
+    // Estado del modo manual (fuera del builder para persistir entre rebuilds)
+    bool showManualInput = false;
+    String? manualError;
 
     if (!context.mounted) return null;
     await showDialog(
@@ -9395,66 +9785,287 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setState) {
-            // Verificar periódicamente si hay geolocalización válida
+
+            // Función local para confirmar entrada manual
+            void confirmManual() {
+              final lat = double.tryParse(latController.text.trim().replaceAll(',', '.'));
+              final lon = double.tryParse(lonController.text.trim().replaceAll(',', '.'));
+              if (lat == null || lon == null ||
+                  lat < -90 || lat > 90 ||
+                  lon < -180 || lon > 180) {
+                setState(() {
+                  manualError = 'Ingresa coordenadas válidas (lat ±90, lon ±180)';
+                });
+                return;
+              }
+              result = ReadGeoStruct(
+                latitude: lat,
+                longitude: lon,
+                altitude: 0.0,
+                errorHorizontal: 0.0,
+                dateHourRead: DateTime.now(),
+              );
+              cancelled = false;
+              Navigator.of(dialogContext).pop();
+            }
+
+            // Verificar periódicamente si hay geolocalización válida (solo si no está en modo manual)
             Future.delayed(const Duration(milliseconds: 500), () {
-              if (!cancelled && dialogContext.mounted) {
+              if (!cancelled && dialogContext.mounted && !showManualInput) {
                 final geo = getLatestValidGeolocation();
                 if (geo != null) {
                   result = geo;
                   Navigator.of(dialogContext).pop();
                 } else {
-                  setState(() {}); // Refrescar el diálogo
+                  setState(() {});
                 }
               }
             });
 
             return Dialog(
-              backgroundColor: Colors.black87,
+              backgroundColor: const Color(0xFF1A1A2E),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const CircularProgressIndicator(
-                      valueColor:
-                          AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Esperando ubicación GPS...',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
+                    if (!showManualInput) ...[
+                      // ── Vista de espera ──
+                      const CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Por favor espere mientras se obtiene una ubicación válida',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 13,
-                        color: Colors.white70,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 16),
-                    TextButton(
-                      onPressed: () {
-                        cancelled = true;
-                        Navigator.of(dialogContext).pop();
-                      },
-                      child: const Text(
-                        'Cancelar',
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Esperando ubicación GPS...',
                         style: TextStyle(
                           fontFamily: 'Roboto',
-                          color: Colors.redAccent,
+                          fontSize: 16,
                           fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Por favor espere mientras se obtiene una ubicación válida',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 13,
+                          color: Colors.white70,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      // Botón sutil Visita Manual
+                      GestureDetector(
+                        onTap: () => setState(() { showManualInput = true; }),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.06),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Icon(Icons.edit_location_alt_outlined,
+                                  color: Color(0xFF94A3B8), size: 14),
+                              SizedBox(width: 6),
+                              Text(
+                                'VISITA MANUAL',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF94A3B8),
+                                  letterSpacing: 0.8,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: () {
+                          cancelled = true;
+                          Navigator.of(dialogContext).pop();
+                        },
+                        child: const Text(
+                          'Cancelar',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            color: Colors.redAccent,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      // ── Vista de entrada manual ──
+                      Row(
+                        children: [
+                          const Icon(Icons.edit_location_alt_outlined,
+                              color: Color(0xFF60A5FA), size: 18),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Ubicación manual',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () => setState(() {
+                              showManualInput = false;
+                              manualError = null;
+                            }),
+                            child: const Icon(Icons.close,
+                                color: Color(0xFF94A3B8), size: 18),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Ingresa las coordenadas para registrar la visita',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 11,
+                          color: Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Campo Latitud
+                      TextField(
+                        controller: latController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true, signed: true),
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          labelText: 'Latitud',
+                          labelStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          hintText: 'Ej: 5.07285',
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF475569), fontSize: 13),
+                          prefixIcon: const Icon(Icons.north_outlined,
+                              color: Color(0xFF60A5FA), size: 18),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.06),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF334155)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF334155)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF60A5FA)),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // Campo Longitud
+                      TextField(
+                        controller: lonController,
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true, signed: true),
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                        decoration: InputDecoration(
+                          labelText: 'Longitud',
+                          labelStyle: const TextStyle(
+                              color: Color(0xFF94A3B8), fontSize: 13),
+                          hintText: 'Ej: -75.53112',
+                          hintStyle: const TextStyle(
+                              color: Color(0xFF475569), fontSize: 13),
+                          prefixIcon: const Icon(Icons.east_outlined,
+                              color: Color(0xFF60A5FA), size: 18),
+                          filled: true,
+                          fillColor: Colors.white.withValues(alpha: 0.06),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF334155)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF334155)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF60A5FA)),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
+                        ),
+                        onSubmitted: (_) => confirmManual(),
+                      ),
+                      if (manualError != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          manualError!,
+                          style: const TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 11,
+                            color: Colors.redAccent,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: confirmManual,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF00a86b),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                          ),
+                          child: const Text(
+                            'Confirmar ubicación',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton(
+                        onPressed: () {
+                          cancelled = true;
+                          Navigator.of(dialogContext).pop();
+                        },
+                        child: const Text(
+                          'Cancelar',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 12,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -9463,6 +10074,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         );
       },
     );
+
+    latController.dispose();
+    lonController.dispose();
 
     if (result != null) {
       debugPrint(
@@ -13418,6 +14032,408 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ],
         ],
       ),
+    );
+  }
+
+  // ===== DISTRIBUCIÓN PROPORCIONAL DE PESO — ÁRBOL INLINE =====
+
+  /// Muestra el árbol de distribución proporcional de peso (=CALCULATION_DISTRIBUTION)
+  /// Jerarquía: Lote → Operadores, con racimos y kg asignados en cada nivel.
+  Widget _buildDistributionDisplay(int statusId) {
+    // Guard 1: sin datos de TAG todavía
+    if (_tagReaderData.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1565C0).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF1565C0).withValues(alpha: 0.3)),
+        ),
+        child: const Row(
+          children: [
+            Icon(Icons.info_outline, color: Color(0xFF1565C0), size: 18),
+            SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Primero lea el TAG para calcular la distribución de peso',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13,
+                  color: Color(0xFF1565C0),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Guard 2: cálculo aún no ejecutado
+    if (!_calculatedDistributions.containsKey(statusId)) {
+      return const SizedBox.shrink();
+    }
+
+    final data = _calculatedDistributions[statusId]!;
+    final hasError = data['error'] == true;
+
+    // Guard 3: error con lotes sin peso
+    if (hasError && data['missingWeights'] != null) {
+      final missing = data['missingWeights'] as List<Map<String, dynamic>>;
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFB71C1C).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFB71C1C).withValues(alpha: 0.4)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Color(0xFFB71C1C), size: 18),
+                SizedBox(width: 8),
+                Text(
+                  'Lotes sin peso promedio configurado',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFFB71C1C),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ...missing.map((m) => Padding(
+                  padding: const EdgeInsets.only(left: 8, bottom: 4),
+                  child: Text(
+                    '• ${m['headquarterName']}',
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 13,
+                      color: Color(0xFFB71C1C),
+                    ),
+                  ),
+                )),
+          ],
+        ),
+      );
+    }
+
+    // Guard 4: error genérico
+    if (hasError) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF57F17).withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFF57F17).withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Color(0xFFF57F17), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                data['errorMessage'] as String? ?? 'Error en el cálculo de distribución',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13,
+                  color: Color(0xFFF57F17),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // --- Renderizado del árbol ---
+    final pesoNeto = data['pesoNeto'] as double;
+    final factor = data['factor'] as double;
+    final grandTotal = data['grandTotal'] as double;
+    final lotes = data['lotes'] as Map<int, Map<String, dynamic>>;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: const Color(0xFF40916C).withValues(alpha: 0.3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.analytics_rounded, color: Color(0xFF52B788), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Distribución de Peso',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: -0.3,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    _buildDistBadge(
+                      label: 'Peso neto',
+                      value: '${_formatDecimal(pesoNeto)} kg',
+                      color: const Color(0xFF52B788),
+                    ),
+                    const SizedBox(width: 8),
+                    _buildDistBadge(
+                      label: 'Factor',
+                      value: factor.toStringAsFixed(4),
+                      color: const Color(0xFF40916C),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+
+          const Divider(color: Color(0xFF40916C), height: 1, thickness: 0.5),
+
+          // Lotes (expandibles)
+          ...lotes.entries.map((loteEntry) {
+            final hqId = loteEntry.key;
+            final lote = loteEntry.value;
+            final hqName = lote['headquarterName'] as String;
+            final totalResults = lote['totalResults'] as int;
+            final pesoAsignado = lote['pesoAsignado'] as double;
+            final operators = lote['operators'] as List<Map<String, dynamic>>;
+            final expansionKey = 'DIST_${statusId}_$hqId';
+            final isExpanded = _distributionExpansionState[expansionKey] ?? false;
+
+            return Column(
+              children: [
+                // Fila de lote (header expandible)
+                InkWell(
+                  onTap: () => setState(() {
+                    _distributionExpansionState[expansionKey] = !isExpanded;
+                  }),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isExpanded ? Icons.expand_more : Icons.chevron_right,
+                          color: const Color(0xFF52B788),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            hqName,
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                        _buildDistBadge(
+                          label: '',
+                          value: '$totalResults rac.',
+                          color: const Color(0xFF2196F3).withValues(alpha: 0.7),
+                          compact: true,
+                        ),
+                        const SizedBox(width: 6),
+                        _buildDistBadge(
+                          label: '',
+                          value: '${_formatDecimal(pesoAsignado)} kg',
+                          color: const Color(0xFF52B788).withValues(alpha: 0.7),
+                          compact: true,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Filas de operadores (visibles cuando expandido)
+                if (isExpanded)
+                  ...operators.map((op) {
+                    final opName = op['operatorName'] as String? ?? op['operatorId'] as String? ?? '—';
+                    final op2Name = op['operator2Name'] as String? ?? '';
+                    final opResults = op['results'] as int;
+                    final pesoOp = op['pesoOp'] as double;
+                    final displayName = opName.isNotEmpty ? opName.toUpperCase() : (op['operatorId'] as String? ?? '—');
+                    return Container(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(40, 8, 16, 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.person_outline, color: Color(0xFF74C69D), size: 16),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayName,
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: Color(0xFFD8F3DC),
+                                    ),
+                                  ),
+                                  if (op2Name.isNotEmpty)
+                                    Text(
+                                      'Cortero: $op2Name',
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 11,
+                                        color: Color(0xFF74C69D),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            _buildDistBadge(
+                              label: '',
+                              value: '$opResults rac.',
+                              color: const Color(0xFF2196F3).withValues(alpha: 0.5),
+                              compact: true,
+                            ),
+                            const SizedBox(width: 6),
+                            _buildDistBadge(
+                              label: '',
+                              value: '${_formatDecimal(pesoOp)} kg',
+                              color: const Color(0xFF52B788).withValues(alpha: 0.5),
+                              compact: true,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+
+                const Divider(color: Color(0xFF40916C), height: 1, thickness: 0.3),
+              ],
+            );
+          }),
+
+          // Footer total
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.2),
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(10),
+                bottomRight: Radius.circular(10),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                const Text(
+                  'TOTAL DISTRIBUIDO:',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF74C69D),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF52B788).withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFF52B788).withValues(alpha: 0.5)),
+                  ),
+                  child: Text(
+                    '${_formatDecimal(grandTotal)} kg',
+                    style: const TextStyle(
+                      fontFamily: 'Roboto Mono',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Badge compacto reutilizable para el árbol de distribución
+  Widget _buildDistBadge({
+    required String label,
+    required String value,
+    required Color color,
+    bool compact = false,
+  }) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 3 : 4,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: label.isEmpty
+          ? Text(
+              value,
+              style: TextStyle(
+                fontFamily: 'Roboto Mono',
+                fontSize: compact ? 12 : 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 10,
+                    color: Colors.white.withValues(alpha: 0.7),
+                  ),
+                ),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto Mono',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 

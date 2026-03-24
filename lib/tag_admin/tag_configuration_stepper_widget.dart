@@ -1,4 +1,4 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
@@ -21,8 +21,9 @@ class _TagConfigurationStepperWidgetState
   int _currentStep = 0;
   bool _isReading = false;
   bool _isClearing = false;
-  String _tagContent = '';
-  String _rawContent = '';
+  // null = no escaneado aún, '' = escaneado pero ilegible/incompatible, otro = contenido
+  String? _tagContent;
+  String? _rawContent;
   bool _showRaw = false;
 
   late AnimationController _slideController;
@@ -55,6 +56,8 @@ class _TagConfigurationStepperWidgetState
     if (_currentStep < 2) {
       setState(() {
         _currentStep++;
+        _tagContent = null; // Resetear para el siguiente paso
+        _rawContent = null;
         _slideController.reset();
         _slideController.forward();
       });
@@ -65,6 +68,8 @@ class _TagConfigurationStepperWidgetState
     if (_currentStep > 0) {
       setState(() {
         _currentStep--;
+        _tagContent = null;
+        _rawContent = null;
         _slideController.reset();
         _slideController.forward();
       });
@@ -74,17 +79,18 @@ class _TagConfigurationStepperWidgetState
   Future<void> _readTag() async {
     setState(() {
       _isReading = true;
-      _tagContent = '';
-      _rawContent = '';
+      _tagContent = null;
+      _rawContent = null;
     });
 
     try {
-      // Usar readNFCBasic para Centro de Administración (sin validación de tipo)
-      final content = await actions.readNFCBasic(context, autoClose: false);
+      // autoClose: true para cerrar la sesión NFC después de leer,
+      // evitando conflicto con clearNFCTag en el paso 2
+      final content = await actions.readNFCBasic(context, autoClose: true);
       if (mounted) {
         setState(() {
-          _tagContent = content ?? '';
-          _rawContent = content ?? '';
+          _tagContent = content; // null si no se pudo leer, '' si ilegible
+          _rawContent = content;
           _isReading = false;
         });
         HapticFeedback.mediumImpact();
@@ -112,7 +118,7 @@ class _TagConfigurationStepperWidgetState
         });
         if (result) {
           HapticFeedback.heavyImpact();
-          _nextStep(); // Pasar automáticamente al paso 3
+          _nextStep(); // Pasar automáticamente al paso 3 (resetea _tagContent)
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -248,6 +254,10 @@ class _TagConfigurationStepperWidgetState
   }
 
   Widget _buildStep1VerifyContent() {
+    final scanned = _tagContent != null;
+    final hasContent = scanned && _tagContent!.isNotEmpty;
+    final isUnreadable = scanned && _tagContent!.isEmpty;
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
       child: Column(
@@ -261,7 +271,7 @@ class _TagConfigurationStepperWidgetState
           ),
           SizedBox(height: 24),
 
-          if (!_isReading && _tagContent.isEmpty)
+          if (!_isReading && !scanned)
             _buildReadyToScanCard(
               icon: Icons.nfc,
               title: 'Acerque el TAG para leer',
@@ -271,7 +281,12 @@ class _TagConfigurationStepperWidgetState
 
           if (_isReading) _buildScanningCard(),
 
-          if (_tagContent.isNotEmpty && !_isReading)
+          // TAG escaneado pero contenido ilegible/incompatible
+          if (isUnreadable && !_isReading)
+            _buildUnreadableWarningCard(),
+
+          // TAG escaneado con contenido legible
+          if (hasContent && !_isReading)
             Column(
               children: [
                 _buildContentPreview(),
@@ -288,7 +303,7 @@ class _TagConfigurationStepperWidgetState
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _readTag,
-                  text: _tagContent.isEmpty ? 'Leer TAG' : 'Leer Nuevamente',
+                  text: !scanned ? 'Leer TAG' : 'Leer Nuevamente',
                   icon: Icon(Icons.nfc, size: 20),
                   options: FFButtonOptions(
                     height: 50,
@@ -302,7 +317,8 @@ class _TagConfigurationStepperWidgetState
                   ),
                 ),
               ),
-              if (_tagContent.isNotEmpty) ...[
+              // Mostrar "Continuar" siempre que se haya escaneado (con o sin contenido)
+              if (scanned) ...[
                 SizedBox(width: 12),
                 Expanded(
                   child: FFButtonWidget(
@@ -430,6 +446,8 @@ class _TagConfigurationStepperWidgetState
   }
 
   Widget _buildStep3VerifyClean() {
+    final scanned = _tagContent != null;
+
     return SingleChildScrollView(
       padding: EdgeInsets.all(24),
       child: Column(
@@ -443,7 +461,7 @@ class _TagConfigurationStepperWidgetState
           ),
           SizedBox(height: 24),
 
-          if (!_isReading && _tagContent.isEmpty)
+          if (!_isReading && !scanned)
             _buildReadyToScanCard(
               icon: Icons.verified,
               title: 'Acerque el TAG para verificar',
@@ -453,7 +471,7 @@ class _TagConfigurationStepperWidgetState
 
           if (_isReading) _buildScanningCard(),
 
-          if (_tagContent.isNotEmpty && !_isReading)
+          if (scanned && !_isReading)
             Column(
               children: [
                 _tagContent == '0'
@@ -490,7 +508,7 @@ class _TagConfigurationStepperWidgetState
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _readTag,
-                  text: _tagContent.isEmpty ? 'Verificar' : 'Verificar Nuevamente',
+                  text: !scanned ? 'Verificar' : 'Verificar Nuevamente',
                   icon: Icon(Icons.check, size: 20),
                   options: FFButtonOptions(
                     height: 50,
@@ -658,6 +676,50 @@ class _TagConfigurationStepperWidgetState
     );
   }
 
+  /// Aviso cuando el TAG fue detectado pero su contenido no es legible/compatible
+  Widget _buildUnreadableWarningCard() {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Color(0xFFF59E0B).withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Color(0xFFF59E0B)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 28),
+          SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'TAG detectado pero ilegible',
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFFF59E0B),
+                  ),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'El contenido del TAG no es compatible o no pudo leerse (puede estar vacío, encriptado o en formato no soportado). Puede continuar con la limpieza para formatearlo correctamente.',
+                  style: TextStyle(fontFamily: 'Roboto',
+                    fontSize: 13,
+                    color: Colors.white70,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildContentPreview() {
     return Container(
       padding: EdgeInsets.all(16),
@@ -691,7 +753,7 @@ class _TagConfigurationStepperWidgetState
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              _showRaw ? _rawContent : _tagContent,
+              _showRaw ? (_rawContent ?? '') : (_tagContent ?? ''),
               style: TextStyle(fontFamily: 'Roboto Mono',
                 fontSize: 12,
                 color: Color(0xFF10B981),
