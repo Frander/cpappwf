@@ -10,6 +10,7 @@ import '/components/connection_retry_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:shared_preferences/shared_preferences.dart';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -125,6 +126,66 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       debugPrint('   deviceDefault.imeI1: ${FFAppState().deviceDefault.imeI1}');
       debugPrint('   deviceDefault.deviceName: ${FFAppState().deviceDefault.deviceName}');
       debugPrint('   UUID del dispositivo: ${_model.identifierCTR}');
+
+      // ── FLUJO OFFLINE: datos base ya sincronizados ────────────────────────
+      // Si lastSyncBase != null los datos ya están en SQLite.
+      // NO verificar internet — cargar directo desde SQLite y navegar a LoginPage.
+      // Si falla la carga, limpiamos el flag y caemos al flujo normal (re-sync).
+      if (FFAppState().lastSyncBase != null) {
+        debugPrint('');
+        debugPrint('📂 [StartPage] Datos base disponibles (${FFAppState().lastSyncBase})');
+        debugPrint('   → Cargando desde SQLite SIN verificar internet');
+
+        try {
+          _updateProgress(2, 'Cargando datos desde dispositivo...');
+          final loaded = await actions.loadAppStateFromSqlite(context);
+
+          if (!loaded) {
+            // loadAppStateFromSqlite retornó false → datos incompletos o vacíos
+            debugPrint('⚠️ [StartPage] loadAppStateFromSqlite retornó false');
+            debugPrint('   → Limpiando lastSyncBase. El próximo inicio requerirá re-sincronización.');
+            FFAppState().lastSyncBase = null;
+            // No hacer return — caer al flujo normal abajo
+          } else if (mounted) {
+            FFAppState().isSync = true;
+            debugPrint('✅ [StartPage] Navegando a LoginPage desde SQLite (offline OK)');
+            if (Navigator.of(context).canPop()) context.pop();
+            context.pushNamed(
+              LoginPageWidget.routeName,
+              extra: <String, dynamic>{
+                kTransitionInfoKey: const TransitionInfo(
+                  hasTransition: true,
+                  transitionType: PageTransitionType.fade,
+                  duration: Duration(milliseconds: 1000),
+                ),
+              },
+            );
+            return;
+          }
+        } catch (e) {
+          // Error inesperado al cargar desde SQLite — datos pueden estar corruptos
+          debugPrint('❌ [StartPage] Error cargando desde SQLite: $e');
+          debugPrint('   → Limpiando lastSyncBase. El próximo inicio requerirá re-sincronización.');
+          FFAppState().lastSyncBase = null;
+          // No hacer return — caer al flujo normal abajo
+        }
+      }
+
+      // ── CHEQUEO FLAG sync_login_incomplete ───────────────────────────────
+      // Si la última sincronización de login falló a mitad, isSync puede estar
+      // en true pero los datos en SQLite estar corruptos/incompletos.
+      // En ese caso reseteamos isSync = false para forzar el flujo de re-login
+      // con IMEI, que llamará syncLogin de nuevo y limpiará el flag si tiene éxito.
+      {
+        final prefs = await SharedPreferences.getInstance();
+        final syncLoginIncomplete = prefs.getBool('sync_login_incomplete') ?? false;
+        if (syncLoginIncomplete) {
+          debugPrint('');
+          debugPrint('⚠️ [StartPage] sync_login_incomplete=true detectado');
+          debugPrint('   → Reseteando isSync=false para forzar re-sincronización completa');
+          FFAppState().isSync = false;
+        }
+      }
 
       if (FFAppState().isSync == true) {
         // El servicio de geolocalización se iniciará en HomePage al cargar por primera vez
@@ -290,7 +351,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             FFAppState().usersList = [];
             FFAppState().headquarterSelected = HeadquartersStruct();
             FFAppState().zoneSelected = ZonesStruct();
-            FFAppState().activitiesJSON = null;
+            // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
             FFAppState().headquartersSelectedList = [];
             FFAppState().newsList = [];
             FFAppState().isStabilized = false;
@@ -510,10 +571,10 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               },
                             );
 
-                            // Usar imeI1 como IMEI primario; si está vacío usar serialId como fallback
-                            final deviceImei = (device.imeI1.isNotEmpty)
+                            // Usar imeI1 como IMEI primario; si está vacío usar idDevice como fallback
+                            final deviceImei = device.imeI1.isNotEmpty
                                 ? device.imeI1
-                                : device.serialId;
+                                : device.idDevice.toString();
 
                             // Persistir el IMEI seleccionado antes del login
                             if (deviceImei.isNotEmpty) {
@@ -557,7 +618,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               FFAppState().usersList = [];
                               FFAppState().headquarterSelected = HeadquartersStruct();
                               FFAppState().zoneSelected = ZonesStruct();
-                              FFAppState().activitiesJSON = null;
+                              // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
                               FFAppState().headquartersSelectedList = [];
                               FFAppState().newsList = [];
                               FFAppState().isStabilized = false;
@@ -590,12 +651,25 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               if (navigator.canPop()) {
                                 navigator.pop(); // Cerrar loading
                               }
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('Error al iniciar sesión con el dispositivo seleccionado'),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
+                              if (mounted) {
+                                showDialog(
+                                  context: dialogContext,
+                                  builder: (ctx) => AlertDialog(
+                                    title: const Text('Error de inicio de sesión'),
+                                    content: Text(
+                                      'No se pudo iniciar sesión con "${device.deviceName}" '
+                                      '(IMEI: ${device.imeI1.isNotEmpty ? device.imeI1 : "no registrado"}).\n\n'
+                                      'Si este dispositivo no tiene IMEI en el sistema, usa "NO ENCUENTRO MI DISPOSITIVO" para registrarlo.',
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(ctx).pop(),
+                                        child: const Text('OK'),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }
                             }
                           } catch (e, stackTrace) {
                             debugPrint('❌ Error en onDeviceSelected: $e');

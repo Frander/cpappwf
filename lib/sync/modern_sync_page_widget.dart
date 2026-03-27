@@ -51,6 +51,7 @@ enum SyncMode {
   visitsOnly,       // Solo visitas
   basicSync,        // Básica (resetea tablas)
   smartSync,        // Inteligente: detecta qué sincronizar + básica al final
+  baseDataSync,     // Sincronización de datos base (12 endpoints GZIP)
 }
 
 enum SyncStep {
@@ -247,6 +248,8 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                   _buildStatsCard(),
                   const SizedBox(height: 24),
                   _buildSmartSyncButton(),
+                  const SizedBox(height: 16),
+                  _buildBaseDataSyncButton(),
                 ],
               ),
             ),
@@ -544,6 +547,150 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   }
 
 
+  /// Botón de sincronización de datos base (12 endpoints GZIP)
+  Widget _buildBaseDataSyncButton() {
+    final lastSync = FFAppState().lastSyncBase;
+    final hasSync  = lastSync != null;
+
+    String lastSyncLabel;
+    if (!hasSync) {
+      lastSyncLabel = 'Sin sincronización — primera vez requerida';
+    } else {
+      final diff = DateTime.now().difference(lastSync);
+      if (diff.inDays > 0) {
+        lastSyncLabel = 'Último sync: hace ${diff.inDays} día${diff.inDays != 1 ? "s" : ""}';
+      } else if (diff.inHours > 0) {
+        lastSyncLabel = 'Último sync: hace ${diff.inHours} hora${diff.inHours != 1 ? "s" : ""}';
+      } else {
+        lastSyncLabel = 'Último sync: hace ${diff.inMinutes} min';
+      }
+    }
+
+    return InkWell(
+      onTap: () => _startSync(SyncMode.baseDataSync),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: hasSync
+                ? [Color(0xFF1E3A5F), Color(0xFF2563EB)]
+                : [Color(0xFF3B1F6B), Color(0xFF7C3AED)],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: (hasSync ? Color(0xFF2563EB) : Color(0xFF7C3AED)).withOpacity(0.35),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.cloud_download_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sincronizar Datos Base',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'DATOS BASE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  color: Colors.white.withOpacity(0.7),
+                  size: 22,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Descarga completa de lotes, productos, actividades, zonas, puntos virtuales y zonas de exclusión. Ejecuta en lotes de 3 endpoints en paralelo.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.white.withOpacity(0.88),
+                height: 1.5,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white.withOpacity(0.2)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    hasSync ? Icons.check_circle_outline_rounded : Icons.info_outline_rounded,
+                    color: Colors.white70,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      lastSyncLabel,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Pantalla de progreso de sincronización
   Widget _buildSyncProgressScreen() {
     return Container(
@@ -806,6 +953,15 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           {'icon': Icons.eco_rounded, 'label': 'Enviar productos'},
           {'icon': Icons.location_on_rounded, 'label': 'Enviar visitas'},
           {'icon': Icons.delete_rounded, 'label': 'Cerrar sesión'},
+        ];
+      case SyncMode.baseDataSync:
+        return [
+          {'icon': Icons.wifi_rounded,              'label': 'Verificar conexión'},
+          {'icon': Icons.cloud_download_rounded,    'label': 'Lote 1: actividades, usuarios, lotes'},
+          {'icon': Icons.cloud_download_rounded,    'label': 'Lote 2: zonas, productos, noticias'},
+          {'icon': Icons.cloud_download_rounded,    'label': 'Lote 3: pesos, tipos, empresa'},
+          {'icon': Icons.cloud_download_rounded,    'label': 'Lote 4: dispositivos, puntos, exclusiones'},
+          {'icon': Icons.save_rounded,              'label': 'Guardar en base de datos'},
         ];
       default:
         return [];
@@ -1079,6 +1235,9 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         break;
       case SyncMode.smartSync:
         _performSmartSync();
+        break;
+      case SyncMode.baseDataSync:
+        _performBaseDataSync();
         break;
       default:
         break;
@@ -1371,6 +1530,61 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
 
   /// Sincronización inteligente: detecta qué hay pendiente y lo sincroniza.
   /// Siempre finaliza ejecutando la sincronización básica (limpieza de datos base + redirect a login).
+  Future<void> _performBaseDataSync() async {
+    try {
+      // 1. Verificar conexión
+      await _updateProgress(0.02, 'Verificando conexión a internet...');
+      final hasConnection = await _checkInternetConnectionWithQuality();
+      if (!hasConnection) {
+        throw Exception('Sin conexión a internet disponible');
+      }
+
+      // 2. Llamar syncBaseData con callback de progreso en tiempo real
+      await _updateProgress(0.04, 'Iniciando descarga de datos base...');
+
+      final success = await actions.syncBaseData(
+        context,
+        widget.imei,
+        widget.authToken,
+        widget.idCompany,
+        onProgress: (p, m) {
+          if (mounted) {
+            setState(() {
+              _progress       = 0.04 + p * 0.94;
+              _currentMessage = m;
+            });
+          }
+        },
+      );
+
+      if (!success) throw Exception('Error al sincronizar datos base. Verifica tu conexión e intenta nuevamente.');
+
+      // 3. Guardar fecha de última sincronización base
+      FFAppState().lastSyncBase = DateTime.now();
+
+      // 4. Completado
+      if (mounted) {
+        setState(() {
+          _currentStep    = SyncStep.completed;
+          _progress       = 1.0;
+          _currentMessage = 'Datos base sincronizados exitosamente';
+        });
+      }
+
+      await Future.delayed(const Duration(seconds: 3));
+      if (mounted) context.goNamed('StartPage');
+
+    } catch (e) {
+      debugPrint('❌ [BaseDataSync] Error: $e');
+      if (mounted) {
+        setState(() {
+          _currentStep  = SyncStep.error;
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    }
+  }
+
   Future<void> _performSmartSync() async {
     try {
       // 1. Verificar conexión
@@ -1438,76 +1652,25 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       FFAppState().visitDetails = [];
       FFAppState().update(() {});
 
-      // 7. SIEMPRE: Sincronización básica (limpia tablas de login + redirect)
-      debugPrint('🗄️ [SmartSync] Paso 7: Limpiando tablas de login en SQLite...');
-      await _updateProgress(0.80, 'Actualizando datos base del sistema...');
-      await Future.delayed(const Duration(milliseconds: 400));
-
-      debugPrint('🗄️ [SmartSync] Abriendo base de datos...');
-      final dbPath = await _getDatabasePath();
-      final db = await openDatabase(dbPath);
-      debugPrint('🗄️ [SmartSync] Base de datos abierta. Iniciando transacción...');
-      await db.transaction((txn) async {
-        for (final table in [
-          'Nfc_tags_history', 'Login_sessions', 'News', 'Headquarters_weights',
-          'Activities_status', 'Activities_steps', 'Activities', 'Devices',
-          'Users', 'Zones_polygons', 'Zones', 'Companies', 'Types_points',
-        ]) {
-          try { await txn.delete(table); } catch (e) {
-            debugPrint('   ⚠️ Error limpiando $table: $e');
-          }
-        }
-      });
-      await db.close();
-      debugPrint('🗄️ [SmartSync] Tablas limpiadas. Limpiando AppState...');
-
-      await _updateProgress(0.90, 'Cerrando sesión...');
-
-      FFAppState().lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
-      FFAppState().isSync = false;
-      FFAppState().usersList = [];
-      FFAppState().zonesList = [];
-      FFAppState().headquartersList = [];
-      FFAppState().productsList = [];
-      FFAppState().newsList = [];
-      FFAppState().newsSelected = [];
-      FFAppState().activitiesStatusSelected = [];
+      // 7. Limpiar solo los datos de visitas enviadas (sin tocar la sesión)
+      debugPrint('🧹 [SmartSync] Paso 7: Limpiando datos de visitas del AppState...');
       FFAppState().newsAdd = [];
       FFAppState().StatusAdd = [];
-      final currentGeoLocations = FFAppState().geoLocationsList;
-      FFAppState().geoLocationsList = currentGeoLocations.isNotEmpty
-          ? [currentGeoLocations.last]
-          : [];
-      FFAppState().loginResponse = null;
-      FFAppState().userSelected = UsersStruct();
-      FFAppState().companyDefault = CompaniesStruct();
-      FFAppState().activityDefault = ActivitiesStruct();
-      FFAppState().activitiesJSON = null;
-      FFAppState().activityStatusSelectedJSON = null;
-      FFAppState().userSelectedJSON = null;
-      FFAppState().headquarterSelected = HeadquartersStruct();
-      FFAppState().zoneSelected = ZonesStruct();
       FFAppState().productsAdd = [];
-      FFAppState().activitySelectedJSON = null;
-      FFAppState().codeSupervisor = '';
-      FFAppState().codeOperator = '';
-      FFAppState().codeKeyboard = '';
-      FFAppState().moduleSelected = '';
-      FFAppState().nfcRead = '';
-      FFAppState().qrRead = '';
-      FFAppState().stopVoice = false;
-      FFAppState().idActivityStatus = 0;
-      FFAppState().totalStepsActivity = 0;
-      FFAppState().countStepsActivity = 0;
-      FFAppState().visitCount = 0;
+      FFAppState().visitsAdd = [];
+      FFAppState().visitDetails = [];
       FFAppState().formCacheMap = {};
       FFAppState().update(() {});
+
+      // 8. Renovar token para la próxima operación
+      await _updateProgress(0.97, 'Renovando sesión...');
+      await _renewAndSaveToken();
 
       await _updateProgress(1.0, 'Sincronización completada');
       await Future.delayed(const Duration(milliseconds: 800));
 
-      debugPrint('🚀 [SmartSync] Navegando a StartPage... mounted=$mounted');
-      if (mounted) context.goNamed('StartPage');
+      debugPrint('✅ [SmartSync] Completado. Regresando...');
+      if (mounted) context.pop();
     } catch (e, stackTrace) {
       debugPrint('❌ Error en sincronización inteligente: $e');
       debugPrint('Stack trace: $stackTrace');
@@ -1595,7 +1758,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         debugPrint('⚠️ geoLocationsList estaba vacío al hacer logout');
       }
       FFAppState().loginResponse = null;
-      FFAppState().userSelected = UsersStruct();
+      // userSelected NO se limpia después de sync — debe persistir para el próximo ciclo
       FFAppState().companyDefault = CompaniesStruct();
       FFAppState().activityDefault = ActivitiesStruct();
       FFAppState().activitiesJSON = null;
@@ -1651,6 +1814,43 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   // ============================================================================
 
   /// Obtiene la ruta de la base de datos SQLite
+  /// Renueva el token via RenewToken y actualiza únicamente loginResponse['token'].
+  /// No modifica ningún otro campo de sesión. Si falla, solo loguea el error.
+  Future<void> _renewAndSaveToken() async {
+    try {
+      if (widget.imei.isEmpty) {
+        debugPrint('⚠️ [SmartSync] IMEI vacío, no se puede renovar token');
+        return;
+      }
+      debugPrint('🔑 [SmartSync] Renovando token...');
+      final response = await http.post(
+        Uri.parse('https://api.clickpalm.com/Users/RenewToken'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'Type_login': 'IMEI', 'Username': widget.imei, 'Password': widget.imei}),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final newToken = data['token'] as String?;
+        if (newToken != null && newToken.isNotEmpty) {
+          final current = FFAppState().loginResponse;
+          if (current != null) {
+            final updated = Map<String, dynamic>.from(current as Map);
+            updated['token'] = newToken;
+            FFAppState().loginResponse = updated;
+            debugPrint('✅ [SmartSync] Token renovado y guardado en loginResponse');
+          } else {
+            debugPrint('⚠️ [SmartSync] loginResponse es null, no se pudo guardar el nuevo token');
+          }
+          return;
+        }
+      }
+      debugPrint('⚠️ [SmartSync] RenewToken respondió ${response.statusCode}, token no actualizado');
+    } catch (e) {
+      debugPrint('⚠️ [SmartSync] Error al renovar token: $e');
+    }
+  }
+
   Future<String> _getDatabasePath() async {
     final String docsPath = await _getBestDocumentsPath();
     return path.join(docsPath, 'clickpalm_database.db');

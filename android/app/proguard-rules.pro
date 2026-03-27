@@ -10,6 +10,12 @@
 -dontwarn org.bouncycastle.pqc.jcajce.provider.BouncyCastlePQCProvider
 -keep class org.xmlpull.v1.** { *; }
 
+# MediaPipe / flutter_gemma
+-keep class com.google.mediapipe.** { *; }
+-dontwarn com.google.mediapipe.**
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
+
 
 
 

@@ -83,5 +83,9 @@
       android:exported="true"
       android:stopWithTask="true"
       tools:replace="android:exported,android:stopWithTask" />
+
+    <!-- MediaPipe / flutter_gemma GPU acceleration -->
+    <uses-native-library android:name="libOpenCL.so" android:required="false"/>
+    <uses-native-library android:name="libOpenCL-pixel.so" android:required="false"/>
   </application>
 </manifest>

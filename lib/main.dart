@@ -60,6 +60,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Locale? _locale;
+  Timer? _pausedStopTimer;
 
   ThemeMode _themeMode = ThemeMode.system;
 
@@ -97,7 +98,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    // Desregistrar observer
+    _pausedStopTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -106,9 +107,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
 
-    // Cuando la app se va a detached (cerrada completamente), detener el servicio
-    if (state == AppLifecycleState.detached) {
-      debugPrint('🛑 App cerrada - Deteniendo servicio de geolocalización...');
+    if (state == AppLifecycleState.resumed) {
+      // App volvió al primer plano — cancelar cualquier timer de parada pendiente
+      _pausedStopTimer?.cancel();
+      _pausedStopTimer = null;
+      debugPrint('▶️ App en primer plano');
+    } else if (state == AppLifecycleState.paused) {
+      // App pasó a segundo plano. En Android, si el usuario cierra la app desde
+      // el task manager, "detached" a veces NO se dispara. Usamos un timer de
+      // 8 minutos como fallback: si en ese tiempo no vuelve a "resumed", se
+      // considera que el usuario cerró la app y se detiene el servicio.
+      // (El propio stopWithTask="true" en AndroidManifest ya maneja la mayoría
+      // de los casos al matar el proceso nativo, esto es un seguro extra en Dart.)
+      _pausedStopTimer?.cancel();
+      _pausedStopTimer = Timer(const Duration(minutes: 8), () {
+        debugPrint('⏱️ App en pausa >8 min — deteniendo servicio GPS como fallback');
+        stopBackgroundLocationService();
+        _pausedStopTimer = null;
+      });
+      debugPrint('⏸️ App en segundo plano — timer de seguridad iniciado (8 min)');
+    } else if (state == AppLifecycleState.detached) {
+      // Detached sí se disparó — cancelar timer y detener inmediatamente
+      _pausedStopTimer?.cancel();
+      _pausedStopTimer = null;
+      debugPrint('🛑 App cerrada (detached) - Deteniendo servicio de geolocalización...');
       stopBackgroundLocationService();
     }
   }

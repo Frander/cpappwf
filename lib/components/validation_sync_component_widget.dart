@@ -251,7 +251,7 @@ class _ValidationSyncComponentWidgetState
                                   );
                                   _shouldSetState = true;
                                   FFAppState().loginResponse = null;
-                                  FFAppState().userSelected = UsersStruct();
+                                  // userSelected NO se limpia después de sync — debe persistir para el próximo ciclo
                                   FFAppState().companyDefault =
                                       CompaniesStruct();
                                   FFAppState().headquartersList = [];
@@ -290,7 +290,7 @@ class _ValidationSyncComponentWidgetState
                                   return;
                                 } else {
                                   FFAppState().loginResponse = null;
-                                  FFAppState().userSelected = UsersStruct();
+                                  // userSelected NO se limpia después de sync — debe persistir para el próximo ciclo
                                   FFAppState().companyDefault =
                                       CompaniesStruct();
                                   FFAppState().headquartersList = [];

@@ -17,6 +17,7 @@ class ActivitiesStruct extends BaseStruct {
     int? effectivityVisits,
     String? typeEffectivity,
     String? moduleActivity,
+    bool? isSync,
     bool? isSyncFull,
     bool? trackingHeadquarter,
   })  : _idActivity = idActivity,
@@ -28,6 +29,7 @@ class ActivitiesStruct extends BaseStruct {
         _effectivityVisits = effectivityVisits,
         _typeEffectivity = typeEffectivity,
         _moduleActivity = moduleActivity,
+        _isSync = isSync,
         _isSyncFull = isSyncFull,
         _trackingHeadquarter = trackingHeadquarter;
 
@@ -111,6 +113,13 @@ class ActivitiesStruct extends BaseStruct {
 
   bool hasIsSyncFull() => _isSyncFull != null;
 
+  // "is_sync" field.
+  bool? _isSync;
+  bool get isSync => _isSync ?? false;
+  set isSync(bool? val) => _isSync = val;
+
+  bool hasIsSync() => _isSync != null;
+
   // "tracking_headquarter" field.
   bool? _trackingHeadquarter;
   bool get trackingHeadquarter => _trackingHeadquarter ?? false;
@@ -129,6 +138,7 @@ class ActivitiesStruct extends BaseStruct {
         effectivityVisits: castToType<int>(data['effectivity_visits']),
         typeEffectivity: data['type_effectivity'] as String?,
         moduleActivity: data['module_activity'] as String?,
+        isSync: data['is_sync'] == 1 || data['is_sync'] == true,
         isSyncFull: data['is_sync_full'] == 1 || data['is_sync_full'] == true,
         trackingHeadquarter: data['tracking_headquarter'] == 1 || data['tracking_headquarter'] == true,
       );
@@ -147,6 +157,7 @@ class ActivitiesStruct extends BaseStruct {
         'effectivity_visits': _effectivityVisits,
         'type_effectivity': _typeEffectivity,
         'module_activity': _moduleActivity,
+        'is_sync': _isSync,
         'is_sync_full': _isSyncFull,
         'tracking_headquarter': _trackingHeadquarter,
       }.withoutNulls;
@@ -188,6 +199,10 @@ class ActivitiesStruct extends BaseStruct {
         'module_activity': serializeParam(
           _moduleActivity,
           ParamType.String,
+        ),
+        'is_sync': serializeParam(
+          _isSync,
+          ParamType.bool,
         ),
         'is_sync_full': serializeParam(
           _isSyncFull,
@@ -246,6 +261,11 @@ class ActivitiesStruct extends BaseStruct {
           ParamType.String,
           false,
         ),
+        isSync: deserializeParam(
+          data['is_sync'],
+          ParamType.bool,
+          false,
+        ),
         isSyncFull: deserializeParam(
           data['is_sync_full'],
           ParamType.bool,
@@ -273,6 +293,7 @@ class ActivitiesStruct extends BaseStruct {
         effectivityVisits == other.effectivityVisits &&
         typeEffectivity == other.typeEffectivity &&
         moduleActivity == other.moduleActivity &&
+        isSync == other.isSync &&
         isSyncFull == other.isSyncFull &&
         trackingHeadquarter == other.trackingHeadquarter;
   }
@@ -288,6 +309,7 @@ class ActivitiesStruct extends BaseStruct {
         effectivityVisits,
         typeEffectivity,
         moduleActivity,
+        isSync,
         isSyncFull,
         trackingHeadquarter
       ]);
@@ -303,6 +325,7 @@ ActivitiesStruct createActivitiesStruct({
   int? effectivityVisits,
   String? typeEffectivity,
   String? moduleActivity,
+  bool? isSync,
   bool? isSyncFull,
   bool? trackingHeadquarter,
 }) =>
@@ -316,6 +339,7 @@ ActivitiesStruct createActivitiesStruct({
       effectivityVisits: effectivityVisits,
       typeEffectivity: typeEffectivity,
       moduleActivity: moduleActivity,
+      isSync: isSync,
       isSyncFull: isSyncFull,
       trackingHeadquarter: trackingHeadquarter,
     );

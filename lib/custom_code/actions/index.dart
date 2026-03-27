@@ -45,6 +45,8 @@ export 'get_visits_count.dart' show getVisitsCount;
 export 'download_map_tiles.dart' show downloadMapTiles;
 export 'sync_install_module.dart' show syncInstallModule;
 export 'sync_login.dart' show syncLogin;
+export 'sync_base_data.dart' show syncBaseData;
+export 'load_app_state_from_sqlite.dart' show loadAppStateFromSqlite;
 export 'get_device_model.dart' show getDeviceModel;
 export 'get_android_serial_id.dart' show getAndroidSerialId;
 export 'calculate_current_headquarter.dart' show calculateCurrentHeadquarter;

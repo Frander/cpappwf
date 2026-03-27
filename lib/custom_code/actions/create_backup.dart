@@ -16,6 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '/app_state.dart'; // Para acceder al FFAppState
 import 'package:intl/intl.dart';
+import 'backup_storage_paths.dart'; // getBackupsRootDirectory()
 
 // ============================================================================
 // ACCIÓN: CREAR BACKUP COMPLETO
@@ -35,17 +36,10 @@ Future<Map<String, dynamic>> createBackup() async {
 
     debugPrint('📦 Iniciando backup: $backupFolderName');
 
-    // 1. Obtener la carpeta de Documents
-    final documentsDir = await _getDocumentsDirectory();
-    final backupsRootDir = Directory(path.join(documentsDir.path, 'Backups'));
+    // 1. Obtener la carpeta de Backups en la mejor ruta pública disponible
+    final backupsRootDir = await getBackupsRootDirectory();
 
-    // 2. Crear la carpeta Backups si no existe
-    if (!await backupsRootDir.exists()) {
-      await backupsRootDir.create(recursive: true);
-      debugPrint('✅ Carpeta Backups creada');
-    }
-
-    // 3. Crear la carpeta del backup con fecha/hora
+    // 2. Crear la carpeta del backup con fecha/hora
     final backupDir = Directory(path.join(backupsRootDir.path, backupFolderName));
     if (!await backupDir.exists()) {
       await backupDir.create(recursive: true);
@@ -78,25 +72,6 @@ Future<Map<String, dynamic>> createBackup() async {
       'message': 'Error al crear el backup: $e'
     };
   }
-}
-
-// ============================================================================
-// FUNCIÓN: OBTENER DIRECTORIO DE DOCUMENTS
-// ============================================================================
-
-Future<Directory> _getDocumentsDirectory() async {
-  if (Platform.isAndroid) {
-    // En Android, usar getExternalStorageDirectory para acceso público
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir != null) {
-      // Navegar a Documents dentro del almacenamiento externo
-      var documentsPath = externalDir.path.replaceAll('Android/data/com.clickpalm.clickpalmapp/files', 'Documents');
-      return Directory(documentsPath);
-    }
-  }
-
-  // Fallback: usar getApplicationDocumentsDirectory
-  return await getApplicationDocumentsDirectory();
 }
 
 // ============================================================================

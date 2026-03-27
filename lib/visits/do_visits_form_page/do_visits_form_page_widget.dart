@@ -25,6 +25,7 @@ import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'do_visits_form_page_model.dart';
 export 'do_visits_form_page_model.dart';
@@ -103,6 +104,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Caché de nombres de corteros desde SQLite (id_activity_status -> status_name)
   final Map<int, String> _corteroNamesCache = {};
+
+  // Caché de nombres de usuarios desde SQLite (id_user -> name_user)
+  final Map<int, String> _userNamesCache = {};
 
   // Map para rastrear valores numéricos de status por nombre (para numbers-operation)
   // statusName -> valor numérico
@@ -201,9 +205,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     _initializeExpansionStates();
 
     // Restaurar caché del formulario si existe
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _restoreFormCache();
+      await _restoreTagTransferFromPrefs();
       _initializeDateTimeDefaults();
+      _preloadUserNamesFromSQLite(); // Pre-cargar nombres de usuarios para el árbol de tags
     });
   }
 
@@ -374,6 +380,63 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final activityId =
         getJsonField(FFAppState().currentActivity, r'''$.id_activity''');
     return 'form_cache_activity_$activityId';
+  }
+
+  /// Persiste el raw nfcContent del tag de origen en SharedPreferences.
+  /// Clave: tt_<cacheKey>_<statusId>
+  Future<void> _persistTagTransferToPrefs(int statusId, String nfcContent) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('tt_${_getCacheKey()}_$statusId', nfcContent);
+      debugPrint('💾 [TAG-TRANSFER] Persistido en SharedPreferences: statusId=$statusId');
+    } catch (e) {
+      debugPrint('⚠️ [TAG-TRANSFER] Error persistiendo en SharedPreferences: $e');
+    }
+  }
+
+  /// Restaura tag transfer data desde SharedPreferences para statusIds que
+  /// no estén ya en _tagTransferData (fallback al iniciar una nueva sesión).
+  Future<void> _restoreTagTransferFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final prefix = 'tt_${_getCacheKey()}_';
+      final matchingKeys = prefs.getKeys().where((k) => k.startsWith(prefix)).toList();
+      if (matchingKeys.isEmpty) return;
+
+      int restored = 0;
+      for (final key in matchingKeys) {
+        final statusIdStr = key.substring(prefix.length);
+        final statusId = int.tryParse(statusIdStr);
+        if (statusId == null) continue;
+        if (_tagTransferData.containsKey(statusId)) continue;
+
+        final nfcContent = prefs.getString(key) ?? '';
+        if (nfcContent.isEmpty) continue;
+
+        final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
+        if (parsedData.isNotEmpty) {
+          setState(() { _tagTransferData[statusId] = parsedData; });
+          restored++;
+          debugPrint('♻️ [TAG-TRANSFER] Restaurado desde SharedPreferences: statusId=$statusId');
+        }
+      }
+      if (restored > 0) {
+        debugPrint('✅ [TAG-TRANSFER] $restored tag(s) restaurados desde SharedPreferences');
+      }
+    } catch (e) {
+      debugPrint('⚠️ [TAG-TRANSFER] Error restaurando desde SharedPreferences: $e');
+    }
+  }
+
+  /// Limpia el nfcContent persistido de un tag transfer en SharedPreferences.
+  Future<void> _clearTagTransferFromPrefs(int statusId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('tt_${_getCacheKey()}_$statusId');
+      debugPrint('🗑️ [TAG-TRANSFER] Eliminado de SharedPreferences: statusId=$statusId');
+    } catch (e) {
+      debugPrint('⚠️ [TAG-TRANSFER] Error limpiando SharedPreferences: $e');
+    }
   }
 
   /// Guarda el estado actual del formulario en caché
@@ -1628,6 +1691,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                 });
+                _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
                 debugPrint(
                     '✅ TAG-TRANSFER: Tag de origen guardado y limpiado correctamente');
@@ -2761,6 +2825,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                 });
+                _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
                 debugPrint(
                     '✅ TAG-TRANSFER (ROOT): Tag de origen guardado correctamente');
@@ -3517,6 +3582,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                 });
+                _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
                 debugPrint(
                     '✅ TAG-TRANSFER (CHILD): Tag de origen guardado correctamente');
@@ -4202,9 +4268,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   Widget _buildNavigationButtons() {
-    // Verificar si is_sync es true para mostrar el botón Guardar
-    final currentActivity = FFAppState().currentActivity;
-    final isSync = getJsonField(currentActivity, r'''$.is_sync''') == true;
+    // Usar activitySelected (ActivitiesStruct tipado desde SQLite) — fuente de verdad fiable
+    final isSync = FFAppState().activitySelected.isSync;
 
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -4275,7 +4340,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   final currentActivity = FFAppState().currentActivity;
 
                   // Verificar si la actividad tiene steps (estructura jerárquica)
-                  final hasSteps = getJsonField(currentActivity, r'''$.activities_steps''')?.toList().isNotEmpty ?? false;
+                  final hasSteps = getJsonField(currentActivity, r'''$.activity_steps''')?.toList().isNotEmpty ?? false;
 
                   if (hasSteps) {
                     // VALIDACIÓN 1: Si hay steps, validar que los steps requeridos estén completos
@@ -7116,6 +7181,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     setState(() {
                       _tagTransferData.remove(statusId);
                     });
+                    _clearTagTransferFromPrefs(statusId).ignore();
                     Navigator.pop(dialogContext);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
@@ -10115,26 +10181,36 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Si no se encuentra en usersList, intentar buscar como número
     // (podría ser que el ID sea un número directo y no un operID)
-    try {
-      final userId = int.tryParse(operID);
-      if (userId != null) {
+    final userId = int.tryParse(operID);
+    if (userId != null) {
+      // 1. Revisar caché de SQLite
+      if (_userNamesCache.containsKey(userId)) {
+        final cached = _userNamesCache[userId]!;
+        debugPrint('✅ _getUserName: Encontrado en caché SQLite: "$cached"');
+        return cached;
+      }
+
+      // 2. Buscar en usersList por idUser
+      try {
         debugPrint('👤 _getUserName: Intentando buscar por idUser: $userId');
         final userById = FFAppState().usersList.firstWhere(
-              (u) => u.idUser == userId,
-              orElse: () => UsersStruct(),
-            );
+          (u) => u.idUser == userId,
+          orElse: () => UsersStruct(),
+        );
         if (userById.nameUser.isNotEmpty) {
-          debugPrint(
-              '✅ _getUserName: Encontrado por idUser: "${userById.nameUser}"');
+          debugPrint('✅ _getUserName: Encontrado por idUser: "${userById.nameUser}"');
           return userById.nameUser;
         }
+      } catch (e) {
+        debugPrint('❌ Error buscando usuario por idUser en AppState: $e');
       }
-    } catch (e) {
-      debugPrint('❌ Error buscando usuario por ID: $e');
+
+      // 3. Fallback: cargar desde SQLite de forma asíncrona
+      _loadUserNameFromSQLite(userId);
+      debugPrint('⏳ _getUserName: Cargando desde SQLite para idUser=$userId');
     }
 
-    debugPrint(
-        '❌ _getUserName: Usuario no encontrado, retornando operID original: "$operID"');
+    debugPrint('❌ _getUserName: Usuario no encontrado, retornando operID original: "$operID"');
     return operID;
   }
 
@@ -10210,6 +10286,67 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       }
     } catch (e) {
       debugPrint('❌ _loadCorteroNameFromSQLite: Error: $e');
+    }
+  }
+
+  /// Carga el nombre del usuario desde SQLite y lo guarda en caché
+  Future<void> _loadUserNameFromSQLite(int idUser) async {
+    try {
+      final db = await GlobalDbSingleton().database;
+      final result = await db.query(
+        'Users',
+        columns: ['Name_user'],
+        where: 'Id_user = ?',
+        whereArgs: [idUser],
+        limit: 1,
+      );
+      if (result.isNotEmpty) {
+        final name = result.first['Name_user'] as String? ?? '';
+        if (name.isNotEmpty) {
+          _userNamesCache[idUser] = name;
+          if (mounted) setState(() {});
+        }
+      } else {
+        debugPrint('⚠️ _loadUserNameFromSQLite: No encontrado Id_user=$idUser en SQLite');
+      }
+    } catch (e) {
+      debugPrint('❌ _loadUserNameFromSQLite: Error: $e');
+    }
+  }
+
+  /// Pre-carga TODOS los nombres de usuarios desde SQLite al caché en un solo query.
+  /// Se ejecuta en initState para que el árbol de tags tenga nombres listos al expandir.
+  Future<void> _preloadUserNamesFromSQLite() async {
+    try {
+      // Primero intentar poblar desde FFAppState().usersList si ya está cargado
+      final appUsers = FFAppState().usersList;
+      if (appUsers.isNotEmpty) {
+        for (final u in appUsers) {
+          if (u.idUser > 0 && u.nameUser.isNotEmpty) {
+            _userNamesCache[u.idUser] = u.nameUser;
+          }
+        }
+        debugPrint('✅ _preloadUserNames: ${_userNamesCache.length} usuarios desde AppState');
+        if (mounted) setState(() {});
+        return;
+      }
+
+      // Si AppState vacío, cargar directamente desde SQLite
+      final db = await GlobalDbSingleton().database;
+      final rows = await db.query('Users', columns: ['Id_user', 'Name_user']);
+      int count = 0;
+      for (final row in rows) {
+        final id = row['Id_user'] as int?;
+        final name = row['Name_user'] as String?;
+        if (id != null && name != null && name.isNotEmpty) {
+          _userNamesCache[id] = name;
+          count++;
+        }
+      }
+      debugPrint('✅ _preloadUserNames: $count usuarios cargados desde SQLite');
+      if (mounted && count > 0) setState(() {});
+    } catch (e) {
+      debugPrint('❌ _preloadUserNamesFromSQLite: Error: $e');
     }
   }
 

@@ -34,7 +34,10 @@
       "Read(//_parseNfcTagContentByHeadquarter/**)",
       "Read(//c/Users/Juan_Diego_Duque/.pub-cache/**)",
       "Read(//c/Users/Juan_Diego_Duque/**)",
-      "Read(//e/Usuario_JUAN_DIEGO/Escritorio/DESARROLLO/CLICKPALM/CONSULTAS/**)"
+      "Read(//e/Usuario_JUAN_DIEGO/Escritorio/DESARROLLO/CLICKPALM/CONSULTAS/**)",
+      "Bash(find e:RepositoriosFixClickPalmAPP -type f -name *.db)",
+      "Read(//e/RepositoriosFix/ClickPalmAPI/**)",
+      "WebFetch(domain:pub.dev)"
     ],
     "deny": [],
     "ask": []

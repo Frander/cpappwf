@@ -22,13 +22,16 @@ Future<List<UsersStruct>> searchUsersSqlite(String searchText) async {
     if (searchText.trim().isEmpty) {
       queryResult = await db.rawQuery('''
         SELECT
-          Id_user as id_user,
-          Id_company as id_company,
-          Oper_id as operID,
-          Name_user as name_user,
-          Email as email,
-          Created_at as created_at,
-          Modified_at as modifiedAt
+          Id_user      as id_user,
+          Id_company   as id_company,
+          Oper_id      as operID,
+          Name_user    as name_user,
+          Email        as email,
+          Code_user    as code_user,
+          State_user   as state_user,
+          Rol_user     as rol_user,
+          Created_at   as created_at,
+          Modified_at  as modifiedAt
         FROM Users
         ORDER BY last_used DESC, Name_user ASC
       ''');
@@ -36,18 +39,21 @@ Future<List<UsersStruct>> searchUsersSqlite(String searchText) async {
       final searchPattern = '%${searchText.trim()}%';
       queryResult = await db.rawQuery('''
         SELECT
-          Id_user as id_user,
-          Id_company as id_company,
-          Oper_id as operID,
-          Name_user as name_user,
-          Email as email,
-          Created_at as created_at,
-          Modified_at as modifiedAt
+          Id_user      as id_user,
+          Id_company   as id_company,
+          Oper_id      as operID,
+          Name_user    as name_user,
+          Email        as email,
+          Code_user    as code_user,
+          State_user   as state_user,
+          Rol_user     as rol_user,
+          Created_at   as created_at,
+          Modified_at  as modifiedAt
         FROM Users
-        WHERE Name_user LIKE ? OR Oper_id LIKE ?
+        WHERE Name_user LIKE ? OR Oper_id LIKE ? OR Code_user LIKE ?
         ORDER BY last_used DESC, Name_user ASC
         LIMIT 50
-      ''', [searchPattern, searchPattern]);
+      ''', [searchPattern, searchPattern, searchPattern]);
     }
 
     return queryResult.map((map) => UsersStruct.fromMap(map)).toList();

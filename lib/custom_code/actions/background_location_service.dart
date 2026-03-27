@@ -681,14 +681,14 @@ Future<void> startBackgroundLocationService() async {
 
   debugPrint('✅ Permisos de ubicación verificados: $permission');
 
-  // Inicializar si no está inicializado
+  // Iniciar solo si no está corriendo — evita múltiples instancias del loop GPS
   if (!await service.isRunning()) {
     await initializeBackgroundLocationService();
+    await service.startService();
+    debugPrint('✅ Servicio de geolocalización en segundo plano INICIADO [${DateTime.now().toIso8601String()}]');
+  } else {
+    debugPrint('ℹ️ Servicio GPS ya en ejecución, se omite startService() [${DateTime.now().toIso8601String()}]');
   }
-
-  // Iniciar el servicio
-  await service.startService();
-  debugPrint('✅ Servicio de geolocalización en segundo plano INICIADO');
 }
 
 /// Función pública para detener el servicio

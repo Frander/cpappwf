@@ -135,6 +135,12 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   double _finalHorizontalError = 0.0;
   double _currentBestError = 0.0;
 
+  // Modo de entrada manual
+  bool _showManualInput = false;
+  String? _manualError;
+  final TextEditingController _latController = TextEditingController();
+  final TextEditingController _lonController = TextEditingController();
+
   // Modo de rendimiento - detectado automáticamente basado en refresh rate
   late bool _isLowPerformanceMode;
 
@@ -178,6 +184,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     _radarController.dispose();
     _particleController?.dispose();
     _glowController?.dispose();
+    _latController.dispose();
+    _lonController.dispose();
     super.dispose();
   }
 
@@ -792,9 +800,11 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                   ? _buildSuccessScreen()
                   : _isProcessing
                       ? _buildProcessingScreen()
-                      : _isWaiting
-                          ? _buildWaitingScreen()
-                          : _buildCountdownScreen(),
+                      : _showManualInput
+                          ? _buildManualInputScreen()
+                          : _isWaiting
+                              ? _buildWaitingScreen()
+                              : _buildCountdownScreen(),
         ),
       ),
     );
@@ -841,6 +851,11 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                         // Contador circular con radar y ondas - se adapta al espacio
                         _buildAnimatedCounter(isCompact: isCompact),
 
+                        SizedBox(height: isVeryCompact ? 6 : 10),
+
+                        // Botón VISITA MANUAL (siempre visible bajo el contador)
+                        _buildManualButton(),
+
                         SizedBox(height: isVeryCompact ? 8 : 16),
 
                         // Mensaje dinámico
@@ -867,6 +882,252 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         );
       },
     );
+  }
+
+  // ==========================================================================
+  // BOTÓN VISITA MANUAL
+  // ==========================================================================
+
+  Widget _buildManualButton() {
+    return GestureDetector(
+      onTap: () {
+        _countdownTimer?.cancel();
+        _messageTimer?.cancel();
+        setState(() {
+          _showManualInput = true;
+          _manualError = null;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1,
+          ),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.edit_location_alt_outlined,
+                color: Color(0xFF94A3B8), size: 14),
+            SizedBox(width: 6),
+            Text(
+              'VISITA MANUAL',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF94A3B8),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ==========================================================================
+  // PANTALLA DE ENTRADA MANUAL DE COORDENADAS
+  // ==========================================================================
+
+  Widget _buildManualInputScreen() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Cabecera
+          Row(
+            children: [
+              const Icon(Icons.edit_location_alt_outlined,
+                  color: Color(0xFF60A5FA), size: 22),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Ubicación manual',
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _showManualInput = false;
+                    _manualError = null;
+                    _latController.clear();
+                    _lonController.clear();
+                  });
+                  _startCountdown();
+                  _startMessageRotation();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.close,
+                      color: Color(0xFF94A3B8), size: 18),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Ingresa las coordenadas para registrar la visita',
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 12,
+              color: Color(0xFF94A3B8),
+            ),
+          ),
+          const SizedBox(height: 28),
+
+          // Campo Latitud
+          TextField(
+            controller: _latController,
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              labelText: 'Latitud',
+              labelStyle:
+                  const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              hintText: 'Ej: 5.07285',
+              hintStyle:
+                  const TextStyle(color: Color(0xFF475569), fontSize: 13),
+              prefixIcon: const Icon(Icons.north_outlined,
+                  color: Color(0xFF60A5FA), size: 18),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.06),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF334155))),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF334155))),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF60A5FA))),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 14),
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // Campo Longitud
+          TextField(
+            controller: _lonController,
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              labelText: 'Longitud',
+              labelStyle:
+                  const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+              hintText: 'Ej: -75.53112',
+              hintStyle:
+                  const TextStyle(color: Color(0xFF475569), fontSize: 13),
+              prefixIcon: const Icon(Icons.east_outlined,
+                  color: Color(0xFF60A5FA), size: 18),
+              filled: true,
+              fillColor: Colors.white.withValues(alpha: 0.06),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF334155))),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF334155))),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF60A5FA))),
+              contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 14),
+            ),
+            onSubmitted: (_) => _confirmManualCoords(),
+          ),
+
+          if (_manualError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _manualError!,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                color: Colors.redAccent,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+
+          const SizedBox(height: 24),
+
+          // Botón confirmar
+          ElevatedButton(
+            onPressed: _confirmManualCoords,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF00a86b),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+            child: const Text(
+              'Confirmar ubicación',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmManualCoords() {
+    final lat = double.tryParse(
+        _latController.text.trim().replaceAll(',', '.'));
+    final lon = double.tryParse(
+        _lonController.text.trim().replaceAll(',', '.'));
+
+    if (lat == null || lon == null ||
+        lat < -90 || lat > 90 ||
+        lon < -180 || lon > 180) {
+      setState(() {
+        _manualError = 'Ingresa coordenadas válidas (lat ±90, lon ±180)';
+      });
+      return;
+    }
+
+    _gpsPoints = [
+      GPSPoint(
+        latitude: lat,
+        longitude: lon,
+        altitude: 0.0,
+        horizontalError: 0.5,
+        createdAt: DateTime.now().toUtc(),
+        battery: 100,
+      ),
+    ];
+
+    _createVisit();
   }
 
   Widget _buildFloatingParticle(int index) {

@@ -117,11 +117,20 @@ Future<bool> syncLogin(
     }
     debugPrint('🔑 Token obtenido: ${authToken.substring(0, 20)}...');
 
-    // 3. Llamar al endpoint TypesPoints con timeout
-    debugPrint('📡 Llamando a GET /TypesPoints...');
+    // 3. Extraer IDs (necesarios para todos los endpoints comprimidos)
+    final idCompany = loginData['company']?['id_company'];
+    final idDevice  = loginData['device']?['id_device'] ?? 0;
+
+    if (idCompany == null) {
+      debugPrint('❌ Error: id_company no encontrado en loginData');
+      return false;
+    }
+
+    // 4. Llamar al endpoint Types_points comprimido con timeout
+    debugPrint('📡 Llamando a GET /Users/login-data/types-points (GZIP)...');
     final statusRef = [0];
     List<Map<String, dynamic>>? typesPointsData =
-        await _callTypesPointsAPI(authToken, statusRef).timeout(
+        await _callTypesPointsAPI(authToken, idCompany, statusRef).timeout(
       const Duration(seconds: 30),
       onTimeout: () {
         debugPrint('⏱️ Timeout al obtener TypesPoints (30s)');
@@ -142,7 +151,7 @@ Future<bool> syncLogin(
         authToken = renewedToken;
         loginData['token'] = renewedToken;
         final statusRefA = [0];
-        typesPointsData = await _callTypesPointsAPI(renewedToken, statusRefA).timeout(
+        typesPointsData = await _callTypesPointsAPI(renewedToken, idCompany, statusRefA).timeout(
           const Duration(seconds: 30),
           onTimeout: () {
             debugPrint('⏱️ Timeout TypesPoints tras RenewToken');
@@ -163,9 +172,8 @@ Future<bool> syncLogin(
             if (freshToken != null && freshToken.isNotEmpty) {
               debugPrint('   ✅ Re-login exitoso. Reintentando TypesPoints...');
               authToken = freshToken;
-              // Preservar datos de loginData pero actualizar el token
               loginData['token'] = freshToken;
-              typesPointsData = await _callTypesPointsAPI(freshToken).timeout(
+              typesPointsData = await _callTypesPointsAPI(freshToken, idCompany).timeout(
                 const Duration(seconds: 30),
                 onTimeout: () {
                   debugPrint('⏱️ Timeout TypesPoints tras re-login');
@@ -191,46 +199,27 @@ Future<bool> syncLogin(
     }
     debugPrint('✅ TypesPoints obtenidos: ${typesPointsData.length} tipos');
 
-    // 4. Extraer IDs para los endpoints de listas
-    final idCompany = loginData['company']?['id_company'];
-    final idDevice  = loginData['device']?['id_device'] ?? 0;
-    final syncNow   = DateTime.now();
-
-    if (idCompany == null) {
-      debugPrint('❌ Error: id_company no encontrado en loginData');
-      return false;
-    }
     debugPrint('🏢 Company ID: $idCompany | Device ID: $idDevice');
 
-    // 5. Fetch en paralelo de las listas con GZIP
+    // 5. Fetch en paralelo — solo Users y Devices (mínimo obligatorio para login).
+    //    Activities, Headquarters, Zones, News, HQ_weights se sincronizan
+    //    manualmente desde ModernSyncPage → "Sincronizar Datos Base".
     debugPrint('');
     debugPrint('📡 ========================================');
-    debugPrint('📡 PASO 5: Fetching listas en paralelo...');
+    debugPrint('📡 PASO 5: Fetching usuarios y dispositivos...');
     debugPrint('📡 ========================================');
 
     final listResults = await Future.wait([
-      _fetchLoginDataList('activities',           authToken, {'idCompany': idCompany.toString(), 'idDevice': idDevice.toString()}),
-      _fetchLoginDataList('users',                authToken, {'idCompany': idCompany.toString(), 'idDevice': idDevice.toString()}),
-      _fetchLoginDataList('headquarters',         authToken, {'idCompany': idCompany.toString()}),
-      _fetchLoginDataList('zones',                authToken, {'idCompany': idCompany.toString()}),
-      _fetchLoginDataList('news',                 authToken, {'idCompany': idCompany.toString()}),
-      _fetchLoginDataList('headquarters-weights', authToken, {'idCompany': idCompany.toString(), 'year': syncNow.year.toString(), 'month': syncNow.month.toString()}),
+      _fetchLoginDataList('users',   authToken, {'idCompany': idCompany.toString(), 'idDevice': idDevice.toString()}),
+      _fetchLoginDataList('devices', authToken, {'idCompany': idCompany.toString()}),
     ]);
 
-    final List<dynamic>? activitiesData   = listResults[0];
-    final List<dynamic>? usersData        = listResults[1];
-    final List<dynamic>? headquartersData = listResults[2];
-    final List<dynamic>? zonesData        = listResults[3];
-    final List<dynamic>? newsData         = listResults[4];
-    final List<dynamic>? hqWeightsData    = listResults[5];
+    final List<dynamic>? usersData   = listResults[0];
+    final List<dynamic>? devicesData = listResults[1];
 
-    debugPrint('📊 Resultados del fetch paralelo:');
-    debugPrint('   Activities:   ${activitiesData?.length ?? "❌ Error"}');
-    debugPrint('   Users:        ${usersData?.length ?? "❌ Error"}');
-    debugPrint('   Headquarters: ${headquartersData?.length ?? "❌ Error"}');
-    debugPrint('   Zones:        ${zonesData?.length ?? "❌ Error"}');
-    debugPrint('   News:         ${newsData?.length ?? "❌ Error"}');
-    debugPrint('   HQ Weights:   ${hqWeightsData?.length ?? "❌ Error"}');
+    debugPrint('📊 Resultados del fetch:');
+    debugPrint('   Users:   ${usersData?.length ?? "❌ Error"}');
+    debugPrint('   Devices: ${devicesData?.length ?? "❌ Error"}');
 
     // 6. Sincronizar en SQLite con transacción y timeout
     debugPrint('');
@@ -240,12 +229,8 @@ Future<bool> syncLogin(
     final syncSuccess = await _syncLoginDataToSQLite(
       loginData,
       typesPointsData,
-      activitiesData: activitiesData,
-      usersData: usersData,
-      headquartersData: headquartersData,
-      zonesData: zonesData,
-      newsData: newsData,
-      hqWeightsData: hqWeightsData,
+      usersData:   usersData,
+      devicesData: devicesData,
     ).timeout(
       const Duration(seconds: 60),
       onTimeout: () {
@@ -505,30 +490,33 @@ Future<String?> _renewAuthToken(String username, [String password = '']) async {
   }
 }
 
-/// Llama al endpoint GET /TypesPoints.
+/// Llama al endpoint GET /Users/login-data/types-points (GZIP comprimido).
 /// Retorna los datos, o null si falla.
+/// [idCompany] es el ID de la empresa requerido por el nuevo endpoint.
 /// [statusRef] es un contenedor de un elemento para exponer el HTTP status code al caller.
 Future<List<Map<String, dynamic>>?> _callTypesPointsAPI(
-    String authToken, [List<int>? statusRef]) async {
+    String authToken, int idCompany, [List<int>? statusRef]) async {
   try {
-    const String url = 'https://api.clickpalm.com/TypesPoints';
+    final uri = Uri.parse('https://api.clickpalm.com/Users/login-data/types-points')
+        .replace(queryParameters: {'idCompany': idCompany.toString()});
 
     final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $authToken',
-      },
+      uri,
+      headers: {'Authorization': 'Bearer $authToken'},
     );
 
-    debugPrint('📥 TypesPoints Response Status: ${response.statusCode}');
+    debugPrint('📥 TypesPoints Response Status: ${response.statusCode} | ${response.bodyBytes.length} bytes');
     statusRef?[0] = response.statusCode;
 
     if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body);
+      final List<dynamic>? data = _decodeGzipList(response.bodyBytes);
+      if (data == null) {
+        debugPrint('❌ TypesPoints: respuesta no es una lista');
+        return null;
+      }
       return data.cast<Map<String, dynamic>>();
     } else {
       debugPrint('❌ Error en TypesPoints API: ${response.statusCode}');
-      debugPrint('   Body: ${response.body}');
       return null;
     }
   } catch (e) {
@@ -582,107 +570,51 @@ Future<List<dynamic>?> _fetchLoginDataList(
 // SINCRONIZACIÓN A SQLITE
 // ============================================================================
 
-/// Sincroniza los datos del Login a SQLite usando una transacción
+/// Sincroniza los datos mínimos del Login a SQLite:
+/// Types_points, Company, Users, Devices, Login_session.
+/// Activities, Headquarters, Zones, News y HQ_weights son responsabilidad
+/// de syncBaseData (sincronización manual desde ModernSyncPage).
 Future<bool> _syncLoginDataToSQLite(
   Map<String, dynamic> loginData,
   List<Map<String, dynamic>> typesPointsData, {
-  List<dynamic>? activitiesData,
   List<dynamic>? usersData,
-  List<dynamic>? headquartersData,
-  List<dynamic>? zonesData,
-  List<dynamic>? newsData,
-  List<dynamic>? hqWeightsData,
+  List<dynamic>? devicesData,
 }) async {
   try {
     final String dbPath = await _getDatabasePath();
     final Database db = await openDatabase(dbPath);
 
-    // Usar transacción para garantizar atomicidad
     await db.transaction((txn) async {
       debugPrint('🔄 Iniciando transacción de sincronización...');
 
-      // PASO 1: Limpiar todas las tablas de Login (excepto Headquarters)
+      // PASO 1: Limpiar solo las tablas que syncLogin gestiona
       await _cleanLoginDataTables(txn);
 
-      // PASO 2: Insertar Types_points PRIMERO (sin dependencias)
+      // PASO 2: Types_points (sin dependencias, pequeño)
       await _insertTypesPoints(txn, typesPointsData);
 
-      // PASO 3: Insertar Company
+      // PASO 3: Company (viene del JSON de login, no de endpoint separado)
       await _insertCompany(txn, loginData['company']);
 
-      // PASO 4: Insertar Zones + Zones_polygons
-      if (zonesData != null) {
-        await _insertZones(txn, zonesData);
-      }
-
-      // PASO 5: Insertar Users (marcar default)
+      // PASO 4: Users (necesario para la pantalla de selección de usuario)
       if (usersData != null) {
-        await _insertUsers(
-          txn,
-          usersData,
-          loginData['user']?['id_user'],
-        );
+        await _insertUsers(txn, usersData, loginData['user']?['id_user']);
       }
 
-      // PASO 6: Insertar Devices (marcar default)
-      // Los dispositivos ya no vienen en el payload del login.
-      // El dispositivo activo queda registrado en Login_sessions.
-      if (loginData['devices'] != null) {
-        await _insertDevices(
-          txn,
-          loginData['devices'],
-          loginData['device']?['id_device'],
-        );
+      // PASO 5: Devices (necesario para identificar el dispositivo actual)
+      if (devicesData != null) {
+        await _insertDevices(txn, devicesData, loginData['device']?['id_device']);
       }
 
-      // PASO 7: Insertar Activities + Steps + Status (marcar default)
-      if (activitiesData != null) {
-        await _insertActivities(
-          txn,
-          activitiesData,
-          loginData['activity']?['id_activity'],
-        );
-      }
-
-      // PASO 8: MERGE Headquarters + Polygons (preservar datos locales)
-      if (headquartersData != null) {
-        await _mergeHeadquarters(txn, headquartersData);
-      }
-
-      // PASO 8.1: Insertar Headquarters_weights
-      if (hqWeightsData != null) {
-        await _insertHeadquartersWeights(txn, hqWeightsData);
-      }
-
-      // PASO 9: Products y Products_coordinates — NO se tocan en login.
-      // sync_install_module es el dueño de estos datos.
-
-      // PASO 10: Insertar News
-      if (newsData != null) {
-        await _insertNews(txn, newsData);
-      }
-
-      // PASO 11: Insertar Login_sessions (tracking)
+      // PASO 6: Login_session (tracking)
       await _insertLoginSession(txn, loginData);
 
       debugPrint('✅ Transacción completada exitosamente');
     });
 
-    // PASO 12: Cargar Headquarters desde SQLite al AppState ANTES de cerrar la DB
-    await _loadHeadquartersToAppState(db);
-
     await db.close();
 
-    // PASO 13: Guardar activitiesJSON directamente desde el response GZIP
-    // Normaliza la estructura para que el formulario pueda leerla:
-    //   - Step level: 'activities_status' → alias como 'activity_status'
-    //   - Status level: 'activities_status_childs' → alias como 'status_childs'
-    if (activitiesData != null) {
-      FFAppState().activitiesJSON = _normalizeActivitiesForForm(activitiesData);
-      debugPrint('✅ activitiesJSON actualizado: ${activitiesData.length} actividades (normalizado)');
-    }
-
-    // PASO 14: Actualizar AppState (company, device, etc.)
+    // Actualizar AppState (company, device, etc.)
     _updateAppState(loginData);
 
     return true;
@@ -697,31 +629,24 @@ Future<bool> _syncLoginDataToSQLite(
 // LIMPIEZA DE DATOS
 // ============================================================================
 
-/// Limpia todas las tablas de Login (estrategia DELETE+INSERT)
-/// NOTA: NO elimina Headquarters (se hace MERGE para preservar datos locales)
+/// Limpia SOLO las tablas que syncLogin gestiona (DELETE+INSERT).
+/// Activities, Headquarters, Zones, News, HQ_weights son propiedad de
+/// syncBaseData y NO se tocan aquí.
 Future<void> _cleanLoginDataTables(Transaction txn) async {
   debugPrint('🧹 Limpiando tablas de Login...');
 
   // Orden inverso de dependencias (FK constraints)
   await txn.delete('Login_sessions');
-  await txn.delete('News');
-  // NO eliminar Products - sync_install_module es el dueño de estos datos
-  // await txn.delete('Products_coordinates'); // ✅ COMENTADO: Preservar products instalados
-  // await txn.delete('Products');              // ✅ COMENTADO: Preservar products instalados
-  await txn.delete('Headquarters_weights');
-  // NO eliminar Headquarters, Headquarters_polygons (MERGE con INSERT OR IGNORE)
-  await txn.delete('Activities_status');
-  await txn.delete('Activities_steps');
-  await txn.delete('Activities');
   await txn.delete('Devices');
   await txn.delete('Users');
-  await txn.delete('Zones_polygons');
-  await txn.delete('Zones');
   await txn.delete('Companies');
-  // Types_points se borra y recrea porque sync_login es el dueño de esta tabla
-  // El endpoint /TypesPoints tiene la lista completa y oficial
-  // sync_install_module solo usa ConflictAlgorithm.replace para los que vienen anidados
   await txn.delete('Types_points');
+
+  // NO tocar: Activities_status, Activities_steps, Activities,
+  //           Headquarters_weights, News, Headquarters_polygons,
+  //           Headquarters, Zones_polygons, Zones, Products, Products_coordinates,
+  //           Virtual_points, Headquarters_coordinates
+  // → Son propiedad exclusiva de syncBaseData.
 
   debugPrint('   ✅ Tablas limpiadas');
 }
@@ -765,14 +690,16 @@ Future<void> _insertCompany(
   debugPrint('📝 Insertando Company...');
 
   await txn.insert('Companies', {
-    'Id_company': company['id_company'],
-    'Name_company': company['name_company'],
-    'Business_name': company['business_name'],
-    'Nit': company['nit'],
-    'Address': company['address'],
-    'Telephone': company['telephone'],
-    'Id_zone_default': company['id_zone_default'],
-    'Created_at': company['created_at'],
+    'Id_company':          company['id_company'],
+    'Name_company':        company['name_company'],
+    'Business_name':       company['business_name'],
+    'Nit':                 company['nit'],
+    'Address':             company['address'],
+    'Telephone':           company['telephone'],
+    'Id_zone_default':     company['id_zone_default'],
+    'Latitude_extractor':  company['latitude_extractor'],
+    'Longitude_extractor': company['longitude_extractor'],
+    'Created_at':          company['created_at'],
   });
 
   debugPrint('   ✅ Company insertada: ${company['name_company']}');
@@ -792,12 +719,14 @@ Future<void> _insertZones(
   for (final zone in zones) {
     // Insertar zona
     batch.insert('Zones', {
-      'Id_zone': zone['id_zone'],
-      'Id_company': zone['id_company'],
-      'Name_zone': zone['name_zone'],
-      'Difficulty': zone['difficulty'] ?? 0,
-      'State_zone': zone['state_zone'],
-      'Created_at': zone['created_at'],
+      'Id_zone':          zone['id_zone'],
+      'Id_company':       zone['id_company'],
+      'Name_zone':        zone['name_zone'],
+      'Description_zone': zone['description_zone'],
+      'Color_zone':       zone['color_zone'],
+      'Difficulty':       zone['difficulty'] ?? 0,
+      'State_zone':       zone['state_zone'],
+      'Created_at':       zone['created_at'],
     });
     zonesCount++;
 
@@ -806,10 +735,11 @@ Future<void> _insertZones(
       for (final polygon in zone['zones_polygons']) {
         batch.insert('Zones_polygons', {
           'Id_zone_polygon': polygon['id_zone_polygon'],
-          'Id_zone': zone['id_zone'],
-          'Latitude': polygon['latitude'],
-          'Longitude': polygon['longitude'],
-          'Created_at': polygon['created_at'],
+          'Id_zone':         zone['id_zone'],
+          'Latitude':        polygon['latitude'],
+          'Longitude':       polygon['longitude'],
+          'Order_polygon':   polygon['order_polygon'] ?? 0,
+          'Created_at':      polygon['created_at'],
         });
         polygonsCount++;
       }
@@ -839,14 +769,21 @@ Future<void> _insertUsers(
     }
 
     batch.insert('Users', {
-      'Id_user': user['id_user'],
-      'Id_company': user['id_company'],
-      'Oper_id': user['operID'],
-      'Name_user': user['name_user'],
-      'Email': user['email'],
-      'Created_at': user['created_at'],
-      'Modified_at': user['modifiedAt'],
-      'Is_default': isDefault ? 1 : 0,
+      'Id_user':            user['id_user'],
+      'Id_company':         user['id_company'],
+      'Oper_id':            user['oper_id'],
+      'Name_user':          user['name_user'],
+      'Email':              user['email'],
+      'Code_user':          user['code_user'],
+      'State_user':         user['state_user'],
+      'Rol_user':           user['rol_user'],
+      'Created_at':         user['created_at'],
+      'Modified_at':        user['modified_at'],
+      'Is_default':         isDefault ? 1 : 0,
+      'Is_active':          (user['is_active'] == true || user['is_active'] == 1) ? 1 : 0,
+      'Phone_country_code': user['phone_country_code'],
+      'Phone_number':       user['phone_number'],
+      'User_name_login':    user['user_name_login'],
     });
   }
   await batch.commit(noResult: true);
@@ -878,14 +815,14 @@ Future<void> _insertDevices(
       'Id_device': device['id_device'],
       'Id_company': device['id_company'],
       'Device_name': device['device_name'],
-      'Cell_phone': device['cellPhone'],
+      'Cell_phone': device['cell_phone'],
       'Serial_id': device['serial_id'],
-      'Imei1': device['imeI1'],
-      'Imei2': device['imeI2'],
+      'Imei1': device['imei1'],
+      'Imei2': device['imei2'],
       'Model': device['model'],
       'State': device['state'],
       'Is_default': isDefault ? 1 : 0,
-    });
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
   await batch.commit(noResult: true);
 
@@ -934,7 +871,13 @@ Future<void> _insertActivities(
       'Description_activity': activity['description_activity'],
       'Created_at': activity['created_at'],
       'Is_default': isDefault ? 1 : 0,
+      'Is_sync': (activity['is_sync'] == true || activity['is_sync'] == 1) ? 1 : 0,
+      'Is_sync_full': (activity['is_sync_full'] == true || activity['is_sync_full'] == 1) ? 1 : 0,
+      'Tracking_headquarter': (activity['tracking_headquarter'] == true || activity['tracking_headquarter'] == 1) ? 1 : 0,
       'Read_default': activity['read_default'],
+      'Color_activity': activity['color_activity'],
+      'Icon_activity':  activity['icon_activity'],
+      'Visits_number':  activity['visits_number'] ?? 0,
     });
 
     // Recolectar steps de la actividad
@@ -1016,20 +959,24 @@ void _collectStatusRecursive(
 
   statusIds.add(idActivityStatus);
   statusData.add({
-    'Id_activity_status': idActivityStatus,
-    'Id_activity': status['id_activity'],
-    'Id_activity_step_parent': status['id_activity_step_parent'],
-    'Id_activity_status_parent': status['id_activity_status_parent'],
-    'Type_status': status['type_status'],
-    'Order_status': status['order_status'],
-    'Default_status': status['default_status'],
-    'Status_name': status['status_name'],
-    'Color': status['color'],
-    'Peso': status['peso'],
-    'Castigo': status['castigo'],
-    'Boton': status['boton'],
-    'Factor': status['factor'],
-    'Status': status['status'],
+    'Id_activity_status':       idActivityStatus,
+    'Id_activity':              status['id_activity'],
+    'Id_activity_step_parent':  status['id_activity_step_parent'],
+    'Id_activity_status_parent':status['id_activity_status_parent'],
+    'Type_status':              status['type_status'],
+    'Order_status':             status['order_status'],
+    'Default_status':           status['default_status'],
+    'Status_name':              status['status_name'],
+    'Color':                    status['color'],
+    'Peso':                     status['peso'],
+    'Castigo':                  status['castigo'],
+    'Boton':                    status['boton'],
+    'Factor':                   status['factor'],
+    'Status':                   status['status'],
+    'Description_status':       status['description_status'],
+    'Alternative_status':       status['alternative_status'],
+    'Remember_status':          (status['remember_status'] == true) ? 1 : 0,
+    'Tracking_constant':        (status['tracking_constant'] == true) ? 1 : 0,
   });
 
   // Recolectar recursivamente los status hijos
@@ -1159,6 +1106,7 @@ Future<void> _mergeHeadquarters(
 Future<void> _insertHeadquartersWeights(
   Transaction txn,
   List<dynamic> weights,
+  int idCompany,
 ) async {
   debugPrint('📝 Insertando Headquarters_weights desde objeto principal...');
 
@@ -1178,7 +1126,7 @@ Future<void> _insertHeadquartersWeights(
       {
         'Id_headquarter_weight': weight['id_headquarter_weight'],
         'Id_headquarter': weight['id_headquarter'],
-        'Id_company': weight['id_company'],
+        'Id_company': idCompany,
         'Date_year': weight['date_year'],
         'Date_month': weight['date_month'],
         'Weight': (weight['weight'] ?? 0).toDouble(),
@@ -1205,12 +1153,17 @@ Future<void> _insertNews(
   final batch = txn.batch();
   for (final newItem in news) {
     batch.insert('News', {
-      'Id_new': newItem['id_new'],
-      'Id_company': newItem['id_company'],
-      'Name_new': newItem['name_new'],
-      'Descripcion_activity': newItem['descripcion_activity'],
-      'Order_display': newItem['order_display'] ?? 0,
-    });
+      'Id_new':               newItem['id_new'],
+      'Id_company':           newItem['id_company'],
+      'Name_new':             newItem['title_new'],
+      'Descripcion_activity': newItem['description_new'],
+      'Order_display':        newItem['order_display'] ?? 0,
+      'Url_image':            newItem['url_image'],
+      'Type_new':             newItem['type_new'],
+      'Created_at':           newItem['created_at'],
+      'Modified_at':          newItem['modified_at'],
+      'State_new':            newItem['state_new'],
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
   await batch.commit(noResult: true);
 
@@ -1398,13 +1351,13 @@ List<dynamic>? _decodeGzipList(List<int> bodyBytes) {
 List<dynamic> _normalizeActivitiesForForm(List<dynamic> activities) {
   return activities.map((activity) {
     if (activity is! Map) return activity;
-    final act = Map<String, dynamic>.from(activity as Map);
+    final act = Map<String, dynamic>.from(activity);
 
     final steps = act['activity_steps'];
     if (steps is List) {
       act['activity_steps'] = steps.map((step) {
         if (step is! Map) return step;
-        final s = Map<String, dynamic>.from(step as Map);
+        final s = Map<String, dynamic>.from(step);
 
         // Normalizar la lista de status del step (puede venir como 'activities_status' o 'activity_status')
         final raw = s['activities_status'] ?? s['activity_status'];
@@ -1432,7 +1385,7 @@ List<dynamic> _normalizeActivitiesForForm(List<dynamic> activities) {
 /// y aplica la normalización recursivamente a los hijos.
 Map<String, dynamic> _normalizeStatus(dynamic status) {
   if (status is! Map) return {};
-  final s = Map<String, dynamic>.from(status as Map);
+  final s = Map<String, dynamic>.from(status);
 
   // Normalizar hijos recursivamente (el formulario usa ambas claves)
   final childs = s['activities_status_childs'] ?? s['status_childs'];

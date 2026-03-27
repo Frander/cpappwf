@@ -15,6 +15,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '/backend/sqlite/global_db_singleton.dart';
+import '/services/map_download_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page_model.dart';
 export 'home_page_model.dart';
 import '/index.dart';
@@ -84,6 +86,31 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   // Última fecha de visita
   String _lastVisitDate = 'Cargando...';
+
+  // Estados para el banner de sincronización base
+  bool _isSyncingBase = false;
+  double _syncProgress = 0.0;
+  String _syncMessage = '';
+  String? _syncError;
+
+  // Estados para el banner de calibración de brújula/GPS
+  bool _isCalibratingInline = false;
+  int _calibrationCountdown = 20;
+  String? _calibrationError;
+  Timer? _calibrationTimer;
+
+  // Estados para el banner de descarga de mapas offline
+  bool _mapBannerDismissed = false;
+  bool _isDownloadingMapInline = false;
+  double _mapDownloadProgress = 0.0;
+  String _mapDownloadSpeed = '';
+  String _mapDownloadTimeRemaining = '';
+  String? _mapDownloadError;
+  StreamSubscription<MapDownloadState>? _mapDownloadSubscription;
+
+  // Estados para el banner del modelo de voz IA
+  bool _voiceBannerDismissed = false;
+  bool _voiceModelReady = false;
 
   // Suscripción al servicio de background para eventos GPS
   StreamSubscription<Map<String, dynamic>?>? _gpsServiceSubscription;
@@ -178,18 +205,24 @@ class _HomePageWidgetState extends State<HomePageWidget>
         debugPrint('⚠️ Error al iniciar servicio de geolocalización: $e');
       }
 
-      // Verificar si se necesita calibración
-      await _checkAndShowCalibrationDialog();
     });
 
     // Listener para búsqueda en tiempo real
     _model.searchController?.addListener(_onSearchChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) => safeSetState(() {}));
+
+    // Cargar estado del banner de mapas (dismissed flag)
+    _loadMapBannerState();
+
+    // Cargar estado del banner de voz IA
+    _loadVoiceBannerState();
   }
 
   @override
   void dispose() {
+    _mapDownloadSubscription?.cancel();
+    _calibrationTimer?.cancel();
     _gpsServiceSubscription?.cancel();
     _locationServiceSubscription?.cancel();
     _locationProcessingTimer?.cancel();
@@ -497,6 +530,353 @@ class _HomePageWidgetState extends State<HomePageWidget>
     }
   }
 
+  // ============================================================================
+  // BANNER DE MAPAS OFFLINE
+  // ============================================================================
+
+  Future<void> _loadMapBannerState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getBool('map_banner_dismissed') ?? false;
+    if (mounted) setState(() => _mapBannerDismissed = dismissed);
+  }
+
+  // ============================================================================
+  // BANNER DE MODELO DE VOZ IA
+  // ============================================================================
+
+  Future<void> _loadVoiceBannerState() async {
+    final prefs = await SharedPreferences.getInstance();
+    final dismissed = prefs.getBool('voice_banner_dismissed') ?? false;
+    final ready = prefs.getBool('voice_model_ready') ?? false;
+    if (mounted) setState(() {
+      _voiceBannerDismissed = dismissed;
+      _voiceModelReady = ready;
+    });
+  }
+
+  Future<void> _dismissVoiceBanner() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('voice_banner_dismissed', true);
+    if (mounted) setState(() => _voiceBannerDismissed = true);
+  }
+
+  void _openVoiceConfigPage() {
+    context.pushNamed(
+      ConfigVoicePageWidget.routeName,
+      extra: <String, dynamic>{
+        kTransitionInfoKey: const TransitionInfo(
+          hasTransition: true,
+          transitionType: PageTransitionType.fade,
+          duration: Duration(milliseconds: 600),
+        ),
+      },
+    );
+  }
+
+  Widget _buildVoiceBanner() {
+    if (_voiceModelReady || _voiceBannerDismissed) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(18),
+        shadowColor: const Color(0xFF004D40).withValues(alpha: 0.5),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF004D40), Color(0xFF00695C)],
+              ),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Icono
+                GestureDetector(
+                  onTap: _openVoiceConfigPage,
+                  child: Container(
+                    padding: const EdgeInsets.all(9),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.record_voice_over_rounded,
+                        color: Colors.white, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Texto
+                Expanded(
+                  child: GestureDetector(
+                    onTap: _openVoiceConfigPage,
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Asistente de Voz IA disponible',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold)),
+                        SizedBox(height: 2),
+                        Text('Gemma 3 · ~700 MB · Toca para configurar',
+                            style: TextStyle(
+                                color: Color(0xFFB2DFDB), fontSize: 11)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Botón configurar
+                GestureDetector(
+                  onTap: _openVoiceConfigPage,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text('Configurar',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Botón omitir
+                GestureDetector(
+                  onTap: _dismissVoiceBanner,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    child: const Icon(Icons.close,
+                        color: Color(0xFFB2DFDB), size: 18),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _dismissMapBanner() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('map_banner_dismissed', true);
+    if (mounted) setState(() => _mapBannerDismissed = true);
+  }
+
+  Future<void> _startInlineMapDownload() async {
+    if (_isDownloadingMapInline) return;
+    setState(() {
+      _isDownloadingMapInline  = true;
+      _mapDownloadProgress     = 0.0;
+      _mapDownloadSpeed        = '';
+      _mapDownloadTimeRemaining = '';
+      _mapDownloadError        = null;
+    });
+
+    final service = MapDownloadService();
+    _mapDownloadSubscription?.cancel();
+    _mapDownloadSubscription = service.stateStream.listen((state) {
+      if (!mounted) return;
+      setState(() {
+        _mapDownloadProgress      = state.progress;
+        _mapDownloadSpeed         = state.speed;
+        _mapDownloadTimeRemaining = state.timeRemaining;
+        if (state.isComplete) {
+          _isDownloadingMapInline = false;
+          if (service.filePath.isNotEmpty) {
+            FFAppState().pathPmtiles = service.filePath;
+          }
+        }
+        if (state.hasError) {
+          _isDownloadingMapInline = false;
+          _mapDownloadError = state.errorMessage.isNotEmpty
+              ? state.errorMessage
+              : 'Error al descargar los mapas. Verifica tu conexión.';
+        }
+      });
+    });
+
+    await service.startDownload();
+  }
+
+  void _openMapInstallPage() {
+    context.pushNamed(
+      MapInstallPageWidget.routeName,
+      queryParameters: {
+        'idHeadquarter': serializeParam(0, ParamType.int),
+        'isTest': serializeParam(false, ParamType.bool),
+      }.withoutNulls,
+      extra: <String, dynamic>{
+        kTransitionInfoKey: const TransitionInfo(
+          hasTransition: true,
+          transitionType: PageTransitionType.bottomToTop,
+          duration: Duration(milliseconds: 600),
+        ),
+      },
+    );
+  }
+
+  // ============================================================================
+  // ACCESO A PÁGINA DE SINCRONIZACIÓN BASE
+  // ============================================================================
+
+  void _openModernSyncPage() {
+    final imei      = FFAppState().deviceDefault.imeI1;
+    final authToken = (FFAppState().loginResponse?['token'] as String?) ?? '';
+    final idCompany = FFAppState().companyDefault.idCompany;
+    context.pushNamed(
+      'ModernSyncPage',
+      queryParameters: {
+        'idCompany':  serializeParam(idCompany, ParamType.int),
+        'imei':       serializeParam(imei,      ParamType.String),
+        'authToken':  serializeParam(authToken, ParamType.String),
+      }.withoutNulls,
+      extra: <String, dynamic>{
+        kTransitionInfoKey: const TransitionInfo(
+          hasTransition: true,
+          transitionType: PageTransitionType.bottomToTop,
+          duration: Duration(milliseconds: 600),
+        ),
+      },
+    );
+  }
+
+  // ============================================================================
+  // CALIBRACIÓN DE BRÚJULA/GPS DESDE EL BANNER
+  // ============================================================================
+
+  Future<void> _startInlineCalibration() async {
+    if (_isCalibratingInline) return;
+    setState(() {
+      _isCalibratingInline  = true;
+      _calibrationCountdown = 20;
+      _calibrationError     = null;
+    });
+
+    // Iniciar acciones de calibración en paralelo (idéntico a ModernCalibrateCompassWidget)
+    calibrateCompass().catchError((_) => false);
+    calibrateGPS().catchError((_) => false);
+
+    // Countdown de 20 segundos — al terminar marca como calibrado
+    _calibrationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) { timer.cancel(); return; }
+      if (_calibrationCountdown <= 1) {
+        timer.cancel();
+        _finishInlineCalibration();
+      } else {
+        setState(() => _calibrationCountdown--);
+      }
+    });
+  }
+
+  void _finishInlineCalibration() {
+    if (!mounted) return;
+    FFAppState().calibrateCompass = true;
+    setState(() {
+      _isCalibratingInline = false;
+      _calibrationError    = null;
+    });
+  }
+
+  Future<void> _openCalibrationDialog() async {
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => CalibrationRequiredDialogWidget(
+        onCalibrateNow: () async {
+          Navigator.of(dialogContext).pop();
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (calibrateContext) => Dialog(
+              insetPadding: EdgeInsets.zero,
+              backgroundColor: Colors.transparent,
+              child: SizedBox(
+                height: MediaQuery.sizeOf(context).height * 0.95,
+                width:  MediaQuery.sizeOf(context).width  * 0.95,
+                child: const ModernCalibrateCompassWidget(),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+    // Forzar rebuild para que el banner desaparezca si se completó la calibración
+    if (mounted) setState(() {});
+  }
+
+  // ============================================================================
+  // SINCRONIZACIÓN BASE DESDE EL BANNER
+  // ============================================================================
+
+  Future<void> _startBaseSync() async {
+    if (_isSyncingBase) return;
+    setState(() {
+      _isSyncingBase = true;
+      _syncProgress  = 0.0;
+      _syncMessage   = 'Iniciando sincronización...';
+      _syncError     = null;
+    });
+
+    final imei      = FFAppState().deviceDefault.imeI1;
+    final authToken = (FFAppState().loginResponse?['token'] as String?) ?? '';
+    final idCompany = FFAppState().companyDefault.idCompany;
+
+    try {
+      final success = await syncBaseData(
+        context,
+        imei,
+        authToken,
+        idCompany,
+        onProgress: (p, m) {
+          if (mounted) {
+            setState(() {
+              _syncProgress = p;
+              _syncMessage  = m;
+            });
+          }
+        },
+      );
+
+      if (!success) {
+        if (mounted) {
+          setState(() {
+            _isSyncingBase = false;
+            _syncError = 'No se pudo completar la sincronización. Verifica tu conexión e intenta nuevamente.';
+          });
+        }
+        return;
+      }
+
+      FFAppState().lastSyncBase = DateTime.now();
+      if (mounted) {
+        setState(() {
+          _isSyncingBase = false;
+          _syncError     = null;
+        });
+        await _loadActivities();
+        await _loadActivityMetrics();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSyncingBase = false;
+          _syncError = e.toString().replaceAll('Exception: ', '');
+        });
+      }
+    }
+  }
+
   // Obtener iniciales del usuario
   String _getUserInitials() {
     final userName = FFAppState().userSelected.nameUser;
@@ -678,45 +1058,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
     });
   }
 
-  // Verificar y mostrar diálogo de calibración si es necesario
-  Future<void> _checkAndShowCalibrationDialog() async {
-    try {
-      // Verificar si se necesita calibración usando la custom action
-      final needsCalibration = await checkCalibrationNeeded();
-
-      if (needsCalibration && mounted) {
-        // Mostrar el diálogo de calibración
-        await showDialog(
-          context: context,
-          barrierDismissible: false, // No se puede cerrar tocando fuera
-          builder: (dialogContext) => CalibrationRequiredDialogWidget(
-            onCalibrateNow: () async {
-              // Cerrar el diálogo de aviso
-              Navigator.of(dialogContext).pop();
-
-              // Abrir el diálogo de calibración
-              await showDialog(
-                context: context,
-                barrierDismissible: false,
-                builder: (calibrateContext) => Dialog(
-                  insetPadding: EdgeInsets.zero,
-                  backgroundColor: Colors.transparent,
-                  child: SizedBox(
-                    height: MediaQuery.sizeOf(context).height * 0.95,
-                    width: MediaQuery.sizeOf(context).width * 0.95,
-                    child: const ModernCalibrateCompassWidget(),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('❌ Error al verificar calibración: $e');
-    }
-  }
-
   // Seleccionar actividad - actualiza inmediatamente el AppState
   void _selectActivity(Map<String, dynamic> activity) {
     setState(() {
@@ -820,6 +1161,18 @@ class _HomePageWidgetState extends State<HomePageWidget>
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // 0a. Banner de calibración (solo si la brújula/GPS no están calibrados)
+                          _buildCalibrationBanner(),
+
+                          // 0b. Banner de sincronización base (solo si no se ha sincronizado)
+                          _buildSyncBanner(),
+
+                          // 0c. Banner de mapas offline (si no se han descargado, y no fue omitido)
+                          _buildMapBanner(),
+
+                          // 0d. Banner de modelo de voz IA
+                          _buildVoiceBanner(),
+
                           // 1. Header con identificación de usuario
                           _buildUserHeader(),
 
@@ -881,6 +1234,888 @@ class _HomePageWidgetState extends State<HomePageWidget>
   // ============================================================================
   // COMPONENTES
   // ============================================================================
+
+  // ============================================================================
+  // BANNER DE MAPAS OFFLINE
+  // ============================================================================
+
+  Widget _buildMapBanner() {
+    final mapReady = FFAppState().pathPmtiles.trim().isNotEmpty;
+    if (mapReady || _mapBannerDismissed) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(18),
+        shadowColor: const Color(0xFF4A148C).withValues(alpha: 0.45),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SizeTransition(sizeFactor: anim, child: child),
+          ),
+          child: _isDownloadingMapInline
+              ? _buildMapBannerProgress()
+              : _mapDownloadError != null
+                  ? _buildMapBannerError()
+                  : _buildMapBannerIdle(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapBannerIdle() {
+    return ClipRRect(
+      key: const ValueKey('map_idle'),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF4A148C), Color(0xFF880E4F)],
+          ),
+        ),
+        child: Row(
+          children: [
+            // Zona principal → abre MapInstallPage
+            Expanded(
+              child: GestureDetector(
+                onTap: _openMapInstallPage,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.map_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Mapas offline no descargados',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Recorridos ideales · Toca para abrir la configuración',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Botón inline → descarga directa
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: GestureDetector(
+                onTap: _startInlineMapDownload,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.download_rounded,
+                          color: Colors.white, size: 14),
+                      SizedBox(width: 3),
+                      Text(
+                        'Descargar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Botón Omitir → oculta banner permanentemente
+            Padding(
+              padding: const EdgeInsets.only(right: 12, left: 2),
+              child: GestureDetector(
+                onTap: _dismissMapBanner,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    'Omitir',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.7),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMapBannerProgress() {
+    final percent = (_mapDownloadProgress * 100).clamp(0, 100).toInt();
+
+    return Container(
+      key: const ValueKey('map_progress'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF38006B), Color(0xFF4A0072)],
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Descargando mapas offline…',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$percent%',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          if (_mapDownloadSpeed.isNotEmpty || _mapDownloadTimeRemaining.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                [
+                  if (_mapDownloadSpeed.isNotEmpty) _mapDownloadSpeed,
+                  if (_mapDownloadTimeRemaining.isNotEmpty)
+                    'Resta: $_mapDownloadTimeRemaining',
+                ].join('  ·  '),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 11,
+                ),
+              ),
+            ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: _mapDownloadProgress,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Colors.white),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapBannerError() {
+    return Container(
+      key: const ValueKey('map_error'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              color: Colors.white, size: 30),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _mapDownloadError ?? 'Error al descargar los mapas',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: _startInlineMapDownload,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  width: 1,
+                ),
+              ),
+              child: const Text(
+                'Reintentar',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: _dismissMapBanner,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  width: 1,
+                ),
+              ),
+              child: Text(
+                'Omitir',
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================================
+  // BANNER DE CALIBRACIÓN DE BRÚJULA/GPS
+  // ============================================================================
+
+  Widget _buildCalibrationBanner() {
+    final needsCalibration = !FFAppState().calibrateCompass;
+    if (!needsCalibration && !_isCalibratingInline && _calibrationError == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Material(
+        elevation: 8,
+        borderRadius: BorderRadius.circular(18),
+        shadowColor: const Color(0xFF1A237E).withValues(alpha: 0.45),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SizeTransition(sizeFactor: anim, child: child),
+          ),
+          child: _isCalibratingInline
+              ? _buildCalibrationBannerProgress()
+              : _calibrationError != null
+                  ? _buildCalibrationBannerError()
+                  : _buildCalibrationBannerIdle(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalibrationBannerIdle() {
+    return ClipRRect(
+      key: const ValueKey('cal_idle'),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1A237E), Color(0xFF0277BD)],
+          ),
+        ),
+        child: Row(
+          children: [
+            // Zona principal → abre la pantalla completa de calibración
+            Expanded(
+              child: GestureDetector(
+                onTap: _openCalibrationDialog,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.sensors_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Calibración de sensores pendiente',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Brújula y GPS · Toca para abrir pantalla completa',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.8),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            // Botón inline → calibración rápida de 20 segundos
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: GestureDetector(
+                onTap: _startInlineCalibration,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_arrow_rounded,
+                          color: Colors.white, size: 15),
+                      SizedBox(width: 4),
+                      Text(
+                        'Calibrar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCalibrationBannerProgress() {
+    final elapsed  = 20 - _calibrationCountdown;
+    final progress = elapsed / 20.0;
+
+    return Container(
+      key: const ValueKey('cal_progress'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0D1B6A), Color(0xFF1565C0)],
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.sensors_rounded,
+                  color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Calibrando brújula y GPS…',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              // Countdown circular
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: progress,
+                      strokeWidth: 3,
+                      backgroundColor:
+                          Colors.white.withValues(alpha: 0.2),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                          Colors.white),
+                    ),
+                    Text(
+                      '$_calibrationCountdown',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Mueve el dispositivo lentamente en forma de 8',
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.75),
+              fontSize: 11,
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: progress,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              valueColor:
+                  const AlwaysStoppedAnimation<Color>(Colors.white),
+              minHeight: 5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCalibrationBannerError() {
+    return Container(
+      key: const ValueKey('cal_error'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          const Icon(Icons.error_outline_rounded,
+              color: Colors.white, size: 30),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _calibrationError ?? 'Error en la calibración',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: _startInlineCalibration,
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                  horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  width: 1,
+                ),
+              ),
+              child: const Text(
+                'Reintentar',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================================
+  // BANNER DE SINCRONIZACIÓN BASE
+  // ============================================================================
+
+  Widget _buildSyncBanner() {
+    final needsSync = FFAppState().lastSyncBase == null;
+    if (!needsSync && !_isSyncingBase && _syncError == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Material(
+        elevation: 10,
+        borderRadius: BorderRadius.circular(18),
+        shadowColor: const Color(0xFFFF6D00).withValues(alpha: 0.45),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 350),
+          transitionBuilder: (child, anim) => FadeTransition(
+            opacity: anim,
+            child: SizeTransition(sizeFactor: anim, child: child),
+          ),
+          child: _isSyncingBase
+              ? _buildBannerProgress()
+              : _syncError != null
+                  ? _buildBannerError()
+                  : _buildBannerIdle(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBannerIdle() {
+    return ClipRRect(
+      key: const ValueKey('idle'),
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFFE65100), Color(0xFFFF8F00)],
+          ),
+        ),
+        child: Row(
+          children: [
+            // Zona principal → abre la página de sincronización base
+            Expanded(
+              child: GestureDetector(
+                onTap: _openModernSyncPage,
+                behavior: HitTestBehavior.opaque,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.cloud_download_rounded,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Configuración inicial pendiente',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.1,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              'Datos base · Toca para abrir la página de sincronización',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.85),
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Botón inline → sincronización directa desde aquí
+            Padding(
+              padding: const EdgeInsets.only(right: 14),
+              child: GestureDetector(
+                onTap: _startBaseSync,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.45),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_arrow_rounded,
+                          color: Colors.white, size: 15),
+                      SizedBox(width: 4),
+                      Text(
+                        'Sincronizar',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBannerProgress() {
+    final percent = (_syncProgress * 100).clamp(0, 100).toInt();
+    return Container(
+      key: const ValueKey('progress'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFBF360C), Color(0xFFE64A19)],
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.5,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _syncMessage.isNotEmpty
+                      ? _syncMessage
+                      : 'Sincronizando datos base...',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$percent%',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: _syncProgress,
+              backgroundColor: Colors.white.withValues(alpha: 0.2),
+              valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+              minHeight: 6,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBannerError() {
+    return Container(
+      key: const ValueKey('error'),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Colors.white,
+            size: 30,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              _syncError ?? 'Error en la sincronización',
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.9),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 10),
+          GestureDetector(
+            onTap: _startBaseSync,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.45),
+                  width: 1,
+                ),
+              ),
+              child: const Text(
+                'Reintentar',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildUserHeader() {
     final userName = FFAppState().userSelected.nameUser;

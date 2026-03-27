@@ -13,6 +13,9 @@ class UsersStruct extends BaseStruct {
     String? operID,
     String? nameUser,
     String? email,
+    String? codeUser,
+    String? stateUser,
+    String? rolUser,
     String? createdAt,
     String? modifiedAt,
   })  : _idUser = idUser,
@@ -20,6 +23,9 @@ class UsersStruct extends BaseStruct {
         _operID = operID,
         _nameUser = nameUser,
         _email = email,
+        _codeUser = codeUser,
+        _stateUser = stateUser,
+        _rolUser = rolUser,
         _createdAt = createdAt,
         _modifiedAt = modifiedAt;
 
@@ -62,6 +68,27 @@ class UsersStruct extends BaseStruct {
 
   bool hasEmail() => _email != null;
 
+  // "code_user" field.
+  String? _codeUser;
+  String get codeUser => _codeUser ?? '';
+  set codeUser(String? val) => _codeUser = val;
+
+  bool hasCodeUser() => _codeUser != null;
+
+  // "state_user" field.
+  String? _stateUser;
+  String get stateUser => _stateUser ?? '';
+  set stateUser(String? val) => _stateUser = val;
+
+  bool hasStateUser() => _stateUser != null;
+
+  // "rol_user" field.
+  String? _rolUser;
+  String get rolUser => _rolUser ?? '';
+  set rolUser(String? val) => _rolUser = val;
+
+  bool hasRolUser() => _rolUser != null;
+
   // "created_at" field.
   String? _createdAt;
   String get createdAt => _createdAt ?? '';
@@ -77,11 +104,14 @@ class UsersStruct extends BaseStruct {
   bool hasModifiedAt() => _modifiedAt != null;
 
   static UsersStruct fromMap(Map<String, dynamic> data) => UsersStruct(
-        idUser: castToType<int>(data['id_user']),
+        idUser:    castToType<int>(data['id_user']),
         idCompany: castToType<int>(data['id_company']),
-        operID: data['operID'] as String?,
-        nameUser: data['name_user'] as String?,
-        email: data['email'] as String?,
+        operID:    data['operID']     as String?,
+        nameUser:  data['name_user']  as String?,
+        email:     data['email']      as String?,
+        codeUser:  data['code_user']  as String?,
+        stateUser: data['state_user'] as String?,
+        rolUser:   data['rol_user']   as String?,
         createdAt: data['created_at'] as String?,
         modifiedAt: data['modifiedAt'] as String?,
       );
@@ -90,11 +120,14 @@ class UsersStruct extends BaseStruct {
       data is Map ? UsersStruct.fromMap(data.cast<String, dynamic>()) : null;
 
   Map<String, dynamic> toMap() => {
-        'id_user': _idUser,
+        'id_user':    _idUser,
         'id_company': _idCompany,
-        'operID': _operID,
-        'name_user': _nameUser,
-        'email': _email,
+        'operID':     _operID,
+        'name_user':  _nameUser,
+        'email':      _email,
+        'code_user':  _codeUser,
+        'state_user': _stateUser,
+        'rol_user':   _rolUser,
         'created_at': _createdAt,
         'modifiedAt': _modifiedAt,
       }.withoutNulls;

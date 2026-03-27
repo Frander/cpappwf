@@ -147,6 +147,7 @@ Future<Map<String, dynamic>?> _loadActivityFromSQLite(int activityId) async {
       'description_activity': actRow['Description_activity'],
       'created_at':          actRow['Created_at'],
       'is_default':          actRow['Is_default'] == 1,
+      'is_sync':             actRow['Is_sync'] == 1,
       'read_default':        actRow['Read_default'],
       'is_sync_full':        false, // no almacenado en SQLite
       'activity_steps':      stepsJson,
@@ -208,6 +209,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
             Effectivity_visits as effectivity_visits,
             Type_effectivity as type_effectivity,
             Module_activity as module_activity,
+            Is_sync as is_sync,
             Is_sync_full as is_sync_full,
             Tracking_headquarter as tracking_headquarter
           FROM Activities
@@ -283,7 +285,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
               children: [
                 // Header moderno
                 Container(
-                  padding: EdgeInsetsDirectional.fromSTEB(12.0, 12.0, 12.0, 16.0),
+                  padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
@@ -348,7 +350,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                           SizedBox(width: 44),
                         ],
                       ),
-                      SizedBox(height: 16),
+                      SizedBox(height: 6),
                       // Título con efecto brillante
                       ShaderMask(
                         shaderCallback: (bounds) {
@@ -365,7 +367,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                           'Lista de actividades',
                           textAlign: TextAlign.center,
                           style: TextStyle(
-                            fontSize: 22,
+                            fontSize: 18,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.2,
                             color: Colors.white,
@@ -378,9 +380,11 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                           ),
                         ),
                       ),
-                      SizedBox(height: 16),
-                      // Campo de búsqueda mejorado
-                      Container(
+                      SizedBox(height: 8),
+                      // Búsqueda + contador en la misma fila
+                      Row(
+                        children: [
+                      Expanded(child: Container(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
@@ -486,20 +490,11 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                SizedBox(height: 8),
-
-                // Contador de actividades
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
+                      )),
+                      SizedBox(width: 8),
+                      // Contador al lado del buscador
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
@@ -513,22 +508,22 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             width: 1,
                           ),
                         ),
-                        child: Row(
+                        child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
                               Icons.list_alt_rounded,
                               color: Color(0xFF00ff9f),
-                              size: 18,
+                              size: 16,
                             ),
-                            SizedBox(width: 8),
+                            SizedBox(height: 2),
                             Text(
-                              '${filteredActivities.length} actividad${filteredActivities.length != 1 ? 'es' : ''}',
-                              style: TextStyle(fontFamily: 'Roboto',
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
+                              '${filteredActivities.length}',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
                                 color: Color(0xFF00ff9f),
-                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
@@ -536,9 +531,11 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                       ),
                     ],
                   ),
-                ),
+                ],
+              ),
+            ),
 
-                SizedBox(height: 12),
+            SizedBox(height: 6),
 
                 // Lista de actividades
                 Expanded(

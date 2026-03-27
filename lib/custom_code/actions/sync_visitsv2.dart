@@ -1058,26 +1058,9 @@ Future<void> _cleanupSQLiteDataAfterSync() async {
     final int deletedRoutes = await db.delete('Optimized_routes');
     debugPrint('   ✅ Eliminadas $deletedRoutes rutas optimizadas');
 
-    // 5. Limpiar Products_coordinates
-    final int deletedProductCoords = await db.delete('Products_coordinates');
-    debugPrint(
-        '   ✅ Eliminadas $deletedProductCoords coordenadas de productos');
-
-    // 6. Limpiar Products
-    final int deletedProducts = await db.delete('Products');
-    debugPrint('   ✅ Eliminados $deletedProducts productos');
-
-    // 7. Limpiar Headquarters_coordinates (zonas de exclusión)
-    final int deletedHQCoords = await db.delete('Headquarters_coordinates');
-    debugPrint('   ✅ Eliminadas $deletedHQCoords coordenadas de exclusión');
-
-    // 8. Limpiar Types_points
-    final int deletedTypes = await db.delete('Types_points');
-    debugPrint('   ✅ Eliminados $deletedTypes tipos de puntos');
-
-    // 9. Limpiar Virtual_points
-    final int deletedVirtualPoints = await db.delete('Virtual_points');
-    debugPrint('   ✅ Eliminados $deletedVirtualPoints puntos virtuales');
+    // 5-9. Tablas de datos base (Products, Headquarters_coordinates, Types_points,
+    // Virtual_points, Products_coordinates) NO se tocan aquí — son propiedad
+    // exclusiva de syncBaseData. Solo syncBaseData puede modificarlas.
 
     // 10. NO limpiar Headquarters_polygons - sync_login es el dueño de estos datos
     // Se preservan para que el módulo NFC (Centro de Administración) pueda

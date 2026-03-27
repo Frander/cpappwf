@@ -285,7 +285,7 @@ class _InformationFormState extends State<InformationForm>
     final idsHeadquarters =
         joinHeadquarterIds(FFAppState().headquartersSelectedList);
     final imei = FFAppState().deviceDefault.imeI1;
-    final authToken = FFAppState().loginResponse['token'] as String? ?? '';
+    final authToken = (FFAppState().loginResponse?['token'] as String?) ?? '';
 
     // Navegar a la nueva página de sincronización moderna
     await context.pushNamed(

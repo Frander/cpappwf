@@ -528,7 +528,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                                       ),
                                                       const SizedBox(width: 3),
                                                       Text(
-                                                        'Codigo: ${user.operID}',
+                                                        'Codigo: ${user.codeUser.isNotEmpty ? user.codeUser : user.operID}',
                                                         style: TextStyle(
                                                           fontFamily: 'Roboto',
                                                           fontSize: 11,

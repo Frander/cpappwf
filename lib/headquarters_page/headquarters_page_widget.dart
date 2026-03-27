@@ -6,8 +6,10 @@ import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'package:provider/provider.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 import 'headquarters_page_model.dart';
 export 'headquarters_page_model.dart';
 
@@ -28,6 +30,9 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
+  List<HeadquartersStruct> _allHeadquarters = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +40,46 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
 
     _model.textController ??= TextEditingController();
     _model.textFieldFocusNode ??= FocusNode();
+
+    SchedulerBinding.instance.addPostFrameCallback((_) async {
+      await _loadHeadquartersFromSQLite();
+    });
+  }
+
+  Future<void> _loadHeadquartersFromSQLite() async {
+    try {
+      final idCompany = FFAppState().userSelected.idCompany;
+      final rows = await globalDb.executeOperation((db) async {
+        return await db.rawQuery('''
+          SELECT
+            h.Id_headquarter       AS id_headquarter,
+            h.Id_zone              AS id_zone,
+            h.Created_at           AS created_at,
+            h.Name_headquarter     AS name_headquarter,
+            h.Density_headquarter  AS density_headquarter,
+            h.Seed_time            AS seed_time,
+            h.State_headquarter    AS state_headquarter,
+            h.Area_headquarter     AS area_headquarter,
+            h.Polygon              AS polygon
+          FROM Headquarters h
+          JOIN Zones z ON h.Id_zone = z.Id_zone
+          WHERE z.Id_company = ?
+          ORDER BY h.Name_headquarter ASC
+        ''', [idCompany]);
+      });
+
+      if (mounted) {
+        setState(() {
+          _allHeadquarters = rows
+              .map((map) => HeadquartersStruct.fromMap(map))
+              .toList();
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error cargando lotes desde SQLite: $e');
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -47,10 +92,10 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
-    // Filtrar lotes por búsqueda
+    // Filtrar lotes por búsqueda usando la lista cargada desde SQLite
     final filteredHeadquarters = functions
         .filterHeadquartersByName(
-            FFAppState().headquartersList.toList(), _model.textController.text)
+            _allHeadquarters, _model.textController.text)
         .toList();
 
     final selectedCount = FFAppState().headquartersSelectedList.length;
@@ -421,7 +466,14 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
 
                 // Grid de lotes
                 Expanded(
-                  child: filteredHeadquarters.isEmpty
+                  child: _isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00ff9f)),
+                            strokeWidth: 1.5,
+                          ),
+                        )
+                      : filteredHeadquarters.isEmpty
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,

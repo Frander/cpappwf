@@ -45,7 +45,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          20, // Incrementada a v20 para agregar Id_rfid a Products
+          26, // v26: Code_user, State_user, Rol_user en Users
       onCreate: (Database db, int version) async {
         await _createTables(db);
       },
@@ -92,6 +92,8 @@ Future<void> _createTables(Database db) async {
         Address TEXT,
         Telephone TEXT,
         Id_zone_default INTEGER,
+        Latitude_extractor REAL,
+        Longitude_extractor REAL,
         Created_at TEXT
     );
   ''');
@@ -104,7 +106,9 @@ Future<void> _createTables(Database db) async {
         Id_zone INTEGER PRIMARY KEY,
         Id_company INTEGER NOT NULL,
         Name_zone TEXT,
-        Difficulty INTEGER NOT NULL,
+        Description_zone TEXT,
+        Color_zone TEXT,
+        Difficulty INTEGER DEFAULT 0,
         State_zone TEXT,
         Created_at TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
@@ -137,9 +141,16 @@ Future<void> _createTables(Database db) async {
         Oper_id TEXT,
         Name_user TEXT,
         Email TEXT,
+        Code_user TEXT,
+        State_user TEXT,
+        Rol_user TEXT,
         Created_at TEXT,
         Modified_at TEXT,
         Is_default INTEGER DEFAULT 0,
+        Is_active INTEGER DEFAULT 1,
+        Phone_country_code TEXT,
+        Phone_number TEXT,
+        User_name_login TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
     );
   ''');
@@ -168,8 +179,8 @@ Future<void> _createTables(Database db) async {
       'CREATE INDEX IF NOT EXISTS IX_Devices_company ON Devices(Id_company);');
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Devices_imei1 ON Devices(Imei1);');
-  await db.execute(
-      'CREATE UNIQUE INDEX IF NOT EXISTS IX_Devices_imei_unique ON Devices(Imei1, Imei2);');
+  // Sin UNIQUE INDEX en (Imei1, Imei2): muchos dispositivos tienen Imei2 vacío
+  // lo que causaría UNIQUE constraint failures. La PK Id_device garantiza unicidad real.
 
   // Tabla Activities
   await db.execute('''
@@ -193,6 +204,9 @@ Future<void> _createTables(Database db) async {
         Tracking_headquarter INTEGER DEFAULT 1,
         Is_sync_full INTEGER DEFAULT 0,
         Read_default TEXT,
+        Color_activity TEXT,
+        Icon_activity TEXT,
+        Visits_number INTEGER DEFAULT 0,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
         FOREIGN KEY (Id_activity_parent) REFERENCES Activities(Id_activity)
     );
@@ -259,6 +273,10 @@ Future<void> _createTables(Database db) async {
         Boton INTEGER,
         Factor INTEGER,
         Status TEXT,
+        Description_status TEXT,
+        Alternative_status TEXT,
+        Remember_status INTEGER DEFAULT 0,
+        Tracking_constant INTEGER DEFAULT 0,
         FOREIGN KEY (Id_activity) REFERENCES Activities(Id_activity) ON DELETE CASCADE,
         FOREIGN KEY (Id_activity_step_parent) REFERENCES Activities_steps(Id_activity_step),
         FOREIGN KEY (Id_activity_status_parent) REFERENCES Activities_status(Id_activity_status)
@@ -305,6 +323,11 @@ Future<void> _createTables(Database db) async {
         Name_new TEXT,
         Descripcion_activity TEXT,
         Order_display INTEGER NOT NULL,
+        Url_image TEXT,
+        Type_new TEXT,
+        Created_at TEXT,
+        Modified_at TEXT,
+        State_new TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
     );
   ''');
@@ -1488,6 +1511,8 @@ Future<void> _upgradeDatabase(
             Address TEXT,
             Telephone TEXT,
             Id_zone_default INTEGER,
+            Latitude_extractor REAL,
+            Longitude_extractor REAL,
             Created_at TEXT
         );
       ''');
@@ -1501,6 +1526,8 @@ Future<void> _upgradeDatabase(
             Id_zone INTEGER PRIMARY KEY,
             Id_company INTEGER NOT NULL,
             Name_zone TEXT,
+            Description_zone TEXT,
+            Color_zone TEXT,
             Difficulty INTEGER NOT NULL,
             State_zone TEXT,
             Created_at TEXT,
@@ -1536,9 +1563,16 @@ Future<void> _upgradeDatabase(
             Oper_id TEXT,
             Name_user TEXT,
             Email TEXT,
+            Code_user TEXT,
+            State_user TEXT,
+            Rol_user TEXT,
             Created_at TEXT,
             Modified_at TEXT,
             Is_default INTEGER DEFAULT 0,
+            Is_active INTEGER DEFAULT 1,
+            Phone_country_code TEXT,
+            Phone_number TEXT,
+            User_name_login TEXT,
             FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
         );
       ''');
@@ -2022,8 +2056,210 @@ Future<void> _upgradeDatabase(
       }
     }
 
-    // Futuras migraciones se agregarían aquí
-    // if (oldVersion < 21) { ... }
+    // Migración v20 a v21: Agregar columnas de coordenadas a Companies
+    if (oldVersion < 21) {
+      debugPrint('📦 Aplicando migración a versión 21...');
+      try {
+        final columns = await db.rawQuery('PRAGMA table_info(Companies);');
+        final columnNames = columns.map((col) => col['name'] as String).toSet();
+
+        if (!columnNames.contains('Latitude_extractor')) {
+          await db.execute('ALTER TABLE Companies ADD COLUMN Latitude_extractor REAL;');
+          debugPrint('   ✅ Columna Latitude_extractor agregada a Companies');
+        }
+        if (!columnNames.contains('Longitude_extractor')) {
+          await db.execute('ALTER TABLE Companies ADD COLUMN Longitude_extractor REAL;');
+          debugPrint('   ✅ Columna Longitude_extractor agregada a Companies');
+        }
+        debugPrint('✅ Migración a versión 21 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 21: $e');
+      }
+    }
+
+    // Migración v21 a v22: Agregar columnas Description_zone y Color_zone a Zones
+    if (oldVersion < 22) {
+      debugPrint('📦 Aplicando migración a versión 22...');
+      try {
+        final columns = await db.rawQuery('PRAGMA table_info(Zones);');
+        final columnNames = columns.map((col) => col['name'] as String).toSet();
+
+        if (!columnNames.contains('Description_zone')) {
+          await db.execute('ALTER TABLE Zones ADD COLUMN Description_zone TEXT;');
+          debugPrint('   ✅ Columna Description_zone agregada a Zones');
+        }
+        if (!columnNames.contains('Color_zone')) {
+          await db.execute('ALTER TABLE Zones ADD COLUMN Color_zone TEXT;');
+          debugPrint('   ✅ Columna Color_zone agregada a Zones');
+        }
+        debugPrint('✅ Migración a versión 22 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 22: $e');
+      }
+    }
+
+    // Migración v22 a v23: Recrear Zones para quitar NOT NULL de Difficulty y añadir columnas
+    if (oldVersion < 23) {
+      debugPrint('📦 Aplicando migración a versión 23...');
+      try {
+        await db.execute('ALTER TABLE Zones RENAME TO Zones_old;');
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS Zones (
+              Id_zone INTEGER PRIMARY KEY,
+              Id_company INTEGER NOT NULL,
+              Name_zone TEXT,
+              Description_zone TEXT,
+              Color_zone TEXT,
+              Difficulty INTEGER DEFAULT 0,
+              State_zone TEXT,
+              Created_at TEXT,
+              FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
+          );
+        ''');
+        await db.execute('''
+          INSERT INTO Zones (Id_zone, Id_company, Name_zone, Description_zone, Color_zone, Difficulty, State_zone, Created_at)
+          SELECT Id_zone, Id_company, Name_zone,
+                 NULL, NULL,
+                 COALESCE(Difficulty, 0),
+                 State_zone, Created_at
+          FROM Zones_old;
+        ''');
+        await db.execute('DROP TABLE Zones_old;');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS IX_Zones_company ON Zones(Id_company);');
+        debugPrint('✅ Migración a versión 23 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 23: $e');
+      }
+    }
+
+    // Migración v23 a v24: columnas faltantes + drop UNIQUE erróneo en Devices
+    if (oldVersion < 24) {
+      debugPrint('📦 Aplicando migración a versión 24...');
+      try {
+        // 1. Eliminar el UNIQUE INDEX incorrecto en Devices(Imei1, Imei2).
+        //    Muchos dispositivos legítimos tienen Imei2 = '' y colisionan entre sí.
+        //    La unicidad real la garantiza el Id_device (PRIMARY KEY).
+        await db.execute('DROP INDEX IF EXISTS IX_Devices_imei_unique;');
+        debugPrint('   ✅ UNIQUE INDEX IX_Devices_imei_unique eliminado de Devices');
+
+        // 2. Columnas faltantes en Activities
+        final actCols = (await db.rawQuery('PRAGMA table_info(Activities);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!actCols.contains('Color_activity')) {
+          await db.execute('ALTER TABLE Activities ADD COLUMN Color_activity TEXT;');
+          debugPrint('   ✅ Columna Color_activity agregada a Activities');
+        }
+        if (!actCols.contains('Icon_activity')) {
+          await db.execute('ALTER TABLE Activities ADD COLUMN Icon_activity TEXT;');
+          debugPrint('   ✅ Columna Icon_activity agregada a Activities');
+        }
+        if (!actCols.contains('Visits_number')) {
+          await db.execute('ALTER TABLE Activities ADD COLUMN Visits_number INTEGER DEFAULT 0;');
+          debugPrint('   ✅ Columna Visits_number agregada a Activities');
+        }
+
+        // 3. Columnas faltantes en Activities_status
+        final stsCols = (await db.rawQuery('PRAGMA table_info(Activities_status);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!stsCols.contains('Description_status')) {
+          await db.execute('ALTER TABLE Activities_status ADD COLUMN Description_status TEXT;');
+          debugPrint('   ✅ Columna Description_status agregada a Activities_status');
+        }
+        if (!stsCols.contains('Alternative_status')) {
+          await db.execute('ALTER TABLE Activities_status ADD COLUMN Alternative_status TEXT;');
+          debugPrint('   ✅ Columna Alternative_status agregada a Activities_status');
+        }
+        if (!stsCols.contains('Remember_status')) {
+          await db.execute('ALTER TABLE Activities_status ADD COLUMN Remember_status INTEGER DEFAULT 0;');
+          debugPrint('   ✅ Columna Remember_status agregada a Activities_status');
+        }
+        if (!stsCols.contains('Tracking_constant')) {
+          await db.execute('ALTER TABLE Activities_status ADD COLUMN Tracking_constant INTEGER DEFAULT 0;');
+          debugPrint('   ✅ Columna Tracking_constant agregada a Activities_status');
+        }
+
+        // 4. Columnas faltantes en Users
+        final usrCols = (await db.rawQuery('PRAGMA table_info(Users);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!usrCols.contains('Is_active')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN Is_active INTEGER DEFAULT 1;');
+          debugPrint('   ✅ Columna Is_active agregada a Users');
+        }
+        if (!usrCols.contains('Phone_country_code')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN Phone_country_code TEXT;');
+          debugPrint('   ✅ Columna Phone_country_code agregada a Users');
+        }
+        if (!usrCols.contains('Phone_number')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN Phone_number TEXT;');
+          debugPrint('   ✅ Columna Phone_number agregada a Users');
+        }
+        if (!usrCols.contains('User_name_login')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN User_name_login TEXT;');
+          debugPrint('   ✅ Columna User_name_login agregada a Users');
+        }
+
+        debugPrint('✅ Migración a versión 24 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 24: $e');
+      }
+    }
+
+    // Migración v24 a v25: columnas faltantes en News
+    if (oldVersion < 25) {
+      debugPrint('📦 Aplicando migración a versión 25...');
+      try {
+        final newsCols = (await db.rawQuery('PRAGMA table_info(News);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!newsCols.contains('Url_image')) {
+          await db.execute('ALTER TABLE News ADD COLUMN Url_image TEXT;');
+          debugPrint('   ✅ Columna Url_image agregada a News');
+        }
+        if (!newsCols.contains('Type_new')) {
+          await db.execute('ALTER TABLE News ADD COLUMN Type_new TEXT;');
+          debugPrint('   ✅ Columna Type_new agregada a News');
+        }
+        if (!newsCols.contains('Created_at')) {
+          await db.execute('ALTER TABLE News ADD COLUMN Created_at TEXT;');
+          debugPrint('   ✅ Columna Created_at agregada a News');
+        }
+        if (!newsCols.contains('Modified_at')) {
+          await db.execute('ALTER TABLE News ADD COLUMN Modified_at TEXT;');
+          debugPrint('   ✅ Columna Modified_at agregada a News');
+        }
+        if (!newsCols.contains('State_new')) {
+          await db.execute('ALTER TABLE News ADD COLUMN State_new TEXT;');
+          debugPrint('   ✅ Columna State_new agregada a News');
+        }
+        debugPrint('✅ Migración a versión 25 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 25: $e');
+      }
+    }
+
+    // Migración v25 a v26: Code_user, State_user, Rol_user en Users
+    if (oldVersion < 26) {
+      debugPrint('📦 Aplicando migración a versión 26...');
+      try {
+        final usrCols = (await db.rawQuery('PRAGMA table_info(Users);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!usrCols.contains('Code_user')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN Code_user TEXT;');
+          debugPrint('   ✅ Columna Code_user agregada a Users');
+        }
+        if (!usrCols.contains('State_user')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN State_user TEXT;');
+          debugPrint('   ✅ Columna State_user agregada a Users');
+        }
+        if (!usrCols.contains('Rol_user')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN Rol_user TEXT;');
+          debugPrint('   ✅ Columna Rol_user agregada a Users');
+        }
+        debugPrint('✅ Migración a versión 26 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 26: $e');
+      }
+    }
   } catch (e) {
     debugPrint('❌ Error durante la migración de la base de datos: $e');
     rethrow;

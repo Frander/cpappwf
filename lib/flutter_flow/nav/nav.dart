@@ -312,6 +312,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           name: UpdatedAPPageWidget.routeName,
           path: UpdatedAPPageWidget.routePath,
           builder: (context, params) => UpdatedAPPageWidget(),
+        ),
+        FFRoute(
+          name: ConfigVoicePageWidget.routeName,
+          path: ConfigVoicePageWidget.routePath,
+          builder: (context, params) => ConfigVoicePageWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

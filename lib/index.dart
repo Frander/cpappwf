@@ -3,7 +3,6 @@ export '/visits/do_visits_form_page/do_visits_form_page_widget.dart'
     show DoVisitsFormPageWidget;
 export '/visits/visits_with_map_page/visits_with_map_page_widget.dart'
     show VisitsWithMapPageWidget;
-export '/users_page/users_page_widget.dart' show UsersPageWidget;
 export '/login_page/login_page_widget.dart' show LoginPageWidget;
 export '/headquarters_page/headquarters_page_widget.dart'
     show HeadquartersPageWidget;
@@ -54,3 +53,5 @@ export '/configuration/information_page/information_page_widget.dart'
     show InformationPageWidget;
 export '/configuration/updated_a_p_page/updated_a_p_page_widget.dart'
     show UpdatedAPPageWidget;
+export '/configuration/config_voice_page/config_voice_page_widget.dart'
+    show ConfigVoicePageWidget;

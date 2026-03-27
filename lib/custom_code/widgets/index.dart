@@ -14,3 +14,4 @@ export 'information_form.dart' show InformationForm;
 export 'install_page.dart' show InstallPage;
 export 'printer_configuration_page.dart' show PrinterConfigurationPage;
 export 'compass_clickpalm.dart' show CompassClickpalm;
+export 'load_resources_voice_model.dart' show LoadResourcesVoiceModel;

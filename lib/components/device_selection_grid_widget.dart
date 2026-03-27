@@ -1,9 +1,11 @@
 import '/backend/api_requests/api_calls.dart';
 import '/backend/schema/structs/index.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:sqflite/sqflite.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'device_selection_grid_model.dart';
 export 'device_selection_grid_model.dart';
@@ -53,12 +55,53 @@ class _DeviceSelectionGridWidgetState
     super.dispose();
   }
 
+  /// Normaliza un mapa de dispositivo (de API o SQLite) a campos snake_case uniformes.
+  Map<String, dynamic> _normalizeDevice(Map<String, dynamic> raw) {
+    return {
+      'id_device':   raw['Id_device']   ?? raw['id_device']   ?? 0,
+      'id_company':  raw['Id_company']  ?? raw['id_company']  ?? 0,
+      'device_name': raw['Device_name'] ?? raw['device_name'] ?? '',
+      'cell_phone':  raw['Cell_phone']  ?? raw['cell_phone']  ?? raw['cellPhone'] ?? '',
+      'serial_id':   raw['Serial_id']   ?? raw['serial_id']   ?? '',
+      'imei1':       raw['Imei1']       ?? raw['imei1']       ?? raw['imeI1']     ?? '',
+      'imei2':       raw['Imei2']       ?? raw['imei2']       ?? raw['imeI2']     ?? '',
+      'model':       raw['Model']       ?? raw['model']       ?? '',
+      'state':       raw['State']       ?? raw['state']       ?? '',
+    };
+  }
+
   Future<void> _loadDevices() async {
-    setState(() {
-      _model.isLoading = true;
-    });
+    setState(() => _model.isLoading = true);
 
     try {
+      // ── 1. Intentar cargar desde SQLite ──────────────────────────────────
+      List<Map<String, dynamic>> sqliteDevices = [];
+      try {
+        final db = await globalDb.database;
+        final rows = await db.query(
+          'Devices',
+          where: 'Id_company = ?',
+          whereArgs: [widget.idCompany],
+          orderBy: 'Device_name ASC',
+        );
+        sqliteDevices = rows.map(_normalizeDevice).toList();
+        debugPrint('📦 [CTR] SQLite: ${sqliteDevices.length} dispositivos para empresa ${widget.idCompany}');
+      } catch (e) {
+        debugPrint('⚠️ [CTR] SQLite no disponible: $e');
+      }
+
+      if (sqliteDevices.isNotEmpty) {
+        // Usar datos de SQLite directamente
+        setState(() {
+          _model.devicesList = sqliteDevices;
+          _model.filteredDevicesList = List.from(sqliteDevices);
+          _model.isLoading = false;
+        });
+        return;
+      }
+
+      // ── 2. SQLite vacía → llamar API y cachear ────────────────────────────
+      debugPrint('📡 [CTR] SQLite vacía, consultando API /Devices/filters...');
       _model.apiResultDevices =
           await APIClickPalmGroup.devicesFiltersGETCall.call(
         typeSearch: 'ID COMPANY',
@@ -68,27 +111,60 @@ class _DeviceSelectionGridWidgetState
         daysToProcess: 0,
       );
 
-      if ((_model.apiResultDevices?.succeeded ?? false)) {
-        setState(() {
-          _model.devicesList = getJsonField(
-            (_model.apiResultDevices?.jsonBody ?? ''),
-            r'''$''',
-            true,
-          )!
-              .toList();
-          _model.filteredDevicesList = List.from(_model.devicesList);
-          _model.isLoading = false;
-        });
-      } else {
-        setState(() {
-          _model.isLoading = false;
-        });
+      if (!(_model.apiResultDevices?.succeeded ?? false)) {
+        setState(() => _model.isLoading = false);
         _showError('No se pudieron cargar los dispositivos');
+        return;
       }
-    } catch (e) {
+
+      final rawList = (getJsonField(
+        _model.apiResultDevices?.jsonBody ?? '',
+        r'''$''',
+        true,
+      ) as List?)?.cast<dynamic>() ?? [];
+
+      // Cachear en SQLite para uso futuro
+      try {
+        final db = await globalDb.database;
+        await db.transaction((txn) async {
+          // Limpiar registros anteriores de esta empresa
+          await txn.delete('Devices', where: 'Id_company = ?', whereArgs: [widget.idCompany]);
+          final batch = txn.batch();
+          for (final d in rawList) {
+            final map = d as Map<String, dynamic>;
+            batch.insert('Devices', {
+              'Id_device':   map['id_device']  ?? 0,
+              'Id_company':  map['id_company'] ?? widget.idCompany,
+              'Device_name': map['device_name'] ?? '',
+              'Cell_phone':  map['cellPhone'] ?? map['cell_phone'] ?? '',
+              'Serial_id':   map['serial_id'] ?? '',
+              'Imei1':       map['imeI1'] ?? map['imei1'] ?? '',
+              'Imei2':       map['imeI2'] ?? map['imei2'] ?? '',
+              'Model':       map['model'] ?? '',
+              'State':       map['state'] ?? '',
+              'Is_default':  0,
+            }, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+          await batch.commit(noResult: true);
+        });
+        debugPrint('✅ [CTR] ${rawList.length} dispositivos cacheados en SQLite');
+      } catch (e) {
+        debugPrint('⚠️ [CTR] No se pudo cachear en SQLite: $e');
+      }
+
+      // Normalizar y mostrar
+      final normalized = rawList
+          .cast<Map<String, dynamic>>()
+          .map(_normalizeDevice)
+          .toList();
+
       setState(() {
+        _model.devicesList = normalized;
+        _model.filteredDevicesList = List.from(normalized);
         _model.isLoading = false;
       });
+    } catch (e) {
+      setState(() => _model.isLoading = false);
       _showError('Error al cargar dispositivos: $e');
     }
   }
@@ -113,22 +189,24 @@ class _DeviceSelectionGridWidgetState
     });
 
     try {
-      // Convertir el JSON a DevicesStruct
+      // Convertir el JSON a DevicesStruct (ya normalizado a snake_case)
       final device = DevicesStruct(
         idDevice: deviceId,
         idCompany: deviceJson['id_company'] ?? 0,
         deviceName: deviceJson['device_name'] ?? '',
-        cellPhone: deviceJson['cellPhone'] ?? '',
+        cellPhone: deviceJson['cell_phone'] ?? '',
         serialId: deviceJson['serial_id'] ?? '',
-        imeI1: deviceJson['imeI1'] ?? '',
-        imeI2: deviceJson['imeI2'] ?? '',
+        imeI1: deviceJson['imei1'] ?? '',
+        imeI2: deviceJson['imei2'] ?? '',
         model: deviceJson['model'] ?? '',
         state: deviceJson['state'] ?? '',
       );
 
-      // Persistir el IMEI del dispositivo en el archivo
-      await _persistDeviceImei(device.imeI1);
-      if (!mounted) return;
+      // Persistir el IMEI del dispositivo en el archivo (si está disponible)
+      if (device.imeI1.isNotEmpty) {
+        await _persistDeviceImei(device.imeI1);
+        if (!mounted) return;
+      }
 
       // Mostrar mensaje de éxito
       ScaffoldMessenger.of(context).showSnackBar(
@@ -463,11 +541,13 @@ class _DeviceSelectionGridWidgetState
   }
 
   Widget _buildDeviceCard(dynamic device) {
-    final deviceName = device['device_name'] ?? 'Sin nombre';
-    final serialId = device['serial_id'] ?? 'N/A';
-    final model = device['model'] ?? 'N/A';
-    final imei1 = device['imeI1'] ?? '';
-    final state = device['state'] ?? 'Desconocido';
+    // Todos los campos ya normalizados a snake_case por _normalizeDevice()
+    final deviceName = (device['device_name'] as String?) ?? 'Sin nombre';
+    final serialId = (device['serial_id'] as String?) ?? '';
+    final model = (device['model'] as String?) ?? '';
+    final imei1 = (device['imei1'] as String?) ?? '';
+    final cellPhone = (device['cell_phone'] as String?) ?? '';
+    final state = (device['state'] as String?) ?? 'Desconocido';
 
     final isActive = state.toLowerCase() == 'activo' ||
         state.toLowerCase() == 'active';
@@ -555,14 +635,21 @@ class _DeviceSelectionGridWidgetState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildInfoRow(Icons.tag, 'Serial:', serialId),
-                      const SizedBox(height: 3),
-                      _buildInfoRow(Icons.smartphone, 'Modelo:', model),
-                      if (imei1.isNotEmpty) ...[
+                      if (serialId.isNotEmpty) ...[
+                        _buildInfoRow(Icons.tag, 'Serial:', serialId),
                         const SizedBox(height: 3),
+                      ],
+                      if (model.isNotEmpty) ...[
+                        _buildInfoRow(Icons.smartphone, 'Modelo:', model),
+                        const SizedBox(height: 3),
+                      ],
+                      if (cellPhone.isNotEmpty) ...[
+                        _buildInfoRow(Icons.phone, 'Tel:', cellPhone),
+                        const SizedBox(height: 3),
+                      ],
+                      if (imei1.isNotEmpty)
                         _buildInfoRow(Icons.numbers, 'IMEI:', imei1,
                             maxLength: 15),
-                      ],
                     ],
                   ),
                 ),

@@ -26,6 +26,10 @@ class FFAppState extends ChangeNotifier {
       _isSync = prefs.getBool('ff_isSync') ?? _isSync;
     });
     _safeInit(() {
+      final ms = prefs.getInt('ff_lastSyncBase');
+      if (ms != null) _lastSyncBase = DateTime.fromMillisecondsSinceEpoch(ms);
+    });
+    _safeInit(() {
       if (prefs.containsKey('ff_loginResponse')) {
         try {
           _loginResponse =
@@ -419,6 +423,19 @@ class FFAppState extends ChangeNotifier {
   DateTime? get lastSync => _lastSync;
   set lastSync(DateTime? value) {
     _lastSync = value;
+  }
+
+  // Fecha de la última sincronización de datos base (12 endpoints GZIP).
+  // null = nunca sincronizado (primera vez). Persistido en SharedPreferences.
+  DateTime? _lastSyncBase;
+  DateTime? get lastSyncBase => _lastSyncBase;
+  set lastSyncBase(DateTime? value) {
+    _lastSyncBase = value;
+    if (value != null) {
+      prefs.setInt('ff_lastSyncBase', value.millisecondsSinceEpoch);
+    } else {
+      prefs.remove('ff_lastSyncBase');
+    }
   }
 
   dynamic _loginResponse;

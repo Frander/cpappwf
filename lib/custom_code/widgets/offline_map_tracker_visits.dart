@@ -845,7 +845,6 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 
   final MapController _mapController = MapController();
   bool _isFollowingUser = true;
-  Timer? _updateTimer;
   PmTilesArchive? _pmtilesArchive;
   bool _isLoading = true;
   String? _errorMessage;
@@ -1065,13 +1064,6 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 
     // Listener para cambios en AppState
     FFAppState().addListener(_onLocationUpdate);
-
-    // Timer de respaldo
-    _updateTimer = Timer.periodic(const Duration(milliseconds: 1200), (_) {
-      if (mounted) {
-        setState(() {});
-      }
-    });
 
     // Inicializar sistema de navegación por voz
     _proximityOptimizer = ProximityOptimizer();
@@ -3673,7 +3665,6 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
   @override
   void dispose() {
     FFAppState().removeListener(_onLocationUpdate);
-    _updateTimer?.cancel();
     _proximityTimer?.cancel();
     _playbackTimer?.cancel(); // Cancelar timer del reproductor
     _pulseController.dispose();

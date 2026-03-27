@@ -11,11 +11,9 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:io';
-import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
-import '/app_state.dart'; // Para acceder al FFAppState
-import 'package:intl/intl.dart';
+import 'backup_storage_paths.dart'; // getBackupsRootDirectory(), findAllBackupFolders()
 
 // ============================================================================
 // ACCIÓN: RESTAURAR BACKUP COMPLETO
@@ -61,25 +59,6 @@ Future<Map<String, dynamic>> restoreBackup(String backupPath) async {
       'message': 'Error al restaurar backup: $e'
     };
   }
-}
-
-// ============================================================================
-// FUNCIÓN: OBTENER DIRECTORIO DE DOCUMENTS
-// ============================================================================
-
-Future<Directory> _getDocumentsDirectory() async {
-  if (Platform.isAndroid) {
-    // En Android, usar getExternalStorageDirectory para acceso público
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir != null) {
-      // Navegar a Documents dentro del almacenamiento externo
-      var documentsPath = externalDir.path.replaceAll('Android/data/com.clickpalm.clickpalmapp/files', 'Documents');
-      return Directory(documentsPath);
-    }
-  }
-
-  // Fallback: usar getApplicationDocumentsDirectory
-  return await getApplicationDocumentsDirectory();
 }
 
 // ============================================================================
@@ -323,45 +302,33 @@ Future<void> _restoreAppStates(Directory backupDir) async {
 // FUNCIÓN: LISTAR BACKUPS DISPONIBLES
 // ============================================================================
 
-/// Obtiene la lista de backups disponibles
+/// Obtiene la lista de backups disponibles buscando en todas las rutas accesibles.
 Future<List<Map<String, dynamic>>> listAvailableBackups() async {
   try {
-    final documentsDir = await _getDocumentsDirectory();
-    final backupsDir = Directory(path.join(documentsDir.path, 'Backups'));
-
-    if (!await backupsDir.exists()) {
-      return [];
-    }
+    // Busca en TODAS las rutas públicas accesibles (ya ordenadas por fecha desc)
+    final backupDirs = await findAllBackupFolders();
 
     final backups = <Map<String, dynamic>>[];
-    final entries = backupsDir.listSync();
 
-    for (final entry in entries) {
-      if (entry is Directory) {
-        final folderName = path.basename(entry.path);
-        
-        // Obtener info del backup
-        final infoFile = File(path.join(entry.path, 'backup_info.txt'));
-        final configFile = File(path.join(entry.path, 'backup_config.json'));
-        final dbFile = File(path.join(entry.path, 'clickpalm_database.db'));
+    for (final entry in backupDirs) {
+      final folderName = path.basename(entry.path);
+      final infoFile   = File(path.join(entry.path, 'backup_info.txt'));
+      final configFile = File(path.join(entry.path, 'backup_config.json'));
+      final dbFile     = File(path.join(entry.path, 'clickpalm_database.db'));
 
-        final dbExists = await dbFile.exists();
-        final configExists = await configFile.exists();
+      final dbExists     = await dbFile.exists();
+      final configExists = await configFile.exists();
 
-        backups.add({
-          'name': folderName,
-          'path': entry.path,
-          'hasDatabase': dbExists,
-          'hasConfig': configExists,
-          'hasInfo': await infoFile.exists(),
-          'createdTime': entry.statSync().modified,
-          'valid': dbExists && configExists,
-        });
-      }
+      backups.add({
+        'name':        folderName,
+        'path':        entry.path,
+        'hasDatabase': dbExists,
+        'hasConfig':   configExists,
+        'hasInfo':     await infoFile.exists(),
+        'createdTime': entry.statSync().modified,
+        'valid':       dbExists && configExists,
+      });
     }
-
-    // Ordenar por fecha descendente (más recientes primero)
-    backups.sort((a, b) => (b['createdTime'] as DateTime).compareTo(a['createdTime'] as DateTime));
 
     return backups;
   } catch (e) {

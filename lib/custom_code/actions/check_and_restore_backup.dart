@@ -15,6 +15,7 @@ import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import '/app_state.dart'; // Para acceder al FFAppState
+import 'backup_storage_paths.dart'; // findAllBackupFolders()
 
 // ============================================================================
 // MODELO: INFORMACIÓN DE BACKUP DISPONIBLE
@@ -48,31 +49,13 @@ class BackupInfo {
 /// Retorna la información del backup más reciente (si existe)
 Future<Map<String, dynamic>> checkAndRestoreBackup() async {
   try {
-    debugPrint('🔍 Buscando backups disponibles...');
+    debugPrint('🔍 Buscando backups disponibles en todas las rutas...');
 
-    // Obtener la carpeta de Documents
-    final documentsDir = await _getDocumentsDirectory();
-    final backupsRootDir = Directory(path.join(documentsDir.path, 'Backups'));
-
-    // Si la carpeta de backups no existe, retornar sin backups
-    if (!await backupsRootDir.exists()) {
-      debugPrint('⚠️ No existe carpeta de Backups');
-      return {
-        'hasBackup': false,
-        'backupList': [],
-        'message': 'No se encontraron backups',
-      };
-    }
-
-    // Obtener lista de carpetas de backup
-    final backupDirs = backupsRootDir
-        .listSync()
-        .whereType<Directory>()
-        .where((dir) => dir.path.contains('Backup_'))
-        .toList();
+    // Busca en TODAS las rutas públicas accesibles (no solo Documents)
+    final backupDirs = await findAllBackupFolders();
 
     if (backupDirs.isEmpty) {
-      debugPrint('⚠️ No hay carpetas de backup disponibles');
+      debugPrint('⚠️ No se encontraron carpetas de backup en ninguna ruta');
       return {
         'hasBackup': false,
         'backupList': [],
@@ -454,23 +437,6 @@ Future<void> _restoreAppStates(Directory backupDir) async {
     debugPrint('❌ Error restaurando app states: $e');
     throw Exception('No se pudieron restaurar los app states: $e');
   }
-}
-
-// ============================================================================
-// FUNCIÓN PRIVADA: OBTENER DIRECTORIO DE DOCUMENTS
-// ============================================================================
-
-Future<Directory> _getDocumentsDirectory() async {
-  if (Platform.isAndroid) {
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir != null) {
-      var documentsPath = externalDir.path.replaceAll(
-          'Android/data/com.clickpalm.clickpalmapp/files', 'Documents');
-      return Directory(documentsPath);
-    }
-  }
-
-  return await getApplicationDocumentsDirectory();
 }
 
 // ============================================================================
