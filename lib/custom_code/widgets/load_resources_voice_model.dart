@@ -17,15 +17,15 @@ import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// URL del modelo Gemma 3 1B IT INT4 (formato .task para MediaPipe / flutter_gemma)
+/// Qwen 2.5 0.5B Instruct — Apache 2.0, sin token, ~547 MB
 const String _kModelUrl =
-    'https://huggingface.co/litert-community/Gemma3-1B-IT/resolve/main/gemma3-1b-it-int4.task';
-const String _kModelFileName = 'gemma3-1b-it-int4.task';
+    'https://huggingface.co/litert-community/Qwen2.5-0.5B-Instruct/resolve/main/Qwen2.5-0.5B-Instruct_multi-prefill-seq_q8_ekv1280.task';
+const String _kModelFileName = 'qwen2.5_0.5b_q8.task';
 const String _kModelReadyKey = 'voice_model_ready';
 
 enum VoiceModelState { checking, notDownloaded, downloading, ready, error }
 
-/// Widget para gestionar la descarga del modelo IA de voz (Gemma 3 on-device).
+/// Widget para gestionar la descarga del modelo IA de voz (Qwen 2.5 on-device).
 /// Soporta modo inline (compacto, para HomePage) y modo pantalla completa
 /// (para ConfigVoicePage).
 class LoadResourcesVoiceModel extends StatefulWidget {
@@ -89,8 +89,15 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
   }
 
   Future<String> _getModelPath() async {
+    // Usar external storage para que flutter_gemma NO borre el archivo
+    // (flutter_gemma limpia solo app_flutter/ que es getApplicationDocumentsDirectory)
+    final ext = await getExternalStorageDirectory();
+    if (ext != null) return '${ext.path}/$_kModelFileName';
+    // Fallback: subdirectorio separado dentro de app_flutter
     final dir = await getApplicationDocumentsDirectory();
-    return '${dir.path}/$_kModelFileName';
+    final sub = Directory('${dir.path}/voice_models');
+    await sub.create(recursive: true);
+    return '${sub.path}/$_kModelFileName';
   }
 
   Future<void> _checkModelStatus() async {
@@ -103,7 +110,6 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
       if (ready && await file.exists()) {
         _setStateIfMounted(VoiceModelState.ready);
       } else {
-        // If prefs say ready but file is gone, reset flag
         if (ready) { await prefs.setBool(_kModelReadyKey, false); }
         _setStateIfMounted(VoiceModelState.notDownloaded);
       }
@@ -141,12 +147,36 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
       final tempPath = '$_modelPath.partial';
       final tempFile = File(tempPath);
 
+      // Resolver redirects manualmente (HuggingFace usa 302)
       _httpClient = http.Client();
-      final request = http.Request('GET', Uri.parse(_kModelUrl));
-      final response = await _httpClient!.send(request);
+      Uri url = Uri.parse(_kModelUrl);
+      http.StreamedResponse response;
+      int redirects = 0;
+      while (true) {
+        final request = http.Request('GET', url);
+        request.followRedirects = false;
+        response = await _httpClient!.send(request);
+        debugPrint('🌐 [VoiceDownload] HTTP ${response.statusCode} → $url');
+        if (response.statusCode == 301 ||
+            response.statusCode == 302 ||
+            response.statusCode == 303 ||
+            response.statusCode == 307 ||
+            response.statusCode == 308) {
+          final location = response.headers['location'];
+          if (location == null || redirects >= 10) {
+            throw Exception('Redirect sin destino o demasiados redirects');
+          }
+          // Drenar el body del redirect para liberar la conexión
+          await response.stream.drain<void>();
+          url = Uri.parse(location);
+          redirects++;
+          continue;
+        }
+        break;
+      }
 
       if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${response.statusCode} en $url');
       }
 
       _totalBytes = response.contentLength ?? 0;
@@ -213,6 +243,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
 
       // Rename temp to final
       await tempFile.rename(_modelPath);
+      debugPrint('✅ [VoiceDownload] Archivo guardado en: $_modelPath');
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kModelReadyKey, true);
@@ -224,7 +255,9 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
         });
         widget.onModelReady?.call();
       }
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('❌ [VoiceDownload] Error: $e');
+      debugPrint('❌ [VoiceDownload] Stack: $stack');
       await _fileSink?.close();
       _setErrorIfMounted('Error durante la descarga:\n$e');
     }
@@ -349,7 +382,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
                         fontSize: 18,
                         fontWeight: FontWeight.bold)),
                 SizedBox(height: 2),
-                Text('Gemma 3 · On-device · MediaPipe',
+                Text('Qwen 2.5 · On-device · MediaPipe',
                     style: TextStyle(color: Color(0xFF64748B), fontSize: 12)),
               ],
             ),
@@ -602,7 +635,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
                         fontSize: 13,
                         fontWeight: FontWeight.w600)),
                 SizedBox(height: 2),
-                Text('Gemma 3 · On-device · Activo',
+                Text('Qwen 2.5 · On-device · Activo',
                     style: TextStyle(color: Color(0xFF10B981), fontSize: 11)),
               ],
             ),
@@ -731,7 +764,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
           const SizedBox(height: 10),
 
           const Text(
-            'Modelo Gemma 3 · ~700 MB · Funciona sin internet',
+            'Modelo Qwen 2.5 · ~547 MB · Funciona sin internet',
             style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
             textAlign: TextAlign.center,
           ),
@@ -858,7 +891,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
 
           const SizedBox(height: 6),
 
-          const Text('Gemma 3 1B · Optimizado para móvil',
+          const Text('Qwen 2.5 0.5B · Optimizado para móvil',
               style: TextStyle(color: Color(0xFF64748B), fontSize: 13)),
 
           const SizedBox(height: 24),
@@ -992,7 +1025,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
 
           const SizedBox(height: 10),
 
-          const Text('Gemma 3 1B · On-device · Español colombiano',
+          const Text('Qwen 2.5 0.5B · On-device · Español colombiano',
               style: TextStyle(color: Color(0xFF64748B), fontSize: 13),
               textAlign: TextAlign.center),
 
@@ -1167,40 +1200,47 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
   Widget _buildGradientButton({
     required String label,
     required IconData icon,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
   }) {
+    final enabled = onTap != null;
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 56,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF0D9488), Color(0xFF059669)],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFF0D9488).withValues(alpha: 0.45),
-              blurRadius: 24,
-              offset: const Offset(0, 8),
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.45,
+        child: Container(
+          width: double.infinity,
+          height: 56,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0D9488), Color(0xFF059669)],
             ),
-          ],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: Colors.white, size: 22),
-            const SizedBox(width: 12),
-            Text(label,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8)),
-          ],
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: enabled
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFF0D9488).withValues(alpha: 0.45),
+                      blurRadius: 24,
+                      offset: const Offset(0, 8),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, color: Colors.white, size: 22),
+              const SizedBox(width: 12),
+              Text(label,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8)),
+            ],
+          ),
         ),
       ),
     );
   }
+
 }

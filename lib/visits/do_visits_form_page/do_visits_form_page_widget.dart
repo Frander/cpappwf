@@ -11,6 +11,7 @@ import '/components/time_picker_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import 'package:flutter/services.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import 'dart:async';
 import 'dart:ui';
 import 'dart:io';
 import 'package:nfc_manager/nfc_manager.dart';
@@ -5254,6 +5255,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       });
 
       debugPrint('✅ Visita NFC completada exitosamente. ID: $visitId');
+      unawaited(actions.announceVisitVoice());
       return true;
     } catch (e) {
       debugPrint('❌ Error creando visita NFC: $e');
@@ -5463,6 +5465,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       });
 
       debugPrint('✅ Visita QR completada exitosamente. ID: $visitId');
+      unawaited(actions.announceVisitVoice());
       return true;
     } catch (e) {
       debugPrint('❌ Error creando visita QR: $e');

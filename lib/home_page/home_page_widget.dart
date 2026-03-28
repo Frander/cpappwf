@@ -623,7 +623,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
                                 fontSize: 13,
                                 fontWeight: FontWeight.bold)),
                         SizedBox(height: 2),
-                        Text('Gemma 3 · ~700 MB · Toca para configurar',
+                        Text('Qwen 2.5 · ~547 MB · Toca para configurar',
                             style: TextStyle(
                                 color: Color(0xFFB2DFDB), fontSize: 11)),
                       ],

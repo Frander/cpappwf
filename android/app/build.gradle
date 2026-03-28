@@ -30,7 +30,7 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace "com.clickpalm.clickpalmapp"
-    compileSdkVersion 35
+    compileSdkVersion 36
     // ndkVersion = "28.2.13676358" // Comentado temporalmente para resolver problemas de build
 
     compileOptions {

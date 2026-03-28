@@ -37,9 +37,33 @@
       "Read(//e/Usuario_JUAN_DIEGO/Escritorio/DESARROLLO/CLICKPALM/CONSULTAS/**)",
       "Bash(find e:RepositoriosFixClickPalmAPP -type f -name *.db)",
       "Read(//e/RepositoriosFix/ClickPalmAPI/**)",
-      "WebFetch(domain:pub.dev)"
+      "WebFetch(domain:pub.dev)",
+      "Bash(find e:/RepositoriosFix/ClickPalmAPP -path *flutter_gemma* -name *.dart)",
+      "Read(//e/RepositoriosFix/ClickPalmAPP/$USERPROFILE/AppData/Local/Pub/Cache/hosted/**)",
+      "Bash(find e:RepositoriosFixClickPalmAPPlibcustom_codeactions -type f -name *.dart)",
+      "Bash(curl -s https://raw.githubusercontent.com/DenisovAV/flutter_gemma/main/README.md)",
+      "Bash(curl -s https://pub.dev/packages/flutter_gemma)",
+      "Bash(curl -s \"https://raw.githubusercontent.com/DenisovAV/flutter_gemma/main/example/lib/models.dart\")",
+      "Bash(curl -s \"https://raw.githubusercontent.com/DenisovAV/flutter_gemma/main/example/lib/model_list.dart\")",
+      "Bash(curl -s https://api.github.com/repos/DenisovAV/flutter_gemma/contents/example/lib)",
+      "WebFetch(domain:ai.google.dev)",
+      "Bash(dart pub:*)",
+      "Read(//e/RepositoriosFix/ClickPalmAPP/$USERPROFILE/AppData/Local/Pub/Cache/hosted/pub.dev/flutter_gemma-0.11.0/**)",
+      "Bash(taskkill /F /IM java.exe /T)",
+      "Bash(taskkill /F /IM javaw.exe /T)",
+      "Bash(taskkill //F //IM java.exe //T)",
+      "Bash(taskkill //F //IM javaw.exe //T)",
+      "Read(//e/RepositoriosFix/ClickPalmAPP/**)",
+      "Bash(find e:RepositoriosFixClickPalmAPPlibservices -type f -name *.dart)",
+      "Bash(find e:RepositoriosFixClickPalmAPP -type f -name *.dart -path */lib/* -exec grep -l \"await createVisit\\\\|actions.createVisit\" {})",
+      "Bash(2)",
+      "Bash(find ~/.pub-cache -path */flutter_gemma* -name *.dart)",
+      "Bash(find /c/Users/Juan_Diego_Duque/AppData -path *flutter_gemma* -name *.dart)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\Users\\Juan_Diego_Duque\\.gradle\\caches\\modules-2"
+    ]
   }
 }

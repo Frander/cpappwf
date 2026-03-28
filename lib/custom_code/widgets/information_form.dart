@@ -1615,6 +1615,17 @@ class _InformationFormState extends State<InformationForm>
                       ),
                       const SizedBox(height: 10),
                       _buildAdvancedOptionCard(
+                        icon: Icons.record_voice_over_rounded,
+                        title: 'Configuración de Voz',
+                        description: 'Descargar modelo IA para asistente de voz offline',
+                        color: const Color(0xFF0D9488),
+                        onTap: () {
+                          Navigator.pop(context);
+                          context.pushNamed('ConfigVoicePage');
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      _buildAdvancedOptionCard(
                         icon: Icons.system_update_alt,
                         title: 'Actualización de CTR',
                         description:

@@ -325,6 +325,8 @@ class _CalculateCoordenatesComponentWidgetState
                     ),
                   );
 
+                  unawaited(actions.announceVisitVoice());
+
                   context.pushNamed(
                     DoVisitsFormPageWidget.routeName,
                     extra: <String, dynamic>{
@@ -400,6 +402,7 @@ class _CalculateCoordenatesComponentWidgetState
                       backgroundColor: FlutterFlowTheme.of(context).primary,
                     ),
                   );
+                  unawaited(actions.announceVisitVoice());
                   Navigator.pop(context);
                   if (_shouldSetState) safeSetState(() {});
                   return;

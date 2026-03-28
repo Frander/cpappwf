@@ -71,6 +71,7 @@ export 'check_and_restore_backup.dart'
     show checkAndRestoreBackup, restoreBackupData;
 export 'diagnose_storage.dart' show diagnoseStorage;
 export 'is_new_device.dart' show isNewDevice;
+export 'announce_visit_voice.dart' show announceVisitVoice;
 export 'nfc_json_helper.dart'
     show
         buildInitialNfcJson,

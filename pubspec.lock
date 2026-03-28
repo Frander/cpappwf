@@ -65,6 +65,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.6.8"
+  background_downloader:
+    dependency: transitive
+    description:
+      name: background_downloader
+      sha256: "4cb23d9ad4f5060944f38164e7b90d4bf99b57b2472a3bd4676e59b2db4afd06"
+      url: "https://pub.dev"
+    source: hosted
+    version: "9.5.4"
   barcode:
     dependency: transitive
     description:
@@ -554,10 +562,10 @@ packages:
     dependency: "direct main"
     description:
       name: flutter_gemma
-      sha256: "685ad6bd3abe2d5f2cb7913426c4b58a16cf259f1eb0ea414a2f3a593e260a22"
+      sha256: "5f43eea786e66199ae317068665b17795a84867b83f744d5d4720dbe95f10721"
       url: "https://pub.dev"
     source: hosted
-    version: "0.3.1"
+    version: "0.11.0"
   flutter_internet_speed_test:
     dependency: "direct main"
     description:

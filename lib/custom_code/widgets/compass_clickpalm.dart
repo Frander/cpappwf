@@ -13,7 +13,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_gemma/core/model.dart';
 import 'tts_queue_manager.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 
 // ============================================================================
 // CLASES DE DATOS
@@ -66,12 +68,14 @@ class CurrentLocationDisplay {
   final double longitude;
   final DateTime timestamp;
   final double? battery;
+  final double? horizontalError;
 
   CurrentLocationDisplay({
     required this.latitude,
     required this.longitude,
     required this.timestamp,
     this.battery,
+    this.horizontalError,
   });
 
   String get formattedLatitude  => latitude.toStringAsFixed(5);
@@ -84,12 +88,55 @@ class CurrentLocationDisplay {
 // ============================================================================
 
 const String _kVoiceModelReadyKey = 'voice_model_ready';
-const String _kVoiceModelFileName = 'gemma3-1b-it-int4.task';
+const String _kVoiceModelFileName = 'qwen2.5_0.5b_q8.task';
+
+/// Resuelve la ruta del modelo fuera de app_flutter/ para que
+/// flutter_gemma no lo borre durante su limpieza de "orphaned files".
+Future<String> _resolveModelPath(String fileName) async {
+  final ext = await getExternalStorageDirectory();
+  if (ext != null) return '${ext.path}/$fileName';
+  final dir = await getApplicationDocumentsDirectory();
+  final sub = Directory('${dir.path}/voice_models');
+  await sub.create(recursive: true);
+  return '${sub.path}/$fileName';
+}
+
+/// Workaround para bug de flutter_gemma 0.11.0:
+/// registerExternalFile() graba el path externo pero NO agrega el archivo
+/// a la lista `installed_models` que verifica isModelInstalled().
+/// Sin esto, createModel() lanza "Active model is no longer installed".
+Future<void> _patchFlutterGemmaInstalled(String modelPath) async {
+  await FlutterGemmaPlugin.instance.modelManager.setModelPath(modelPath);
+  final prefs = await SharedPreferences.getInstance();
+  // flutter_gemma usa el nombre SIN extensión en installed_models
+  // (el manager lo logea como "Model qwen2.5_0.5b_q8 is ready", sin ".task")
+  final fileName = modelPath.split('/').last;
+  final modelName = fileName.endsWith('.task')
+      ? fileName.substring(0, fileName.length - 5)
+      : fileName;
+  final models = List<String>.from(prefs.getStringList('installed_models') ?? []);
+  debugPrint('🔧 [VoiceModel] installed_models actual: $models');
+  if (!models.contains(modelName)) {
+    models.add(modelName);
+    await prefs.setStringList('installed_models', models);
+    debugPrint('🔧 [VoiceModel] Patched installed_models → agregado: $modelName');
+  } else {
+    debugPrint('🔧 [VoiceModel] installed_models ya contiene: $modelName');
+  }
+}
+
+const List<int> _kMilestones        = [150, 75, 30, 10]; // metros
+const Duration  _kCooldown          = Duration(seconds: 50);
+const Duration  _kInactivityLimit   = Duration(minutes: 3);
+const double    _kInactivityMaxDist = 200.0;
 
 const String _kSystemPrompt =
     'Eres un asistente de campo para operarios de palma africana en Colombia. '
-    'Convierte datos de brújula GPS en UNA frase corta, amable y en español colombiano. '
-    'Máximo 2 oraciones. Sin símbolos especiales. Solo texto para lectura en voz alta.';
+    'Recibes datos contextuales del campo: actividad actual, visitas recientes, '
+    'puntos virtuales cercanos y zonas de exclusión. '
+    'Genera UNA respuesta corta, amable y en español colombiano. '
+    'Máximo 2 oraciones. Sin símbolos especiales. Solo texto para lectura en voz alta. '
+    'Prioriza la información más relevante para el operario en campo.';
 
 class CompassVoiceController {
   final TTSQueueManager _tts = TTSQueueManager();
@@ -99,9 +146,9 @@ class CompassVoiceController {
   bool isInferring     = false;
   bool voiceEnabled    = false;
 
-  String? _lastKey;
-  double? _lastDist;
+  String?   _lastKey;
   DateTime? _lastAt;
+  int?      _lastMilestone;
 
   final VoidCallback onStateChanged;
 
@@ -113,18 +160,19 @@ class CompassVoiceController {
       final ready = prefs.getBool(_kVoiceModelReadyKey) ?? false;
       if (!ready) return;
 
-      final dir = await getApplicationDocumentsDirectory();
-      final modelPath = '${dir.path}/$_kVoiceModelFileName';
+      final modelPath = await _resolveModelPath(_kVoiceModelFileName);
       if (!await File(modelPath).exists()) return;
 
-      await FlutterGemmaPlugin.instance.init(
+      // 1. Apuntar al archivo del modelo + parchear installed_models (bug flutter_gemma 0.11.0)
+      await _patchFlutterGemmaInstalled(modelPath);
+
+      // 2. Crear el modelo de inferencia
+      _model = await FlutterGemmaPlugin.instance.createModel(
+        modelType: ModelType.qwen,
+        fileType:  ModelFileType.task,
         maxTokens: 256,
-        temperature: 0.7,
-        topK: 40,
-        randomSeed: 42,
       );
 
-      _model = await InferenceModel.create(modelPath);
       isModelReady = true;
       onStateChanged();
     } catch (e) {
@@ -136,77 +184,83 @@ class CompassVoiceController {
     Map<String, CardinalDirection> directions,
     CurrentLocationDisplay location,
   ) async {
-    if (!voiceEnabled) return;
-    if (isInferring) return;
+    if (!voiceEnabled || isInferring) return;
 
-    // Buscar la palma más cercana con punto
     CardinalDirection? nearest;
     for (final cd in directions.values) {
       if (cd.point == null) continue;
-      if (nearest == null || cd.distanceMeters < nearest.distanceMeters) {
-        nearest = cd;
-      }
+      if (nearest == null || cd.distanceMeters < nearest.distanceMeters) nearest = cd;
     }
     if (nearest == null) return;
 
-    final newKey = 'L${nearest.point!.lineNumber}P${nearest.point!.pointNumber}';
-    final newDist = nearest.distanceMeters;
-    final now = DateTime.now();
+    final newKey           = 'L${nearest.point!.lineNumber}P${nearest.point!.pointNumber}';
+    final newDist          = nearest.distanceMeters;
+    final now              = DateTime.now();
+    final int curMilestone = _currentMilestoneIndex(newDist);
 
-    // Anti-spam: clave igual, distancia no cambió ±15m, cooldown 30s
-    final keyChanged  = newKey != _lastKey;
-    final distChanged = _lastDist == null || (newDist - _lastDist!).abs() > 15;
-    final cooldownOk  = _lastAt == null || now.difference(_lastAt!).inSeconds >= 30;
+    final bool keyChanged       = newKey != _lastKey;
+    final bool milestoneEntered = _lastMilestone == null || curMilestone > _lastMilestone!;
+    final bool cooldownOk       = _lastAt == null || now.difference(_lastAt!) >= _kCooldown;
+    final bool inactivity       = _lastAt == null ||
+        (now.difference(_lastAt!) >= _kInactivityLimit && newDist < _kInactivityMaxDist);
 
-    if (!keyChanged && !distChanged) return;
-    if (!cooldownOk) return;
+    bool shouldAnnounce = false;
+    if (inactivity) {
+      shouldAnnounce = true;                                         // fallback 3 min
+    } else if (cooldownOk) {
+      if (keyChanged) shouldAnnounce = true;                         // nueva palma
+      else if (milestoneEntered && curMilestone >= 0) shouldAnnounce = true; // zona más cercana
+    }
 
-    _lastKey  = newKey;
-    _lastDist = newDist;
-    _lastAt   = now;
+    if (!shouldAnnounce) return;
+
+    _lastKey       = newKey;
+    _lastAt        = now;
+    _lastMilestone = curMilestone;
 
     if (isModelReady && _model != null) {
-      await _announceWithLLM(directions, nearest);
+      await _announceWithLLM(directions, nearest, location);
     } else {
       _announceFallback(nearest);
     }
   }
 
+  int _currentMilestoneIndex(double dist) {
+    for (int i = _kMilestones.length - 1; i >= 0; i--) {
+      if (dist <= _kMilestones[i]) return i;
+    }
+    return -1;
+  }
+
   Future<void> _announceWithLLM(
     Map<String, CardinalDirection> directions,
     CardinalDirection nearest,
+    CurrentLocationDisplay location,
   ) async {
     isInferring = true;
     onStateChanged();
     try {
-      final lines = <String>[];
-      final dirLabels = {'N': 'Norte', 'S': 'Sur', 'E': 'Este', 'O': 'Oeste'};
-      for (final entry in directions.entries) {
-        final cd = entry.value;
-        if (cd.point != null) {
-          lines.add(
-            '${dirLabels[entry.key]}: L${cd.point!.lineNumber}P${cd.point!.pointNumber} '
-            'a ${cd.distanceMeters.toStringAsFixed(0)}m',
-          );
-        } else {
-          lines.add('${dirLabels[entry.key]}: sin palma');
+      final richContext = await _buildRichContext(directions, location);
+      final prompt      = '$_kSystemPrompt\n\n$richContext';
+
+      final session = await _model!.createSession(
+        temperature: 0.7,
+        topK:        40,
+        randomSeed:  42,
+      );
+      try {
+        await session.addQueryChunk(Message.text(text: prompt, isUser: true));
+        final response = StringBuffer();
+        await for (final token in session.getResponseAsync()) {
+          response.write(token);
         }
-      }
-      final fieldData = lines.join('\n');
-
-      final session = await _model!.createSession();
-      final prompt = '$_kSystemPrompt\n\nDatos del campo:\n$fieldData';
-      final response = StringBuffer();
-
-      await for (final token in session.getResponseAsync(prompt)) {
-        response.write(token);
-      }
-      await session.close();
-
-      final text = response.toString().trim();
-      if (text.isNotEmpty) {
-        _tts.enqueueSpeech(text, 'compass_llm', SpeechPriority.normal,
-            const Duration(seconds: 25));
+        final text = response.toString().trim();
+        if (text.isNotEmpty) {
+          _tts.enqueueSpeech(text, 'compass_llm', SpeechPriority.normal,
+              const Duration(seconds: 25));
+        }
+      } finally {
+        await session.close();
       }
     } catch (e) {
       debugPrint('⚠️ [CompassVoice] Error LLM: $e');
@@ -219,16 +273,192 @@ class CompassVoiceController {
 
   void _announceFallback(CardinalDirection nearest) {
     final dirLabel = nearest.getDirectionLabel();
-    final p = nearest.point!;
-    final dist = nearest.distanceMeters.toStringAsFixed(0);
-    final text =
+    final p        = nearest.point!;
+    final dist     = nearest.distanceMeters.toStringAsFixed(0);
+    final text     =
         'Palma al $dirLabel: línea ${p.lineNumber}, punto ${p.pointNumber}, a $dist metros.';
     _tts.enqueueSpeech(text, 'compass_fallback', SpeechPriority.normal,
         const Duration(seconds: 25));
   }
 
+  // ─── Rich context builder ─────────────────────────────────────────────────
+
+  Future<String> _buildRichContext(
+    Map<String, CardinalDirection> directions,
+    CurrentLocationDisplay location,
+  ) async {
+    final buf = StringBuffer();
+
+    // 1. UBICACIÓN Y BATERÍA
+    buf.writeln('=== POSICIÓN ACTUAL ===');
+    buf.writeln('Lat: ${location.latitude.toStringAsFixed(5)}, Lon: ${location.longitude.toStringAsFixed(5)}');
+    if (location.horizontalError != null) {
+      buf.writeln('Margen de error GPS: ±${location.horizontalError!.toStringAsFixed(1)} m');
+    }
+    if (location.battery != null) {
+      buf.writeln('Batería: ${location.battery!.toStringAsFixed(0)}%');
+    }
+
+    // 2. ACTIVIDAD ACTUAL (desde SharedPreferences)
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final actJson = prefs.getString('ff_currentActivity');
+      if (actJson != null && actJson.isNotEmpty) {
+        final act = jsonDecode(actJson) as Map<String, dynamic>?;
+        if (act != null) {
+          buf.writeln('\n=== ACTIVIDAD ACTUAL ===');
+          if (act['name_activity'] != null) buf.writeln('Nombre: ${act['name_activity']}');
+          if (act['group_activity'] != null) buf.writeln('Grupo: ${act['group_activity']}');
+          if (act['unity'] != null) buf.writeln('Unidad: ${act['unity']}');
+          if (act['module_activity'] != null) buf.writeln('Módulo: ${act['module_activity']}');
+          if (act['type_effectivity'] != null) buf.writeln('Tipo efectividad: ${act['type_effectivity']}');
+        }
+      }
+    } catch (_) {}
+
+    // 3. PUNTOS VIRTUALES CERCANOS (ya calculados por la brújula)
+    buf.writeln('\n=== PUNTOS CERCANOS POR DIRECCIÓN ===');
+    final dirLabels = {'N': 'Norte', 'S': 'Sur', 'E': 'Este', 'O': 'Oeste'};
+    for (final entry in directions.entries) {
+      final cd = entry.value;
+      final label = dirLabels[entry.key] ?? entry.key;
+      if (cd.point != null) {
+        final p = cd.point!;
+        final desc = (p.description != null && p.description!.isNotEmpty)
+            ? ' (${p.description})'
+            : '';
+        buf.writeln('$label: Línea ${p.lineNumber}, Punto ${p.pointNumber}$desc '
+            '— ${cd.distanceMeters.toStringAsFixed(0)} m');
+      } else {
+        buf.writeln('$label: Sin punto cercano');
+      }
+    }
+
+    // 4. VISITAS RECIENTES (últimas 5, con JOINs, sin IDs)
+    try {
+      final visits = await globalDb.executeOperation((db) async {
+        return await db.rawQuery('''
+          SELECT
+            v.Created_at,
+            v.State_visit,
+            v.Observations,
+            a.Name_activity,
+            a.Group_activity,
+            a.Unity,
+            h.Name_headquarter,
+            z.Name_zone,
+            (SELECT COUNT(*) FROM Visits_details vd WHERE vd.Id_visit = v.Id_visit) AS detalle_count
+          FROM Visits v
+          LEFT JOIN Activities a ON v.Id_activity = a.Id_activity
+          LEFT JOIN Headquarters h ON v.Id_headquarter = h.Id_headquarter
+          LEFT JOIN Zones z ON h.Id_zone = z.Id_zone
+          ORDER BY v.Created_at DESC
+          LIMIT 5
+        ''');
+      });
+
+      if (visits.isNotEmpty) {
+        buf.writeln('\n=== VISITAS RECIENTES ===');
+        for (final v in visits) {
+          final fecha = _formatRelativeDate(v['Created_at'] as String?);
+          final estado = v['State_visit'] ?? 'desconocido';
+          final actividad = v['Name_activity'] ?? 'sin actividad';
+          final finca = v['Name_headquarter'] ?? '';
+          final zona = v['Name_zone'] ?? '';
+          final detalles = v['detalle_count'] ?? 0;
+          buf.writeln('• $fecha — $actividad en $finca ($zona), estado: $estado, $detalles detalle(s)');
+          if (v['Observations'] != null && (v['Observations'] as String).isNotEmpty) {
+            buf.writeln('  Obs: ${v['Observations']}');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [RichContext] Error cargando visitas: $e');
+    }
+
+    // 5. ZONAS DE EXCLUSIÓN CERCANAS (<= 500 m)
+    try {
+      final zones = await globalDb.executeOperation((db) async {
+        return await db.rawQuery('''
+          SELECT hc.Coordinates_raw, h.Name_headquarter
+          FROM Headquarters_coordinates hc
+          JOIN Headquarters h ON hc.Id_headquarter = h.Id_headquarter
+          WHERE hc.Coordinates_raw IS NOT NULL AND hc.Coordinates_raw != ''
+        ''');
+      });
+
+      final List<String> nearbyExclusions = [];
+      for (final z in zones) {
+        try {
+          final raw = z['Coordinates_raw'] as String;
+          final coords = jsonDecode(raw) as List<dynamic>;
+          if (coords.isEmpty) continue;
+
+          // Centroide simple del polígono
+          double sumLat = 0, sumLon = 0;
+          int count = 0;
+          for (final c in coords) {
+            final lat = (c['latitude'] ?? c['lat']) as num?;
+            final lon = (c['longitude'] ?? c['lng'] ?? c['lon']) as num?;
+            if (lat != null && lon != null) {
+              sumLat += lat;
+              sumLon += lon;
+              count++;
+            }
+          }
+          if (count == 0) continue;
+
+          final centLat = sumLat / count;
+          final centLon = sumLon / count;
+          final dist = _haversineMeters(
+            location.latitude, location.longitude, centLat, centLon);
+
+          if (dist <= 500) {
+            final name = z['Name_headquarter'] ?? 'zona';
+            nearbyExclusions.add('$name — ${dist.toStringAsFixed(0)} m');
+          }
+        } catch (_) {}
+      }
+
+      if (nearbyExclusions.isNotEmpty) {
+        buf.writeln('\n=== ZONAS DE EXCLUSIÓN CERCANAS ===');
+        for (final ex in nearbyExclusions) {
+          buf.writeln('⚠ $ex');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [RichContext] Error cargando zonas exclusión: $e');
+    }
+
+    return buf.toString();
+  }
+
+  double _haversineMeters(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLon = (lon2 - lon1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) * math.cos(lat2 * math.pi / 180) *
+        math.sin(dLon / 2) * math.sin(dLon / 2);
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+  }
+
+  String _formatRelativeDate(String? isoDate) {
+    if (isoDate == null) return 'fecha desconocida';
+    try {
+      final dt = DateTime.parse(isoDate).toLocal();
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      if (diff.inDays == 0) return 'hoy ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      if (diff.inDays == 1) return 'ayer';
+      if (diff.inDays < 7) return 'hace ${diff.inDays} días';
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return isoDate;
+    }
+  }
+
   Future<void> dispose() async {
-    await _model?.close();
     await _tts.dispose();
   }
 }
@@ -458,10 +688,11 @@ class _CompassClickpalmState extends State<CompassClickpalm>
       final lastGeo = geoLocations.last;
       setState(() {
         _currentLocation = CurrentLocationDisplay(
-          latitude:  lastGeo.latitude,
-          longitude: lastGeo.longitude,
-          timestamp: DateTime.now(),
-          battery:   null,
+          latitude:        lastGeo.latitude,
+          longitude:       lastGeo.longitude,
+          timestamp:       DateTime.now(),
+          battery:         null,
+          horizontalError: lastGeo.errorHorizontal,
         );
       });
 
@@ -481,7 +712,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
       final database = await openDatabase(dbPath);
 
       final List<Map<String, dynamic>> results = await database.rawQuery('''
-        SELECT Latitude, Longitude, Battery
+        SELECT Latitude, Longitude, Battery, HorizontalError
         FROM Location_tracking
         ORDER BY CreatedAt DESC
         LIMIT 1
@@ -491,10 +722,11 @@ class _CompassClickpalmState extends State<CompassClickpalm>
       if (results.isNotEmpty) {
         setState(() {
           _currentLocation = CurrentLocationDisplay(
-            latitude:  (results[0]['Latitude']  as num?)?.toDouble() ?? 0.0,
-            longitude: (results[0]['Longitude'] as num?)?.toDouble() ?? 0.0,
-            timestamp: DateTime.now(),
-            battery:   (results[0]['Battery']   as num?)?.toDouble(),
+            latitude:        (results[0]['Latitude']        as num?)?.toDouble() ?? 0.0,
+            longitude:       (results[0]['Longitude']       as num?)?.toDouble() ?? 0.0,
+            timestamp:       DateTime.now(),
+            battery:         (results[0]['Battery']         as num?)?.toDouble(),
+            horizontalError: (results[0]['HorizontalError'] as num?)?.toDouble(),
           );
         });
         await _calculateCardinalDirections();
@@ -749,7 +981,16 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                     )
                   else
                     GestureDetector(
-                      onTap: () => context.pushNamed('ConfigVoicePage'),
+                      onTap: () async {
+                        // Si el modelo ya está descargado, intentar cargarlo sin navegar
+                        final prefs = await SharedPreferences.getInstance();
+                        final ready = prefs.getBool(_kVoiceModelReadyKey) ?? false;
+                        if (ready) {
+                          await _voiceController.initialize();
+                        } else {
+                          if (mounted) context.pushNamed('ConfigVoicePage');
+                        }
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
@@ -759,12 +1000,22 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                             color: const Color(0xFFF59E0B).withOpacity(0.5),
                           ),
                         ),
-                        child: const Text('DESCARGAR IA',
-                            style: TextStyle(
-                                color: Color(0xFFF59E0B),
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.5)),
+                        child: FutureBuilder<bool>(
+                          future: SharedPreferences.getInstance().then(
+                            (p) => p.getBool(_kVoiceModelReadyKey) ?? false,
+                          ),
+                          builder: (_, snap) {
+                            final downloaded = snap.data ?? false;
+                            return Text(
+                              downloaded ? 'ACTIVAR IA' : 'DESCARGAR IA',
+                              style: const TextStyle(
+                                  color: Color(0xFFF59E0B),
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5),
+                            );
+                          },
+                        ),
                       ),
                     ),
 
