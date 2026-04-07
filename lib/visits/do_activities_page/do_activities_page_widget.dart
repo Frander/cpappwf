@@ -454,14 +454,25 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                 final activitiesJSON = FFAppState().activitiesJSON;
                                 if (activitiesJSON is List) {
                                   try {
-                                    final activityJSON = activitiesJSON.firstWhere(
-                                      (a) => a is Map && a['id_activity'] == activityId,
-                                      orElse: () => null,
-                                    );
+                                    dynamic activityJSON;
+                                    for (final a in activitiesJSON) {
+                                      if (a is Map && a['id_activity'] == activityId) {
+                                        activityJSON = a;
+                                        break;
+                                      }
+                                    }
                                     if (activityJSON != null) {
-                                      FFAppState().currentActivity = activityJSON;
-                                      FFAppState().activitySelectedJSON = activityJSON;
-                                      debugPrint('✅ currentActivity refrescado desde activitiesJSON: id=$activityId');
+                                      // Solo actualizar si el currentActivity actual es de otra actividad
+                                      // o está vacío. Si ya es la misma actividad, no reemplazar para
+                                      // preservar activities_status embebidos en los steps.
+                                      final currentId = getJsonField(FFAppState().currentActivity, r'''$.id_activity''');
+                                      if (currentId != activityId) {
+                                        FFAppState().currentActivity = activityJSON;
+                                        FFAppState().activitySelectedJSON = activityJSON;
+                                        debugPrint('✅ currentActivity refrescado desde activitiesJSON: id=$activityId');
+                                      } else {
+                                        debugPrint('✅ currentActivity ya es correcto (id=$activityId), no reemplazar');
+                                      }
                                     } else {
                                       debugPrint('⚠️ Actividad $activityId no encontrada en activitiesJSON');
                                     }
@@ -478,7 +489,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               if (!mounted) return;
                               await Navigator.of(this.context).push(
                                 MaterialPageRoute(
-                                  builder: (context) => VisitsWithMapPageWidget(
+                                  builder: (context) => const VisitsWithMapPageWidget(
                                     isMapEnabled: false,
                                   ),
                                 ),

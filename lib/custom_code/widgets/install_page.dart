@@ -20,7 +20,10 @@ import 'package:dio/dio.dart';
 import 'package:install_plugin/install_plugin.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import '../actions/persistent_id_paths.dart';
+import '../actions/backup_storage_paths.dart';
 
 // ============================================================================
 // CONFIGURACIÓN DE ACTUALIZACIÓN
@@ -115,6 +118,10 @@ class _InstallPageState extends State<InstallPage>
 
   // Ruta del APK descargado
   String _apkFilePath = '';
+
+  // Desinstalación completa
+  bool _isUninstalling = false;
+  String _uninstallStatus = '';
 
   // Animaciones
   late AnimationController _animationController;
@@ -1132,19 +1139,317 @@ class _InstallPageState extends State<InstallPage>
         ),
       ),
       child: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildHeader(),
-            Expanded(
-              child: _isLoading
-                  ? _buildLoadingScreen()
-                  : _hasError
-                      ? _buildErrorScreen()
-                      : _downloadComplete
-                          ? _buildCompleteScreen()
-                          : _isDownloading
-                              ? _buildDownloadingScreen()
-                              : _buildUpdateAvailableScreen(),
+            Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: _isLoading
+                      ? _buildLoadingScreen()
+                      : _hasError
+                          ? _buildErrorScreen()
+                          : _downloadComplete
+                              ? _buildCompleteScreen()
+                              : _isDownloading
+                                  ? _buildDownloadingScreen()
+                                  : _buildUpdateAvailableScreen(),
+                ),
+              ],
+            ),
+            _buildUninstallingOverlay(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // DESINSTALACIÓN COMPLETA
+  // ──────────────────────────────────────────────────────────────────────────
+
+  Future<void> _showCompleteUninstallDialog() async {
+    // Primera confirmación
+    final first = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A0A0A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: const [
+            Icon(Icons.warning_rounded, color: Color(0xFFFF5252), size: 28),
+            SizedBox(width: 10),
+            Text('Desinstalación Completa',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Se eliminarán permanentemente:',
+                  style: TextStyle(color: Color(0xFFFF8A80), fontWeight: FontWeight.w600)),
+              const SizedBox(height: 12),
+              ...[
+                '• Todos los datos de sesión y configuración',
+                '• Base de datos SQLite (visitas, puntos, etc.)',
+                '• ID de dispositivo persistente',
+                '• Todos los backups guardados',
+                '• Modelo de voz IA (Gemma)',
+                '• Mapas descargados (pmtiles)',
+              ].map((t) => Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Text(t, style: const TextStyle(color: Color(0xFFBBBBBB), fontSize: 13)),
+              )),
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF5252).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFF5252).withValues(alpha: 0.4)),
+                ),
+                child: const Text(
+                  '⚠️ Esta acción no se puede deshacer.',
+                  style: TextStyle(color: Color(0xFFFF5252), fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: Color(0xFF888888))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF5252)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Continuar', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (first != true || !mounted) return;
+
+    // Segunda confirmación
+    final second = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A0A0A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('¿Completamente seguro?',
+            style: TextStyle(color: Color(0xFFFF5252), fontWeight: FontWeight.bold)),
+        content: const Text(
+          'Esta es su última oportunidad. Todos los archivos y datos de la aplicación serán eliminados de forma irreversible.',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('No, cancelar', style: TextStyle(color: Color(0xFF888888))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB71C1C)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('SÍ, ELIMINAR TODO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+
+    if (second != true || !mounted) return;
+    await _performCompleteUninstall();
+  }
+
+  Future<void> _performCompleteUninstall() async {
+    if (!mounted) return;
+    setState(() {
+      _isUninstalling = true;
+      _uninstallStatus = 'Limpiando preferencias...';
+    });
+
+    try {
+      // 1. SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      _setStatus('Reiniciando estado de la app...');
+
+      // 2. FFAppState en memoria
+      FFAppState().update(() {
+        FFAppState().isSync = false;
+        FFAppState().loginResponse = null;
+        FFAppState().userSelected = UsersStruct();
+        FFAppState().companyDefault = CompaniesStruct();
+        FFAppState().deviceDefault = DevicesStruct();
+        FFAppState().activityDefault = ActivitiesStruct();
+        FFAppState().activitySelected = ActivitiesStruct();
+        FFAppState().headquarterSelected = HeadquartersStruct();
+        FFAppState().headquartersList = [];
+        FFAppState().productsList = [];
+        FFAppState().usersList = [];
+        FFAppState().zonesList = [];
+        FFAppState().visitsAdd = [];
+        FFAppState().pathDatabase = '';
+        FFAppState().androidID = '';
+        FFAppState().isCalibrateVoice = false;
+        FFAppState().calibrateCompass = false;
+        FFAppState().listVoiceCalibration = [];
+        FFAppState().currentActivity = null;
+        FFAppState().pathPmtiles = ' ';
+        FFAppState().geoLocationsList = [];
+        FFAppState().visitDetails = [];
+        FFAppState().headquartersSelectedList = [];
+        FFAppState().newsList = [];
+        FFAppState().newsSelected = [];
+        FFAppState().activitiesStatusSelected = [];
+        FFAppState().newsAdd = [];
+        FFAppState().StatusAdd = [];
+        FFAppState().lastLineInstall = 0;
+        FFAppState().lastPalmInstall = 0;
+      });
+
+      // 3. Base de datos SQLite — eliminar carpeta ClickPalmData completa
+      _setStatus('Eliminando base de datos...');
+      try {
+        final extDir = await getExternalStorageDirectory();
+        if (extDir != null) {
+          final dbFolder = Directory('${extDir.path}/ClickPalmData');
+          if (await dbFolder.exists()) await dbFolder.delete(recursive: true);
+        }
+      } catch (e) {
+        debugPrint('⚠️ [uninstall] Error borrando ClickPalmData: $e');
+      }
+
+      // 4. persistent_id.txt en todas las rutas accesibles
+      _setStatus('Eliminando ID de dispositivo...');
+      try {
+        final paths = await discoverWritablePaths();
+        for (final dirPath in paths.values) {
+          final file = File('$dirPath/persistent_id.txt');
+          if (await file.exists()) await file.delete();
+        }
+      } catch (e) {
+        debugPrint('⚠️ [uninstall] Error borrando persistent_id: $e');
+      }
+
+      // 5. Backups en todas las rutas
+      _setStatus('Eliminando backups...');
+      try {
+        final backupFolders = await findAllBackupFolders();
+        for (final folder in backupFolders) {
+          if (await folder.exists()) await folder.delete(recursive: true);
+        }
+        // También eliminar carpetas Backups/ raíz vacías
+        final paths = await discoverWritablePaths();
+        for (final dirPath in paths.values) {
+          final backupsRoot = Directory('$dirPath/Backups');
+          if (await backupsRoot.exists()) await backupsRoot.delete(recursive: true);
+        }
+      } catch (e) {
+        debugPrint('⚠️ [uninstall] Error borrando backups: $e');
+      }
+
+      // 6. Modelo de voz Gemma
+      _setStatus('Eliminando modelo de IA...');
+      try {
+        final appDocsDir = await getApplicationDocumentsDirectory();
+        final modelFile = File('${appDocsDir.path}/gemma3-1b-it-int4.task');
+        if (await modelFile.exists()) await modelFile.delete();
+      } catch (e) {
+        debugPrint('⚠️ [uninstall] Error borrando modelo Gemma: $e');
+      }
+
+      // 7. Archivo pmtiles
+      _setStatus('Eliminando mapas...');
+      try {
+        final pmtilesPath = FFAppState().pathPmtiles.trim();
+        if (pmtilesPath.isNotEmpty) {
+          final f = File(pmtilesPath);
+          if (await f.exists()) await f.delete();
+        }
+      } catch (e) {
+        debugPrint('⚠️ [uninstall] Error borrando pmtiles: $e');
+      }
+
+      // 8. APK descargado previamente
+      try {
+        if (_apkFilePath.isNotEmpty) {
+          final apk = File(_apkFilePath);
+          if (await apk.exists()) await apk.delete();
+        }
+      } catch (e) {
+        debugPrint('⚠️ [uninstall] Error borrando APK: $e');
+      }
+
+      if (!mounted) return;
+      setState(() { _isUninstalling = false; _uninstallStatus = ''; });
+
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: const Color(0xFF0A1F0A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: const [
+              Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 28),
+              SizedBox(width: 10),
+              Text('Limpieza Completa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: const Text(
+            'Todos los datos han sido eliminados correctamente.\n\n'
+            'Ahora puede desinstalar la aplicación desde:\n'
+            'Configuración → Aplicaciones → ClickPalm APP → Desinstalar',
+            style: TextStyle(color: Colors.white70, height: 1.5),
+          ),
+          actions: [
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00E676)),
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Entendido', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ [uninstall] Error general: $e');
+      if (mounted) {
+        setState(() { _isUninstalling = false; _uninstallStatus = ''; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error durante la limpieza: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _setStatus(String msg) {
+    if (mounted) setState(() => _uninstallStatus = msg);
+    debugPrint('🗑️ [uninstall] $msg');
+  }
+
+  Widget _buildUninstallingOverlay() {
+    if (!_isUninstalling) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.75),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const CircularProgressIndicator(color: Color(0xFFFF5252), strokeWidth: 3),
+            const SizedBox(height: 24),
+            const Text('Eliminando datos...',
+                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(_uninstallStatus,
+                  style: const TextStyle(color: Color(0xFFAAAAAA), fontSize: 13),
+                  textAlign: TextAlign.center),
             ),
           ],
         ),
@@ -1211,6 +1516,11 @@ class _InstallPageState extends State<InstallPage>
                 ),
               ],
             ),
+          ),
+          IconButton(
+            onPressed: _isUninstalling ? null : _showCompleteUninstallDialog,
+            icon: const Icon(Icons.delete_forever_rounded, color: Color(0xFFFF5252)),
+            tooltip: 'Desinstalación Completa',
           ),
           IconButton(
             onPressed: () => Navigator.pop(context),

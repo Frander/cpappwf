@@ -302,10 +302,53 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     });
   }
 
+  /// Obtiene puntos válidos desde AppState con un umbral de error configurable.
+  Future<List<GPSPoint>> _getValidPointsFromAppState({double maxError = _maxHorizontalError}) async {
+    final geoList = FFAppState().geoLocationsList;
+    if (geoList.isEmpty) return [];
+
+    int batteryLevel = 100;
+    try {
+      batteryLevel = await Battery().batteryLevel;
+    } catch (_) {}
+
+    return geoList
+        .map((g) => GPSPoint(
+              latitude: g.latitude,
+              longitude: g.longitude,
+              altitude: g.altitude,
+              horizontalError: g.errorHorizontal,
+              createdAt: g.dateHourRead ?? DateTime.now().toUtc(),
+              battery: batteryLevel,
+            ))
+        .where((p) => p.horizontalError <= maxError)
+        .toList();
+  }
+
+  /// Obtiene puntos válidos desde SQLite Location_tracking con un umbral configurable.
+  Future<List<GPSPoint>> _getValidPointsFromSQLite({int limit = 8, double maxError = _maxHorizontalError}) async {
+    try {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) return [];
+      final dbPath = path.join('${externalDir.path}/ClickPalmData', 'clickpalm_database.db');
+      final database = await openDatabase(dbPath);
+      final results = await database.rawQuery('''
+        SELECT Latitude, Longitude, Altitude, HorizontalError, Battery, CreatedAt
+        FROM Location_tracking
+        WHERE HorizontalError <= ?
+        ORDER BY CreatedAt DESC
+        LIMIT $limit
+      ''', [maxError]);
+      await database.close();
+      return results.map((row) => GPSPoint.fromMap(row)).toList();
+    } catch (e) {
+      debugPrint('⚠️ Error leyendo SQLite en _getValidPointsFromSQLite: $e');
+      return [];
+    }
+  }
+
   Future<void> _checkGPSPoints() async {
-    debugPrint('🌐🌐🌐 ========================================');
     debugPrint('🌐🌐🌐 INICIO DE _checkGPSPoints()');
-    debugPrint('🌐🌐🌐 ========================================');
 
     setState(() {
       _isWaiting = true;
@@ -313,156 +356,83 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       _elapsedSeconds = 0;
     });
 
-    debugPrint('🔍 Estado cambiado: _isWaiting = true');
-
     try {
-      final startTime = DateTime.now();
-      int attemptNumber = 0;
+      // ── PASO 1: AppState inmediato ──────────────────────────────────────────
+      debugPrint('📍 PASO 1: Revisando AppState...');
+      _gpsPoints = await _getValidPointsFromAppState();
+      if (_gpsPoints.isNotEmpty) {
+        debugPrint('✅ RUTA 1 (AppState): ${_gpsPoints.length} punto(s) válido(s)');
+        _updateValidPoints();
+        await _createVisit();
+        return;
+      }
 
-      while (true) {
-        attemptNumber++;
-        final elapsedSeconds = DateTime.now().difference(startTime).inSeconds;
+      // ── PASO 2: SQLite inmediato (sin esperar) ──────────────────────────────
+      debugPrint('📍 PASO 2: AppState sin puntos válidos → consultando SQLite inmediatamente...');
+      setState(() { _statusMessage = 'Buscando historial GPS...'; });
+      _gpsPoints = await _getValidPointsFromSQLite();
+      if (_gpsPoints.isNotEmpty) {
+        debugPrint('✅ RUTA 2 (SQLite inmediato): ${_gpsPoints.length} punto(s) válido(s)');
+        _updateValidPoints();
+        await _createVisit();
+        return;
+      }
+
+      // ── PASO 3: Loop corto de 15s revisando AppState + SQLite ───────────────
+      debugPrint('📍 PASO 3: Sin puntos aún → loop de espera máx 15s...');
+      setState(() { _statusMessage = 'Esperando señal GPS...'; });
+      final startWait = DateTime.now();
+      while (DateTime.now().difference(startWait).inSeconds < 15) {
+        await Future.delayed(const Duration(seconds: 2));
+        if (!mounted) return;
 
         setState(() {
-          _elapsedSeconds = elapsedSeconds;
+          _elapsedSeconds = DateTime.now().difference(startWait).inSeconds;
         });
 
-        if (elapsedSeconds >= _maxWaitTimeSeconds) {
-          debugPrint('⏱️ Timeout de $_maxWaitTimeSeconds segundos alcanzado.');
-          break;
-        }
-
-        final geoLocationsList = FFAppState().geoLocationsList;
-        debugPrint('📍 [Intento $attemptNumber] Puntos GPS en AppState: ${geoLocationsList.length}');
-
-        if (geoLocationsList.isNotEmpty) {
-          final battery = Battery();
-          int batteryLevel = 100;
-          try {
-            batteryLevel = await battery.batteryLevel;
-          } catch (e) {
-            debugPrint('⚠️ No se pudo obtener nivel de batería: $e');
-          }
-
-          final allPoints = geoLocationsList.map((geoStruct) {
-            return GPSPoint(
-              latitude: geoStruct.latitude,
-              longitude: geoStruct.longitude,
-              altitude: geoStruct.altitude,
-              horizontalError: geoStruct.errorHorizontal,
-              createdAt: geoStruct.dateHourRead ?? DateTime.now().toUtc(),
-              battery: batteryLevel,
-            );
-          }).toList();
-
-          _gpsPoints = allPoints
-              .where((point) => point.horizontalError <= _maxHorizontalError)
-              .toList();
-
-          setState(() {
-            _validPoints = _gpsPoints.length;
-            if (_gpsPoints.isNotEmpty) {
-              _currentBestError = _gpsPoints.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b);
-            }
-          });
-
-          if (_gpsPoints.length >= 1) {
-            debugPrint('✅ Suficientes puntos precisos obtenidos (${_gpsPoints.length} >= 1)');
-            debugPrint('📍 RUTA 1: Llamando _createVisit() desde AppState geoLocationsList...');
-            await _createVisit();
-            return;
-          }
-
-          setState(() {
-            _statusMessage = 'Esperando señal GPS precisa...';
-          });
-
-          await Future.delayed(const Duration(seconds: _retryIntervalSeconds));
-          if (!mounted) return;
-          continue;
-        } else {
-          setState(() {
-            _statusMessage = 'Buscando señal GPS...';
-          });
-
-          await Future.delayed(const Duration(seconds: _retryIntervalSeconds));
-          if (!mounted) return;
-          continue;
-        }
-      }
-
-      // Estrategia 2: SQLite
-      debugPrint('⚠️ Timeout alcanzado, intentando SQLite...');
-
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        throw Exception('No se pudo acceder al almacenamiento externo');
-      }
-      final String pathStr = '${externalDir.path}/ClickPalmData';
-      final dbPath = path.join(pathStr, 'clickpalm_database.db');
-
-      final database = await openDatabase(dbPath);
-
-      final List<Map<String, dynamic>> results = await database.rawQuery('''
-        SELECT Latitude, Longitude, Altitude, HorizontalError, Battery, CreatedAt
-        FROM Location_tracking
-        WHERE HorizontalError <= ?
-        ORDER BY CreatedAt DESC
-        LIMIT 8
-      ''', [_maxHorizontalError]);
-
-      await database.close();
-
-      final allPointsFromDB = results.map((row) => GPSPoint.fromMap(row)).toList();
-      _gpsPoints = allPointsFromDB
-          .where((point) => point.horizontalError <= _maxHorizontalError)
-          .toList();
-
-      setState(() {
-        _validPoints = _gpsPoints.length;
+        _gpsPoints = await _getValidPointsFromAppState();
+        if (_gpsPoints.isEmpty) _gpsPoints = await _getValidPointsFromSQLite();
         if (_gpsPoints.isNotEmpty) {
-          _currentBestError = _gpsPoints.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b);
-        }
-      });
-
-      if (_gpsPoints.length >= 2) {
-        debugPrint('✅ Usando puntos de SQLite');
-        debugPrint('📍 RUTA 2: Llamando _createVisit() desde SQLite Location_tracking...');
-        await _createVisit();
-      } else {
-        _retryAttempts++;
-
-        if (_retryAttempts >= _maxRetryAttempts) {
-          debugPrint('⚠️ Usando fallback de geolocator...');
-          setState(() {
-            _statusMessage = 'Obteniendo GPS directo del dispositivo...';
-          });
-          await _getGPSFromGeolocator();
+          debugPrint('✅ RUTA 3 (loop ${_elapsedSeconds}s): ${_gpsPoints.length} punto(s) válido(s)');
+          _updateValidPoints();
+          await _createVisit();
           return;
         }
-
-        setState(() {
-          _statusMessage = 'Reintentando obtener coordenadas...';
-        });
-
-        _countdown = 5;
-        await Future.delayed(const Duration(seconds: 2));
-
-        if (mounted) {
-          setState(() {
-            _isWaiting = false;
-          });
-          _startCountdown();
-        }
       }
+
+      // ── PASO 4: Relajar umbral a 20m y usar lo mejor disponible ────────────
+      debugPrint('📍 PASO 4: Sin puntos ≤10m → relajando umbral a 20m...');
+      setState(() { _statusMessage = 'Usando mejor señal disponible...'; });
+      _gpsPoints = await _getValidPointsFromAppState(maxError: 20.0);
+      if (_gpsPoints.isEmpty) _gpsPoints = await _getValidPointsFromSQLite(maxError: 20.0);
+      if (_gpsPoints.isNotEmpty) {
+        debugPrint('✅ RUTA 4 (umbral 20m): ${_gpsPoints.length} punto(s)');
+        _updateValidPoints();
+        await _createVisit();
+        return;
+      }
+
+      // ── PASO 5: Fallback Geolocator directo ────────────────────────────────
+      debugPrint('⚠️ PASO 5: Fallback Geolocator directo...');
+      setState(() { _statusMessage = 'Obteniendo GPS directo del dispositivo...'; });
+      await _getGPSFromGeolocator();
     } catch (e) {
-      debugPrint('❌ Error verificando puntos GPS: $e');
+      debugPrint('❌ Error en _checkGPSPoints: $e');
       setState(() {
         _hasError = true;
         _errorMessage = 'Error al obtener coordenadas GPS:\n$e';
         _isWaiting = false;
       });
     }
+  }
+
+  void _updateValidPoints() {
+    setState(() {
+      _validPoints = _gpsPoints.length;
+      if (_gpsPoints.isNotEmpty) {
+        _currentBestError = _gpsPoints.map((p) => p.horizontalError).reduce((a, b) => a < b ? a : b);
+      }
+    });
   }
 
   Future<void> _getGPSFromGeolocator() async {

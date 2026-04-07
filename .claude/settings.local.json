@@ -58,7 +58,10 @@
       "Bash(find e:RepositoriosFixClickPalmAPP -type f -name *.dart -path */lib/* -exec grep -l \"await createVisit\\\\|actions.createVisit\" {})",
       "Bash(2)",
       "Bash(find ~/.pub-cache -path */flutter_gemma* -name *.dart)",
-      "Bash(find /c/Users/Juan_Diego_Duque/AppData -path *flutter_gemma* -name *.dart)"
+      "Bash(find /c/Users/Juan_Diego_Duque/AppData -path *flutter_gemma* -name *.dart)",
+      "Bash(find e:/RepositoriosFix/ClickPalmAPP/lib/custom_code -type f -name *tts* -o -name *TTSQueue*)",
+      "Bash(ls -1 /e/RepositoriosFix/ClickPalmAPP/lib/custom_code/actions/*.dart)",
+      "Read(//c/Users/JUAN_D~1/AppData/Local/Temp/claude/e--RepositoriosFix-ClickPalmAPP/2578ff06-7cc1-43f2-84d4-4c11b179eac2/tasks/**)"
     ],
     "deny": [],
     "ask": [],

@@ -328,25 +328,14 @@ class _HomePageWidgetState extends State<HomePageWidget>
       // Procesar todos EXCEPTO el último para evitar duplicados en el próximo ciclo
       final locationsToProcess = allLocations.sublist(0, allLocations.length - 1);
 
-      debugPrint('🔄 Procesando ${locationsToProcess.length} ubicaciones (guardando última para próximo ciclo)...');
-      debugPrint('   Total en AppState: ${allLocations.length} | A procesar: ${locationsToProcess.length} | Quedarán: 1');
-
       // Depurar las ubicaciones a procesar (agrupar puntos dentro de 2 metros)
       final depurados = _depurarGeolocalizaciones(locationsToProcess);
-
-      debugPrint(
-          '📊 Depuración: ${locationsToProcess.length} registros → ${depurados.length} grupos');
 
       // Insertar a SQLite
       await _insertDepuradosToSQLite(depurados);
 
       // Limpiar solo los procesados, mantener el último
       FFAppState().geoLocationsList = [allLocations.last];
-
-      debugPrint('✅ Procesamiento completado.');
-      debugPrint('   ✓ ${locationsToProcess.length} registros procesados e insertados en SQLite');
-      debugPrint('   ✓ Último punto GPS mantenido en AppState para próximo ciclo');
-      debugPrint('   ✓ geoLocationsList ahora tiene: ${FFAppState().geoLocationsList.length} registro(s)');
     } catch (e) {
       debugPrint('❌ Error en _processAndInsertLocations: $e');
     }

@@ -214,6 +214,7 @@ Future<String> readNFC(
                 .map((byte) => byte.toRadixString(16).toUpperCase().padLeft(2, '0'))
                 .join('');
             debugPrint('📍 TAG ID: $tagId');
+            FFAppState().nfcHardwareTagId = tagId;
           } else {
             debugPrint('⚠️ No se pudo obtener el ID del TAG');
           }
@@ -304,6 +305,7 @@ Future<String> readNFC(
                       final productName = productResults.first['Name_product'] as String?;
 
                       debugPrint('✅ TAG-TRANSFER: Producto origen encontrado: $productName (Tipo: $productType)');
+                      FFAppState().nfcLastProductName = productName ?? '';
 
                       if ((productType ?? '').toLowerCase().trim() != requiredProductType.toLowerCase().trim()) {
                         debugPrint('❌ TAG-TRANSFER: Tipo de producto de origen no coincide');
@@ -378,16 +380,30 @@ Future<String> readNFC(
 Future<bool> _eraseTagInSession(NfcTag tag) async {
   debugPrint('🧹 _eraseTagInSession: iniciando borrado en sesión activa...');
 
-  // 1. Intentar como NDEF (tag ya formateado)
+  final minimalMsg = _createMinimalNdefMessage();
+
+  // 1. Intentar como NDEF (tag ya formateado — Mifare Classic 4K con NDEF mapping)
   final ndef = Ndef.from(tag);
+  debugPrint('🔍 Ndef.from(tag): ${ndef != null ? "OK (isWritable=${ndef.isWritable}, maxSize=${ndef.maxSize})" : "null"}');
+
   if (ndef != null) {
     if (ndef.isWritable) {
+      // Intento 1
       try {
-        await ndef.write(message: _createMinimalNdefMessage());
-        debugPrint('✅ TAG borrado como NDEF ("0")');
+        await ndef.write(message: minimalMsg);
+        debugPrint('✅ TAG borrado como NDEF intento 1 ("0")');
         return true;
       } catch (e) {
-        debugPrint('⚠️ Error borrando como NDEF: $e');
+        debugPrint('⚠️ Error NDEF intento 1: $e — reintentando en 300ms...');
+      }
+      // Intento 2 con pequeña pausa (permite que Android NFC stack se resetee)
+      await Future.delayed(const Duration(milliseconds: 300));
+      try {
+        await ndef.write(message: minimalMsg);
+        debugPrint('✅ TAG borrado como NDEF intento 2 ("0")');
+        return true;
+      } catch (e) {
+        debugPrint('⚠️ Error NDEF intento 2: $e');
       }
     } else {
       debugPrint('⚠️ TAG NDEF de solo lectura — no se puede borrar');
@@ -395,11 +411,12 @@ Future<bool> _eraseTagInSession(NfcTag tag) async {
     }
   }
 
-  // 2. Intentar como NdefFormatable (tag virgen sin formato NDEF)
+  // 2. Intentar como NdefFormatable (tag sin NDEF mapping)
   final ndefFormatable = NdefFormatableAndroid.from(tag);
+  debugPrint('🔍 NdefFormatable.from(tag): ${ndefFormatable != null ? "OK" : "null"}');
   if (ndefFormatable != null) {
     try {
-      await ndefFormatable.format(_createMinimalNdefMessage());
+      await ndefFormatable.format(minimalMsg);
       debugPrint('✅ TAG formateado y borrado (NdefFormatable)');
       return true;
     } catch (e) {
@@ -407,63 +424,67 @@ Future<bool> _eraseTagInSession(NfcTag tag) async {
     }
   }
 
-  // 3. Intentar MifareClassic bajo nivel (sectores 0-3)
+  // 3. Mifare Classic raw — SOLO como último recurso y de forma segura:
+  //    Escribir el payload NDEF ("0") en los bloques de datos conservando
+  //    el TLV header de NDEF intacto (sector 1 bloque 4).
+  //    NO se zerean los bloques — se escribe el mensaje NDEF serializado correctamente.
   final mifareClassic = MifareClassicAndroid.from(tag);
+  debugPrint('🔍 MifareClassic.from(tag): ${mifareClassic != null ? "OK" : "null"}');
   if (mifareClassic != null) {
-    final key = Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
-    final emptyBlock = Uint8List(16);
-    int blocksCleared = 0;
-    bool tagLost = false;
-
-    // Sector 0: bloques 1 y 2 (bloque 0 = fabricante, bloque 3 = trailer de sector)
     try {
-      await mifareClassic.authenticateSectorWithKeyA(sectorIndex: 0, key: key);
-      for (var b = 1; b <= 2 && !tagLost; b++) {
-        try {
-          await mifareClassic.writeBlock(blockIndex: b, data: emptyBlock);
-          blocksCleared++;
-        } catch (e) {
-          if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
-            tagLost = true;
-          }
+      debugPrint('📝 Intentando borrado MifareClassic raw con NDEF payload válido...');
+      final key = Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+
+      // Serializar el mensaje NDEF correctamente con TLV wrapper
+      // Formato: 0x03 [length] [ndef payload] 0xFE
+      final ndefPayloadBytes = _serializeNdefMessage(minimalMsg);
+      debugPrint('   Payload NDEF serializado: ${ndefPayloadBytes.length} bytes');
+
+      // Escribir solo en sector 1 bloques 0-2 (donde NDEF mapping pone los datos en MC4K)
+      // Sector 1 = bloques 4, 5, 6 (bloque 7 = trailer, no tocar)
+      await mifareClassic.authenticateSectorWithKeyA(sectorIndex: 1, key: key);
+
+      int offset = 0;
+      for (var blockInSector = 0; blockInSector <= 2; blockInSector++) {
+        final blockIndex = 4 + blockInSector;
+        final blockData = Uint8List(16);
+        final end = (offset + 16 < ndefPayloadBytes.length) ? offset + 16 : ndefPayloadBytes.length;
+        if (offset < ndefPayloadBytes.length) {
+          blockData.setRange(0, end - offset, ndefPayloadBytes, offset);
         }
+        await mifareClassic.writeBlock(blockIndex: blockIndex, data: blockData);
+        offset += 16;
+        debugPrint('   Bloque $blockIndex escrito');
       }
+
+      debugPrint('✅ TAG borrado por MifareClassic raw (NDEF payload intacto)');
+      return true;
     } catch (e) {
-      if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
-        tagLost = true;
-      }
+      debugPrint('⚠️ Error borrado MifareClassic raw: $e');
     }
-
-    // Sectores 1-3: bloques 0, 1, 2 de cada sector (bloque 3 es trailer, no tocar)
-    for (var sector = 1; sector <= 3 && !tagLost; sector++) {
-      try {
-        await mifareClassic.authenticateSectorWithKeyA(sectorIndex: sector, key: key);
-      } catch (e) {
-        if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
-          tagLost = true;
-          break;
-        }
-        continue;
-      }
-      for (var blockInSector = 0; blockInSector <= 2 && !tagLost; blockInSector++) {
-        final blockIndex = (sector * 4) + blockInSector;
-        try {
-          await mifareClassic.writeBlock(blockIndex: blockIndex, data: emptyBlock);
-          blocksCleared++;
-        } catch (e) {
-          if (e.toString().contains('TagLost') || e.toString().contains('IOException')) {
-            tagLost = true;
-          }
-        }
-      }
-    }
-
-    debugPrint('MifareClassic: $blocksCleared bloques borrados${tagLost ? " (TAG perdido antes de terminar)" : ""}');
-    return blocksCleared > 0;
   }
 
-  debugPrint('❌ Tipo de TAG no soportado para borrado en sesión');
+  debugPrint('❌ No se pudo borrar el TAG — ningún método disponible');
   return false;
+}
+
+/// Serializa un NdefMessage al formato TLV usado en Mifare Classic NDEF mapping.
+/// Formato: 0x03 [len] [records...] 0xFE
+Uint8List _serializeNdefMessage(NdefMessage message) {
+  // Serializar cada record manualmente
+  final recordBytes = <int>[];
+  for (final record in message.records) {
+    // NDEF Short Record: MB=1, ME=1, SR=1, TNF=wellKnown(0x01)
+    const tnf = 0x01;
+    const flags = 0xD1; // MB | ME | SR | TNF=wellKnown
+    recordBytes.add(flags);
+    recordBytes.add(record.type.length);        // Type length
+    recordBytes.add(record.payload.length);     // Payload length (short record = 1 byte)
+    recordBytes.addAll(record.type);
+    recordBytes.addAll(record.payload);
+  }
+  // TLV wrapper: T=0x03, L=[length], V=[records], T=0xFE (terminator)
+  return Uint8List.fromList([0x03, recordBytes.length, ...recordBytes, 0xFE]);
 }
 
 /// Crea un mensaje NDEF mínimo con contenido "0"

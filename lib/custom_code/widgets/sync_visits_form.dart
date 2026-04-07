@@ -79,9 +79,11 @@ class ProductSummary {
   int idProduct;
   int idHeadquarter;
   int idCompany;
+  int? idType;
   String? nameProduct;
   String? typeProduct;
   String? rfid;
+
   String? stateProduct;
   String? descriptionProduct;
   int? line;
@@ -96,6 +98,7 @@ class ProductSummary {
     required this.idProduct,
     required this.idHeadquarter,
     required this.idCompany,
+    this.idType,
     this.nameProduct,
     this.typeProduct,
     this.rfid,
@@ -841,6 +844,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           Type_product,
           Name_product,
           Rfid,
+          Id_rfid,
           State_product,
           Description_product,
           Location_raw,
@@ -879,9 +883,11 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           idProduct: idProduct,
           idHeadquarter: row['Id_headquarter'] as int,
           idCompany: row['Id_company'] as int,
+          idType: row['Id_type'] as int?,
           nameProduct: row['Name_product'] as String?,
           typeProduct: row['Type_product'] as String?,
           rfid: row['Rfid'] as String?,
+
           stateProduct: row['State_product'] as String?,
           descriptionProduct: row['Description_product'] as String?,
           line: row['Line'] as int?,
@@ -1089,12 +1095,13 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
 
           // Preparar el payload según ProductsInputDTO del API
           final Map<String, dynamic> productPayload = {
-            'id_product': product.idProduct,
+            'id_product': product.syncStatus == 'new' ? 0 : product.idProduct,
             'id_headquarter': product.idHeadquarter,
             'id_company': product.idCompany,
+            'id_type': product.idType ?? 0,
             'name_product': product.nameProduct ?? '',
             'type_product': product.typeProduct ?? '',
-            'rfid': product.rfid ?? '',
+            'r_f_i_d': product.rfid ?? '',
             'created_at': product.createdAt ?? DateTime.now().toIso8601String(),
             'modified_at': product.modifiedAt ?? DateTime.now().toIso8601String(),
             'state_product': product.stateProduct ?? 'Activo',

@@ -89,15 +89,11 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
   }
 
   Future<String> _getModelPath() async {
-    // Usar external storage para que flutter_gemma NO borre el archivo
-    // (flutter_gemma limpia solo app_flutter/ que es getApplicationDocumentsDirectory)
-    final ext = await getExternalStorageDirectory();
-    if (ext != null) return '${ext.path}/$_kModelFileName';
-    // Fallback: subdirectorio separado dentro de app_flutter
+    // Guardar en getApplicationDocumentsDirectory() (app_flutter/) porque
+    // flutter_gemma siempre busca archivos ahí (ModelFileSystemManager.getModelFilePath).
+    // El archivo queda protegido del cleanup gracias a installed_models en SharedPrefs.
     final dir = await getApplicationDocumentsDirectory();
-    final sub = Directory('${dir.path}/voice_models');
-    await sub.create(recursive: true);
-    return '${sub.path}/$_kModelFileName';
+    return '${dir.path}/$_kModelFileName';
   }
 
   Future<void> _checkModelStatus() async {
@@ -107,7 +103,29 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
       final file = File(_modelPath);
       final prefs = await SharedPreferences.getInstance();
       final ready = prefs.getBool(_kModelReadyKey) ?? false;
+
+      // Migración: si el archivo está en external storage (ruta antigua) pero no en
+      // internal, moverlo al directorio correcto que usa flutter_gemma.
+      if (!await file.exists()) {
+        final ext = await getExternalStorageDirectory();
+        if (ext != null) {
+          final oldFile = File('${ext.path}/$_kModelFileName');
+          if (await oldFile.exists()) {
+            debugPrint('🔄 [VoiceModel] Migrando modelo de external → internal storage...');
+            await oldFile.copy(_modelPath);
+            await oldFile.delete();
+            debugPrint('✅ [VoiceModel] Migración completa: $_modelPath');
+          }
+        }
+      }
+
       if (ready && await file.exists()) {
+        // Asegurarse de que installed_models tenga el filename (por si migración)
+        final models = List<String>.from(prefs.getStringList('installed_models') ?? []);
+        if (!models.contains(_kModelFileName)) {
+          models.add(_kModelFileName);
+          await prefs.setStringList('installed_models', models);
+        }
         _setStateIfMounted(VoiceModelState.ready);
       } else {
         if (ready) { await prefs.setBool(_kModelReadyKey, false); }
@@ -247,6 +265,14 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kModelReadyKey, true);
+      // Registrar en installed_models para que flutter_gemma proteja el archivo
+      // del cleanup y para que isModelInstalled() devuelva true.
+      final models = List<String>.from(prefs.getStringList('installed_models') ?? []);
+      if (!models.contains(_kModelFileName)) {
+        models.add(_kModelFileName);
+        await prefs.setStringList('installed_models', models);
+        debugPrint('✅ [VoiceDownload] Registrado en installed_models: $_kModelFileName');
+      }
 
       if (mounted) {
         setState(() {
@@ -314,6 +340,10 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
       if (await partial.exists()) await partial.delete();
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_kModelReadyKey, false);
+      // Quitar de installed_models para que flutter_gemma no lo busque
+      final models = List<String>.from(prefs.getStringList('installed_models') ?? []);
+      models.remove(_kModelFileName);
+      await prefs.setStringList('installed_models', models);
       _setStateIfMounted(VoiceModelState.notDownloaded);
     } catch (e) {
       _setErrorIfMounted('Error al eliminar: $e');

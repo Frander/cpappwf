@@ -12,9 +12,8 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_gemma/flutter_gemma.dart';
-import 'package:flutter_gemma/core/model.dart';
 import 'tts_queue_manager.dart';
+import 'voice_model_singleton.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 
 // ============================================================================
@@ -87,43 +86,7 @@ class CurrentLocationDisplay {
 // CONTROLADOR DE VOZ LLM ON-DEVICE
 // ============================================================================
 
-const String _kVoiceModelReadyKey = 'voice_model_ready';
-const String _kVoiceModelFileName = 'qwen2.5_0.5b_q8.task';
-
-/// Resuelve la ruta del modelo fuera de app_flutter/ para que
-/// flutter_gemma no lo borre durante su limpieza de "orphaned files".
-Future<String> _resolveModelPath(String fileName) async {
-  final ext = await getExternalStorageDirectory();
-  if (ext != null) return '${ext.path}/$fileName';
-  final dir = await getApplicationDocumentsDirectory();
-  final sub = Directory('${dir.path}/voice_models');
-  await sub.create(recursive: true);
-  return '${sub.path}/$fileName';
-}
-
-/// Workaround para bug de flutter_gemma 0.11.0:
-/// registerExternalFile() graba el path externo pero NO agrega el archivo
-/// a la lista `installed_models` que verifica isModelInstalled().
-/// Sin esto, createModel() lanza "Active model is no longer installed".
-Future<void> _patchFlutterGemmaInstalled(String modelPath) async {
-  await FlutterGemmaPlugin.instance.modelManager.setModelPath(modelPath);
-  final prefs = await SharedPreferences.getInstance();
-  // flutter_gemma usa el nombre SIN extensión en installed_models
-  // (el manager lo logea como "Model qwen2.5_0.5b_q8 is ready", sin ".task")
-  final fileName = modelPath.split('/').last;
-  final modelName = fileName.endsWith('.task')
-      ? fileName.substring(0, fileName.length - 5)
-      : fileName;
-  final models = List<String>.from(prefs.getStringList('installed_models') ?? []);
-  debugPrint('🔧 [VoiceModel] installed_models actual: $models');
-  if (!models.contains(modelName)) {
-    models.add(modelName);
-    await prefs.setStringList('installed_models', models);
-    debugPrint('🔧 [VoiceModel] Patched installed_models → agregado: $modelName');
-  } else {
-    debugPrint('🔧 [VoiceModel] installed_models ya contiene: $modelName');
-  }
-}
+// kVoiceModelReadyKey y kVoiceModelFileName vienen de voice_model_singleton.dart
 
 const List<int> _kMilestones        = [150, 75, 30, 10]; // metros
 const Duration  _kCooldown          = Duration(seconds: 50);
@@ -140,11 +103,8 @@ const String _kSystemPrompt =
 
 class CompassVoiceController {
   final TTSQueueManager _tts = TTSQueueManager();
-  InferenceModel? _model;
 
-  bool isModelReady    = false;
-  bool isInferring     = false;
-  bool voiceEnabled    = false;
+  bool voiceEnabled = false;
 
   String?   _lastKey;
   DateTime? _lastAt;
@@ -154,30 +114,14 @@ class CompassVoiceController {
 
   CompassVoiceController({required this.onStateChanged});
 
+  // Delegamos is/ready/inferring al singleton global
+  bool get isModelReady => VoiceModelSingleton.instance.isReady;
+  bool get isInferring  => VoiceModelSingleton.instance.isInferring;
+
   Future<void> initialize() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final ready = prefs.getBool(_kVoiceModelReadyKey) ?? false;
-      if (!ready) return;
-
-      final modelPath = await _resolveModelPath(_kVoiceModelFileName);
-      if (!await File(modelPath).exists()) return;
-
-      // 1. Apuntar al archivo del modelo + parchear installed_models (bug flutter_gemma 0.11.0)
-      await _patchFlutterGemmaInstalled(modelPath);
-
-      // 2. Crear el modelo de inferencia
-      _model = await FlutterGemmaPlugin.instance.createModel(
-        modelType: ModelType.qwen,
-        fileType:  ModelFileType.task,
-        maxTokens: 256,
-      );
-
-      isModelReady = true;
-      onStateChanged();
-    } catch (e) {
-      debugPrint('⚠️ [CompassVoice] Error cargando modelo: $e');
-    }
+    final ok = await VoiceModelSingleton.instance.initialize();
+    if (ok) onStateChanged();
+    debugPrint('🧭 [CompassVoice] initialize() → isReady=$ok');
   }
 
   Future<void> announceState(
@@ -218,7 +162,7 @@ class CompassVoiceController {
     _lastAt        = now;
     _lastMilestone = curMilestone;
 
-    if (isModelReady && _model != null) {
+    if (isModelReady) {
       await _announceWithLLM(directions, nearest, location);
     } else {
       _announceFallback(nearest);
@@ -237,36 +181,29 @@ class CompassVoiceController {
     CardinalDirection nearest,
     CurrentLocationDisplay location,
   ) async {
-    isInferring = true;
     onStateChanged();
     try {
-      final richContext = await _buildRichContext(directions, location);
-      final prompt      = '$_kSystemPrompt\n\n$richContext';
+      final userContext = await _buildRichContext(directions, location);
 
-      final session = await _model!.createSession(
-        temperature: 0.7,
-        topK:        40,
-        randomSeed:  42,
+      final text = await VoiceModelSingleton.instance.infer(
+        systemPrompt: _kSystemPrompt,
+        userPrompt:   userContext,
+        temperature:  0.7,
+        topK:         40,
+        randomSeed:   42,
+        timeoutSecs:  45,
       );
-      try {
-        await session.addQueryChunk(Message.text(text: prompt, isUser: true));
-        final response = StringBuffer();
-        await for (final token in session.getResponseAsync()) {
-          response.write(token);
-        }
-        final text = response.toString().trim();
-        if (text.isNotEmpty) {
-          _tts.enqueueSpeech(text, 'compass_llm', SpeechPriority.normal,
-              const Duration(seconds: 25));
-        }
-      } finally {
-        await session.close();
+
+      if (text != null && text.isNotEmpty) {
+        _tts.enqueueSpeech(text, 'compass_llm', SpeechPriority.normal,
+            const Duration(seconds: 25));
+      } else {
+        _announceFallback(nearest);
       }
     } catch (e) {
       debugPrint('⚠️ [CompassVoice] Error LLM: $e');
       _announceFallback(nearest);
     } finally {
-      isInferring = false;
       onStateChanged();
     }
   }
@@ -984,7 +921,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                       onTap: () async {
                         // Si el modelo ya está descargado, intentar cargarlo sin navegar
                         final prefs = await SharedPreferences.getInstance();
-                        final ready = prefs.getBool(_kVoiceModelReadyKey) ?? false;
+                        final ready = prefs.getBool(kVoiceModelReadyKey) ?? false;
                         if (ready) {
                           await _voiceController.initialize();
                         } else {
@@ -1002,7 +939,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                         ),
                         child: FutureBuilder<bool>(
                           future: SharedPreferences.getInstance().then(
-                            (p) => p.getBool(_kVoiceModelReadyKey) ?? false,
+                            (p) => p.getBool(kVoiceModelReadyKey) ?? false,
                           ),
                           builder: (_, snap) {
                             final downloaded = snap.data ?? false;

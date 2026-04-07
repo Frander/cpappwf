@@ -146,9 +146,13 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
 
     // 5. Indexar status por Id_activity_step_parent
     final Map<int?, List<Map<String, dynamic>>> statusByStep = {};
+    // También indexar por Id_activity para reference-list
+    final Map<int, List<Map<String, dynamic>>> statusByActivity = {};
     for (final st in statusRows) {
       final stepId = st['Id_activity_step_parent'] as int?;
       statusByStep.putIfAbsent(stepId, () => []).add(Map<String, dynamic>.from(st));
+      final actId = st['Id_activity'] as int? ?? 0;
+      statusByActivity.putIfAbsent(actId, () => []).add(Map<String, dynamic>.from(st));
     }
 
     // 6. Construir JSON anidado
@@ -156,12 +160,32 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
       final actId = a['Id_activity'] as int? ?? 0;
       final steps = (stepsByActivity[actId] ?? []).map((s) {
         final stepId = s['Id_activity_step'] as int?;
-        final rawStatus = statusByStep[stepId] ?? [];
-        final normalizedStatus = rawStatus.map((st) => _lsBuildStatus(st, statusByStep)).toList();
+        final typeStep = s['Type_step'] as String? ?? '';
+
+        List<Map<String, dynamic>> normalizedStatus;
+        if (typeStep == 'reference-list') {
+          // Los status son de la actividad referenciada en Default_value
+          final refId = int.tryParse(s['Default_value']?.toString() ?? '');
+          if (refId != null) {
+            // Solo status raíz de esa actividad (sin step parent y sin status parent)
+            final refStatus = (statusByActivity[refId] ?? []).where((st) {
+              final sp = st['Id_activity_step_parent'];
+              final sap = st['Id_activity_status_parent'];
+              return (sp == null || sp == 0) && (sap == null || sap == 0);
+            }).toList();
+            normalizedStatus = refStatus.map((st) => _lsBuildStatus(st, statusByStep)).toList();
+          } else {
+            normalizedStatus = [];
+          }
+        } else {
+          final rawStatus = statusByStep[stepId] ?? [];
+          normalizedStatus = rawStatus.map((st) => _lsBuildStatus(st, statusByStep)).toList();
+        }
+
         return {
           'id_activity_step':   s['Id_activity_step'],
           'id_activity':        s['Id_activity'],
-          'type_step':          s['Type_step'],
+          'type_step':          typeStep,
           'order_step':         s['Order_step'],
           'default_value':      s['Default_value'],
           'unity':              s['Unity'],
@@ -195,7 +219,11 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
         'tracking_headquarter': a['Tracking_headquarter'] == 1,
         'read_default':         a['Read_default'],
         'activity_steps':       steps,
-        'activity_status':      statusByStep[null] ?? [],
+        'activity_status':      (statusByActivity[actId] ?? []).where((st) {
+          final sp  = st['Id_activity_step_parent'];
+          final sap = st['Id_activity_status_parent'];
+          return (sp == null || sp == 0) && (sap == null || sap == 0);
+        }).map((st) => _lsBuildStatus(st, statusByStep)).toList(),
       };
     }).toList();
 

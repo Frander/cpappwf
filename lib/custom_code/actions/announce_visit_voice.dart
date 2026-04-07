@@ -10,28 +10,11 @@ import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import 'dart:io';
-import 'package:flutter_gemma/flutter_gemma.dart';
-import 'package:flutter_gemma/core/model.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/custom_code/widgets/tts_queue_manager.dart';
+import '/custom_code/widgets/voice_model_singleton.dart';
 
-// Singleton para reutilizar el modelo entre visitas sucesivas
-InferenceModel? _cachedVoiceModel;
-
-const String _kModelReadyKey   = 'voice_model_ready';
-const String _kModelFileName   = 'qwen2.5_0.5b_q8.task';
-
-Future<String> _resolveModelPath() async {
-  final ext = await getExternalStorageDirectory();
-  if (ext != null) return '${ext.path}/$_kModelFileName';
-  final dir = await getApplicationDocumentsDirectory();
-  final sub = Directory('${dir.path}/voice_models');
-  await sub.create(recursive: true);
-  return '${sub.path}/$_kModelFileName';
-}
+// kVoiceModelReadyKey y resolveModelPath() vienen de voice_model_singleton.dart
 
 const String _kVisitSystemPrompt =
     'Eres un asistente de campo para operarios de palma africana en Colombia. '
@@ -45,27 +28,47 @@ Future<void> announceVisitVoice() async {
 
   // 1. Consultar datos
   final int totalVisits = await _getTotalVisits();
-  final _TopOption top = await _getTopStatusOption();
+  final _TopOption top  = await _getTopStatusOption();
 
   debugPrint('🎙️ [VisitVoice] totalVisits=$totalVisits');
   debugPrint('🎙️ [VisitVoice] topOption="${top.option}" count=${top.count}');
 
-  // 2. Verificar modelo
-  final bool modelOk = await _isModelAvailable();
-  debugPrint('🎙️ [VisitVoice] modelAvailable=$modelOk  cachedModel=${_cachedVoiceModel != null ? "YA CARGADO" : "NULL"}');
+  // 2. Asegurar que el modelo esté cargado (idempotente si ya está listo)
+  final singleton = VoiceModelSingleton.instance;
+  if (!singleton.isReady) {
+    debugPrint('🎙️ [VisitVoice] Modelo no cargado — inicializando...');
+    await singleton.initialize();
+  }
+  debugPrint('🎙️ [VisitVoice] singleton.isReady=${singleton.isReady}  isInferring=${singleton.isInferring}');
 
-  if (modelOk) {
-    try {
-      await _speakWithLLM(totalVisits, top);
-      debugPrint('🎙️ [VisitVoice] ✅ LLM completado exitosamente');
+  if (singleton.isReady && !singleton.isInferring) {
+    final userPrompt = _buildUserPrompt(totalVisits, top);
+    debugPrint('🎙️ [VisitVoice] ─── PROMPT ───────────────────────────────');
+    debugPrint(userPrompt);
+    debugPrint('🎙️ [VisitVoice] ─────────────────────────────────────────');
+
+    final text = await singleton.infer(
+      systemPrompt: _kVisitSystemPrompt,
+      userPrompt:   userPrompt,
+      temperature:  0.6,
+      topK:         40,
+      randomSeed:   1,
+      timeoutSecs:  30,
+    );
+
+    debugPrint('🎙️ [VisitVoice] ─── RESPUESTA ───────────────────────────');
+    debugPrint('🎙️ [VisitVoice] "$text"');
+    debugPrint('🎙️ [VisitVoice] ─────────────────────────────────────────');
+
+    if (text != null && text.isNotEmpty) {
+      TTSQueueManager().enqueueSpeech(
+        text, 'visit_complete', SpeechPriority.high, const Duration(seconds: 5),
+      );
+      debugPrint('🎙️ [VisitVoice] ✅ LLM completado y encolado en TTS');
       return;
-    } catch (e, stack) {
-      debugPrint('🎙️ [VisitVoice] ❌ Error LLM: $e');
-      debugPrint('🎙️ [VisitVoice] Stack: $stack');
-      _cachedVoiceModel = null;
     }
   } else {
-    debugPrint('🎙️ [VisitVoice] ⚠️ Modelo no disponible → usando fallback TTS');
+    debugPrint('🎙️ [VisitVoice] ⚠️ Modelo no disponible o infiriendo → fallback TTS');
   }
 
   _speakFallback(totalVisits, top);
@@ -124,113 +127,10 @@ Future<_TopOption> _getTopStatusOption() async {
   }
 }
 
-// ─── Verificación del modelo ─────────────────────────────────────────────────
+// ─── Construcción del prompt de usuario ──────────────────────────────────────
 
-Future<bool> _isModelAvailable() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final prefReady = prefs.getBool(_kModelReadyKey) ?? false;
-    debugPrint('🎙️ [VisitVoice] SharedPrefs voice_model_ready=$prefReady');
-    if (!prefReady) return false;
-
-    final path = await _resolveModelPath();
-    final file = File(path);
-    final exists = file.existsSync();
-    debugPrint('🎙️ [VisitVoice] Archivo modelo: $path → exists=$exists');
-    return exists;
-  } catch (e) {
-    debugPrint('🎙️ [VisitVoice] ❌ Error verificando modelo: $e');
-    return false;
-  }
-}
-
-// ─── Workaround flutter_gemma 0.11.0: registerExternalFile() no agrega el
-// archivo a `installed_models`, que es lo que verifica isModelInstalled().
-// Sin este patch, createModel() lanza "Active model is no longer installed".
-Future<void> _patchFlutterGemmaInstalled(String modelPath) async {
-  await FlutterGemmaPlugin.instance.modelManager.setModelPath(modelPath);
-  final prefs = await SharedPreferences.getInstance();
-  // flutter_gemma usa el nombre SIN extensión en installed_models
-  final fileName = modelPath.split('/').last;
-  final modelName = fileName.endsWith('.task')
-      ? fileName.substring(0, fileName.length - 5)
-      : fileName;
-  final models = List<String>.from(prefs.getStringList('installed_models') ?? []);
-  debugPrint('🔧 [VisitVoice] installed_models actual: $models');
-  if (!models.contains(modelName)) {
-    models.add(modelName);
-    await prefs.setStringList('installed_models', models);
-    debugPrint('🔧 [VisitVoice] Patched installed_models → agregado: $modelName');
-  } else {
-    debugPrint('🔧 [VisitVoice] installed_models ya contiene: $modelName');
-  }
-}
-
-// ─── LLM ─────────────────────────────────────────────────────────────────────
-
-Future<void> _speakWithLLM(int totalVisits, _TopOption top) async {
-  final modelPath = await _resolveModelPath();
-
-  if (_cachedVoiceModel == null) {
-    debugPrint('🎙️ [VisitVoice] 🔄 Inicializando modelo por primera vez...');
-    debugPrint('🎙️ [VisitVoice]    patchFlutterGemmaInstalled → $modelPath');
-    await _patchFlutterGemmaInstalled(modelPath);
-    debugPrint('🎙️ [VisitVoice]    createModel(qwen, task, maxTokens:128)...');
-    _cachedVoiceModel = await FlutterGemmaPlugin.instance.createModel(
-      modelType: ModelType.qwen,
-      fileType:  ModelFileType.task,
-      maxTokens: 128,
-    );
-    debugPrint('🎙️ [VisitVoice] ✅ Modelo inicializado y cacheado');
-  } else {
-    debugPrint('🎙️ [VisitVoice] ♻️  Reutilizando modelo cacheado');
-  }
-
-  final prompt = _buildPrompt(totalVisits, top);
-  debugPrint('🎙️ [VisitVoice] ─── PROMPT ENVIADO AL LLM ───────────────────');
-  debugPrint(prompt);
-  debugPrint('🎙️ [VisitVoice] ────────────────────────────────────────────');
-
-  debugPrint('🎙️ [VisitVoice] Creando sesión (temp=0.6, topK=40, seed=1)...');
-  final session = await _cachedVoiceModel!.createSession(
-    temperature: 0.6,
-    topK:        40,
-    randomSeed:  1,
-  );
-  debugPrint('🎙️ [VisitVoice] ✅ Sesión creada, enviando query...');
-
-  try {
-    await session.addQueryChunk(Message.text(text: prompt, isUser: true));
-    debugPrint('🎙️ [VisitVoice] Leyendo stream de respuesta...');
-    final buf = StringBuffer();
-    await for (final token in session.getResponseAsync()) {
-      buf.write(token);
-    }
-    final text = buf.toString().trim();
-    debugPrint('🎙️ [VisitVoice] ─── RESPUESTA LLM ──────────────────────────');
-    debugPrint('🎙️ [VisitVoice] "$text"');
-    debugPrint('🎙️ [VisitVoice] ─────────────────────────────────────────────');
-    if (text.isNotEmpty) {
-      TTSQueueManager().enqueueSpeech(
-        text,
-        'visit_complete',
-        SpeechPriority.high,
-        const Duration(seconds: 5),
-      );
-      debugPrint('🎙️ [VisitVoice] ✅ Texto encolado en TTS');
-    } else {
-      debugPrint('🎙️ [VisitVoice] ⚠️ Respuesta LLM vacía');
-    }
-  } finally {
-    await session.close();
-    debugPrint('🎙️ [VisitVoice] Sesión cerrada');
-  }
-}
-
-String _buildPrompt(int totalVisits, _TopOption top) {
+String _buildUserPrompt(int totalVisits, _TopOption top) {
   final buf = StringBuffer();
-  buf.writeln(_kVisitSystemPrompt);
-  buf.writeln();
   buf.writeln('Datos de la visita recién registrada:');
   buf.writeln('- Total visitas registradas en la sesión: $totalVisits');
   if (top.option.isNotEmpty) {

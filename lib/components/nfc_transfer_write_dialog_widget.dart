@@ -60,28 +60,51 @@ class _NfcTransferWriteDialogWidgetState
     HapticFeedback.mediumImpact();
 
     try {
-      // Primero, limpiar el tag de destino (escribir "0")
-      debugPrint('🧹 Limpiando tag de destino...');
-      final clearSuccess = await actions.clearNFCTag(context);
+      // Leer el contenido actual del tag de destino
+      debugPrint('📖 Leyendo contenido actual del tag de destino...');
+      final destContent = await actions.readNFC(context, autoClose: false);
 
       if (!mounted) return;
 
-      if (!clearSuccess) {
-        throw Exception(
-            'No se pudo limpiar el tag de destino.\n\nIntente de nuevo.');
+      String contentToWrite;
+
+      if (destContent.trim().isEmpty || destContent.trim() == '0') {
+        // Tag de destino vacío: escribir el JSON completo del origen
+        debugPrint(
+            '📝 TAG-TRANSFER: Tag destino vacío, escribiendo JSON completo del origen');
+        contentToWrite = widget.sourceTagContent;
+      } else if (actions.isNewJsonFormat(destContent)) {
+        // Tag de destino ya tiene JSON: fusionar los arrays Visits
+        debugPrint('🔀 TAG-TRANSFER: Fusionando Visits del origen al destino...');
+        final destJson = actions.parseNfcJson(destContent);
+        final srcJson = actions.parseNfcJson(widget.sourceTagContent);
+
+        if (destJson != null && srcJson != null) {
+          final destVisits =
+              List<dynamic>.from(destJson['Visits'] as List? ?? []);
+          final srcVisits =
+              List<dynamic>.from(srcJson['Visits'] as List? ?? []);
+          destVisits.addAll(srcVisits);
+          destJson['Visits'] = destVisits;
+          contentToWrite = jsonEncode(destJson);
+          debugPrint(
+              '✅ TAG-TRANSFER: Fusionados ${srcVisits.length} Visits nuevos. Total destino: ${destVisits.length}');
+        } else {
+          debugPrint(
+              '⚠️ TAG-TRANSFER: No se pudo parsear JSON, escribiendo JSON completo del origen');
+          contentToWrite = widget.sourceTagContent;
+        }
+      } else {
+        // Formato de destino no reconocido: escribir fuente completo
+        debugPrint(
+            '⚠️ TAG-TRANSFER: Formato destino no reconocido, escribiendo JSON completo del origen');
+        contentToWrite = widget.sourceTagContent;
       }
 
-      debugPrint('✅ Tag de destino limpiado exitosamente');
-
-      // Esperar un momento después de limpiar
-      await Future.delayed(Duration(milliseconds: 500));
-
-      if (!mounted) return;
-
-      // Luego, escribir el contenido del tag de origen en el tag de destino
+      // Escribir el contenido final en el tag de destino
       debugPrint('📝 Escribiendo contenido en tag de destino...');
       final writeSuccess =
-          await actions.writeNFCTag(context, widget.sourceTagContent);
+          await actions.writeNFCTag(context, contentToWrite);
 
       if (!mounted) return;
 
@@ -235,7 +258,7 @@ class _NfcTransferWriteDialogWidgetState
           ),
           SizedBox(height: 12),
           Text(
-            'El tag será limpiado y se escribirá\nel contenido del tag de origen',
+            'Se leerá el tag de destino y se agregarán\nlas visitas del tag de origen',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,

@@ -496,9 +496,17 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       // Obtener el id_company del AppState o de la zona
       final idCompany = _selectedZone!['Id_company'] ?? 1;
 
-      // Determinar el id_type basado en el tipo de TAG seleccionado
-      // Por ahora usamos un valor por defecto, idealmente debería mapearse a Types_points
-      final idType = _selectedTagType!.index + 1;
+      // Buscar el Id_type_point real en la tabla Types_points por nombre
+      final typeResults = await db.query(
+        'Types_points',
+        columns: ['Id_type_point'],
+        where: 'Name_type = ?',
+        whereArgs: [_selectedTagType!.displayName],
+        limit: 1,
+      );
+      final idType = typeResults.isNotEmpty
+          ? (typeResults.first['Id_type_point'] as int)
+          : _selectedTagType!.index + 1; // fallback si no se encuentra
 
       if (_isUpdateMode && _existingProduct != null) {
         // Actualizar producto existente - marcar como 'updated' para sincronización
@@ -511,6 +519,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             'Modified_at': now,
             'Type_product': _selectedTagType!.displayName,
             'Name_product': _nameController.text.trim(),
+            'Rfid': _tagId,
             'Description_product': _descriptionController.text.trim(),
             'State_product': 'Activo',
             'Line': 0,
@@ -581,29 +590,34 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9 -
-          MediaQuery.of(context).viewInsets.bottom,
-      decoration: BoxDecoration(
-        color: Color(0xFF1F2937),
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(24),
-          topRight: Radius.circular(24),
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(bottom: keyboardHeight),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.9 - keyboardHeight,
+        decoration: BoxDecoration(
+          color: Color(0xFF1F2937),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(24),
+            topRight: Radius.circular(24),
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            _buildHeader(),
-            // Content
-            Expanded(
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: _buildStepContent(),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Header
+              _buildHeader(),
+              // Content
+              Expanded(
+                child: SlideTransition(
+                  position: _slideAnimation,
+                  child: _buildStepContent(),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

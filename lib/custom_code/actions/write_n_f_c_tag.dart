@@ -108,6 +108,7 @@ Future<bool> writeNFCTag(
                       final productName = productResults.first['Name_product'] as String?;
 
                       debugPrint('✅ Producto encontrado: $productName (Tipo: $productType)');
+                      FFAppState().nfcLastProductName = productName ?? '';
 
                       if (productType != requiredProductType) {
                         debugPrint('❌ Tipo de producto no coincide');
@@ -169,6 +170,7 @@ Future<bool> writeNFCTag(
                       final productName = productResults.first['Name_product'] as String?;
 
                       debugPrint('✅ TAG-TRANSFER: Producto destino encontrado: $productName (Tipo: $productType)');
+                      FFAppState().nfcLastProductName = productName ?? '';
 
                       if (productType != requiredProductType) {
                         debugPrint('❌ TAG-TRANSFER: Tipo de producto de destino no coincide');

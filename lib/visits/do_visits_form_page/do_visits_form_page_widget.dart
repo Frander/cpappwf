@@ -86,6 +86,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para almacenar geolocalizaciones capturadas al leer tags NFC por status_id
   final Map<int, ReadGeoStruct> _tagReaderGeolocations = {};
 
+  // Maps para almacenar nombres de producto por status_id (de la tabla Products de SQLite)
+  final Map<int, String> _tagReaderProductName = {};
+  final Map<int, String> _tagWriterProductName = {};
+  final Map<int, String> _tagTransferSourceProductName = {};
+  final Map<int, String> _tagTransferDestProductName = {};
+
   // Map para almacenar datos de tags NFC escritos por status_id
   // La estructura es: statusId -> (headquarterId -> {totalVisits, totalResults, records})
   final Map<int, Map<int, Map<String, dynamic>>> _tagWriterData = {};
@@ -241,9 +247,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       });
     }
 
-    // Cachear y ordenar activity status
+    // Cachear y ordenar activity status (solo los de la actividad actual)
     if (activityStatusRawData != null) {
+      final currentActivityId = getJsonField(FFAppState().currentActivity, r'''$.id_activity''');
       _cachedActivityStatus = List.from(activityStatusRawData.toList());
+      if (currentActivityId != null) {
+        _cachedActivityStatus = _cachedActivityStatus.where((s) {
+          final sActivityId = getJsonField(s, r'''$.id_activity''');
+          return sActivityId == currentActivityId;
+        }).toList();
+      }
       _cachedActivityStatus.sort((a, b) {
         final orderA = getJsonField(a, r'''$.order_status''') ?? 999;
         final orderB = getJsonField(b, r'''$.order_status''') ?? 999;
@@ -457,6 +470,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         'calculatedValues': _calculatedValues,
         'numbersOperationCalculated': _numbersOperationCalculated,
         'tagReaderData': _tagReaderData,
+        'tagReaderProductName': _tagReaderProductName,
+        'tagWriterProductName': _tagWriterProductName,
+        'tagTransferSourceProductName': _tagTransferSourceProductName,
+        'tagTransferDestProductName': _tagTransferDestProductName,
         'tagTransferData': _tagTransferData,
         'tagTransferCompleted': _tagTransferCompleted,
         'tagWriterData': _tagWriterData,
@@ -564,6 +581,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               cacheData['tagReaderData'] as Map),
         );
         debugPrint('   ✓ Restaurados ${_tagReaderData.length} tag readers');
+      }
+
+      if (cacheData['tagReaderProductName'] != null) {
+        _tagReaderProductName.clear();
+        _tagReaderProductName.addAll(Map<int, String>.from(cacheData['tagReaderProductName'] as Map));
+      }
+
+      if (cacheData['tagWriterProductName'] != null) {
+        _tagWriterProductName.clear();
+        _tagWriterProductName.addAll(Map<int, String>.from(cacheData['tagWriterProductName'] as Map));
+      }
+
+      if (cacheData['tagTransferSourceProductName'] != null) {
+        _tagTransferSourceProductName.clear();
+        _tagTransferSourceProductName.addAll(Map<int, String>.from(cacheData['tagTransferSourceProductName'] as Map));
+      }
+
+      if (cacheData['tagTransferDestProductName'] != null) {
+        _tagTransferDestProductName.clear();
+        _tagTransferDestProductName.addAll(Map<int, String>.from(cacheData['tagTransferDestProductName'] as Map));
       }
 
       // Restaurar tag transfer data
@@ -922,7 +959,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               // Verificar steps hijos de este status
               final stepsChilds =
                   getJsonField(selectedStatus, r'''$.activities_steps_childs''')
-                      .toList();
+                      ?.toList() ?? [];
 
               for (var childStep in stepsChilds) {
                 final childResult =
@@ -1059,9 +1096,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final typeStep = getJsonField(step, r'''$.type_step''').toString();
     final isRequired = getJsonField(step, r'''$.is_required''') == true;
     final activitiesStatusRaw = getJsonField(step, r'''$.activities_status''');
-    final activitiesStatus = activitiesStatusRaw != null
+    List activitiesStatus = activitiesStatusRaw != null
         ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
         : [];
+
+    // Para reference-list: si el step no tiene activities_status embebidos,
+    // buscarlos en el root _cachedActivityStatus filtrando por id_activity
+    // que coincida con el default_value del step (id de la actividad referenciada).
+    if (typeStep == 'reference-list' && activitiesStatus.isEmpty) {
+      final defaultValue = getJsonField(step, r'''$.default_value''')?.toString() ?? '';
+      final refActivityId = int.tryParse(defaultValue);
+      if (refActivityId != null && _cachedActivityStatus.isNotEmpty) {
+        activitiesStatus = _cachedActivityStatus.where((s) {
+          final sActivityId = getJsonField(s, r'''$.id_activity''');
+          return sActivityId == refActivityId;
+        }).toList();
+      }
+    }
 
     // Log de renderizado
     debugPrint('📋 RENDERIZANDO STEP: nombre="$stepName" tipo="$typeStep" ID=$stepId nivel=$level requerido=$isRequired activitiesStatus=${activitiesStatus.length}');
@@ -1466,6 +1517,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       _parseNfcTagContentByHeadquarter(nfcContent);
                   setState(() {
                     _tagWriterData[statusId] = parsedData;
+                    _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
                   });
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
@@ -1546,11 +1598,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 if (geolocation != null) {
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
+                  final productName = await _fetchProductNameFromRfid(nfcContent);
                   setState(() {
                     _tagReaderData[statusId] = parsedData;
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
+                    _tagReaderProductName[statusId] = productName;
                   });
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
@@ -1689,8 +1743,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     '📊 TAG-TRANSFER: Datos parseados: ${parsedData.length} lotes');
 
                 // Guardar los datos del tag de origen
+                final sourceProductName = await _fetchProductNameFromRfid(nfcContent);
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
+                  _tagTransferSourceProductName[statusId] = sourceProductName;
                 });
                 _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
@@ -2059,6 +2115,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               // Auto-expandir si el status tiene hijos (ej: multiple-option con unique-option hijos)
               if (hasChildren) {
                 _statusExpansionState[expansionKey] = true;
+                // Auto-expandir los steps hijos requeridos para que sean visibles
+                for (var childStep in stepsChilds) {
+                  final childStepId = getJsonField(childStep, r'''$.id_activity_step''');
+                  if (childStepId != null) {
+                    _stepExpansionState[childStepId] =
+                        getJsonField(childStep, r'''$.is_required''') == true;
+                  }
+                }
               }
 
               await _onStatusSelected(parentStep, status);
@@ -2569,6 +2633,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       _parseNfcTagContentByHeadquarter(nfcContent);
                   setState(() {
                     _tagWriterData[statusId] = parsedData;
+                    _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
                   });
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
@@ -2649,11 +2714,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 if (geolocation != null) {
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
+                  final productName = await _fetchProductNameFromRfid(nfcContent);
                   setState(() {
                     _tagReaderData[statusId] = parsedData;
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
+                    _tagReaderProductName[statusId] = productName;
                   });
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
@@ -2823,8 +2890,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     '📊 TAG-TRANSFER (ROOT): Datos parseados: ${parsedData.length} lotes');
 
                 // Guardar los datos del tag de origen
+                final sourceProductName = await _fetchProductNameFromRfid(nfcContent);
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
+                  _tagTransferSourceProductName[statusId] = sourceProductName;
                 });
                 _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
@@ -3360,6 +3429,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       _parseNfcTagContentByHeadquarter(nfcContent);
                   setState(() {
                     _tagWriterData[statusId] = parsedData;
+                    _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
                   });
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
@@ -3440,11 +3510,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 if (geolocation != null) {
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
+                  final productName = await _fetchProductNameFromRfid(nfcContent);
                   setState(() {
                     _tagReaderData[statusId] = parsedData;
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
+                    _tagReaderProductName[statusId] = productName;
                   });
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
@@ -3580,8 +3652,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     '📊 TAG-TRANSFER (CHILD): Datos parseados: ${parsedData.length} lotes');
 
                 // Guardar los datos del tag de origen
+                final sourceProductName = await _fetchProductNameFromRfid(nfcContent);
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
+                  _tagTransferSourceProductName[statusId] = sourceProductName;
                 });
                 _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
@@ -4259,10 +4333,26 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Para unique-list y reference-list: COLAPSAR automáticamente el step después de seleccionar
     // Esto evita que el usuario tenga que tocar manualmente el header para cerrar la lista
     if (!isMultiSelectList) {
-      debugPrint('🔽 Auto-colapsando step "$stepName" (tipo: $typeStep)');
-      _stepExpansionState[parentStepId] = false;
-      // También cerrar el search box si estaba abierto
-      _searchBoxExpansionState[parentStepId] = false;
+      // Para reference-list: si el status seleccionado tiene steps hijos, mantener
+      // el step padre expandido para que los child steps sean visibles directamente.
+      final stepsChildsRaw = getJsonField(status, r'''$.activities_steps_childs''');
+      final stepsChilds = stepsChildsRaw != null
+          ? (stepsChildsRaw is List ? stepsChildsRaw : [])
+          : [];
+      final statusChildsRaw = getJsonField(status, r'''$.activities_status_childs''');
+      final statusChilds = statusChildsRaw != null
+          ? (statusChildsRaw is List ? statusChildsRaw : [])
+          : [];
+      final selectedStatusHasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
+
+      if (typeStep.toLowerCase() == 'reference-list' && selectedStatusHasChildren) {
+        // No colapsar: mantener visible la lista con el status seleccionado y sus hijos
+        debugPrint('🔽 reference-list: status seleccionado tiene hijos → NO colapsar step "$stepName"');
+      } else {
+        debugPrint('🔽 Auto-colapsando step "$stepName" (tipo: $typeStep)');
+        _stepExpansionState[parentStepId] = false;
+        _searchBoxExpansionState[parentStepId] = false;
+      }
     }
 
     setState(() {});
@@ -6706,6 +6796,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
             setState(() {
               _tagWriterData[statusId] = parsedData;
+              _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
             });
           }
         }
@@ -10790,6 +10881,33 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return _formatColombianNumber(calculatedValue);
   }
 
+  /// Obtiene el nombre del producto consultando SQLite por el hardware RFID del chip NFC.
+  /// Fallback: Name_product del JSON del tag → nfcLastProductName.
+  Future<String> _fetchProductNameFromRfid(String nfcContent) async {
+    try {
+      // Usar el hardware tag ID (chip NFC) guardado durante la lectura
+      final hardwareRfid = FFAppState().nfcHardwareTagId;
+      if (hardwareRfid.isNotEmpty) {
+        final rows = await globalDb.executeOperation((db) async {
+          return await db.rawQuery(
+            'SELECT Name_product FROM Products WHERE Rfid = ? LIMIT 1',
+            [hardwareRfid],
+          );
+        });
+        if (rows.isNotEmpty) {
+          final name = rows.first['Name_product'] as String?;
+          if (name != null && name.isNotEmpty) return name;
+        }
+      }
+      // Fallback: nombre almacenado en el JSON del tag
+      final json = jsonDecode(nfcContent) as Map<String, dynamic>?;
+      final readInfo = json?['Read_info'] as Map<String, dynamic>?;
+      final name = readInfo?['Name_product'] as String?;
+      if (name != null && name.isNotEmpty) return name;
+    } catch (_) {}
+    return FFAppState().nfcLastProductName;
+  }
+
   // ===== RESUMEN DEL TAG READER AGRUPADO POR LOTE =====
 
   Widget _buildTagReaderSummary({required int statusId}) {
@@ -10827,9 +10945,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 18,
               ),
               const SizedBox(width: 6),
-              const Text(
-                'Resumen del TAG',
-                style: TextStyle(
+              Text(
+                (_tagReaderProductName[statusId]?.isNotEmpty == true)
+                    ? _tagReaderProductName[statusId]!
+                    : 'Resumen del TAG',
+                style: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -11304,9 +11424,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 18,
               ),
               const SizedBox(width: 6),
-              const Text(
-                'Registros escritos en TAG',
-                style: TextStyle(
+              Text(
+                (_tagWriterProductName[statusId]?.isNotEmpty == true)
+                    ? _tagWriterProductName[statusId]!
+                    : 'Registros escritos en TAG',
+                style: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
@@ -11783,16 +11905,39 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 18,
               ),
               const SizedBox(width: 6),
-              Text(
-                titleText,
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      (_tagTransferSourceProductName[statusId]?.isNotEmpty == true)
+                          ? _tagTransferSourceProductName[statusId]!
+                          : titleText,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    if (_tagTransferDestProductName[statusId]?.isNotEmpty == true)
+                      Row(
+                        children: [
+                          const Icon(Icons.arrow_forward, color: Color(0xFF64B5F6), size: 14),
+                          const SizedBox(width: 4),
+                          Text(
+                            _tagTransferDestProductName[statusId]!,
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 12,
+                              color: Color(0xFF64B5F6),
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
                 ),
               ),
-              const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
@@ -11919,6 +12064,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 if (result == true && mounted) {
                   setState(() {
                     _tagTransferCompleted[statusId] = true;
+                    _tagTransferDestProductName[statusId] = FFAppState().nfcLastProductName;
                   });
                   HapticFeedback.heavyImpact();
                   ScaffoldMessenger.of(context).showSnackBar(

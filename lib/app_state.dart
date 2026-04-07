@@ -890,6 +890,18 @@ class FFAppState extends ChangeNotifier {
     _nfcRead = value;
   }
 
+  String _nfcHardwareTagId = '';
+  String get nfcHardwareTagId => _nfcHardwareTagId;
+  set nfcHardwareTagId(String value) {
+    _nfcHardwareTagId = value;
+  }
+
+  String _nfcLastProductName = '';
+  String get nfcLastProductName => _nfcLastProductName;
+  set nfcLastProductName(String value) {
+    _nfcLastProductName = value;
+  }
+
   dynamic _activitiesJSON;
   dynamic get activitiesJSON => _activitiesJSON;
   set activitiesJSON(dynamic value) {

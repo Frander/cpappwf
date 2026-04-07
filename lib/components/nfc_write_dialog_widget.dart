@@ -125,21 +125,39 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       debugPrint(
           '✅ Visitas pendientes desde SQLite: $totalVisits, Results: $totalResults');
 
-      // Si no hay visitas en SQLite y no se usa COUNTER, intentar con calculateActivityResults
+      // Si no hay visitas pendientes (Status=0) en SQLite y no se usa COUNTER,
+      // usar calculateActivityResults SOLO si no hay visitas en DB (ningún Status).
+      // Si hay visitas en DB (Status=1), todas ya fueron escritas → no usar fallback de memoria.
       if (totalVisits == 0 && !useCounter) {
         try {
-          final activityResults =
-              await actions.calculateActivityResults(context);
-          final activityVisits = activityResults['visits'] ?? 0;
-          final activityResultsCount = activityResults['results'] ?? 0;
-          if (activityVisits > 0) {
-            totalVisits = activityVisits;
-            totalResults = activityResultsCount;
+          bool hasAnyDbVisits = false;
+          final dbPath = FFAppState().pathDatabase;
+          if (dbPath.isNotEmpty) {
+            final tempDb = await openDatabase(dbPath);
+            final countResult = await tempDb.rawQuery(
+                'SELECT COUNT(*) as cnt FROM Visits');
+            await tempDb.close();
+            hasAnyDbVisits = (countResult.first['cnt'] as int? ?? 0) > 0;
+          }
+
+          if (!hasAnyDbVisits && mounted) {
+            // No hay visitas en DB en absoluto → actividades sin persistencia en SQLite
+            final activityResults =
+                await actions.calculateActivityResults(context);
+            final activityVisits = activityResults['visits'] ?? 0;
+            final activityResultsCount = activityResults['results'] ?? 0;
+            if (activityVisits > 0) {
+              totalVisits = activityVisits;
+              totalResults = activityResultsCount;
+              debugPrint(
+                  '✅ Visitas desde calculateActivityResults: $totalVisits, Results: $totalResults');
+            }
+          } else {
             debugPrint(
-                '✅ Visitas desde calculateActivityResults: $totalVisits, Results: $totalResults');
+                'ℹ️ DB tiene visitas (todas escritas en tag). Omitiendo fallback de memoria.');
           }
         } catch (e) {
-          debugPrint('⚠️ Error en calculateActivityResults: $e');
+          debugPrint('⚠️ Error en fallback calculateActivityResults: $e');
         }
       }
 

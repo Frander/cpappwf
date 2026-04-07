@@ -144,11 +144,12 @@ Future<bool> syncBaseData(
     debugPrint('');
     debugPrint('📦 LOTE 3: headquarters-weights | types-points | virtual-points');
 
+    final prevMonth = DateTime(syncNow.year, syncNow.month - 1);
     final batch3 = await Future.wait([
       _sbFetchList('headquarters-weights', currentToken, {
         'idCompany': '$idCompany',
-        'year':      '${syncNow.year}',
-        'month':     '${syncNow.month}',
+        'year':      '${prevMonth.year}',
+        'month':     '${prevMonth.month}',
       }),
       _sbFetchList('types-points',   currentToken, {'idCompany': '$idCompany'}),
       _sbFetchList('virtual-points', currentToken, {'idCompany': '$idCompany'}),

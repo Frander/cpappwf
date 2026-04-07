@@ -97,13 +97,73 @@ Future<Map<String, dynamic>?> _loadActivityFromSQLite(int activityId) async {
       .toList();
 
     // 4. Steps con sus status
-    final stepsJson = stepsRows.map((step) {
-      final stepId    = step['Id_activity_step'] as int;
-      final stepSts   = rootStatusForStep(stepId);
-      return {
+    // Para reference-list, los status pertenecen a la actividad referenciada (default_value)
+    // y deben consultarse por separado.
+    final List<Map<String, dynamic>> stepsJson = [];
+    for (final step in stepsRows) {
+      final stepId   = step['Id_activity_step'] as int;
+      final typeStep = step['Type_step'] as String? ?? '';
+
+      List<Map<String, dynamic>> stepSts;
+
+      if (typeStep == 'reference-list') {
+        // Los status son de la actividad referenciada en default_value
+        final refActivityIdRaw = step['Default_value'];
+        final refActivityId = refActivityIdRaw != null
+            ? int.tryParse(refActivityIdRaw.toString())
+            : null;
+
+        if (refActivityId != null) {
+          try {
+            final refStatusRows = await db.query(
+              'Activities_status',
+              where: 'Id_activity = ? AND (Id_activity_status_parent IS NULL OR Id_activity_status_parent = 0)',
+              whereArgs: [refActivityId],
+              orderBy: 'Order_status ASC',
+            );
+
+            // Construir mapa de todos los status de la actividad referenciada
+            final allRefStatusRows = await db.query(
+              'Activities_status',
+              where: 'Id_activity = ?',
+              whereArgs: [refActivityId],
+              orderBy: 'Order_status ASC',
+            );
+            final refStatusById = <int, Map<String, dynamic>>{};
+            for (final row in allRefStatusRows) {
+              final id = row['Id_activity_status'] as int;
+              refStatusById[id] = _statusRowToJson(row);
+            }
+            // Construir hijos
+            for (final row in allRefStatusRows) {
+              final parentId = row['Id_activity_status_parent'];
+              if (parentId != null && (parentId as int) != 0 && refStatusById.containsKey(parentId)) {
+                final childId = row['Id_activity_status'] as int;
+                (refStatusById[parentId]!['activities_status_childs'] as List).add(refStatusById[childId]!);
+                (refStatusById[parentId]!['status_childs'] as List).add(refStatusById[childId]!);
+              }
+            }
+
+            stepSts = refStatusRows
+                .map((r) => refStatusById[r['Id_activity_status'] as int]!)
+                .toList();
+
+            debugPrint('✅ [SQLite fallback] reference-list step "${step['Name_step']}" → ${stepSts.length} status desde actividad $refActivityId');
+          } catch (e) {
+            debugPrint('❌ [SQLite fallback] Error cargando status de ref-activity $refActivityId: $e');
+            stepSts = [];
+          }
+        } else {
+          stepSts = [];
+        }
+      } else {
+        stepSts = rootStatusForStep(stepId);
+      }
+
+      stepsJson.add({
         'id_activity_step': stepId,
         'id_activity':      step['Id_activity'],
-        'type_step':        step['Type_step'],
+        'type_step':        typeStep,
         'order_step':       step['Order_step'],
         'default_value':    step['Default_value'],
         'unity':            step['Unity'],
@@ -111,11 +171,10 @@ Future<Map<String, dynamic>?> _loadActivityFromSQLite(int activityId) async {
         'name_step':        step['Name_step'],
         'status':           step['Status'],
         'is_required':      step['Is_required'] == 1,
-        // Exponer con AMBAS claves: la form usa ambas en distintos lugares
-        'activity_status':   stepSts, // usado por _initializeDateTimeDefaults
-        'activities_status': stepSts, // usado por _buildStepWidget
-      };
-    }).toList();
+        'activity_status':   stepSts,
+        'activities_status': stepSts,
+      });
+    }
 
     // 5. Status raíz (sin step parent)
     final rootStatus = statusRows
@@ -655,10 +714,12 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
         if (activitiesJSON != null) {
           try {
             final activitiesList = activitiesJSON is List ? activitiesJSON : [];
-            activityJSON = activitiesList.firstWhere(
-              (activity) => getJsonField(activity, r'''$.id_activity''') == activityItem.idActivity,
-              orElse: () => null,
-            );
+            for (final a in activitiesList) {
+              if (a is Map && a['id_activity'] == activityItem.idActivity) {
+                activityJSON = a;
+                break;
+              }
+            }
             if (activityJSON != null) {
               debugPrint('✅ Actividad encontrada en activitiesJSON: ${activityItem.nameActivity}');
             } else {
@@ -678,6 +739,18 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
         }
 
         if (activityJSON != null) {
+          // Diagnóstico: verificar activities_status en steps de tipo reference-list
+          try {
+            final steps = (activityJSON['activity_steps'] as List?) ?? [];
+            for (final step in steps) {
+              if (step is Map && step['type_step'] == 'reference-list') {
+                final statuses = (step['activities_status'] as List?) ?? [];
+                debugPrint('🔍 [activities_page] reference-list step "${step['name_step']}" → activities_status: ${statuses.length}');
+              }
+            }
+          } catch (e) {
+            debugPrint('⚠️ Error inspeccionando steps: $e');
+          }
           FFAppState().activitySelectedJSON = activityJSON;
           FFAppState().currentActivity = activityJSON;
         } else {
