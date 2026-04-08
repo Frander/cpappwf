@@ -1,6 +1,8 @@
 // Export pages
 export '/visits/do_visits_form_page/do_visits_form_page_widget.dart'
     show DoVisitsFormPageWidget;
+export '/visits/formulario_extractora_form_page/formulario_extractora_form_page_widget.dart'
+    show FormularioExtractorPageWidget;
 export '/visits/visits_with_map_page/visits_with_map_page_widget.dart'
     show VisitsWithMapPageWidget;
 export '/login_page/login_page_widget.dart' show LoginPageWidget;

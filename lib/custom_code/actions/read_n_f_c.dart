@@ -331,9 +331,29 @@ Future<String> readNFC(
           }
         }
 
+        // Inyectar tag_from, tag_to y US en el JSON leído (si es formato JSON)
+        String enrichedTagData = tagData;
+        if (isNewJsonFormat(tagData)) {
+          try {
+            final readJson = parseNfcJson(tagData);
+            if (readJson != null) {
+              final readInfo = readJson['Read_info'] as Map<String, dynamic>?;
+              if (readInfo != null) {
+                readInfo['tag_from'] = tagId; // RFID del tag leído
+                readInfo['tag_to'] = '';       // vacío para tag-reader
+                readInfo['US'] = FFAppState().userSelected.idUser;
+              }
+              enrichedTagData = nfcJsonToString(readJson);
+              debugPrint('✅ TAG-READER: JSON enriquecido con tag_from=$tagId, US=${FFAppState().userSelected.idUser}');
+            }
+          } catch (e) {
+            debugPrint('⚠️ Error enriqueciendo JSON del tag-reader: $e');
+          }
+        }
+
         // Actualizar el AppState con los datos leídos
         FFAppState().update(() {
-          FFAppState().nfcRead = tagData;
+          FFAppState().nfcRead = enrichedTagData;
         });
 
         // === BORRADO EN SESIÓN (tag-transfer de origen) ===

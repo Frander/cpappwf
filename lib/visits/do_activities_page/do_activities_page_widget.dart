@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../formulario_extractora_form_page/formulario_extractora_form_page_widget.dart';
 import 'do_activities_page_model.dart';
 export 'do_activities_page_model.dart';
 
@@ -487,13 +488,35 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               FFAppState().update(() {});
 
                               if (!mounted) return;
-                              await Navigator.of(this.context).push(
-                                MaterialPageRoute(
-                                  builder: (context) => const VisitsWithMapPageWidget(
-                                    isMapEnabled: false,
+                              
+                              // VALIDACIÓN: Verificar si type_activity == "FORMULARIO EXTRACTORA"
+                              final typeActivity = getJsonField(
+                                FFAppState().currentActivity,
+                                r'''$.type_activity''',
+                              )?.toString() ?? '';
+                              
+                              if (typeActivity == 'FORMULARIO EXTRACTORA') {
+                                // Navegar a la página especial de FORMULARIO EXTRACTORA
+                                context.pushNamed(
+                                  FormularioExtractorPageWidget.routeName,
+                                  extra: <String, dynamic>{
+                                    kTransitionInfoKey: const TransitionInfo(
+                                      hasTransition: true,
+                                      transitionType: PageTransitionType.fade,
+                                      duration: Duration(milliseconds: 500),
+                                    ),
+                                  },
+                                );
+                              } else {
+                                // Navegación normal para otros tipos de actividades
+                                await Navigator.of(this.context).push(
+                                  MaterialPageRoute(
+                                    builder: (context) => const VisitsWithMapPageWidget(
+                                      isMapEnabled: false,
+                                    ),
                                   ),
-                                ),
-                              );
+                                );
+                              }
                             },
                             onLongPress: () async {
                               // 🔄 LONG PRESS (2 segundos): Forzar mostrar el diálogo nuevamente

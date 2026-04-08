@@ -61,7 +61,10 @@
       "Bash(find /c/Users/Juan_Diego_Duque/AppData -path *flutter_gemma* -name *.dart)",
       "Bash(find e:/RepositoriosFix/ClickPalmAPP/lib/custom_code -type f -name *tts* -o -name *TTSQueue*)",
       "Bash(ls -1 /e/RepositoriosFix/ClickPalmAPP/lib/custom_code/actions/*.dart)",
-      "Read(//c/Users/JUAN_D~1/AppData/Local/Temp/claude/e--RepositoriosFix-ClickPalmAPP/2578ff06-7cc1-43f2-84d4-4c11b179eac2/tasks/**)"
+      "Read(//c/Users/JUAN_D~1/AppData/Local/Temp/claude/e--RepositoriosFix-ClickPalmAPP/2578ff06-7cc1-43f2-84d4-4c11b179eac2/tasks/**)",
+      "Read(//class _DoVisitsFormPageWidgetState/,/^class / { if \\(/Widget build/\\(BuildContext context/\\)/**)",
+      "Read(//e/RepositoriosFix/ClickPalmAPP/NR >= 13500 && NR <= 14500 { if \\(/class.*extends State/ || /Widget build/\\(/**)",
+      "Bash(find /e/RepositoriosFix/ClickPalmAPP/lib/custom_code/actions -name \"*.dart\" -exec grep -l \"flutter_blue_plus\\\\|battery_plus\\\\|sensors_plus\\\\|image_picker\\\\|webview\" {} \\\\;)"
     ],
     "deny": [],
     "ask": [],

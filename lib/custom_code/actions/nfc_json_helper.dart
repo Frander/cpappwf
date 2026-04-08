@@ -33,10 +33,16 @@ import 'dart:convert';
 /// ```
 
 /// Construye el JSON inicial para un nuevo tag
+/// [tagFrom] RFID de origen: para tag-reader = RFID leído, para tag-writer = '', para tag-transfer = RFID origen
+/// [tagTo]   RFID de destino: para tag-reader = '', para tag-writer = RFID escrito, para tag-transfer = RFID destino
+/// [userId]  ID del usuario activo en AppState (FFAppState().userSelected.idUser)
 Map<String, dynamic> buildInitialNfcJson({
   required int idProduct,
   required String rfid,
   required String nameProduct,
+  String tagFrom = '',
+  String tagTo = '',
+  int userId = 0,
 }) {
   return {
     'Read_info': {
@@ -44,6 +50,9 @@ Map<String, dynamic> buildInitialNfcJson({
       'RFID': rfid,
       'Name_product': nameProduct,
       'Date_created': DateTime.now().toIso8601String(),
+      'tag_from': tagFrom,
+      'tag_to': tagTo,
+      'US': userId,
     },
     'Visits': [],
   };
@@ -55,12 +64,18 @@ Map<String, dynamic> updateReadInfo(
   required int idProduct,
   required String rfid,
   required String nameProduct,
+  String tagFrom = '',
+  String tagTo = '',
+  int userId = 0,
 }) {
   nfcJson['Read_info'] = {
     'Id_product': idProduct,
     'RFID': rfid,
     'Name_product': nameProduct,
     'Date_created': DateTime.now().toIso8601String(),
+    'tag_from': tagFrom,
+    'tag_to': tagTo,
+    'US': userId,
   };
   return nfcJson;
 }
@@ -186,6 +201,9 @@ Map<String, dynamic>? migrateOldFormatToJson(
   required int idProduct,
   required String rfid,
   required String nameProduct,
+  String tagFrom = '',
+  String tagTo = '',
+  int userId = 0,
 }) {
   try {
     // Crear JSON base
@@ -193,6 +211,9 @@ Map<String, dynamic>? migrateOldFormatToJson(
       idProduct: idProduct,
       rfid: rfid,
       nameProduct: nameProduct,
+      tagFrom: tagFrom,
+      tagTo: tagTo,
+      userId: userId,
     );
 
     // Extraer todos los registros entre {}

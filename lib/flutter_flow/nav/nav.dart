@@ -83,6 +83,16 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
+          name: FormularioExtractorPageWidget.routeName,
+          path: FormularioExtractorPageWidget.routePath,
+          builder: (context, params) => FormularioExtractorPageWidget(
+            tittle: params.getParam(
+              'tittle',
+              ParamType.String,
+            ),
+          ),
+        ),
+        FFRoute(
           name: LoginPageWidget.routeName,
           path: LoginPageWidget.routePath,
           builder: (context, params) => LoginPageWidget(

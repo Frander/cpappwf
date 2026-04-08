@@ -144,11 +144,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       final String dbPath = await _getDatabasePath();
       final Database db = await openDatabase(dbPath);
 
-      // Contar visitas pendientes (Status = 0 significa pendiente de sincronizar)
+      // Contar todas las visitas pendientes (el sync envía todas sin filtro de Status)
       final List<Map<String, dynamic>> result = await db.rawQuery('''
         SELECT COUNT(*) as count
         FROM Visits
-        WHERE Status = 0
       ''');
 
       await db.close();

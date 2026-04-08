@@ -252,10 +252,32 @@ Future<bool> writeNFCTag(
 
           // === DETECTAR TIPO DE OPERACIÓN ===
           // Si dataToWrite ya es un JSON completo válido (tag-transfer),
-          // escribirlo directamente sin modificar
+          // inyectar tag_from (RFID origen ya viene en el JSON), tag_to y US
           if (isNewJsonFormat(dataToWrite)) {
-            debugPrint('🔄 TAG-TRANSFER: JSON completo detectado, escribiendo directamente');
-            finalContent = dataToWrite;
+            debugPrint('🔄 TAG-TRANSFER: JSON completo detectado, inyectando tag_to y US');
+            try {
+              final transferJson = parseNfcJson(dataToWrite);
+              if (transferJson != null) {
+                final readInfo = transferJson['Read_info'] as Map<String, dynamic>?;
+                if (readInfo != null) {
+                  // tag_from ya viene del JSON (RFID del tag origen)
+                  // tag_to = RFID del tag destino (el tag físico actual)
+                  readInfo['tag_to'] = tagRfid;
+                  readInfo['US'] = FFAppState().userSelected.idUser;
+                  // Si tag_from no fue seteado aún, usar el RFID guardado en Read_info.RFID
+                  if ((readInfo['tag_from'] as String? ?? '').isEmpty) {
+                    readInfo['tag_from'] = readInfo['RFID'] ?? '';
+                  }
+                }
+                finalContent = nfcJsonToString(transferJson);
+                debugPrint('   tag_from=${readInfo?["tag_from"]}, tag_to=$tagRfid, US=${FFAppState().userSelected.idUser}');
+              } else {
+                finalContent = dataToWrite;
+              }
+            } catch (e) {
+              debugPrint('⚠️ Error inyectando campos en tag-transfer: $e');
+              finalContent = dataToWrite;
+            }
           } else {
             // === PROCESAR FORMATO ANTIGUO (TAG-WRITER) ===
             // Parsear el dataToWrite para extraer los campos necesarios
@@ -362,8 +384,11 @@ Future<bool> writeNFCTag(
                     idProduct: productId,
                     rfid: productRfid,
                     nameProduct: productName,
+                    tagFrom: '',
+                    tagTo: tagRfid,
+                    userId: FFAppState().userSelected.idUser,
                   );
-                  debugPrint('📝 Read_info actualizado');
+                  debugPrint('📝 Read_info actualizado (tag-writer)');
                 }
 
                 // Agregar nueva visita
@@ -391,6 +416,9 @@ Future<bool> writeNFCTag(
                   idProduct: productId,
                   rfid: productRfid,
                   nameProduct: productName,
+                  tagFrom: '',
+                  tagTo: tagRfid,
+                  userId: FFAppState().userSelected.idUser,
                 );
 
                 if (nfcJson != null) {
@@ -423,6 +451,9 @@ Future<bool> writeNFCTag(
                 idProduct: productId,
                 rfid: productRfid,
                 nameProduct: productName,
+                tagFrom: '',
+                tagTo: tagRfid,
+                userId: FFAppState().userSelected.idUser,
               );
 
               // Agregar primera visita

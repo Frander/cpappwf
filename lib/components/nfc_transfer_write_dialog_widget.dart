@@ -132,6 +132,7 @@ class _NfcTransferWriteDialogWidgetState
       }
 
       debugPrint('✅ Transferencia completada exitosamente');
+      debugPrint('📦 TAG-TRANSFER: Contenido escrito en destino: ${contentToWrite.length} caracteres');
 
       if (!mounted) return;
       setState(() {
@@ -141,10 +142,10 @@ class _NfcTransferWriteDialogWidgetState
 
       HapticFeedback.heavyImpact();
 
-      // Esperar un momento y cerrar el diálogo
+      // Esperar un momento y cerrar el diálogo retornando el contenido escrito
       await Future.delayed(Duration(seconds: 2));
       if (mounted) {
-        Navigator.pop(context, true);
+        Navigator.pop(context, contentToWrite);
       }
     } catch (e) {
       debugPrint('❌ Error en transferencia: $e');

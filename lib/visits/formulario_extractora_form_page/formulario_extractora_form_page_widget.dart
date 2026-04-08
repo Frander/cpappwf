@@ -28,27 +28,27 @@ import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
-import 'do_visits_form_page_model.dart';
-export 'do_visits_form_page_model.dart';
+import 'formulario_extractora_form_page_model.dart';
+export 'formulario_extractora_form_page_model.dart';
 
-class DoVisitsFormPageWidget extends StatefulWidget {
-  const DoVisitsFormPageWidget({
+class FormularioExtractorPageWidget extends StatefulWidget {
+  const FormularioExtractorPageWidget({
     super.key,
     String? tittle,
   }) : tittle = tittle ?? 'Módulo ClickPalm';
 
   final String tittle;
 
-  static String routeName = 'DoVisitsFormPage';
-  static String routePath = '/doVisitsFormPage';
+  static String routeName = 'FormularioExtractorPage';
+  static String routePath = '/formularioExtractorPage';
 
   @override
-  State<DoVisitsFormPageWidget> createState() => _DoVisitsFormPageWidgetState();
+  State<FormularioExtractorPageWidget> createState() => _FormularioExtractorPageWidgetState();
 }
 
-class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
-    with AutomaticKeepAliveClientMixin {
-  late DoVisitsFormPageModel _model;
+class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageWidget>
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin, TickerProviderStateMixin {
+  late FormularioExtractorPageModel _model;
 
   // Mantener vivo el estado cuando se cambia de tab
   @override
@@ -193,6 +193,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   List<dynamic> _cachedActivityStatus = [];
   bool _isDataCacheInitialized = false;
 
+  // TabController para steps de tipo tab-container
+  TabController? _tabController;
+
+  // Caché de hijos de reference-list cargados desde activitiesJSON por default_status
+  // statusId → List<dynamic> de statuses de la actividad referenciada
+  final Map<int, List<dynamic>> _referenceListChilds = {};
+
   // Caché de búsquedas en visitDetails (evita O(n) en cada rebuild)
   final Map<String, bool> _visitDetailsSearchCache = {};
   int _lastVisitDetailsLength = 0;
@@ -206,7 +213,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   @override
   void initState() {
     super.initState();
-    _model = createModel(context, () => DoVisitsFormPageModel());
+    _model = createModel(context, () => FormularioExtractorPageModel());
     _initializeDataCache(); // LOTE 1: Inicializar caché de datos
     _migrateHtmlToCheckmark(); // Migrar HTML antiguo a checkmark
     _initializeExpansionStates();
@@ -264,7 +271,77 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       });
     }
 
+    // Cargar hijos de reference-list (type_status) desde activitiesJSON
+    // Los hijos viven en otra actividad referenciada por el campo default_status del status
+    _referenceListChilds.clear();
+    final activitiesJson = FFAppState().activitiesJSON;
+    if (activitiesJson is List) {
+      // Indexar actividades por id para búsqueda rápida
+      final Map<int, dynamic> activityById = {};
+      for (var act in activitiesJson) {
+        final actId = getJsonField(act, r'''$.id_activity''');
+        if (actId is int) activityById[actId] = act;
+      }
+
+      for (var step in _cachedActivitySteps) {
+        final statusesRaw = getJsonField(step, r'''$.activities_status''');
+        if (statusesRaw is! List) continue;
+        for (var status in statusesRaw) {
+          final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+          if (typeStatus != 'reference-list') continue;
+          final statusId = getJsonField(status, r'''$.id_activity_status''');
+          if (statusId == null) continue;
+          final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+          final refActivityId = int.tryParse(defaultStatus);
+          if (refActivityId == null) continue;
+          final refActivity = activityById[refActivityId];
+          if (refActivity == null) {
+            debugPrint('⚠️ reference-list status $statusId: actividad referenciada $refActivityId no encontrada');
+            continue;
+          }
+          // Obtener statuses raíz de la actividad referenciada
+          final refStatuses = getJsonField(refActivity, r'''$.activity_status''');
+          if (refStatuses is List && refStatuses.isNotEmpty) {
+            _referenceListChilds[statusId as int] = refStatuses;
+            debugPrint('✅ reference-list status $statusId: ${refStatuses.length} hijos desde actividad $refActivityId');
+          } else {
+            debugPrint('⚠️ reference-list status $statusId: actividad $refActivityId sin statuses raíz');
+          }
+        }
+      }
+    }
+
     _isDataCacheInitialized = true;
+
+    // Inicializar TabController si todos los steps raíz son tab-container
+    final allTabContainer = _cachedActivitySteps.isNotEmpty &&
+        _cachedActivitySteps.every((s) =>
+            getJsonField(s, r'''$.type_step''').toString() == 'tab-container');
+    if (allTabContainer) {
+      _tabController?.dispose();
+      _tabController = TabController(
+        length: _cachedActivitySteps.length,
+        vsync: this,
+      );
+
+      // Auto-expandir reference-list dentro de tab-container (siempre visibles)
+      for (var step in _cachedActivitySteps) {
+        final stepId = getJsonField(step, r'''$.id_activity_step''');
+        final statusesRaw = getJsonField(step, r'''$.activities_status''');
+        if (statusesRaw is! List) continue;
+        for (var status in statusesRaw) {
+          final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+          final statusId = getJsonField(status, r'''$.id_activity_status''');
+          final childsRaw = getJsonField(status, r'''$.activities_status_childs''');
+          final hasRefChilds = typeStatus == 'reference-list' &&
+              ((statusId is int && _referenceListChilds.containsKey(statusId)) ||
+               (childsRaw is List && childsRaw.isNotEmpty));
+          if (hasRefChilds) {
+            _statusExpansionState['${stepId}_$statusId'] = true;
+          }
+        }
+      }
+    }
   }
 
   /// Migra datos antiguos con HTML en status_response a checkmark simple
@@ -365,6 +442,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     _model.dispose();
     // Disponer controllers de búsqueda
     _searchControllers.forEach((_, controller) => controller.dispose());
+    _tabController?.dispose();
     super.dispose();
   }
 
@@ -1017,21 +1095,114 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // Invalidar caché de búsquedas si cambió visitDetails
     _invalidateSearchCacheIfNeeded();
 
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
-      },
-      child: Column(
-        children: [
-          // Contenido del formulario
-          Expanded(
-            child: _buildFormContent(),
+    return Material(
+      color: Colors.transparent,
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF003420), Color(0xFF002415), Color(0xFF00150A)],
+            stops: [0.0, 0.5, 1.0],
           ),
+        ),
+        child: SafeArea(
+          child: GestureDetector(
+            onTap: () {
+              FocusScope.of(context).unfocus();
+              FocusManager.instance.primaryFocus?.unfocus();
+            },
+            child: Column(
+              children: [
+                // Header de la página (título + botón atrás)
+                _buildPageHeader(),
 
-          // Botones de navegación
-          _buildNavigationButtons(),
-        ],
+                // Contenido del formulario
+                Expanded(
+                  child: _buildFormContent(),
+                ),
+
+                // Botones de navegación
+                _buildNavigationButtons(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Header de la página standalone (equivalente al _buildModernHeader de VisitsWithMapPage)
+  Widget _buildPageHeader() {
+    final activityName = FFAppState().activitySelected.nameActivity.isNotEmpty
+        ? FFAppState().activitySelected.nameActivity
+        : 'Formulario Extractora';
+
+    return Container(
+      height: 60,
+      decoration: BoxDecoration(
+        color: const Color(0xFF00a86b).withValues(alpha: 0.15),
+        border: Border(
+          bottom: BorderSide(
+            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Row(
+          children: [
+            // Botón atrás
+            GestureDetector(
+              onTap: () => context.pushNamed(
+                DoActivitiesPageWidget.routeName,
+                extra: <String, dynamic>{
+                  kTransitionInfoKey: const TransitionInfo(
+                    hasTransition: true,
+                    transitionType: PageTransitionType.fade,
+                    duration: Duration(milliseconds: 400),
+                  ),
+                },
+              ),
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF00a86b), Color(0xFF007a4e)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                    width: 1,
+                  ),
+                ),
+                child: const Icon(
+                  Icons.chevron_left_rounded,
+                  color: Color(0xFF00ff9f),
+                  size: 24,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Título de la actividad
+            Expanded(
+              child: Text(
+                activityName,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: 0.3,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1070,6 +1241,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     }
 
+    // Si todos los steps raíz son tab-container → renderizar como Tabs
+    final allTabContainer = activitySteps.isNotEmpty &&
+        activitySteps.every((s) =>
+            getJsonField(s, r'''$.type_step''').toString() == 'tab-container');
+
+    if (allTabContainer && _tabController != null) {
+      return _buildTabLayout(activitySteps, activityStatus);
+    }
+
+    // Fallback: lista accordion original
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: activitySteps.length + activityStatus.length,
@@ -1078,7 +1259,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         if (index < activitySteps.length) {
           return _buildStepCard(activitySteps[index], level: 0);
         } else {
-          // Renderizar status del nivel raíz
           final statusIndex = index - activitySteps.length;
           return _buildRootStatusCard(
             activityStatus[statusIndex],
@@ -1087,6 +1267,61 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           );
         }
       },
+    );
+  }
+
+  /// Renderiza los steps como TabBar + TabBarView (diseño moderno)
+  Widget _buildTabLayout(List<dynamic> activitySteps, List<dynamic> activityStatus) {
+    return Column(
+      children: [
+        // ── TabBar moderna ───────────────────────────────────────
+        _ModernTabBar(
+          controller: _tabController!,
+          steps: activitySteps,
+          getCachedValue: _cachedSearchInVisitDetails,
+          getJsonField: getJsonField,
+        ),
+
+        // ── TabBarView ──────────────────────────────────────────
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: activitySteps.map<Widget>((step) {
+              final activitiesStatusRaw =
+                  getJsonField(step, r'''$.activities_status''');
+              final List<dynamic> tabStatuses = activitiesStatusRaw != null
+                  ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
+                  : [];
+
+              if (tabStatuses.isEmpty) {
+                return const Center(
+                  child: Text(
+                    'Sin campos configurados',
+                    style: TextStyle(color: Colors.white54),
+                  ),
+                );
+              }
+
+              return ListView.separated(
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                itemCount: tabStatuses.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, i) {
+                  return _buildStatusOption(step, tabStatuses[i], level: 0);
+                },
+              );
+            }).toList(),
+          ),
+        ),
+
+        // ── Status raíz adicionales (si los hay) ────────────────
+        if (activityStatus.isNotEmpty)
+          ...activityStatus.map((s) => _buildRootStatusCard(
+                s,
+                allActivityStatus: activityStatus,
+                level: 0,
+              )),
+      ],
     );
   }
 
@@ -1404,9 +1639,16 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         : [];
     final statusChildsRaw =
         getJsonField(status, r'''$.activities_status_childs''');
-    final statusChilds = statusChildsRaw != null
-        ? (statusChildsRaw is List ? statusChildsRaw : [])
-        : [];
+    // Para reference-list (type_status), los hijos viven en otra actividad cargada via default_status
+    // Se usa _referenceListChilds[statusId] si está disponible, si no, fallback a la lista embebida
+    final refListChildsFromCache = (typeStatus.toLowerCase() == 'reference-list' && statusId is int)
+        ? (_referenceListChilds[statusId] ?? [])
+        : <dynamic>[];
+    final statusChilds = refListChildsFromCache.isNotEmpty
+        ? refListChildsFromCache
+        : (statusChildsRaw != null
+            ? (statusChildsRaw is List ? statusChildsRaw : [])
+            : []);
     final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
 
     // LOTE 1: Usar búsqueda cacheada
@@ -1440,6 +1682,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isUsersListType = typeStatus.toLowerCase() == 'users-list';
     final isReferenceListType = typeStatus.toLowerCase() == 'reference-list';
 
+    // Para reference-list: determinar si algún hijo está seleccionado y cuál es su nombre
+    // (el hijo seleccionado se almacena con auxStep == statusId del padre reference-list)
+    final int statusIdInt = statusId is int ? statusId : (statusId as num).toInt();
+    String? referenceListSelectedName;
+    if (isReferenceListType) {
+      for (final d in FFAppState().visitDetails) {
+        if (d.auxStep == statusIdInt) {
+          referenceListSelectedName = d.statusOption;
+          break;
+        }
+      }
+    }
+    final bool hasSelectedRefChild = isReferenceListType && referenceListSelectedName != null;
+
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
       try {
@@ -1465,6 +1721,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             debugPrint('   ID: $statusId');
             debugPrint('═════════════════════════════════════════');
             debugPrint('');
+
+            // Si es tipo reference-list, solo hacer toggle de expansión (los hijos son quienes se seleccionan)
+            if (isReferenceListType) {
+              setState(() {
+                _statusExpansionState[expansionKey] = !(_statusExpansionState[expansionKey] ?? false);
+              });
+              return;
+            }
 
             // Si es tipo number, solo mostrar el control inline
             // NO llamar a _onStatusSelected para evitar agregar registros duplicados al breadcrumb
@@ -1691,7 +1955,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, leer SOLO el tag de origen
             if (isTagTransferType) {
-              // Si ya se leyó el tag origen, bloquear el tap — solo debe usarse TRANSFERIR AHORA
+              // Si ya se leyó el tag origen, bloquear tap — solo debe usarse TRANSFERIR AHORA
               if (_tagTransferData.containsKey(statusId) && _tagTransferData[statusId]!.isNotEmpty) {
                 debugPrint('🚫 TAG-TRANSFER: Tag origen ya leído, tap bloqueado — usar TRANSFERIR AHORA');
                 return;
@@ -2014,14 +2278,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   final currentExpansion =
                       _statusExpansionState[expansionKey] ?? false;
 
-                  // COLAPSAR todos los status hermanos (del mismo step padre) antes de expandir
-                  if (!currentExpansion) {
-                    // Obtener todos los status del step padre
+                  // COLAPSAR todos los status hermanos (solo en non-tab-container)
+                  // En tab-container cada status es independiente y no debe colapsar hermanos
+                  final parentTypeStep = getJsonField(parentStep, r'''$.type_step''')?.toString() ?? '';
+                  if (!currentExpansion && parentTypeStep.toLowerCase() != 'tab-container') {
                     final parentStepStatuses =
                         getJsonField(parentStep, r'''$.activities_status''')
                             .toList();
-
-                    // Colapsar todos los status hermanos
                     for (var siblingStatus in parentStepStatuses) {
                       final siblingStatusId = getJsonField(
                           siblingStatus, r'''$.id_activity_status''');
@@ -2122,7 +2385,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 }
               }
 
-              await _onStatusSelected(parentStep, status);
+              await _onStatusSelected(parentStep, status, parentMultipleOptionId: parentMultipleOptionId);
+
+              // Auto-colapsar el reference-list padre al seleccionar un hijo
+              if (parentMultipleOptionId != null) {
+                setState(() {
+                  _statusExpansionState['${parentStepId}_$parentMultipleOptionId'] = false;
+                });
+              }
             }
           },
           child: Container(
@@ -2132,8 +2402,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                // INVERTIDO: Verde oscuro si está seleccionado (y no es number, tag-writer, tag-reader ni distance-extractor)
-                colors: (isSelected &&
+                colors: ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                         !isNumberType &&
                         !isTagWriterType &&
                         !isTagReaderType &&
@@ -2149,8 +2418,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                // INVERTIDO: Verde oscuro si está seleccionado (y no es number, tag-writer, tag-reader ni distance-extractor)
-                color: (isSelected &&
+                color: ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                         !isNumberType &&
                         !isTextType &&
                         !isTagWriterType &&
@@ -2174,7 +2442,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
-                            color: (isSelected &&
+                            color: ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                                     !isNumberType &&
                                     !isTagWriterType &&
                                     !isTagReaderType)
@@ -2182,9 +2450,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 : const Color(0xFF00a86b),
                             width: 3,
                           ),
-                          color: isSelected ? Colors.white : Colors.transparent,
+                          color: (isReferenceListType ? hasSelectedRefChild : isSelected)
+                              ? Colors.white
+                              : Colors.transparent,
                         ),
-                        child: isSelected
+                        child: (isReferenceListType ? hasSelectedRefChild : isSelected)
                             ? Center(
                                 child: Container(
                                   width: 12,
@@ -2197,9 +2467,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               )
                             : null,
                       ),
-                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType) const SizedBox(width: 12),
-                    // Icono específico para date, time, photo y video, indicador de color para otros tipos (excepto number, users-list y text)
-                    if (!isTagReaderType && !isTagWriterType && !isTagTransferType && !isNumberType && !isUsersListType && !isTextType)
+                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType && !isDateType && !isTimeType && !isReferenceListType && !isLabelInfoType && !isDistanceExtractorType && !isHeadquarterWeightType && !isNumbersOperationType) const SizedBox(width: 12),
+                    // Icono específico para photo y video, indicador de color para otros tipos (excepto number, users-list, text, date, time, reference-list, label-info, distance-extractor, headquarter-weight, numbers-operation)
+                    if (!isTagReaderType && !isTagWriterType && !isTagTransferType && !isNumberType && !isUsersListType && !isTextType && !isDateType && !isTimeType && !isReferenceListType && !isLabelInfoType && !isDistanceExtractorType && !isHeadquarterWeightType && !isNumbersOperationType)
                       // Para photo y video: solo mostrar icono sin contenedor de fondo cuando no está seleccionado
                       (isPhotoType || isVideoType) && !isSelected
                           ? Padding(
@@ -2295,9 +2565,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                                   (_distanceExtractorCalculated[
                                                           statusId] ??
                                                       false))
-                                              ? const Color(
-                                                  0xFF00695C) // Verde oscuro para distance-extractor calculado
-                                              : (isSelected &&
+                                              ? const Color(0xFF00695C)
+                                              : ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                                                       !isNumberType &&
                                                       !isTagWriterType &&
                                                       !isTagReaderType &&
@@ -2337,6 +2606,30 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 ),
                             ],
                           ),
+                          // Opción seleccionada para reference-list - DEBAJO del título
+                          if (isReferenceListType && referenceListSelectedName != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.check_circle_rounded,
+                                      size: 14, color: Colors.white),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      referenceListSelectedName,
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           // Resumen del tag-reader (solo para tipo tag-reader) - DEBAJO
                           if (isTagReaderType &&
                               _tagReaderData.containsKey(statusId))
@@ -2464,6 +2757,39 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ],
                       ),
                     ),
+                    // Botón de búsqueda inline para reference-list
+                    if (isReferenceListType)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _searchBoxExpansionState[statusId] =
+                                !(_searchBoxExpansionState[statusId] ?? false);
+                            // Si abrimos la búsqueda, asegurar que la lista esté expandida
+                            if (_searchBoxExpansionState[statusId] == true) {
+                              _statusExpansionState[expansionKey] = true;
+                            }
+                          });
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            color: (_searchBoxExpansionState[statusId] ?? false)
+                                ? const Color(0xFF00a86b).withValues(alpha: 0.25)
+                                : Colors.transparent,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.white,
+                              width: 2,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.search_rounded,
+                            size: 22,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
                     if (hasChildren)
                       Icon(
                         isExpanded
@@ -2483,27 +2809,22 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // ╔════════════════════════════════════════════════════════════════╗
         // ║ RENDERIZACIÓN ESPECIAL PARA reference-list (type_status)      ║
         // ╚════════════════════════════════════════════════════════════════╝
-        if (isReferenceListType && isExpanded && statusChilds.isNotEmpty)
+        if (isReferenceListType && statusChilds.isNotEmpty && isExpanded)
           Container(
             margin: const EdgeInsets.only(left: 12, bottom: 8),
             child: Column(
               children: [
-                // Botón de búsqueda compacto para reference-list
-                Padding(
-                  padding: const EdgeInsets.only(right: 8, bottom: 8),
-                  child: _buildCompactSearchButton(statusId, hasValue: isSelected),
-                ),
-
                 // Cuadro de búsqueda expandido (solo cuando está activo)
                 if ((_searchBoxExpansionState[statusId] ?? false))
-                  _buildExpandedSearchBox(statusId),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _buildExpandedSearchBox(statusId),
+                  ),
 
                 // Renderizar statusChilds de reference-list filtrando por búsqueda
                 Builder(
                   builder: (context) {
-                    // Aplicar filtro de búsqueda a los statusChilds
                     final displayList = _filterStatusList(statusId, statusChilds);
-                    
                     if (displayList.isEmpty) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -2517,17 +2838,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         ),
                       );
                     }
-
                     return Column(
                       children: displayList
-                          .map<Widget>((childStatus) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: _buildStatusOption(parentStep, childStatus,
-                                  level: level + 1,
-                                  parentMultipleOptionId: statusId),
-                            );
-                          })
+                          .map<Widget>((childStatus) => Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: _buildStatusOption(parentStep, childStatus,
+                                    level: level + 1,
+                                    parentMultipleOptionId: statusId),
+                              ))
                           .toList(),
                     );
                   },
@@ -2868,7 +3186,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, leer SOLO el tag de origen (NO transferir aún)
             if (isTagTransferType) {
-              // Si ya se leyó el tag origen, bloquear el tap — solo debe usarse TRANSFERIR AHORA
+              // Si ya se leyó el tag origen, bloquear tap — solo debe usarse TRANSFERIR AHORA
               if (_tagTransferData.containsKey(statusId) && _tagTransferData[statusId]!.isNotEmpty) {
                 debugPrint('🚫 TAG-TRANSFER (ROOT): Tag origen ya leído, tap bloqueado — usar TRANSFERIR AHORA');
                 return;
@@ -3669,8 +3987,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, leer SOLO el tag de origen (NO transferir aún)
             if (isTagTransferType) {
+              // Si ya se leyó el tag origen, bloquear tap — solo debe usarse TRANSFERIR AHORA
+              if (_tagTransferData.containsKey(statusId) && _tagTransferData[statusId]!.isNotEmpty) {
+                debugPrint('🚫 TAG-TRANSFER (CHILD): Tag origen ya leído, tap bloqueado — usar TRANSFERIR AHORA');
+                return;
+              }
+
               // Si la transferencia ya está completada, NO procesar el tap
-              // El botón TRANSFERENCIA EXITOSA no debe ser clickeable
               if (_tagTransferCompleted[statusId] == true) {
                 debugPrint('🚫 TAG-TRANSFER (CHILD): Transferencia ya completada, tap ignorado');
                 return;
@@ -4228,7 +4551,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     setState(() {});
   }
 
-  Future<void> _onStatusSelected(dynamic parentStep, dynamic status) async {
+  Future<void> _onStatusSelected(dynamic parentStep, dynamic status, {int? parentMultipleOptionId}) async {
     final parentStepId = getJsonField(parentStep, r'''$.id_activity_step''');
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
@@ -4255,21 +4578,46 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('📋 Tipo de step: $typeStep - Solo se permite UNA selección');
     }
 
-    // 1. Para unique-list y reference-list: Eliminar TODOS los status previos con el mismo id_step_parent
-    // Para container-list: NO eliminar nada, permitir múltiples selecciones
+    // 1. Lógica de eliminación de selecciones previas según tipo de step
     List<int> indicesToRemove = [];
 
     if (!isMultiSelectList) {
-      for (int i = 0; i < FFAppState().visitDetails.length; i++) {
-        if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
-            FFAppState().visitDetails[i].idActivityStatus != 0) {
-          indicesToRemove.add(i);
-          debugPrint('   ⚠️ Eliminando selección previa: ${FFAppState().visitDetails[i].statusOption}');
+      if (typeStep.toLowerCase() == 'tab-container') {
+        // Para tab-container: cada status es independiente, NO borrar hermanos del tab.
+        // Pero los hijos de un reference-list deben ser excluyentes entre sí,
+        // identificados por auxStep == parentMultipleOptionId.
+        if (parentMultipleOptionId != null) {
+          // Es hijo de un reference-list: eliminar selección previa del mismo grupo
+          for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+            final d = FFAppState().visitDetails[i];
+            if (d.auxStep == parentMultipleOptionId && d.idActivityStatus != 0) {
+              indicesToRemove.add(i);
+              debugPrint('   ⚠️ Eliminando selección previa de reference-list: ${d.statusOption}');
+            }
+          }
+        } else {
+          // Status independiente del tab: solo eliminar la entrada anterior del mismo statusId
+          for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+            final d = FFAppState().visitDetails[i];
+            if (d.idStepParent == parentStepId && d.idActivityStatus == statusId) {
+              indicesToRemove.add(i);
+              debugPrint('   ⚠️ Eliminando entrada previa del mismo status: ${d.statusOption}');
+            }
+          }
+        }
+      } else {
+        // Comportamiento original para non-tab-container: eliminar todos los status del step
+        for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+          if (FFAppState().visitDetails[i].idStepParent == parentStepId &&
+              FFAppState().visitDetails[i].idActivityStatus != 0) {
+            indicesToRemove.add(i);
+            debugPrint('   ⚠️ Eliminando selección previa: ${FFAppState().visitDetails[i].statusOption}');
+          }
         }
       }
 
       if (indicesToRemove.isNotEmpty) {
-        debugPrint('   🗑️ Eliminando ${indicesToRemove.length} selección(es) previa(s) para permitir solo UNA selección');
+        debugPrint('   🗑️ Eliminando ${indicesToRemove.length} selección(es) previa(s)');
       }
 
       // Remover en orden inverso para no alterar los índices
@@ -4277,7 +4625,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         FFAppState().removeAtIndexFromVisitDetails(indicesToRemove[i]);
       }
     } else {
-      debugPrint('   ✅ container-list: No se eliminan selecciones previas, se permite selección múltiple');
+      debugPrint('   ✅ multi-select: No se eliminan selecciones previas');
     }
 
     // 2. Agregar el nuevo status seleccionado
@@ -4322,7 +4670,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         rememberStatus: rememberStatus,
         defaultStatus: defaultStatus,
         typeStatus: typeStatus,
-        auxStep: parentStepId,
+        // Para hijos de reference-list: auxStep = ID del reference-list padre
+        // Permite identificar hermanos para exclusividad en tab-container
+        auxStep: parentMultipleOptionId ?? parentStepId,
       ),
     );
 
@@ -4408,7 +4758,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           : [];
       final selectedStatusHasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
 
-      if (typeStatus.toLowerCase() == 'reference-list' && selectedStatusHasChildren) {
+      if (typeStep.toLowerCase() == 'tab-container') {
+        // Las tabs nunca colapsan: el auto-collapse no aplica
+        debugPrint('🔽 tab-container: no auto-colapsar');
+      } else if (typeStatus.toLowerCase() == 'reference-list' && selectedStatusHasChildren) {
         // No colapsar: mantener visible la lista con el status seleccionado y sus hijos
         debugPrint('🔽 reference-list (type_status): status seleccionado tiene hijos → NO colapsar estado expandido');
       } else {
@@ -4430,7 +4783,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       child: Row(
         children: [
           Expanded(
-            child: InkWell(
+            child: GestureDetector(
               onTap: () async {
                 context.pushNamed(
                   DoActivitiesPageWidget.routeName,
@@ -4488,7 +4841,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           if (isSync) ...[
             const SizedBox(width: 12),
             Expanded(
-              child: InkWell(
+              child: GestureDetector(
                 onTap: () async {
                   // Obtener la actividad actual
                   final currentActivity = FFAppState().currentActivity;
@@ -11135,8 +11488,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     // Calcular totales del lote
+    int totalVisits = 0;
     int totalResults = 0;
     for (var operatorGroup in operatorGroups.values) {
+      totalVisits += (operatorGroup['totalVisits'] as int?) ?? 0;
       totalResults += (operatorGroup['totalResults'] as int?) ?? 0;
     }
 
@@ -11201,6 +11556,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         const SizedBox(height: 6),
                         Row(
                           children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
@@ -11282,6 +11672,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   Widget _buildTagReaderOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
+    final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
 
     return Container(
@@ -11347,6 +11738,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
                                     '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
@@ -11394,22 +11820,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       grandTotalVisits += (entry['totalVisits'] as int?) ?? 0;
     }
 
-    // Obtener Name_product desde el JSON del statusResponse en visitDetails
-    String productTitle = _tagWriterProductName[statusId] ?? '';
-    if (productTitle.isEmpty) {
-      for (final d in FFAppState().visitDetails) {
-        if (d.idActivityStatus == statusId && d.statusResponse.isNotEmpty) {
-          try {
-            final parsed = actions.parseNfcJson(d.statusResponse);
-            final name = parsed?['Read_info']?['Name_product'] as String?;
-            if (name != null && name.isNotEmpty) productTitle = name;
-          } catch (_) {}
-          break;
-        }
-      }
-    }
-    if (productTitle.isEmpty) productTitle = 'Registros escritos en TAG';
-
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -11432,16 +11842,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 size: 18,
               ),
               const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  productTitle,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                (_tagWriterProductName[statusId]?.isNotEmpty == true)
+                    ? _tagWriterProductName[statusId]!
+                    : 'Registros escritos en TAG',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
                 ),
               ),
               const Spacer(),
@@ -11545,8 +11954,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     // Calcular totales del lote
+    int totalVisits = 0;
     int totalResults = 0;
     for (var operatorGroup in operatorGroups.values) {
+      totalVisits += (operatorGroup['totalVisits'] as int?) ?? 0;
       totalResults += (operatorGroup['totalResults'] as int?) ?? 0;
     }
 
@@ -11610,6 +12021,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         const SizedBox(height: 6),
                         Row(
                           children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                               decoration: BoxDecoration(
@@ -11691,6 +12137,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   Widget _buildTagWriterOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
+    final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
 
     return Container(
@@ -11742,6 +12189,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         const SizedBox(height: 6),
                         Row(
                           children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
@@ -12136,6 +12618,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final expansionKey = 'TT_HE_$headquarterId';
     final isExpanded = _tagTransferExpansionState[expansionKey] ?? false;
 
+    final totalVisits = (data['totalVisits'] as int?) ?? 0;
     final totalResults = (data['totalResults'] as int?) ?? 0;
     final records = (data['records'] as List<Map<String, dynamic>>?) ?? [];
 
@@ -12256,6 +12739,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
                                     '$_unityLabel: ',
                                     style: TextStyle(
                                       fontFamily: 'Roboto',
@@ -12323,6 +12841,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   Widget _buildTagTransferOperatorGroup(int headquarterId, String operatorPairKey,
       Map<String, dynamic> operatorData) {
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
+    final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
 
     return Container(
@@ -12374,6 +12893,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         const SizedBox(height: 6),
                         Row(
                           children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Visitas: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalVisits',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
@@ -14729,51 +15283,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       final formattedDate = '$capitalizedDay $day de $capitalizedMonth $year';
 
-      // Colores según si está seleccionado
-      final textColor = hasValue ? Colors.white : const Color(0xFF00a86b);
-      final bgColor = hasValue
-          ? Colors.white.withValues(alpha: 0.2)
-          : const Color(0xFF00a86b).withValues(alpha: 0.15);
-      final borderColor = hasValue
-          ? Colors.white.withValues(alpha: 0.5)
-          : const Color(0xFF00a86b).withValues(alpha: 0.3);
-
       return Padding(
         padding: const EdgeInsets.only(left: 8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: bgColor,
+            color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: borderColor,
+              color: Colors.white.withValues(alpha: 0.35),
               width: 1.5,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: 16,
-                color: textColor,
-              ),
-              const SizedBox(width: 8),
-              Flexible(
-                child: Text(
-                  formattedDate,
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                    color: textColor,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
-            ],
+          child: Text(
+            formattedDate,
+            overflow: TextOverflow.ellipsis,
+            maxLines: 1,
+            style: const TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
           ),
         ),
       );
@@ -14833,47 +15365,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       formattedTime =
           '${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
 
-      // Colores según si está seleccionado
-      final textColor = hasValue ? Colors.white : const Color(0xFF00a86b);
-      final bgColor = hasValue
-          ? Colors.white.withValues(alpha: 0.2)
-          : const Color(0xFF00a86b).withValues(alpha: 0.15);
-      final borderColor = hasValue
-          ? Colors.white.withValues(alpha: 0.5)
-          : const Color(0xFF00a86b).withValues(alpha: 0.3);
-
       return Padding(
         padding: const EdgeInsets.only(left: 8),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: bgColor,
+            color: Colors.white.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: borderColor,
+              color: Colors.white.withValues(alpha: 0.35),
               width: 1.5,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                Icons.access_time,
-                size: 16,
-                color: textColor,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                formattedTime,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w800,
-                  color: textColor,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
+          child: Text(
+            formattedTime,
+            style: const TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: 0.3,
+            ),
           ),
         ),
       );
@@ -15799,6 +16311,149 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
           width: _controller!.value.size.width,
           height: _controller!.value.size.height,
           child: VideoPlayer(_controller!),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TabBar moderna para formularios EXTRACTORA
+// ─────────────────────────────────────────────────────────────────────────────
+class _ModernTabBar extends StatefulWidget {
+  final TabController controller;
+  final List<dynamic> steps;
+  final bool Function(int id, String type) getCachedValue;
+  final dynamic Function(dynamic json, String path) getJsonField;
+
+  const _ModernTabBar({
+    required this.controller,
+    required this.steps,
+    required this.getCachedValue,
+    required this.getJsonField,
+  });
+
+  @override
+  State<_ModernTabBar> createState() => _ModernTabBarState();
+}
+
+class _ModernTabBarState extends State<_ModernTabBar> {
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onTabChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onTabChanged);
+    super.dispose();
+  }
+
+  void _onTabChanged() {
+    if (!widget.controller.indexIsChanging) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final steps = widget.steps;
+    final currentIndex = widget.controller.index;
+    final count = steps.length;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      color: Colors.transparent,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: List.generate(count, (i) {
+              final step = steps[i];
+              final stepName =
+                  widget.getJsonField(step, r'''$.name_step''').toString();
+              final stepId =
+                  widget.getJsonField(step, r'''$.id_activity_step''');
+              final isRequired =
+                  widget.getJsonField(step, r'''$.is_required''') == true;
+              final isCompleted =
+                  widget.getCachedValue(stepId as int, 'STEP');
+              final isSelected = i == currentIndex;
+
+              // Radio de esquinas: solo externas (primera y última)
+              final radius = Radius.circular(12);
+              final borderRadius = i == 0
+                  ? BorderRadius.only(topLeft: radius, bottomLeft: radius)
+                  : i == count - 1
+                      ? BorderRadius.only(topRight: radius, bottomRight: radius)
+                      : BorderRadius.zero;
+
+              return GestureDetector(
+                onTap: () => widget.controller.animateTo(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? const Color(0xFF00a86b)
+                        : const Color(0xFFF1F8F4),
+                    borderRadius: borderRadius,
+                    border: isSelected
+                        ? null
+                        : Border.all(
+                            color: const Color(0xFF00a86b),
+                            width: 1,
+                          ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Ícono de estado (requerido)
+                      if (isRequired) ...[
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            isCompleted
+                                ? Icons.check_circle_rounded
+                                : Icons.radio_button_unchecked_rounded,
+                            key: ValueKey('$stepId-$isCompleted'),
+                            size: 15,
+                            color: isSelected
+                                ? Colors.white
+                                : (isCompleted
+                                    ? const Color(0xFF00a86b)
+                                    : const Color(0xFF00a86b)
+                                        .withValues(alpha: 0.4)),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                      ],
+                      // Nombre del tab
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 120),
+                        child: Text(
+                          stepName,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: isSelected
+                                ? Colors.white
+                                : const Color(0xFF00a86b),
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ),
         ),
       ),
     );

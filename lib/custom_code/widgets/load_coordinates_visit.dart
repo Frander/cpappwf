@@ -713,7 +713,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       FFAppState().update(() {
         FFAppState().visitCount = FFAppState().visitCount + 1;
-        FFAppState().visitDetails = removeVisits(FFAppState().visitDetails);
+        FFAppState().visitDetails = [];
       });
 
       setState(() {
