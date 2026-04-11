@@ -16,6 +16,7 @@ import 'package:flutter/scheduler.dart';
 
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:io' show Platform;
 import 'modules_page_model.dart';
 export 'modules_page_model.dart';
 
@@ -42,7 +43,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       await Future.wait([
         Future(() async {
-          if (FFAppState().calibrateCompass == false) {
+          if (!Platform.isWindows && FFAppState().calibrateCompass == false) {
             // Mostrar nuevo diálogo moderno de calibración requerida
             final bool? shouldCalibrate = await showDialog<bool>(
               context: context,

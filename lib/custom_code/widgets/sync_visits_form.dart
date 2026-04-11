@@ -1555,11 +1555,15 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
   }
 
   Future<String> _getDatabasePath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
-    final String pathStr = '${externalDir.path}/ClickPalmData';
+    final String pathStr = '${baseDir.path}/ClickPalmData';
     return path.join(pathStr, 'clickpalm_database.db');
   }
 

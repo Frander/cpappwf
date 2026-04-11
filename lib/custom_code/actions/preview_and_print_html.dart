@@ -217,6 +217,7 @@ class _HTMLPreviewScreenState extends State<HTMLPreviewScreen> {
   }
 
   Future<void> _printToThermalPrinter() async {
+    if (Platform.isWindows) return; // Bluetooth no disponible en Windows
     setState(() {
       _isPrinting = true;
     });

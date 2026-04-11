@@ -107,7 +107,7 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
       // Migración: si el archivo está en external storage (ruta antigua) pero no en
       // internal, moverlo al directorio correcto que usa flutter_gemma.
       if (!await file.exists()) {
-        final ext = await getExternalStorageDirectory();
+        final ext = Platform.isAndroid ? await getExternalStorageDirectory() : null;
         if (ext != null) {
           final oldFile = File('${ext.path}/$_kModelFileName');
           if (await oldFile.exists()) {

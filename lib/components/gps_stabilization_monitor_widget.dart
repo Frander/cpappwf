@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -82,6 +83,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
   }
 
   void _setupListeners() {
+    if (Platform.isWindows) return; // Background service no disponible en Windows
     final service = FlutterBackgroundService();
 
     _progressSub = service.on('gpsProgress').listen((event) {

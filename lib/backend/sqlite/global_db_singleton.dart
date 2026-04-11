@@ -5,8 +5,10 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as path;
+import '/custom_code/actions/validate_db_sqlite.dart'
+    show createClickPalmTables, upgradeClickPalmDatabase;
 
 class GlobalDbSingleton {
   // Instancia singleton
@@ -19,14 +21,22 @@ class GlobalDbSingleton {
   String? _dbPath;
   bool _isInitializing = false;
 
-  /// Obtener la ruta de la base de datos (IDÉNTICO a validate_db_sqlite.dart)
+  /// Obtener la ruta de la base de datos según plataforma
   Future<String> _getBestDocumentsPath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) {
+        throw Exception('No se pudo acceder al almacenamiento externo');
+      }
+      baseDir = externalDir;
+    } else {
+      // Windows, Linux, macOS, iOS
+      baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final String pathStr = '${externalDir.path}/ClickPalmData';
+    final String pathStr = '${baseDir.path}/ClickPalmData';
     final Directory targetDir = Directory(pathStr);
 
     if (!await targetDir.exists()) {
@@ -57,7 +67,13 @@ class GlobalDbSingleton {
     // Inicializar
     _isInitializing = true;
     try {
-      // Obtener path IDÉNTICO a validate_db_sqlite.dart
+      // Inicializar FFI en plataformas desktop
+      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+        sqfliteFfiInit();
+        databaseFactory = databaseFactoryFfi;
+      }
+
+      // Obtener path según plataforma
       final String docsPath = await _getBestDocumentsPath();
 
       _dbPath = path.join(docsPath, 'clickpalm_database.db');
@@ -65,7 +81,11 @@ class GlobalDbSingleton {
       // Abrir con singleInstance: true (default) para que sqflite maneje el singleton
       _database = await openDatabase(
         _dbPath!,
+        version: 26,
         singleInstance: true,
+        onCreate: (db, version) => createClickPalmTables(db),
+        onUpgrade: (db, oldVersion, newVersion) =>
+            upgradeClickPalmDatabase(db, oldVersion, newVersion),
       );
 
       // IMPORTANTE: Habilitar WAL mode para mejor concurrencia con el servicio de segundo plano

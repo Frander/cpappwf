@@ -29,6 +29,7 @@ Future<String> readNFC(
   bool autoClose = true,
   bool clearAfterRead = false,
 }) async {
+  if (Platform.isWindows) return ''; // NFC no disponible en Windows
   // Verificar si NFC está disponible y activado usando la nueva función
   bool nfcReady = await checkNfcStatus(context, showAlert: true);
   if (!nfcReady) {
@@ -544,14 +545,20 @@ Future<void> _saveTagToHistory(String tagId, String tagType, int usedSpace) asyn
   // NOTA: No cerrar db manualmente — sqflite maneja el pool automáticamente.
   // Cerrar aquí causa database_closed en _saveTagToHistory que corre concurrente (sin await).
   try {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      debugPrint('❌ No se pudo acceder al almacenamiento externo');
-      return;
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) {
+        debugPrint('❌ No se pudo acceder al almacenamiento externo');
+        return;
+      }
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
 
     final String dbPath = path.join(
-      '${externalDir.path}/ClickPalmData',
+      '${baseDir.path}/ClickPalmData',
       'clickpalm_database.db',
     );
 

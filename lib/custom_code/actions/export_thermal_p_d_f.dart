@@ -487,12 +487,15 @@ Future<void> _openPDF(String filePath, BuildContext context) async {
 }
 
 Future<String> _getBestDocumentsPath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String path = '${externalDir.path}/ClickPalmData/PDFs';
+  final String path = '${baseDir.path}/ClickPalmData/PDFs';
   final Directory targetDir = Directory(path);
 
   if (!await targetDir.exists()) {

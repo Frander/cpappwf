@@ -24,6 +24,7 @@ import 'index.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import '/components/animated_splash_screen_widget.dart';
 import '/custom_code/actions/background_location_service.dart';
@@ -37,11 +38,20 @@ void main() async {
 
   await SQLiteManager.initialize();
 
-  // Inicializar el servicio de geolocalización en segundo plano
-  await initializeBackgroundLocationService();
+  // Inicializar el servicio de geolocalización en segundo plano (solo móvil)
+  if (!Platform.isWindows) {
+    await initializeBackgroundLocationService();
+  }
 
   final appState = FFAppState(); // Initialize FFAppState
   await appState.initializePersistedState();
+
+  // En desktop no hay GPS ni brújula — simular sensores estabilizados
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    appState.isStabilized = true;
+    appState.calibrateCompass = true;
+  }
+
   WakelockPlus.enable();
   runApp(ChangeNotifierProvider(
     create: (context) => appState,

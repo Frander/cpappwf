@@ -15,6 +15,8 @@ import 'dart:async';
 import 'dart:ui';
 import 'dart:io';
 import 'package:nfc_manager/nfc_manager.dart';
+import '/custom_code/actions/adb_nfc_bridge_service.dart';
+import '/custom_code/actions/adb_nfc_client_service.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
 import 'package:path/path.dart' as path;
@@ -80,6 +82,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para almacenar datos de tags NFC leídos por status_id
   final Map<int, List<Map<String, dynamic>>> _tagReaderData = {};
 
+  // Map para acumulación de tags en modo NO_REMOVE (statusId → lista de raw JSON strings)
+  final Map<int, List<String>> _tagReaderRawJsons = {};
+
   // Map para controlar el estado de expansión del tree view de tag-reader (por lote)
   final Map<String, bool> _tagReaderExpansionState = {};
 
@@ -108,6 +113,21 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // Map para rastrear si una transferencia fue completada exitosamente por statusId
   final Map<int, bool> _tagTransferCompleted = {};
+
+  // Checkboxes para tags ADB acumulados (statusId → Set de índices marcados)
+  final Map<int, Set<int>> _adbTagChecked = {};
+
+  // ── ADB NFC Bridge (tag-transfer-adb-server / tag-transfer-adb-from) ──────
+  AdbBridgeStatus _adbServerStatus = AdbBridgeStatus.serverDown;
+  StreamSubscription<AdbBridgeStatus>? _adbStatusSub;
+  StreamSubscription<Map<String, dynamic>>? _adbTagSub;
+  // statusId -> received tag payload from mobile
+  final Map<int, Map<String, dynamic>> _adbReceivedTagData = {};
+  // mobile client connection state (for tag-transfer-adb-from)
+  bool _adbClientConnected = false;
+  StreamSubscription<bool>? _adbClientConnSub;
+  StreamSubscription<Map<String, dynamic>>? _adbServerCommandSub;
+  Timer? _adbRetryTimer; // reintento automático si no conecta al iniciar
 
   // Caché de nombres de corteros desde SQLite (id_activity_status -> status_name)
   final Map<int, String> _corteroNamesCache = {};
@@ -217,6 +237,236 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       await _restoreTagTransferFromPrefs();
       _initializeDateTimeDefaults();
       _preloadUserNamesFromSQLite(); // Pre-cargar nombres de usuarios para el árbol de tags
+      _initAdbBridge(); // Inicializar bridge ADB si corresponde
+    });
+  }
+
+  // Inicia el servidor ADB (desktop) o el cliente ADB (mobile) según los campos renderizados
+  void _initAdbBridge() {
+    final statuses = _cachedActivityStatus;
+
+    // Incluir también los statuses dentro de steps (tag-transfer-adb-server puede estar en un step)
+    final List<dynamic> allStatuses = [...statuses];
+    for (final step in _cachedActivitySteps) {
+      final stepStatuses = getJsonField(step, r'''$.activities_status''');
+      if (stepStatuses is List) allStatuses.addAll(stepStatuses);
+    }
+
+    final hasServerField = allStatuses.any((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                .toLowerCase() ==
+            'tag-transfer-adb-server');
+    final hasFromField = allStatuses.any((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                .toLowerCase() ==
+            'tag-transfer-adb-from');
+
+    if (hasServerField && Platform.isWindows) {
+      _adbStatusSub = AdbNfcBridgeService.instance.onStatusChanged.listen((status) {
+        if (mounted) setState(() => _adbServerStatus = status);
+      });
+      _adbTagSub = AdbNfcBridgeService.instance.onTagReceived.listen((payload) {
+        if (!mounted) return;
+
+        // Recopilar los statuses procesados ANTES del setState para poder
+        // disparar los cálculos de pesos async después (setState es síncrono).
+        final List<({int id, String name, List<Map<String, dynamic>> parsedData})>
+            processedStatuses = [];
+
+        setState(() {
+          final serverStatuses = allStatuses.where((s) =>
+              (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                      .toLowerCase() ==
+                  'tag-transfer-adb-server');
+          for (final s in serverStatuses) {
+            final id = getJsonField(s, r'''$.id_activity_status''') as int?;
+            if (id == null) continue;
+            _adbReceivedTagData[id] = payload;
+            final tagContent = payload['tagContent'] as String? ?? '';
+            final productName = payload['productName'] as String? ?? '';
+            if (tagContent.isEmpty) continue;
+
+            final defaultStatus =
+                getJsonField(s, r'''$.default_status''')?.toString() ?? '';
+            final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
+            if (isNoRemove) {
+              // Modo acumulativo: agregar al array y aplanar todos
+              _tagReaderRawJsons[id] ??= [];
+              _tagReaderRawJsons[id]!.add(tagContent);
+              final allRecords = <Map<String, dynamic>>[];
+              for (final raw in _tagReaderRawJsons[id]!) {
+                allRecords.addAll(_parseNfcTagContent(raw));
+              }
+              _tagReaderData[id] = allRecords;
+            } else {
+              // Modo normal: reemplazar
+              _tagReaderRawJsons.remove(id);
+              _tagReaderData[id] = _parseNfcTagContent(tagContent);
+            }
+            _tagReaderProductName[id] = productName;
+
+            // Registrar para post-setState cálculos de peso
+            final statusName =
+                getJsonField(s, r'''$.name_status''')?.toString() ?? '';
+            processedStatuses.add((
+              id: id,
+              name: statusName,
+              parsedData: List<Map<String, dynamic>>.from(_tagReaderData[id]!),
+            ));
+          }
+        });
+
+        // Cálculos de pesos async — misma lógica que tag-reader tras leer un tag
+        if (processedStatuses.isNotEmpty) {
+          Future(() async {
+            for (final entry in processedStatuses) {
+              if (!mounted) return;
+              debugPrint(
+                  '⚡ ADB-TAG: Disparando cálculos de pesos para statusId=${entry.id} name="${entry.name}"');
+
+              // 1. Validar / calcular pesos por lote (igual que tag-reader)
+              if (_hasHeadquartersWeightsStatus()) {
+                final List<int> tagHeadquarterIds = [];
+                for (var record in entry.parsedData) {
+                  final hqId = record['headquarterId'] as int? ?? 0;
+                  if (hqId > 0 && !tagHeadquarterIds.contains(hqId)) {
+                    tagHeadquarterIds.add(hqId);
+                  }
+                }
+
+                if (tagHeadquarterIds.isNotEmpty) {
+                  await _loadHeadquarterWeights(tagHeadquarterIds);
+
+                  if (_headquartersWithoutWeight.isNotEmpty && mounted) {
+                    _showWeightWarningDialog();
+                  }
+
+                  _calculateHeadquarterWeightResults(entry.id, entry.name);
+                }
+              }
+
+              // 2. Calcular distancias relacionadas
+              await _autoCalculateRelatedDistances(entry.id, entry.name);
+
+              // 3. Calcular campos headquarter-weight que referencien este tag
+              debugPrint(
+                  '🎯 ADB-TAG: _autoCalculateRelatedHeadquarterWeights() statusName="${entry.name}"');
+              await _autoCalculateRelatedHeadquarterWeights(
+                  entry.id, entry.name);
+            }
+          });
+        }
+      });
+      AdbNfcBridgeService.instance.start().then((_) {
+        if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+      });
+    }
+
+    if (hasFromField && !Platform.isWindows) {
+      _adbClientConnSub = AdbNfcClientService.instance.onConnectionChanged.listen((connected) {
+        if (mounted) {
+          setState(() => _adbClientConnected = connected);
+          if (!connected) _scheduleAdbRetry(); // reconectar si se cae
+        }
+      });
+      _tryAdbConnect();
+
+      // Escuchar comandos enviados desde Windows → Android
+      _adbServerCommandSub = AdbNfcClientService.instance.onServerCommand.listen(
+        (msg) => _handleAdbServerCommand(msg),
+      );
+    }
+  }
+
+  /// Procesa comandos recibidos desde el servidor Windows.
+  void _handleAdbServerCommand(Map<String, dynamic> msg) {
+    if (!mounted) return;
+    final type = msg['type'] as String? ?? '';
+    if (type == 'request_nfc_read') {
+      debugPrint('📨 ADB-FROM: request_nfc_read recibido desde Windows — simulando tap');
+      _triggerAdbFromNfcRead();
+    }
+  }
+
+  /// Busca el primer status de tipo tag-transfer-adb-from y simula el tap
+  /// (abre el diálogo NFC y envía el resultado al servidor).
+  Future<void> _triggerAdbFromNfcRead() async {
+    if (Platform.isWindows) return;
+
+    // Asegurar conexión activa
+    if (!AdbNfcClientService.instance.isConnected) {
+      final connected = await AdbNfcClientService.instance.connect();
+      if (!mounted) return;
+      setState(() => _adbClientConnected = connected);
+      if (!connected) return;
+    }
+
+    // Abrir diálogo NFC — mismo flujo que el tap manual
+    if (!mounted) return;
+    await showDialog(
+      barrierDismissible: false,
+      context: context,
+      builder: (dialogContext) => const Dialog(
+        elevation: 0,
+        insetPadding: EdgeInsets.zero,
+        backgroundColor: Colors.transparent,
+        child: NfcReadDialogWidget(
+          autoStart: true,
+          isTagTransferMode: false,
+        ),
+      ),
+    );
+    if (!mounted) return;
+
+    final nfcContent = FFAppState().nfcRead;
+    if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+      await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+      if (!mounted) return;
+
+      // Reflejar el resumen inline en Android también (igual que el tap manual)
+      // Buscar el statusId del campo adb-from para actualizar _tagReaderData
+      final allStatuses = <dynamic>[..._cachedActivityStatus];
+      for (final step in _cachedActivitySteps) {
+        final ss = getJsonField(step, r'''$.activities_status''');
+        if (ss is List) allStatuses.addAll(ss);
+      }
+      for (final s in allStatuses) {
+        final t = getJsonField(s, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+        if (t == 'tag-transfer-adb-from') {
+          final id = getJsonField(s, r'''$.id_activity_status''') as int?;
+          if (id != null) {
+            setState(() {
+              _tagReaderData[id] = _parseNfcTagContent(nfcContent);
+              _tagReaderProductName[id] = '';
+            });
+          }
+        }
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('📡 Tag enviado al servidor desktop'),
+        backgroundColor: Color(0xFF00a86b),
+        duration: Duration(seconds: 3),
+      ));
+    }
+  }
+
+  /// Intenta conectar al servidor ADB. Si falla, programa un reintento.
+  void _tryAdbConnect() {
+    AdbNfcClientService.instance.connect().then((connected) {
+      if (!mounted) return;
+      setState(() => _adbClientConnected = connected);
+      if (!connected) _scheduleAdbRetry();
+    });
+  }
+
+  /// Reintenta la conexión cada 5 segundos hasta lograrla.
+  void _scheduleAdbRetry() {
+    _adbRetryTimer?.cancel();
+    _adbRetryTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted || AdbNfcClientService.instance.isConnected) return;
+      _tryAdbConnect();
     });
   }
 
@@ -365,6 +615,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     _model.dispose();
     // Disponer controllers de búsqueda
     _searchControllers.forEach((_, controller) => controller.dispose());
+    // Limpiar ADB bridge
+    _adbStatusSub?.cancel();
+    _adbTagSub?.cancel();
+    _adbClientConnSub?.cancel();
+    _adbServerCommandSub?.cancel();
+    _adbRetryTimer?.cancel();
+    if (Platform.isWindows) {
+      AdbNfcBridgeService.instance.stop();
+    } else {
+      AdbNfcClientService.instance.disconnect();
+    }
     super.dispose();
   }
 
@@ -1070,24 +1331,75 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      itemCount: activitySteps.length + activityStatus.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        if (index < activitySteps.length) {
-          return _buildStepCard(activitySteps[index], level: 0);
-        } else {
-          // Renderizar status del nivel raíz
-          final statusIndex = index - activitySteps.length;
-          return _buildRootStatusCard(
-            activityStatus[statusIndex],
-            allActivityStatus: activityStatus,
-            level: 0,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = _responsiveColumnCount(constraints.maxWidth);
+
+        if (columns == 1) {
+          // Pantalla pequeña: lista vertical con lazy loading
+          return ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            itemCount: activitySteps.length + activityStatus.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              if (index < activitySteps.length) {
+                return _buildStepCard(activitySteps[index], level: 0);
+              } else {
+                final statusIndex = index - activitySteps.length;
+                return _buildRootStatusCard(
+                  activityStatus[statusIndex],
+                  allActivityStatus: activityStatus,
+                  level: 0,
+                );
+              }
+            },
           );
         }
+
+        // Pantalla mediana/grande: grilla responsiva con Wrap
+        const double spacing = 12.0;
+        const double hPadding = 24.0; // 12 izq + 12 der
+        final itemWidth =
+            (constraints.maxWidth - spacing * (columns - 1) - hPadding) /
+            columns;
+
+        final cardWidgets = <Widget>[
+          for (int i = 0; i < activitySteps.length; i++)
+            SizedBox(
+              width: itemWidth,
+              child: _buildStepCard(activitySteps[i], level: 0),
+            ),
+          for (int i = 0; i < activityStatus.length; i++)
+            SizedBox(
+              width: itemWidth,
+              child: _buildRootStatusCard(
+                activityStatus[i],
+                allActivityStatus: activityStatus,
+                level: 0,
+              ),
+            ),
+        ];
+
+        return SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            child: Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: cardWidgets,
+            ),
+          ),
+        );
       },
     );
+  }
+
+  /// Determina el número de columnas según el ancho disponible del widget.
+  /// < 600px → 1 columna (lista), 600–899px → 2 columnas, ≥ 900px → 3 columnas.
+  int _responsiveColumnCount(double availableWidth) {
+    if (availableWidth >= 900) return 3;
+    if (availableWidth >= 600) return 2;
+    return 1;
   }
 
   Widget _buildStepCard(dynamic step, {required int level}) {
@@ -1439,6 +1751,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isTimeType = typeStatus.toLowerCase() == 'time';
     final isUsersListType = typeStatus.toLowerCase() == 'users-list';
     final isReferenceListType = typeStatus.toLowerCase() == 'reference-list';
+    final isTagTransferAdbServerType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-server';
+    final isTagTransferAdbFromType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-from';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -1591,13 +1907,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
                   final productName = await _fetchProductNameFromRfid(nfcContent);
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+                  final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
                   setState(() {
-                    _tagReaderData[statusId] = parsedData;
+                    if (isNoRemove) {
+                      // Modo acumulativo: agregar al array de raw JSONs
+                      if (!_tagReaderRawJsons.containsKey(statusId)) {
+                        _tagReaderRawJsons[statusId] = [];
+                      }
+                      _tagReaderRawJsons[statusId]!.add(nfcContent);
+                      // Aplanar todos los records acumulados para _tagReaderData
+                      final allRecords = <Map<String, dynamic>>[];
+                      for (final raw in _tagReaderRawJsons[statusId]!) {
+                        allRecords.addAll(_parseNfcTagContent(raw));
+                      }
+                      _tagReaderData[statusId] = allRecords;
+                    } else {
+                      // Modo normal: reemplazar
+                      _tagReaderRawJsons.remove(statusId);
+                      _tagReaderData[statusId] = parsedData;
+                    }
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                     _tagReaderProductName[statusId] = productName;
                   });
+
+                  // Determinar el statusResponse a guardar
+                  final statusResponseToSave = isNoRemove
+                      ? jsonEncode(_tagReaderRawJsons[statusId])
+                      : nfcContent;
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
                   // Buscar el índice existente o agregar nuevo
@@ -1609,11 +1953,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     }
                   }
 
-                  // Extraer valores necesarios del status
-                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
-                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-
                   if (existingIndex >= 0) {
                     FFAppState().updateVisitDetailsAtIndex(
                       existingIndex,
@@ -1622,7 +1961,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -1637,7 +1976,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -1646,7 +1985,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ),
                     );
                   }
-                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)${isNoRemove ? " [NO_REMOVE: ${_tagReaderRawJsons[statusId]!.length} tags acumulados]" : ""}');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -1792,6 +2131,59 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               }
 
               setState(() {});
+              return;
+            }
+
+            // tag-transfer-adb-server: el tap intenta habilitar el socket (solo desktop)
+            if (isTagTransferAdbServerType) {
+              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+                await AdbNfcBridgeService.instance.start();
+                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+              }
+              return;
+            }
+
+            // tag-transfer-adb-from: el tap lee NFC y envía datos al server (solo móvil)
+            if (isTagTransferAdbFromType) {
+              if (!Platform.isWindows) {
+                if (!AdbNfcClientService.instance.isConnected) {
+                  final connected = await AdbNfcClientService.instance.connect();
+                  if (!mounted) return;
+                  setState(() => _adbClientConnected = connected);
+                  if (!connected) return;
+                }
+                // Abrir diálogo NFC de lectura
+                if (!mounted) return;
+                await showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) => const Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: false,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                final nfcContent = FFAppState().nfcRead;
+                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                  if (!mounted) return;
+                  // Mostrar resumen inline en el dispositivo Android también
+                  setState(() {
+                    _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
+                    _tagReaderProductName[statusId] = '';
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('📡 Tag enviado al servidor desktop'),
+                    backgroundColor: Color(0xFF00a86b),
+                    duration: Duration(seconds: 3),
+                  ));
+                }
+              }
               return;
             }
 
@@ -2127,7 +2519,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: (isTagTransferAdbFromType && !Platform.isWindows)
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+                : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -2166,8 +2560,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               children: [
                 Row(
                   children: [
-                    // Radio button visual (no mostrar para tag-transfer, text, photo, video, number, users-list)
-                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType)
+                    // Radio button visual (no mostrar para tag-transfer, adb-server, adb-from, text, photo, video, number, users-list)
+                    if (!isTagTransferType && !isTagTransferAdbServerType && !isTagTransferAdbFromType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType)
                       Container(
                         width: 24,
                         height: 24,
@@ -2197,7 +2591,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               )
                             : null,
                       ),
-                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType) const SizedBox(width: 12),
+                    if (!isTagTransferType && !isTagTransferAdbServerType && !isTagTransferAdbFromType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType) const SizedBox(width: 12),
                     // Icono específico para date, time, photo y video, indicador de color para otros tipos (excepto number, users-list y text)
                     if (!isTagReaderType && !isTagWriterType && !isTagTransferType && !isNumberType && !isUsersListType && !isTextType)
                       // Para photo y video: solo mostrar icono sin contenedor de fondo cuando no está seleccionado
@@ -2343,6 +2737,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildTagReaderSummary(statusId: statusId),
+                            ),
+                          // Resumen ADB server en Windows (con checkbox)
+                          if (isTagTransferAdbServerType && _tagReaderData.containsKey(statusId))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildTagReaderSummary(statusId: statusId, isAdbServer: true),
                             ),
                           // Resumen del tag-writer (solo para tipo tag-writer) - DEBAJO
                           if (isTagWriterType &&
@@ -2633,6 +3033,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         typeStatus.toLowerCase() == 'distance-extractor';
     final isDynamicPrintingType =
         typeStatus.toLowerCase() == 'dynamic-printing';
+    final isTagTransferAdbServerType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-server';
+    final isTagTransferAdbFromType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-from';
 
     // Calcular progreso de steps hijos requeridos
     int totalRequired = 0;
@@ -2768,13 +3172,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
                   final productName = await _fetchProductNameFromRfid(nfcContent);
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+                  final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
                   setState(() {
-                    _tagReaderData[statusId] = parsedData;
+                    if (isNoRemove) {
+                      // Modo acumulativo: agregar al array de raw JSONs
+                      if (!_tagReaderRawJsons.containsKey(statusId)) {
+                        _tagReaderRawJsons[statusId] = [];
+                      }
+                      _tagReaderRawJsons[statusId]!.add(nfcContent);
+                      // Aplanar todos los records acumulados para _tagReaderData
+                      final allRecords = <Map<String, dynamic>>[];
+                      for (final raw in _tagReaderRawJsons[statusId]!) {
+                        allRecords.addAll(_parseNfcTagContent(raw));
+                      }
+                      _tagReaderData[statusId] = allRecords;
+                    } else {
+                      // Modo normal: reemplazar
+                      _tagReaderRawJsons.remove(statusId);
+                      _tagReaderData[statusId] = parsedData;
+                    }
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                     _tagReaderProductName[statusId] = productName;
                   });
+
+                  // Determinar el statusResponse a guardar
+                  final statusResponseToSave = isNoRemove
+                      ? jsonEncode(_tagReaderRawJsons[statusId])
+                      : nfcContent;
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
                   // Buscar el índice existente o agregar nuevo
@@ -2786,11 +3218,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     }
                   }
 
-                  // Extraer valores necesarios del status
-                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
-                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-
                   if (existingIndex >= 0) {
                     FFAppState().updateVisitDetailsAtIndex(
                       existingIndex,
@@ -2799,7 +3226,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -2814,7 +3241,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -2823,7 +3250,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ),
                     );
                   }
-                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)${isNoRemove ? " [NO_REMOVE: ${_tagReaderRawJsons[statusId]!.length} tags acumulados]" : ""}');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -3059,6 +3486,53 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
+            // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
+            if (isTagTransferAdbServerType) {
+              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+                await AdbNfcBridgeService.instance.start();
+                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+              }
+              return;
+            }
+
+            // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
+            if (isTagTransferAdbFromType) {
+              if (!Platform.isWindows) {
+                if (!AdbNfcClientService.instance.isConnected) {
+                  final connected = await AdbNfcClientService.instance.connect();
+                  if (!mounted) return;
+                  setState(() => _adbClientConnected = connected);
+                  if (!connected) return;
+                }
+                if (!mounted) return;
+                await showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) => const Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: false,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                final nfcContent = FFAppState().nfcRead;
+                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('📡 Tag enviado al servidor desktop'),
+                    backgroundColor: Color(0xFF00a86b),
+                    duration: Duration(seconds: 3),
+                  ));
+                }
+              }
+              return;
+            }
+
             if (hasChildren) {
               setState(() {
                 // COLAPSAR todos los status hermanos antes de alternar este
@@ -3112,7 +3586,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 if (!hasChildren &&
                     typeStatus != 'tag-writer' &&
                     typeStatus != 'tag-reader' &&
-                    typeStatus != 'tag-transfer')
+                    typeStatus != 'tag-transfer' &&
+                    typeStatus != 'tag-transfer-adb-server')
                   // Mostrar indicador de color para unique-option y unique_choice
                   (typeStatus.toLowerCase() == 'unique-option' || typeStatus.toLowerCase() == 'unique_choice')
                       ? Container(
@@ -3230,6 +3705,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 status: status,
                               ),
                             ),
+                          // Badge inline para tag-transfer-adb-server (desktop)
+                          if (isTagTransferAdbServerType)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildAdbServerBadge(statusId: statusId),
+                            ),
+                          // Badge compacto adb-from solo en desktop (móvil usa card completa debajo)
+                          if (isTagTransferAdbFromType && Platform.isWindows)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildAdbFromBadge(statusId: statusId),
+                            ),
                           // Botón inline para dynamic-printing
                           if (isDynamicPrintingType)
                             Padding(
@@ -3254,6 +3741,19 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildTagReaderSummary(statusId: statusId),
                         ),
+                      // Tarjeta grande adb-from (solo móvil)
+                      if (isTagTransferAdbFromType && !Platform.isWindows)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildAdbFromCard(statusId: statusId, context: context, status: status),
+                        ),
+                      // Resumen ADB server en Windows (con checkbox)
+                      if (isTagTransferAdbServerType && _tagReaderData.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildTagReaderSummary(statusId: statusId, isAdbServer: true),
+                        ),
+                      // Resumen ADB (adb-from) en móvil — se muestra dentro de _buildAdbFromCard
                       // Resumen del tag-writer
                       if (isTagWriterType && _tagWriterData.containsKey(statusId))
                         Padding(
@@ -3443,6 +3943,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final isDateType = typeStatus.toLowerCase() == 'date';
     final isTimeType = typeStatus.toLowerCase() == 'time';
     final isUsersListType = typeStatus.toLowerCase() == 'users-list';
+    final isTagTransferAdbServerType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-server';
+    final isTagTransferAdbFromType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-from';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -3569,13 +4073,41 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
                   final productName = await _fetchProductNameFromRfid(nfcContent);
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+                  final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
                   setState(() {
-                    _tagReaderData[statusId] = parsedData;
+                    if (isNoRemove) {
+                      // Modo acumulativo: agregar al array de raw JSONs
+                      if (!_tagReaderRawJsons.containsKey(statusId)) {
+                        _tagReaderRawJsons[statusId] = [];
+                      }
+                      _tagReaderRawJsons[statusId]!.add(nfcContent);
+                      // Aplanar todos los records acumulados para _tagReaderData
+                      final allRecords = <Map<String, dynamic>>[];
+                      for (final raw in _tagReaderRawJsons[statusId]!) {
+                        allRecords.addAll(_parseNfcTagContent(raw));
+                      }
+                      _tagReaderData[statusId] = allRecords;
+                    } else {
+                      // Modo normal: reemplazar
+                      _tagReaderRawJsons.remove(statusId);
+                      _tagReaderData[statusId] = parsedData;
+                    }
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                     _tagReaderProductName[statusId] = productName;
                   });
+
+                  // Determinar el statusResponse a guardar
+                  final statusResponseToSave = isNoRemove
+                      ? jsonEncode(_tagReaderRawJsons[statusId])
+                      : nfcContent;
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
                   // Buscar el índice existente o agregar nuevo
@@ -3587,11 +4119,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     }
                   }
 
-                  // Extraer valores necesarios del status
-                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
-                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-
                   if (existingIndex >= 0) {
                     FFAppState().updateVisitDetailsAtIndex(
                       existingIndex,
@@ -3600,7 +4127,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -3615,7 +4142,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -3624,7 +4151,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       ),
                     );
                   }
-                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)${isNoRemove ? " [NO_REMOVE: ${_tagReaderRawJsons[statusId]!.length} tags acumulados]" : ""}');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -3738,6 +4265,53 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
+            // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
+            if (isTagTransferAdbServerType) {
+              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+                await AdbNfcBridgeService.instance.start();
+                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+              }
+              return;
+            }
+
+            // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
+            if (isTagTransferAdbFromType) {
+              if (!Platform.isWindows) {
+                if (!AdbNfcClientService.instance.isConnected) {
+                  final connected = await AdbNfcClientService.instance.connect();
+                  if (!mounted) return;
+                  setState(() => _adbClientConnected = connected);
+                  if (!connected) return;
+                }
+                if (!mounted) return;
+                await showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) => const Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: false,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                final nfcContent = FFAppState().nfcRead;
+                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('📡 Tag enviado al servidor desktop'),
+                    backgroundColor: Color(0xFF00a86b),
+                    duration: Duration(seconds: 3),
+                  ));
+                }
+              }
+              return;
+            }
+
             // Obtener todos los status childs del parent status para manejar unique_choice
             final parentStatusChildsRaw = getJsonField(parentStatus, r'''$.activities_status_childs''');
             final parentStatusChildsList = parentStatusChildsRaw != null
@@ -3842,7 +4416,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: (isTagTransferAdbFromType && !Platform.isWindows)
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+                : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -3878,8 +4454,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ),
             child: Row(
               children: [
-                // Radio button visual (no mostrar para tag-transfer, text, photo)
-                if (!isTagTransferType && !isTextType && !isPhotoType)
+                // Radio button visual (no mostrar para tag-transfer, adb-server, adb-from, text, photo)
+                if (!isTagTransferType && !isTagTransferAdbServerType && !isTagTransferAdbFromType && !isTextType && !isPhotoType)
                   Container(
                     width: 24,
                     height: 24,
@@ -3909,7 +4485,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           )
                         : null,
                   ),
-                if (!isTagTransferType && !isTextType && !isPhotoType) const SizedBox(width: 12),
+                if (!isTagTransferType && !isTagTransferAdbServerType && !isTagTransferAdbFromType && !isTextType && !isPhotoType) const SizedBox(width: 12),
                 // Icono específico para date, time, text y photo, indicador de color para otros tipos
                 if (!isTagTransferType)
                   // Para text y photo: solo mostrar icono sin contenedor de fondo cuando no está seleccionado
@@ -3997,6 +4573,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ),
                   ),
                 ),
+                // Badge inline para tag-transfer-adb-server
+                if (isTagTransferAdbServerType)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _buildAdbServerBadge(statusId: statusId),
+                  ),
+                // Badge inline para tag-transfer-adb-from
+                if (isTagTransferAdbFromType)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _buildAdbFromBadge(statusId: statusId),
+                  ),
                 if (hasChildren)
                   Icon(
                     isExpanded
@@ -7210,6 +7798,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   onPressed: () {
                     setState(() {
                       _tagReaderData.remove(statusId);
+                      _tagReaderRawJsons.remove(statusId);
                       _tagReaderGeolocations.remove(statusId);
                       _headquartersWithoutWeight.clear();
                       _headquarterWeights.clear();
@@ -7376,6 +7965,341 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           Icons.delete_rounded,
           color: Colors.white,
           size: 20,
+        ),
+      ),
+    );
+  }
+
+  // ===== ADB NFC BRIDGE BADGES =====
+
+  /// Badge para campo tag-transfer-adb-server (desktop).
+  /// Verde = servidor activo y cliente conectado.
+  /// Naranja = servidor activo esperando cliente.
+  /// Rojo = servidor apagado (tap para intentar levantar).
+  Widget _buildAdbServerBadge({required int statusId}) {
+    Color bgColor;
+    IconData icon;
+    String label;
+
+    switch (_adbServerStatus) {
+      case AdbBridgeStatus.clientConnected:
+        bgColor = const Color(0xFF00a86b);
+        icon = Icons.usb_rounded;
+        label = 'Conectado';
+        break;
+      case AdbBridgeStatus.waitingForClient:
+        bgColor = const Color(0xFFFF9800);
+        icon = Icons.usb_off_rounded;
+        label = 'Esperando';
+        break;
+      case AdbBridgeStatus.serverDown:
+        bgColor = const Color(0xFFE53935);
+        icon = Icons.usb_rounded;
+        label = 'Inactivo';
+        break;
+    }
+
+    return GestureDetector(
+      onTap: () async {
+        if (!AdbNfcBridgeService.instance.isServerRunning) {
+          await AdbNfcBridgeService.instance.start();
+          if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: bgColor.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Badge compacto (solo conexión) — usado en la fila del status cuando no hay datos aún.
+  Widget _buildAdbFromBadge({required int statusId}) {
+    final connected = _adbClientConnected;
+    final bgColor = connected ? const Color(0xFF00a86b) : const Color(0xFFE53935);
+    final icon = connected ? Icons.wifi_tethering_rounded : Icons.wifi_tethering_off_rounded;
+    final label = connected ? 'Conectado' : 'Sin conexión';
+
+    return GestureDetector(
+      onTap: () async {
+        if (!AdbNfcClientService.instance.isConnected) {
+          _adbRetryTimer?.cancel();
+          _tryAdbConnect();
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: bgColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tarjeta grande para tag-transfer-adb-from — estado de conexión + animación + botón re-lectura.
+  Widget _buildAdbFromCard({required int statusId, required BuildContext context, required dynamic status}) {
+    final connected = _adbClientConnected;
+    final hasData = _tagReaderData.containsKey(statusId);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: connected
+              ? [const Color(0xFF0D1B2A), const Color(0xFF1A2F45)]
+              : [const Color(0xFF1A0A0A), const Color(0xFF2A1010)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: connected ? const Color(0xFF00E5FF).withValues(alpha: 0.4) : const Color(0xFFE53935).withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: connected ? const Color(0xFF00E5FF).withValues(alpha: 0.15) : const Color(0xFFE53935).withValues(alpha: 0.15),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header: iconos animados + estado ──
+            Row(
+              children: [
+                // Icono NFC con pulso
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.85, end: 1.0),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeInOut,
+                  builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+                  onEnd: () => setState(() {}), // loop
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                      border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 1.5),
+                    ),
+                    child: const Icon(Icons.nfc_rounded, color: Color(0xFF00E5FF), size: 26),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // Icono de transferencia animado
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeInOut,
+                  builder: (_, t, __) => Opacity(
+                    opacity: (t < 0.5 ? t * 2 : (1.0 - t) * 2).clamp(0.3, 1.0),
+                    child: Icon(
+                      Icons.sync_alt_rounded,
+                      color: connected ? const Color(0xFF00E5FF) : const Color(0xFFE53935),
+                      size: 28,
+                    ),
+                  ),
+                  onEnd: () => setState(() {}), // loop
+                ),
+                const SizedBox(width: 12),
+                // Estado
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Transferencia NFC',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: connected ? const Color(0xFF00E676) : const Color(0xFFE53935),
+                              boxShadow: [BoxShadow(color: (connected ? const Color(0xFF00E676) : const Color(0xFFE53935)).withValues(alpha: 0.6), blurRadius: 6)],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              connected ? 'Servidor conectado' : 'Sin conexión al servidor',
+                              style: TextStyle(
+                                color: connected ? const Color(0xFF00E676) : const Color(0xFFE53935),
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // Botón reconectar si no está conectado
+                if (!connected)
+                  GestureDetector(
+                    onTap: () { _adbRetryTimer?.cancel(); _tryAdbConnect(); },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE53935).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.5)),
+                      ),
+                      child: const Text('Reintentar', style: TextStyle(color: Color(0xFFE53935), fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
+            ),
+
+            // ── Instrucción o resumen ──
+            if (!hasData) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.touch_app_rounded, color: Colors.white.withValues(alpha: 0.4), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        connected ? 'Toca para leer un tag NFC y transferirlo' : 'Conecta al servidor para habilitar la lectura',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // ── Resumen inline cuando ya hay datos ──
+            if (hasData) ...[
+              const SizedBox(height: 12),
+              _buildTagReaderSummary(statusId: statusId),
+            ],
+
+            // ── Botón nueva lectura (cuando ya hay datos) ──
+            if (hasData) ...[
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: connected ? () async {
+                  if (!AdbNfcClientService.instance.isConnected) {
+                    final ok = await AdbNfcClientService.instance.connect();
+                    if (!mounted) return;
+                    setState(() => _adbClientConnected = ok);
+                    if (!ok) return;
+                  }
+                  if (!mounted) return;
+                  await showDialog(
+                    barrierDismissible: false,
+                    context: context,
+                    builder: (_) => const Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: NfcReadDialogWidget(autoStart: true, isTagTransferMode: false),
+                    ),
+                  );
+                  if (!mounted) return;
+                  final nfcContent = FFAppState().nfcRead;
+                  if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                    await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                    if (!mounted) return;
+                    setState(() {
+                      _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
+                      _tagReaderProductName[statusId] = '';
+                    });
+                  }
+                } : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    gradient: connected
+                        ? const LinearGradient(colors: [Color(0xFF00B4D8), Color(0xFF0077B6)])
+                        : null,
+                    color: connected ? null : Colors.white.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: connected ? [const BoxShadow(color: Color(0x4400B4D8), blurRadius: 12, offset: Offset(0, 4))] : [],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.nfc_rounded, color: connected ? Colors.white : Colors.white38, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Leer otro tag',
+                        style: TextStyle(
+                          color: connected ? Colors.white : Colors.white38,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -9657,11 +10581,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         // Leer productos desde SQLite usando la MISMA ruta que sync_install_module
         try {
           // Obtener la ruta de la base de datos (misma que usa sync_install_module)
-          final Directory? externalDir = await getExternalStorageDirectory();
-          if (externalDir == null) {
-            throw Exception('No se pudo acceder al almacenamiento externo');
+          late Directory baseDir;
+          if (Platform.isAndroid) {
+            final Directory? externalDir = await getExternalStorageDirectory();
+            if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+            baseDir = externalDir;
+          } else {
+            baseDir = await getApplicationDocumentsDirectory();
           }
-          final String basePath = '${externalDir.path}/ClickPalmData';
+          final String basePath = '${baseDir.path}/ClickPalmData';
           final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
           debugPrint('📂 Ruta de SQLite: $dbPath');
@@ -10531,6 +11459,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         .toList();
     for (final statusId in tagReaderIdsToRemove) {
       _tagReaderData.remove(statusId);
+      _tagReaderRawJsons.remove(statusId);
       debugPrint('   ❌ Limpiado _tagReaderData[$statusId]');
       cleanedCount++;
     }
@@ -10975,13 +11904,62 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // ===== RESUMEN DEL TAG READER AGRUPADO POR LOTE =====
 
-  Widget _buildTagReaderSummary({required int statusId}) {
+  String _extractTagProductName(String rawJson) {
+    try {
+      final parsed = actions.parseNfcJson(rawJson);
+      return (parsed?['Read_info']?['Name_product'] as String?) ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  Widget _buildTagReaderSummary({required int statusId, bool isAdbServer = false}) {
+    final rawJsons = _tagReaderRawJsons[statusId];
+    final isMulti = rawJsons != null && rawJsons.length > 1;
+
+    if (isMulti) {
+      // Modo NO_REMOVE: una sección por cada tag leído
+      return Column(
+        children: rawJsons.asMap().entries.map((entry) {
+          final index = entry.key;
+          final raw = entry.value;
+          final sectionData = _parseNfcTagContent(raw);
+          final sectionProductName = _extractTagProductName(raw);
+          return _buildTagReaderSummarySection(
+            sectionData: sectionData,
+            productName: sectionProductName,
+            tagIndex: index + 1,
+            statusId: statusId,
+            isAdbServer: isAdbServer,
+          );
+        }).toList(),
+      );
+    }
+
+    // Modo normal (un solo tag): comportamiento original
     final tagData = _tagReaderData[statusId] ?? [];
     if (tagData.isEmpty) return const SizedBox.shrink();
+    return _buildTagReaderSummarySection(
+      sectionData: tagData,
+      productName: _tagReaderProductName[statusId] ?? '',
+      tagIndex: 0,
+      statusId: statusId,
+      isAdbServer: isAdbServer,
+    );
+  }
+
+  Widget _buildTagReaderSummarySection({
+    required List<Map<String, dynamic>> sectionData,
+    required String productName,
+    required int tagIndex,
+    required int statusId,
+    bool isAdbServer = false,
+  }) {
+    if (sectionData.isEmpty) return const SizedBox.shrink();
 
     // Agrupar por lote (headquarterId)
     final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
-    for (var record in tagData) {
+    for (var record in sectionData) {
       final heId = record['headquarterId'] as int? ?? 0;
       if (!groupedByHeadquarter.containsKey(heId)) {
         groupedByHeadquarter[heId] = [];
@@ -10989,79 +11967,130 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       groupedByHeadquarter[heId]!.add(record);
     }
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B4332), // Verde oscuro
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    // Checkbox state para adb-server
+    final checkKey = tagIndex; // 0 en modo normal, 1-based en multi
+    final isChecked = isAdbServer && (_adbTagChecked[statusId]?.contains(checkKey) ?? false);
+
+    final treeContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Encabezado de sección cuando hay múltiples tags
+        if (tagIndex > 0) ...[
           Row(
             children: [
-              const Icon(
-                Icons.summarize_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
+              Icon(Icons.nfc, color: Colors.white.withValues(alpha: 0.7), size: 14),
+              const SizedBox(width: 4),
               Text(
-                (_tagReaderProductName[statusId]?.isNotEmpty == true)
-                    ? _tagReaderProductName[statusId]!
-                    : 'Resumen del TAG',
-                style: const TextStyle(
+                'Tag #$tagIndex',
+                style: TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.7),
                 ),
               ),
-              // Mostrar geolocalización de forma sutil si está disponible
-              if (_tagReaderGeolocations.containsKey(statusId)) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 12,
+              const SizedBox(width: 8),
+              Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.24), height: 1)),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: [
+            const Icon(Icons.summarize_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 6),
+            Text(
+              productName.isNotEmpty ? productName : 'Resumen del TAG',
+              style: const TextStyle(fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+            ),
+            // Geolocalización solo en el primer tag (o modo normal)
+            if (tagIndex <= 1 && _tagReaderGeolocations.containsKey(statusId)) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.location_on, color: Colors.white.withValues(alpha: 0.7), size: 12),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${_tagReaderGeolocations[statusId]!.latitude.toStringAsFixed(5)}, ${_tagReaderGeolocations[statusId]!.longitude.toStringAsFixed(5)}',
+                      style: TextStyle(fontFamily: 'Roboto', fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...groupedByHeadquarter.entries.map((entry) {
+          return _buildHeadquarterGroup(entry.key, entry.value);
+        }),
+      ],
+    );
+
+    return Container(
+      margin: tagIndex > 0 ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B4332),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
+      ),
+      child: isAdbServer
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                // Árbol de datos
+                Expanded(child: treeContent),
+                const SizedBox(width: 16),
+                // Checkbox ultra moderno centrado verticalmente
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _adbTagChecked[statusId] ??= {};
+                      if (isChecked) {
+                        _adbTagChecked[statusId]!.remove(checkKey);
+                      } else {
+                        _adbTagChecked[statusId]!.add(checkKey);
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: isChecked
+                          ? const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFF00E676), Color(0xFF00C853)],
+                            )
+                          : null,
+                      color: isChecked ? null : Colors.transparent,
+                      border: Border.all(
+                        color: isChecked ? const Color(0xFF00E676) : Colors.white.withValues(alpha: 0.4),
+                        width: 2,
                       ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${_tagReaderGeolocations[statusId]!.latitude.toStringAsFixed(5)}, ${_tagReaderGeolocations[statusId]!.longitude.toStringAsFixed(5)}',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 10,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
+                      boxShadow: isChecked
+                          ? [BoxShadow(color: const Color(0xFF00E676).withValues(alpha: 0.5), blurRadius: 10, spreadRadius: 1)]
+                          : [],
+                    ),
+                    child: isChecked
+                        ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                        : null,
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...groupedByHeadquarter.entries.map((entry) {
-            final headquarterId = entry.key;
-            final records = entry.value;
-            return _buildHeadquarterGroup(headquarterId, records);
-          }),
-        ],
-      ),
+            )
+          : treeContent,
     );
   }
 

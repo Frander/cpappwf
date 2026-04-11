@@ -18,8 +18,9 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 
 Future<String?> validateDbSqlite(BuildContext context) async {
-  if (!Platform.isAndroid) {
-    throw UnsupportedError('Esta función solo está disponible en Android');
+  if (!Platform.isAndroid && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+    debugPrint('validateDbSqlite: omitido en plataforma ${Platform.operatingSystem}');
+    return null;
   }
 
   try {
@@ -47,11 +48,11 @@ Future<String?> validateDbSqlite(BuildContext context) async {
       version:
           26, // v26: Code_user, State_user, Rol_user en Users
       onCreate: (Database db, int version) async {
-        await _createTables(db);
+        await createClickPalmTables(db);
       },
       onUpgrade: (Database db, int oldVersion, int newVersion) async {
         // Migración de versiones anteriores
-        await _upgradeDatabase(db, oldVersion, newVersion);
+        await upgradeClickPalmDatabase(db, oldVersion, newVersion);
       },
     );
 
@@ -75,7 +76,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
   }
 }
 
-Future<void> _createTables(Database db) async {
+Future<void> createClickPalmTables(Database db) async {
   debugPrint('Creando tablas de la base de datos...');
 
   // ============================================================================
@@ -871,14 +872,25 @@ Future<void> _verifyTables(Database db) async {
 
 // Duplicado de get_persistent_id.dart - Función para obtener la ruta de documentos
 Future<String> _getBestDocumentsPath() async {
+  if (!Platform.isAndroid) {
+    // En Windows/Linux/macOS usar directorio de documentos de la app
+    final Directory appDocDir = await getApplicationDocumentsDirectory();
+    final String dirPath = path.join(appDocDir.path, 'ClickPalmData');
+    final Directory targetDir = Directory(dirPath);
+    if (!await targetDir.exists()) {
+      await targetDir.create(recursive: true);
+    }
+    return targetDir.path;
+  }
+
   final Directory? externalDir = await getExternalStorageDirectory();
   if (externalDir == null) {
     throw Exception('No se pudo acceder al almacenamiento externo');
   }
 
-  final String path =
+  final String dirPath =
       '${externalDir.path}/ClickPalmData'; // Carpeta personalizada
-  final Directory targetDir = Directory(path);
+  final Directory targetDir = Directory(dirPath);
 
   if (!await targetDir.exists()) {
     await targetDir.create(recursive: true);
@@ -890,7 +902,7 @@ Future<String> _getBestDocumentsPath() async {
 // Duplicado de get_persistent_id.dart - Función para verificar permisos
 Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
   try {
-    if (!Platform.isAndroid) return false;
+    if (!Platform.isAndroid) return true; // Desktop no requiere permisos de storage
 
     final androidInfo = await DeviceInfoPlugin().androidInfo;
     final sdkVersion = androidInfo.version.sdkInt;
@@ -1169,7 +1181,7 @@ Future<void> _verifyAndUpdateOptimizedRoutesSchema(Database db) async {
 }
 
 /// Función de migración para actualizar la base de datos de versiones anteriores
-Future<void> _upgradeDatabase(
+Future<void> upgradeClickPalmDatabase(
     Database db, int oldVersion, int newVersion) async {
   debugPrint(
       '🔄 Migrando base de datos de versión $oldVersion a $newVersion...');

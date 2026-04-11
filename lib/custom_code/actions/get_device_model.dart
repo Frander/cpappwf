@@ -17,6 +17,15 @@ Future<String> getDeviceModel() async {
     } else if (Platform.isIOS) {
       IosDeviceInfo iosInfo = await deviceInfo.iosInfo;
       return iosInfo.model ?? 'Unknown iOS Device';
+    } else if (Platform.isWindows) {
+      WindowsDeviceInfo windowsInfo = await deviceInfo.windowsInfo;
+      return windowsInfo.productName;
+    } else if (Platform.isLinux) {
+      LinuxDeviceInfo linuxInfo = await deviceInfo.linuxInfo;
+      return 'Linux ${linuxInfo.prettyName}';
+    } else if (Platform.isMacOS) {
+      MacOsDeviceInfo macInfo = await deviceInfo.macOsInfo;
+      return 'macOS ${macInfo.model}';
     } else {
       return 'Unknown Device';
     }

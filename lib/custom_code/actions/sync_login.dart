@@ -397,13 +397,13 @@ Future<Map<String, dynamic>?> _callLoginAPI(
     const String url = 'https://api.clickpalm.com/Users/Login';
 
     final Map<String, dynamic> requestBody = {
-      'user_name': username,
-      'pass_word': password,
+      'username': username,
+      'password': password,
       'type_login': 'IMEI',
     };
 
     debugPrint('📤 Login Request Body:');
-    debugPrint('   user_name: $username');
+    debugPrint('   username: $username');
     debugPrint('   type_login: IMEI');
 
     final response = await http.post(
@@ -422,7 +422,7 @@ Future<Map<String, dynamic>?> _callLoginAPI(
 
     debugPrint('📥 Login Response Status: ${response.statusCode}');
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 200 || response.statusCode == 201) {
       final Map<String, dynamic> data = jsonDecode(response.body);
       debugPrint('✅ Login exitoso');
       return data;
@@ -1407,11 +1407,18 @@ Map<String, dynamic> _normalizeStatus(dynamic status) {
 
 /// Obtiene la ruta de la base de datos SQLite
 Future<String> _getDatabasePath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) {
+      throw Exception('No se pudo acceder al almacenamiento externo');
+    }
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
 
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  final String basePath = '${baseDir.path}/ClickPalmData';
   return path.join(basePath, 'clickpalm_database.db');
 }

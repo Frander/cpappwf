@@ -64,12 +64,34 @@
       "Read(//c/Users/JUAN_D~1/AppData/Local/Temp/claude/e--RepositoriosFix-ClickPalmAPP/2578ff06-7cc1-43f2-84d4-4c11b179eac2/tasks/**)",
       "Read(//class _DoVisitsFormPageWidgetState/,/^class / { if \\(/Widget build/\\(BuildContext context/\\)/**)",
       "Read(//e/RepositoriosFix/ClickPalmAPP/NR >= 13500 && NR <= 14500 { if \\(/class.*extends State/ || /Widget build/\\(/**)",
-      "Bash(find /e/RepositoriosFix/ClickPalmAPP/lib/custom_code/actions -name \"*.dart\" -exec grep -l \"flutter_blue_plus\\\\|battery_plus\\\\|sensors_plus\\\\|image_picker\\\\|webview\" {} \\\\;)"
+      "Bash(find /e/RepositoriosFix/ClickPalmAPP/lib/custom_code/actions -name \"*.dart\" -exec grep -l \"flutter_blue_plus\\\\|battery_plus\\\\|sensors_plus\\\\|image_picker\\\\|webview\" {} \\\\;)",
+      "Bash(cmd /c \"dir /s /b \\\\\"%LOCALAPPDATA%\\\\\\\\ClickPalm APP\\\\\"\")",
+      "Bash(cmd /c \"dir /s /b \\\\\"%APPDATA%\\\\\\\\ClickPalm*\\\\\" 2>nul; dir /s /b \\\\\"%LOCALAPPDATA%\\\\\\\\ClickPalm*\\\\\" 2>nul; dir /s /b \\\\\"%USERPROFILE%\\\\\\\\AppData\\\\\\\\*click*\\\\\" 2>nul\")",
+      "Bash(cmd /c \"reg query HKCU\\\\\\\\Software\\\\\\\\ClickPalm 2>nul; reg query HKCU\\\\\\\\Software\\\\\\\\click_palm 2>nul; reg query HKCU\\\\\\\\Software /f click /k 2>nul\")",
+      "Bash(cmd /c \"reg query HKCU\\\\\\\\Software\\\\\\\\ClickPalm 2>nul\")",
+      "Bash(cmd /c \"reg query HKCU\\\\\\\\Software\\\\\\\\click_palm_a_p_p 2>nul\")",
+      "Bash(cmd /c \"reg query \\\\\"HKCU\\\\\\\\Software\\\\\\\\flutter\\\\\" 2>nul\")",
+      "Bash(cmd /c \"reg query \\\\\"HKCU\\\\\\\\Software\\\\\\\\flutter\\\\\" /f ff_ /t REG_SZ 2>nul | head -5\")",
+      "Bash(cmd /c \"reg query \\\\\"HKCU\\\\\\\\Software\\\\\\\\click_palm_a_p_p\\\\\" 2>nul\")",
+      "Bash(cmd /c \"reg query \\\\\"HKCU\\\\\\\\Software\\\\\" 2>nul\")",
+      "Bash(powershell -command 'Get-ChildItem '\\\\''HKCU:\\\\Software'\\\\'' | Where-Object { $_.Name -match '\\\\''click|palm|flutter'\\\\'' }')",
+      "Bash(powershell -command \"Get-ChildItem 'HKCU:\\\\\\\\Software' | Select-Object -ExpandProperty Name\")",
+      "Bash(find /e/RepositoriosFix/ClickPalmAPP -type f -name \"*.dart\" -exec grep -l \"AdbNfcBridgeService\" {} \\\\;)",
+      "WebSearch",
+      "WebFetch(domain:paulnasilele.medium.com)",
+      "WebFetch(domain:api.dart.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:api.flutter.dev)",
+      "WebFetch(domain:www.codestudy.net)",
+      "WebFetch(domain:dev.to)",
+      "Read(//tmp/**)"
     ],
     "deny": [],
     "ask": [],
     "additionalDirectories": [
-      "C:\\Users\\Juan_Diego_Duque\\.gradle\\caches\\modules-2"
+      "C:\\Users\\Juan_Diego_Duque\\.gradle\\caches\\modules-2",
+      "C:\\Users\\Juan_Diego_Duque\\AppData\\Local\\Pub\\Cache\\hosted\\pub.dev\\flutter_tts-4.2.3\\windows"
     ]
   }
 }

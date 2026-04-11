@@ -3594,12 +3594,16 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
   }
 
   Future<String> _getDatabasePath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final String pathStr = '${externalDir.path}/ClickPalmData';
+    final String pathStr = '${baseDir.path}/ClickPalmData';
     return path.join(pathStr, 'clickpalm_database.db');
   }
 
@@ -8851,11 +8855,15 @@ Future<bool> _routeExists(
 ) async {
   try {
     // Obtener path de la base de datos
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      return false;
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) return false;
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
-    final String basePath = '${externalDir.path}/ClickPalmData';
+    final String basePath = '${baseDir.path}/ClickPalmData';
     final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
     // Abrir base de datos
@@ -8921,11 +8929,15 @@ Future<void> _saveRouteToDatabase(
     debugPrint('   Puntos: ${orderedPoints.length}');
 
     // Obtener path de la base de datos
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
-    final String basePath = '${externalDir.path}/ClickPalmData';
+    final String basePath = '${baseDir.path}/ClickPalmData';
     final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
     // Abrir base de datos
@@ -9150,11 +9162,15 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
       debugPrint('📂 Cargando rutas guardadas desde SQLite...');
 
       // Obtener path de la base de datos
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        throw Exception('No se pudo acceder al almacenamiento externo');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
-      final String basePath = '${externalDir.path}/ClickPalmData';
+      final String basePath = '${baseDir.path}/ClickPalmData';
       final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
       // Abrir base de datos (sqflite reutiliza la conexión si ya está abierta)
@@ -9227,10 +9243,16 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
     int maxPoints,
   ) async {
     try {
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) return null;
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) return null;
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
+      }
 
-      final String basePath = '${externalDir.path}/ClickPalmData';
+      final String basePath = '${baseDir.path}/ClickPalmData';
       final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
       final Database db = await openDatabase(dbPath);
@@ -9264,13 +9286,19 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
       debugPrint('📂 Cargando ruta optimizada existente desde SQLite...');
       debugPrint('   ID de ruta: $routeId');
 
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        debugPrint('❌ No se pudo acceder al almacenamiento externo');
-        return;
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) {
+          debugPrint('❌ No se pudo acceder al almacenamiento externo');
+          return;
+        }
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
 
-      final String basePath = '${externalDir.path}/ClickPalmData';
+      final String basePath = '${baseDir.path}/ClickPalmData';
       final String dbPath = path.join(basePath, 'clickpalm_database.db');
       final Database db = await openDatabase(dbPath);
 
@@ -9977,11 +10005,15 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
   ) async {
     try {
       // Obtener path de la base de datos
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        throw Exception('No se pudo acceder al almacenamiento externo');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
-      final String basePath = '${externalDir.path}/ClickPalmData';
+      final String basePath = '${baseDir.path}/ClickPalmData';
       final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
       // Abrir base de datos

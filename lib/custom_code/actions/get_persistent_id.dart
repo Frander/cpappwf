@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 
 import 'dart:io';
 import 'dart:math';
+import 'package:path_provider/path_provider.dart';
 import 'persistent_id_paths.dart';
 
 /// Lee el IMEI/ID persistido del dispositivo.
@@ -22,7 +23,7 @@ import 'persistent_id_paths.dart';
 ///   3. Si lo encuentra → propaga a rutas donde falte → retorna ID.
 ///   4. Si no encuentra → genera ID nuevo → guarda en todas → retorna ID.
 Future<String> getPersistentId(BuildContext context) async {
-  if (!Platform.isAndroid) return _generateId();
+  if (!Platform.isAndroid) return _getOrCreateDesktopId();
 
   const fileName = 'persistent_id.txt';
 
@@ -103,6 +104,30 @@ Future<void> _propagate(
     } catch (e) {
       debugPrint('⚠️ [getPersistentId] No se pudo propagar a ${entry.key}: $e');
     }
+  }
+}
+
+/// En desktop (Windows/Linux/macOS) persiste el ID en AppDocuments/ClickPalmData/persistent_id.txt
+Future<String> _getOrCreateDesktopId() async {
+  try {
+    final dir = await getApplicationDocumentsDirectory();
+    final folder = Directory('${dir.path}/ClickPalmData');
+    if (!await folder.exists()) await folder.create(recursive: true);
+    final file = File('${folder.path}/persistent_id.txt');
+    if (await file.exists()) {
+      final content = (await file.readAsString()).trim();
+      if (content.isNotEmpty) {
+        debugPrint('✅ [getPersistentId] ID desktop encontrado: $content');
+        return content;
+      }
+    }
+    final newId = _generateId();
+    await file.writeAsString(newId, flush: true);
+    debugPrint('🆕 [getPersistentId] ID desktop generado y guardado: $newId');
+    return newId;
+  } catch (e) {
+    debugPrint('❌ [getPersistentId] Error en desktop: $e');
+    return _generateId();
   }
 }
 

@@ -21,7 +21,7 @@ Future<Database> initializeDatabaseFromDbFile(
     } catch (_) {}
     // Copy the database file over to the working database directory.
     final databaseData = await rootBundle
-        .load(join('assets', 'sqlite_db_files', databaseAssetFilename));
+        .load('assets/sqlite_db_files/$databaseAssetFilename');
     final databaseBytes = databaseData.buffer.asUint8List(
       databaseData.offsetInBytes,
       databaseData.lengthInBytes,

@@ -570,11 +570,14 @@ bool _isGzip(List<int> bytes) =>
     bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
 
 Future<String> _getDatabasePath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  final String basePath = '${baseDir.path}/ClickPalmData';
   return path.join(basePath, 'clickpalm_database.db');
 }

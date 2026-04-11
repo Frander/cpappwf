@@ -1,10 +1,12 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 
 import '/backend/sqlite/init.dart';
 import 'queries/read.dart';
 import 'queries/update.dart';
 
 import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 export 'queries/read.dart';
 export 'queries/update.dart';
 
@@ -20,6 +22,10 @@ class SQLiteManager {
   static Future initialize() async {
     if (kIsWeb) {
       return;
+    }
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      sqfliteFfiInit();
+      databaseFactory = databaseFactoryFfi;
     }
     _database = await initializeDatabaseFromDbFile(
       'click_palm_local_b_d_n_e_w',

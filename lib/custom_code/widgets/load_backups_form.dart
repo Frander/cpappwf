@@ -177,12 +177,16 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
     });
 
     try {
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        throw Exception('No se pudo acceder al almacenamiento');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
 
-      final String basePath = '${externalDir.path}/ClickPalmData';
+      final String basePath = '${baseDir.path}/ClickPalmData';
 
       // Cargar archivos CSV
       final String csvPath = '$basePath/csv_exports';
@@ -305,6 +309,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
   // ==========================================================================
 
   Future<void> _checkBluetoothStatus() async {
+    if (Platform.isWindows) return; // Bluetooth no disponible en Windows
     try {
       final adapterState = await FlutterBluePlus.adapterState.first;
       setState(() {

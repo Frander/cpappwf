@@ -44,17 +44,23 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
 
     try {
       // Obtener la ruta de la base de datos
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        debugPrint('❌ No se pudo acceder al almacenamiento externo');
-        setState(() {
-          _isLoading = false;
-        });
-        return;
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) {
+          debugPrint('❌ No se pudo acceder al almacenamiento externo');
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        }
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
 
       final String dbPath = path.join(
-        '${externalDir.path}/ClickPalmData',
+        '${baseDir.path}/ClickPalmData',
         'clickpalm_database.db',
       );
 
@@ -156,14 +162,20 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
     if (confirmed == true) {
       try {
         // Obtener la ruta de la base de datos
-        final Directory? externalDir = await getExternalStorageDirectory();
-        if (externalDir == null) {
-          debugPrint('❌ No se pudo acceder al almacenamiento externo');
-          return;
+        late Directory baseDir;
+        if (Platform.isAndroid) {
+          final Directory? externalDir = await getExternalStorageDirectory();
+          if (externalDir == null) {
+            debugPrint('❌ No se pudo acceder al almacenamiento externo');
+            return;
+          }
+          baseDir = externalDir;
+        } else {
+          baseDir = await getApplicationDocumentsDirectory();
         }
 
         final String dbPath = path.join(
-          '${externalDir.path}/ClickPalmData',
+          '${baseDir.path}/ClickPalmData',
           'clickpalm_database.db',
         );
 

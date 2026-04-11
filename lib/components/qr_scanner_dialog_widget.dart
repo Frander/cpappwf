@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'dart:io' show Platform;
 
 /// Diálogo moderno para escanear códigos QR
 /// Diseño elegante con animaciones sutiles y alto rendimiento
@@ -33,6 +34,11 @@ class _QrScannerDialogWidgetState extends State<QrScannerDialogWidget>
   @override
   void initState() {
     super.initState();
+
+    if (Platform.isWindows) {
+      // Escáner QR no disponible en Windows — no inicializar MobileScannerController
+      return;
+    }
 
     _scannerController = MobileScannerController(
       detectionSpeed: DetectionSpeed.normal,

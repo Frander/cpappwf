@@ -12,8 +12,10 @@ import 'package:flutter/material.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 
 Future<bool> calibrateGPS() async {
+  if (Platform.isWindows) return false; // GPS no disponible en Windows
   StreamSubscription<Position>? positionStream;
   final completer = Completer<bool>();
   final stopwatch = Stopwatch()..start();

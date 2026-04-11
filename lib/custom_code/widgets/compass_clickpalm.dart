@@ -509,10 +509,16 @@ class _CompassClickpalmState extends State<CompassClickpalm>
 
   Future<void> _loadVirtualPoints() async {
     try {
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
+      }
 
-      final String pathStr = '${externalDir.path}/ClickPalmData';
+      final String pathStr = '${baseDir.path}/ClickPalmData';
       final dbPath = path.join(pathStr, 'clickpalm_database.db');
       final database = await openDatabase(dbPath);
 
@@ -557,6 +563,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
   }
 
   void _initSensors() {
+    if (Platform.isWindows) return; // Sensores no disponibles en Windows
     // Acelerómetro — guarda la última lectura de gravedad
     _accelerometerSub = accelerometerEventStream().listen((event) {
       _ax = event.x;
@@ -641,10 +648,16 @@ class _CompassClickpalmState extends State<CompassClickpalm>
 
   Future<void> _loadFromSQLite() async {
     try {
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) return;
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) return;
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
+      }
 
-      final String pathStr = '${externalDir.path}/ClickPalmData';
+      final String pathStr = '${baseDir.path}/ClickPalmData';
       final dbPath = path.join(pathStr, 'clickpalm_database.db');
       final database = await openDatabase(dbPath);
 

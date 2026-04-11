@@ -714,12 +714,16 @@ class MapDownloadService {
   }
 
   Future<String> _getBestDocumentsPath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final String path = '${externalDir.path}/ClickPalmData/Maps';
+    final String path = '${baseDir.path}/ClickPalmData/Maps';
     final Directory targetDir = Directory(path);
 
     if (!await targetDir.exists()) {

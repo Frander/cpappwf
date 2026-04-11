@@ -328,9 +328,15 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   /// Obtiene puntos válidos desde SQLite Location_tracking con un umbral configurable.
   Future<List<GPSPoint>> _getValidPointsFromSQLite({int limit = 8, double maxError = _maxHorizontalError}) async {
     try {
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) return [];
-      final dbPath = path.join('${externalDir.path}/ClickPalmData', 'clickpalm_database.db');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) return [];
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
+      }
+      final dbPath = path.join('${baseDir.path}/ClickPalmData', 'clickpalm_database.db');
       final database = await openDatabase(dbPath);
       final results = await database.rawQuery('''
         SELECT Latitude, Longitude, Altitude, HorizontalError, Battery, CreatedAt
@@ -436,6 +442,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   Future<void> _getGPSFromGeolocator() async {
+    if (Platform.isWindows) return; // GPS no disponible en Windows
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
@@ -627,11 +634,15 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       final mainGPSPoint = _gpsPoints.first;
 
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        throw Exception('No se pudo acceder al almacenamiento externo');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
-      final String pathStr = '${externalDir.path}/ClickPalmData';
+      final String pathStr = '${baseDir.path}/ClickPalmData';
       final dbPath = path.join(pathStr, 'clickpalm_database.db');
 
       final database = await openDatabase(dbPath);

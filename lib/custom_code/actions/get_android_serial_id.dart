@@ -22,8 +22,20 @@ Future<String> getAndroidSerialId() async {
       }
 
       return serialId;
+    } else if (Platform.isWindows) {
+      WindowsDeviceInfo windowsInfo =
+          await DeviceInfoPlugin().windowsInfo;
+      return windowsInfo.computerName.isNotEmpty
+          ? windowsInfo.computerName
+          : 'WINDOWS_DESKTOP';
+    } else if (Platform.isLinux) {
+      LinuxDeviceInfo linuxInfo = await DeviceInfoPlugin().linuxInfo;
+      return linuxInfo.machineId ?? 'LINUX_DESKTOP';
+    } else if (Platform.isMacOS) {
+      MacOsDeviceInfo macInfo = await DeviceInfoPlugin().macOsInfo;
+      return macInfo.systemGUID ?? 'MACOS_DESKTOP';
     } else {
-      return 'NOT_ANDROID';
+      return 'DESKTOP_DEVICE';
     }
   } catch (e) {
     print('Error getting Android serial ID: $e');

@@ -87,6 +87,7 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
   }
 
   Future<void> _initBluetooth() async {
+    if (Platform.isWindows) return; // Bluetooth no disponible en Windows
     try {
       // Obtener estado actual de Bluetooth
       BluetoothAdapterState state = await FlutterBluePlus.adapterState.first;

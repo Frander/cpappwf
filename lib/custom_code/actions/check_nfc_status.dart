@@ -28,6 +28,7 @@ enum NfcStatus {
 /// Verifica el estado del NFC y muestra alerta si está desactivado
 /// Retorna true si NFC está listo para usar, false si no
 Future<bool> checkNfcStatus(BuildContext context, {bool showAlert = true}) async {
+  if (Platform.isWindows) return false; // NFC no disponible en Windows
   try {
     // Verificar si NFC está disponible
     bool isAvailable = await NfcManager.instance.isAvailable();

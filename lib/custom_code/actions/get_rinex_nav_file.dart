@@ -109,11 +109,15 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
 }
 
 Future<String> _getBestDocumentsPath() async {
-  final extDir = await getExternalStorageDirectory();
-  if (extDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-  final path = p.join(extDir.path, 'ClickPalmData', 'RINEXNAV');
+  final path = p.join(baseDir.path, 'ClickPalmData', 'RINEXNAV');
   final dir = Directory(path);
   if (!await dir.exists()) {
     await dir.create(recursive: true);

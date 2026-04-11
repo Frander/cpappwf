@@ -6,6 +6,7 @@ import '/components/modern_calibrate_compass_widget.dart';
 import '/custom_code/actions/index.dart';
 import '/backend/schema/structs/read_geo_struct.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -172,10 +173,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
       await _loadActivityMetrics();
       _userBadgeController.forward();
 
-      // Iniciar servicio de geolocalización en segundo plano
-      // IMPORTANTE: Verificar y solicitar permisos ANTES de iniciar el servicio
-      // porque el servicio de segundo plano no tiene acceso a UI/Activity
-      debugPrint('🚀 Verificando permisos de ubicación antes de iniciar servicio...');
+      // Iniciar servicio de geolocalización en segundo plano (solo en móvil)
+      if (!Platform.isWindows) {
       try {
         // Verificar si el servicio de ubicación está habilitado
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -204,6 +203,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
       } catch (e) {
         debugPrint('⚠️ Error al iniciar servicio de geolocalización: $e');
       }
+      } // end !Platform.isWindows
 
     });
 
@@ -237,6 +237,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
 
   // Configurar listener para eventos del servicio de background GPS
   void _setupGpsServiceListener() {
+    if (Platform.isWindows) return; // Background service no disponible en Windows
     debugPrint('🔧 Configurando listeners del servicio de GPS...');
     final service = FlutterBackgroundService();
 

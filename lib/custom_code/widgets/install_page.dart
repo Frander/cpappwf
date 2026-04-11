@@ -456,12 +456,16 @@ class _InstallPageState extends State<InstallPage>
       }
 
       // Obtener ruta de almacenamiento
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        throw Exception('No se pudo acceder al almacenamiento');
+      late Directory baseDir;
+      if (Platform.isAndroid) {
+        final Directory? externalDir = await getExternalStorageDirectory();
+        if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+        baseDir = externalDir;
+      } else {
+        baseDir = await getApplicationDocumentsDirectory();
       }
 
-      final String downloadPath = '${externalDir.path}/ClickPalmData/Updates';
+      final String downloadPath = '${baseDir.path}/ClickPalmData/Updates';
       final Directory downloadDir = Directory(downloadPath);
 
       if (!await downloadDir.exists()) {
@@ -1316,9 +1320,17 @@ class _InstallPageState extends State<InstallPage>
       // 3. Base de datos SQLite — eliminar carpeta ClickPalmData completa
       _setStatus('Eliminando base de datos...');
       try {
-        final extDir = await getExternalStorageDirectory();
-        if (extDir != null) {
-          final dbFolder = Directory('${extDir.path}/ClickPalmData');
+        late Directory baseDir;
+        if (Platform.isAndroid) {
+          final Directory? extDir = await getExternalStorageDirectory();
+          if (extDir != null) {
+            baseDir = extDir;
+            final dbFolder = Directory('${baseDir.path}/ClickPalmData');
+            if (await dbFolder.exists()) await dbFolder.delete(recursive: true);
+          }
+        } else {
+          baseDir = await getApplicationDocumentsDirectory();
+          final dbFolder = Directory('${baseDir.path}/ClickPalmData');
           if (await dbFolder.exists()) await dbFolder.delete(recursive: true);
         }
       } catch (e) {

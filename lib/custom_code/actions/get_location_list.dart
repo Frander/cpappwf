@@ -1327,6 +1327,7 @@ class DatabaseManager {
 
 /// Sistema principal mejorado
 Future<void> getLocationList(BuildContext context) async {
+  if (Platform.isWindows) return; // GPS/sensores no disponibles en Windows
   debugPrint('=== Sistema de Geolocalización Mejorado Iniciado ===');
 
   // GPS debe mantenerse activo SIEMPRE en segundo plano
@@ -1830,12 +1831,15 @@ Future<void> getLocationList(BuildContext context) async {
 
 /// Obtener ruta de la base de datos usando el mismo patrón de los otros archivos
 Future<String> _getDatabasePathSqflite() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  final String basePath = '${baseDir.path}/ClickPalmData';
   return path.join(basePath, 'clickpalm_database.db');
 }
 
@@ -1892,6 +1896,7 @@ Future<void> _ensureLocationTrackingTableExists(Database database) async {
 
 /// Función de limpieza mejorada
 Future<void> stopLocationUpdates(BuildContext context) async {
+  if (Platform.isWindows) return; // GPS/sensores no disponibles en Windows
   debugPrint('Deteniendo actualizaciones de ubicación...');
 
   await _locationSubscription?.cancel();

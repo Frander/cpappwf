@@ -968,12 +968,16 @@ class _DownloadIaFormState extends State<DownloadIaForm>
   // ============================================================================
 
   Future<String> _getAIModelStoragePath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final String basePath = '${externalDir.path}/ClickPalmData';
+    final String basePath = '${baseDir.path}/ClickPalmData';
     final String aiModelsPath = '$basePath/ai_models';
     final Directory aiModelsDir = Directory(aiModelsPath);
 

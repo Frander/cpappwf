@@ -122,6 +122,7 @@ class _VideoCaptureComponentWidgetState
   }
 
   Future<void> _captureVideo(ImageSource source) async {
+    if (Platform.isWindows) return; // Captura de video no disponible en Windows
     try {
       HapticFeedback.mediumImpact();
 

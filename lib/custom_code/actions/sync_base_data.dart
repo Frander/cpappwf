@@ -347,9 +347,15 @@ Future<String?> _sbRenewAuthToken(String imei) async {
 // ============================================================================
 
 Future<String> _sbGetDatabasePath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) throw Exception('[SyncBase] No se pudo acceder al almacenamiento externo');
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('[SyncBase] No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
+  }
+  final String basePath = '${baseDir.path}/ClickPalmData';
   return path.join(basePath, 'clickpalm_database.db');
 }
 

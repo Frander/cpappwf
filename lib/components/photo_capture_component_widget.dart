@@ -108,6 +108,7 @@ class _PhotoCaptureComponentWidgetState
   }
 
   Future<void> _capturePhoto(ImageSource source) async {
+    if (Platform.isWindows) return; // Captura de cámara no disponible en Windows
     try {
       HapticFeedback.mediumImpact();
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'dart:async';
+import 'dart:io' show Platform;
 import '/components/gps_stabilization_monitor_widget.dart';
 
 class GPSQualityIndicator extends StatefulWidget {
@@ -52,6 +53,7 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
   }
 
   void _setupGpsProgressListener() {
+    if (Platform.isWindows) return; // Background service no disponible en Windows
     final service = FlutterBackgroundService();
     _gpsProgressSubscription = service.on('gpsProgress').listen((event) {
       if (event != null && mounted) {
@@ -123,6 +125,9 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
 
   @override
   Widget build(BuildContext context) {
+    // En Windows no hay GPS real — siempre simulado como estabilizado
+    if (Platform.isWindows) return const SizedBox.shrink();
+
     return Consumer<FFAppState>(
       builder: (context, appState, _) {
         final currentStabilized = appState.isStabilized;

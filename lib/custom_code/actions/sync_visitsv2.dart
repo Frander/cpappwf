@@ -607,12 +607,15 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
 }
 
 Future<String> _getTempFolderPath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  final String basePath = '${baseDir.path}/ClickPalmData';
   final String tempPath = '$basePath/sync_files';
   final Directory tempDir = Directory(tempPath);
 
@@ -624,12 +627,15 @@ Future<String> _getTempFolderPath() async {
 }
 
 Future<String> _getCSVFolderPath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  final String basePath = '${baseDir.path}/ClickPalmData';
   final String csvPath = '$basePath/csv_exports';
   final Directory csvDir = Directory(csvPath);
 
@@ -989,12 +995,15 @@ Future<List<int>> _getLocationTrackingFromSQLiteAndCompress(
 }
 
 Future<String> _getDatabasePath() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String basePath = '${externalDir.path}/ClickPalmData';
+  final String basePath = '${baseDir.path}/ClickPalmData';
   return path.join(basePath, 'clickpalm_database.db');
 }
 

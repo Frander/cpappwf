@@ -1336,10 +1336,10 @@ class DevicesPOSTCall {
   "id_device": ${idDevice ?? 0},
   "id_company": ${idCompany ?? 0},
   "device_name": "${deviceName ?? ''}",
-  "cellPhone": "${cellPhone ?? ''}",
+  "cell_phone": "${cellPhone ?? ''}",
   "serial_id": "${serialId ?? ''}",
-  "imeI1": "${imeI1 ?? ''}",
-  "imeI2": "${imeI2 ?? ''}",
+  "i_m_e_i1": "${imeI1 ?? ''}",
+  "i_m_e_i2": "${imeI2 ?? ''}",
   "model": "${model ?? ''}",
   "state": "${state ?? 'A'}"
 }''';

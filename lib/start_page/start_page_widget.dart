@@ -70,7 +70,9 @@ class _StartPageWidgetState extends State<StartPageWidget> {
       _model.pathDBSQLite1 = await actions.validateDbSqlite(
         context,
       );
-      FFAppState().pathDatabase = _model.pathDBSQLite1!;
+      if (_model.pathDBSQLite1 != null) {
+        FFAppState().pathDatabase = _model.pathDBSQLite1!;
+      }
 
       // ============================================================================
       // DETECTAR DISPOSITIVO NUEVO Y BUSCAR BACKUPS
@@ -708,6 +710,8 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               String deviceModel = await actions.getDeviceModel();
               String deviceSerialId = await actions.getAndroidSerialId();
               String deviceImei = _model.identifierCTR ?? '';
+
+              debugPrint('📋 [RegisterDevice] model=$deviceModel | serial=$deviceSerialId | imei=$deviceImei | identifierCTR=${_model.identifierCTR}');
 
               // Mostrar formulario de registro
               Map<String, String>? deviceFormData =

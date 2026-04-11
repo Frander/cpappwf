@@ -261,12 +261,15 @@ Future<void> _openPDFDynamic(String filePath, BuildContext context, String title
 }
 
 Future<String> _getBestDocumentsPathDynamic() async {
-  final Directory? externalDir = await getExternalStorageDirectory();
-  if (externalDir == null) {
-    throw Exception('No se pudo acceder al almacenamiento externo');
+  late Directory baseDir;
+  if (Platform.isAndroid) {
+    final Directory? externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+    baseDir = externalDir;
+  } else {
+    baseDir = await getApplicationDocumentsDirectory();
   }
-
-  final String path = '${externalDir.path}/ClickPalmData/PDFs';
+  final String path = '${baseDir.path}/ClickPalmData/PDFs';
   final Directory targetDir = Directory(path);
 
   if (!await targetDir.exists()) {

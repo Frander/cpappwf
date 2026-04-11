@@ -15,6 +15,8 @@ import 'dart:async';
 import 'dart:ui';
 import 'dart:io';
 import 'package:nfc_manager/nfc_manager.dart';
+import '/custom_code/actions/adb_nfc_bridge_service.dart';
+import '/custom_code/actions/adb_nfc_client_service.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
 import 'package:path/path.dart' as path;
@@ -80,6 +82,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   // Map para almacenar datos de tags NFC leídos por status_id
   final Map<int, List<Map<String, dynamic>>> _tagReaderData = {};
 
+  // Map para acumulación de tags en modo NO_REMOVE (statusId → lista de raw JSON strings)
+  final Map<int, List<String>> _tagReaderRawJsons = {};
+
   // Map para controlar el estado de expansión del tree view de tag-reader (por lote)
   final Map<String, bool> _tagReaderExpansionState = {};
 
@@ -108,6 +113,29 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // Map para rastrear si una transferencia fue completada exitosamente por statusId
   final Map<int, bool> _tagTransferCompleted = {};
+
+  // Checkboxes para tags ADB acumulados (statusId → Set de índices marcados)
+  final Map<int, Set<int>> _adbTagChecked = {};
+
+  // ── ADB NFC Bridge (tag-transfer-adb-server / tag-transfer-adb-from) ──────
+  AdbBridgeStatus _adbServerStatus = AdbBridgeStatus.serverDown;
+  StreamSubscription<AdbBridgeStatus>? _adbStatusSub;
+  StreamSubscription<Map<String, dynamic>>? _adbTagSub;
+  final Map<int, Map<String, dynamic>> _adbReceivedTagData = {};
+  bool _adbClientConnected = false;
+  StreamSubscription<bool>? _adbClientConnSub;
+  // Panel superior ADB
+  bool _hasAdbServerField = false;
+  int? _adbServerStatusId;
+  int _selectedAdbTagIndex = 0;
+  final List<DateTime> _adbTagTimestamps = [];
+  // Una entrada por tarjeta leída (índice = número de tarjeta)
+  final Map<int, List<List<Map<String, dynamic>>>> _adbServerCardsData = {};
+  final Map<int, List<String>> _adbServerCardsProductName = {};
+  final Map<int, List<String>> _adbServerCardsRawJson = {};  // raw JSON completo por tarjeta
+  // Caché de productos para lookup inline adb-server
+  final Map<int, String> _productByIdCache = {};      // Id_product -> Name_product
+  final Map<String, String> _productByRfidCache = {}; // Rfid -> Name_product
 
   // Caché de nombres de corteros desde SQLite (id_activity_status -> status_name)
   final Map<int, String> _corteroNamesCache = {};
@@ -224,7 +252,106 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       await _restoreTagTransferFromPrefs();
       _initializeDateTimeDefaults();
       _preloadUserNamesFromSQLite(); // Pre-cargar nombres de usuarios para el árbol de tags
+      _initAdbBridge(); // Inicializar bridge ADB si corresponde
     });
+  }
+
+  void _initAdbBridge() {
+    final statuses = _cachedActivityStatus;
+
+    // Incluir también los statuses dentro de steps (tag-transfer-adb-server puede estar en un step)
+    final List<dynamic> allStatuses = [...statuses];
+    for (final step in _cachedActivitySteps) {
+      final stepStatuses = getJsonField(step, r'''$.activities_status''');
+      if (stepStatuses is List) allStatuses.addAll(stepStatuses);
+    }
+
+    final hasServerField = allStatuses.any((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                .toLowerCase() ==
+            'tag-transfer-adb-server');
+    final hasFromField = allStatuses.any((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                .toLowerCase() ==
+            'tag-transfer-adb-from');
+
+    if (hasServerField && Platform.isWindows) {
+      // Guardar flag y statusId del primer campo adb-server detectado
+      _hasAdbServerField = true;
+      final firstServer = allStatuses.firstWhere(
+        (s) => (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() == 'tag-transfer-adb-server',
+        orElse: () => null,
+      );
+      _adbServerStatusId = firstServer != null
+          ? getJsonField(firstServer, r'''$.id_activity_status''') as int?
+          : null;
+
+      _adbStatusSub = AdbNfcBridgeService.instance.onStatusChanged.listen((status) {
+        if (mounted) setState(() => _adbServerStatus = status);
+      });
+      _adbTagSub = AdbNfcBridgeService.instance.onTagReceived.listen((payload) {
+        if (!mounted) return;
+
+        // Lista de (statusId, statusName) para los que hay que recalcular
+        final List<({int id, String name})> toRecalc = [];
+
+        setState(() {
+          final serverStatuses = allStatuses.where((s) =>
+              (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                      .toLowerCase() ==
+                  'tag-transfer-adb-server');
+          for (final s in serverStatuses) {
+            final id = getJsonField(s, r'''$.id_activity_status''') as int?;
+            if (id == null) continue;
+            _adbReceivedTagData[id] = payload;
+            final tagContent = payload['tagContent'] as String? ?? '';
+            final productName = payload['productName'] as String? ?? '';
+            if (tagContent.isEmpty) continue;
+
+            // Cada tag es una tarjeta independiente — sin acumulación ni reemplazo
+            final parsed = _parseNfcTagContent(tagContent);
+            _adbServerCardsData[id] ??= [];
+            _adbServerCardsData[id]!.add(parsed);
+            _adbServerCardsProductName[id] ??= [];
+            _adbServerCardsProductName[id]!.add(productName);
+            _adbServerCardsRawJson[id] ??= [];
+            _adbServerCardsRawJson[id]!.add(tagContent);
+
+            // Registrar timestamp y seleccionar la nueva tarjeta
+            _adbTagTimestamps.add(DateTime.now());
+            final newIndex = _adbTagTimestamps.length - 1;
+            _selectedAdbTagIndex = newIndex;
+
+            // Mostrar en el árbol inline los datos de la tarjeta recién recibida
+            _tagReaderData[id] = parsed;
+            _tagReaderProductName[id] = productName;
+            _tagReaderRawJsons.remove(id);
+
+            // Registrar para recalcular headquarter-weight después del setState
+            final sName = getJsonField(s, r'''$.status_name''')?.toString() ?? '';
+            toRecalc.add((id: id, name: sName));
+          }
+        });
+
+        // Disparar cálculos fuera del setState (son async)
+        for (final entry in toRecalc) {
+          _autoCalculateRelatedDistances(entry.id, entry.name);
+          _autoCalculateRelatedHeadquarterWeights(entry.id, entry.name);
+        }
+      });
+      AdbNfcBridgeService.instance.start().then((_) {
+        if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+      });
+    }
+
+    if (hasFromField && !Platform.isWindows) {
+      _adbClientConnSub = AdbNfcClientService.instance.onConnectionChanged.listen((connected) {
+        if (mounted) setState(() => _adbClientConnected = connected);
+      });
+      AdbNfcClientService.instance.connect().then((connected) {
+        if (mounted) setState(() => _adbClientConnected = connected);
+      });
+    }
   }
 
   // ============================================================================
@@ -322,7 +449,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       _tabController = TabController(
         length: _cachedActivitySteps.length,
         vsync: this,
-      );
+      )..addListener(() {
+        if (mounted) setState(() {});
+      });
 
       // Auto-expandir reference-list dentro de tab-container (siempre visibles)
       for (var step in _cachedActivitySteps) {
@@ -443,6 +572,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     // Disponer controllers de búsqueda
     _searchControllers.forEach((_, controller) => controller.dispose());
     _tabController?.dispose();
+    // Limpiar ADB bridge
+    _adbStatusSub?.cancel();
+    _adbTagSub?.cancel();
+    _adbClientConnSub?.cancel();
+    if (Platform.isWindows) {
+      AdbNfcBridgeService.instance.stop();
+    } else {
+      AdbNfcClientService.instance.disconnect();
+    }
     super.dispose();
   }
 
@@ -1141,10 +1279,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     return Container(
       height: 60,
       decoration: BoxDecoration(
-        color: const Color(0xFF00a86b).withValues(alpha: 0.15),
+        color: const Color(0xFFB45309).withValues(alpha: 0.15),
         border: Border(
           bottom: BorderSide(
-            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+            color: const Color(0xFFB45309).withValues(alpha: 0.3),
             width: 1,
           ),
         ),
@@ -1170,17 +1308,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 height: 36,
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF00a86b), Color(0xFF007a4e)],
+                    colors: [Color(0xFFB45309), Color(0xFF451A03)],
                   ),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                    color: const Color(0xFFB45309).withValues(alpha: 0.5),
                     width: 1,
                   ),
                 ),
                 child: const Icon(
                   Icons.chevron_left_rounded,
-                  color: Color(0xFF00ff9f),
+                  color: Colors.white,
                   size: 24,
                 ),
               ),
@@ -1246,28 +1384,38 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         activitySteps.every((s) =>
             getJsonField(s, r'''$.type_step''').toString() == 'tab-container');
 
-    if (allTabContainer && _tabController != null) {
-      return _buildTabLayout(activitySteps, activityStatus);
+    final Widget formBody = allTabContainer
+        ? _buildSimultaneousPanelLayout(activitySteps, activityStatus)
+        : ListView.separated(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            itemCount: activitySteps.length + activityStatus.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemBuilder: (context, index) {
+              if (index < activitySteps.length) {
+                return _buildStepCard(activitySteps[index], level: 0);
+              } else {
+                final statusIndex = index - activitySteps.length;
+                return _buildRootStatusCard(
+                  activityStatus[statusIndex],
+                  allActivityStatus: activityStatus,
+                  level: 0,
+                );
+              }
+            },
+          );
+
+    // Si hay campo adb-server en Windows → panel vertical izquierdo + formulario a la derecha
+    if (_hasAdbServerField && Platform.isWindows) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _buildAdbSidePanel(),
+          Expanded(child: formBody),
+        ],
+      );
     }
 
-    // Fallback: lista accordion original
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      itemCount: activitySteps.length + activityStatus.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        if (index < activitySteps.length) {
-          return _buildStepCard(activitySteps[index], level: 0);
-        } else {
-          final statusIndex = index - activitySteps.length;
-          return _buildRootStatusCard(
-            activityStatus[statusIndex],
-            allActivityStatus: activityStatus,
-            level: 0,
-          );
-        }
-      },
-    );
+    return formBody;
   }
 
   /// Renderiza los steps como TabBar + TabBarView (diseño moderno)
@@ -1304,10 +1452,28 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
               return ListView.separated(
                 padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                itemCount: tabStatuses.length,
+                itemCount: (tabStatuses.length / 2).ceil(),
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, i) {
-                  return _buildStatusOption(step, tabStatuses[i], level: 0);
+                itemBuilder: (context, rowIndex) {
+                  final leftIndex = rowIndex * 2;
+                  final rightIndex = leftIndex + 1;
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: _buildStatusOption(step, tabStatuses[leftIndex], level: 0),
+                        ),
+                        const SizedBox(width: 10),
+                        if (rightIndex < tabStatuses.length)
+                          Expanded(
+                            child: _buildStatusOption(step, tabStatuses[rightIndex], level: 0),
+                          )
+                        else
+                          const Expanded(child: SizedBox()),
+                      ],
+                    ),
+                  );
                 },
               );
             }).toList(),
@@ -1322,6 +1488,261 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 level: 0,
               )),
       ],
+    );
+  }
+
+  // ============================================================
+  // LAYOUT SIMULTÁNEO DE PANELES (reemplaza TabBarView)
+  // ============================================================
+
+  /// Renderiza todos los steps tab-container en paralelo: panel izquierdo (primer step)
+  /// y panel derecho (steps restantes fusionados en grid 2 columnas).
+  Widget _buildSimultaneousPanelLayout(
+      List<dynamic> activitySteps, List<dynamic> activityStatus) {
+    if (activitySteps.isEmpty) return const SizedBox.shrink();
+
+    final firstStep = activitySteps.first;
+    final remainingSteps = activitySteps.skip(1).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Panel izquierdo — primer step (ancho fijo, llena el alto disponible)
+          SizedBox(
+            width: 340,
+            child: _buildPanelForStep(firstStep),
+          ),
+          const SizedBox(width: 8),
+          // Panel derecho — steps restantes fusionados (llena el alto disponible)
+          Expanded(
+            child: _buildMergedPanel(remainingSteps),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Panel izquierdo: statuses normales en grid 2 columnas; tag-transfer-adb-server en full-width.
+  Widget _buildPanelForStep(dynamic step) {
+    final stepName = getJsonField(step, r'''$.unity''')?.toString() ??
+        getJsonField(step, r'''$.name_step''')?.toString() ?? '';
+    final statusesRaw = getJsonField(step, r'''$.activities_status''');
+    final List<dynamic> statuses = statusesRaw is List ? statusesRaw : [];
+
+    // Separar por tipo: date primero, time segundo, adb full-width, el resto en grid
+    final dateStatuses = statuses.where((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() == 'date').toList();
+    final timeStatuses = statuses.where((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() == 'time').toList();
+    final adbStatuses = statuses.where((s) =>
+        (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() ==
+        'tag-transfer-adb-server').toList();
+    final normalStatuses = statuses.where((s) {
+      final t = (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase();
+      return t != 'date' && t != 'time' && t != 'tag-transfer-adb-server';
+    }).toList();
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1F0F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF2D5A2D).withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header del panel
+          if (stepName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              child: Text(
+                stepName.toUpperCase(),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.45),
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          // Contenido scrollable que llena el espacio restante
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Date — fila individual (full-width)
+                  for (final s in dateStatuses)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildStatusOption(step, s, level: 0),
+                    ),
+                  // Time — fila individual (full-width)
+                  for (final s in timeStatuses)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildStatusOption(step, s, level: 0),
+                    ),
+                  // Grid 2 columnas para statuses normales
+                  if (normalStatuses.isNotEmpty)
+                    Column(
+                      children: List.generate(
+                        (normalStatuses.length / 2).ceil(),
+                        (rowIndex) {
+                          final leftIndex = rowIndex * 2;
+                          final rightIndex = leftIndex + 1;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Expanded(
+                                    child: _buildStatusOption(
+                                        step, normalStatuses[leftIndex], level: 0),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  if (rightIndex < normalStatuses.length)
+                                    Expanded(
+                                      child: _buildStatusOption(
+                                          step, normalStatuses[rightIndex], level: 0),
+                                    )
+                                  else
+                                    const Expanded(child: SizedBox()),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  // ADB statuses en full-width
+                  for (final adbStatus in adbStatuses)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildStatusOption(step, adbStatus, level: 0),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Busca el step al que pertenece un status dado (por id_activity_step_parent).
+  dynamic _findStepForStatus(List<dynamic> steps, dynamic status) {
+    final parentId = getJsonField(status, r'''$.id_activity_step_parent''');
+    if (parentId == null) return steps.isNotEmpty ? steps.first : null;
+    for (final step in steps) {
+      final stepId = getJsonField(step, r'''$.id_activity_step''');
+      if (stepId == parentId) return step;
+    }
+    return steps.isNotEmpty ? steps.first : null;
+  }
+
+  /// Panel derecho: fusiona statuses de todos los steps restantes en grid de 2 columnas.
+  Widget _buildMergedPanel(List<dynamic> steps) {
+    if (steps.isEmpty) return const SizedBox.shrink();
+
+    // Recopilar todos los statuses y ordenar por order_status
+    final List<dynamic> allStatuses = [];
+    for (final step in steps) {
+      final raw = getJsonField(step, r'''$.activities_status''');
+      if (raw is List) allStatuses.addAll(raw);
+    }
+
+    if (allStatuses.isEmpty) return const SizedBox.shrink();
+
+    allStatuses.sort((a, b) {
+      final orderA = getJsonField(a, r'''$.order_status''');
+      final orderB = getJsonField(b, r'''$.order_status''');
+      final numA = orderA is num ? orderA.toInt() : int.tryParse(orderA?.toString() ?? '') ?? 0;
+      final numB = orderB is num ? orderB.toInt() : int.tryParse(orderB?.toString() ?? '') ?? 0;
+      return numA.compareTo(numB);
+    });
+
+    // Nombre del panel = nombres de los steps fusionados
+    final panelName = steps.map((s) =>
+        getJsonField(s, r'''$.unity''')?.toString() ??
+        getJsonField(s, r'''$.name_step''')?.toString() ?? '').join(' · ');
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1F0F),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: const Color(0xFF2D5A2D).withValues(alpha: 0.5),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (panelName.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              child: Text(
+                panelName.toUpperCase(),
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white.withValues(alpha: 0.45),
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+          // Contenido scrollable que llena el espacio restante
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                children: List.generate(
+                  (allStatuses.length / 2).ceil(),
+                  (rowIndex) {
+                    final leftIndex = rowIndex * 2;
+                    final rightIndex = leftIndex + 1;
+                    final leftStep = _findStepForStatus(steps, allStatuses[leftIndex]);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: _buildStatusOption(
+                                  leftStep, allStatuses[leftIndex], level: 0),
+                            ),
+                            const SizedBox(width: 10),
+                            if (rightIndex < allStatuses.length)
+                              Expanded(
+                                child: _buildStatusOption(
+                                    _findStepForStatus(steps, allStatuses[rightIndex]),
+                                    allStatuses[rightIndex],
+                                    level: 0),
+                              )
+                            else
+                              const Expanded(child: SizedBox()),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1394,13 +1815,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             decoration: BoxDecoration(
               // Reemplazado gradiente por color sólido para mejor rendimiento
               color: hasValue
-                  ? const Color(0xFF00a86b)
-                  : const Color(0xFFF1F8F4),
+                  ? const Color(0xFFB45309)
+                  : const Color(0xFF0D2B1A),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: hasValue
-                    ? const Color(0xFF00a86b)
-                    : const Color(0xFFE8F5E9),
+                    ? const Color(0xFFB45309)
+                    : const Color(0xFF1A4A2E),
                 width: 2,
               ),
               // BoxShadow removido para mejor rendimiento en scroll
@@ -1414,7 +1835,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     height: 24,
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00a86b),
+                      color: const Color(0xFFB45309),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1425,7 +1846,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         ? Icons.expand_more_rounded
                         : Icons.chevron_right_rounded,
                     color:
-                        hasValue ? Colors.white : const Color(0xFF00a86b),
+                        hasValue ? Colors.white : const Color(0xFFB45309),
                     size: 36,
                   ),
                 const SizedBox(width: 8),
@@ -1445,7 +1866,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 fontWeight: FontWeight.bold,
                                 color: hasValue
                                     ? Colors.white
-                                    : const Color(0xFF00a86b),
+                                    : const Color(0xFFB45309),
                               ),
                             ),
                           ),
@@ -1500,8 +1921,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
                       color: totalCompleted == totalRequired
-                          ? const Color(0xFF1B5E20)
-                          : const Color(0xFFF57C00),
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFD97706),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -1630,8 +2051,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
     // Log de renderizado (comentado para evitar spam en consola)
     // debugPrint('  🔹 RENDERIZANDO STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level');
-    final statusColor =
-        getJsonField(status, r'''$.color''')?.toString() ?? '#00ff9f';
     final stepsChildsRaw =
         getJsonField(status, r'''$.activities_steps_childs''');
     final stepsChilds = stepsChildsRaw != null
@@ -1655,7 +2074,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final isSelected = _cachedSearchInVisitDetails(statusId, 'STATUS');
 
     final expansionKey = '${parentStepId}_$statusId';
-    final isExpanded = _statusExpansionState[expansionKey] ?? false;
+    final typeStatusLower = typeStatus.toLowerCase();
+    // distance-extractor: siempre expandido (el árbol interno siempre visible)
+    final isExpanded = typeStatusLower == 'distance-extractor'
+        ? true
+        : (_statusExpansionState[expansionKey] ?? false);
 
     // Verificar si tiene algún tipo de hijos
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
@@ -1681,6 +2104,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final isTimeType = typeStatus.toLowerCase() == 'time';
     final isUsersListType = typeStatus.toLowerCase() == 'users-list';
     final isReferenceListType = typeStatus.toLowerCase() == 'reference-list';
+    final isTagTransferAdbServerType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-server';
+    final isTagTransferAdbFromType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-from';
 
     // Para reference-list: determinar si algún hijo está seleccionado y cuál es su nombre
     // (el hijo seleccionado se almacena con auxStep == statusId del padre reference-list)
@@ -1695,18 +2122,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
     }
     final bool hasSelectedRefChild = isReferenceListType && referenceListSelectedName != null;
-
-    // Convertir color hex a Color
-    Color parseColor(String hexColor) {
-      try {
-        final hex = hexColor.replaceAll('#', '');
-        return Color(int.parse('FF$hex', radix: 16));
-      } catch (e) {
-        return const Color(0xFF00ff9f); // Color por defecto
-      }
-    }
-
-    final color = parseColor(statusColor);
 
     return Column(
       children: [
@@ -1746,6 +2161,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             // Si es tipo users-list, NO seleccionar automáticamente al hacer tap
             // El usuario interactúa con el control de búsqueda inline
             if (isUsersListType) {
+              return;
+            }
+
+            // Tipos que no deben reaccionar al tap del contenedor principal
+            // (date y time tienen sus propios handlers más abajo con return)
+            // distance-extractor tiene su propio handler más abajo que sí calcula
+            if (isTagTransferAdbServerType ||
+                isDateType ||
+                isTimeType ||
+                isLabelInfoType) {
               return;
             }
 
@@ -1855,13 +2280,41 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
                   final productName = await _fetchProductNameFromRfid(nfcContent);
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+                  final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
                   setState(() {
-                    _tagReaderData[statusId] = parsedData;
+                    if (isNoRemove) {
+                      // Modo acumulativo: agregar al array de raw JSONs
+                      if (!_tagReaderRawJsons.containsKey(statusId)) {
+                        _tagReaderRawJsons[statusId] = [];
+                      }
+                      _tagReaderRawJsons[statusId]!.add(nfcContent);
+                      // Aplanar todos los records acumulados para _tagReaderData
+                      final allRecords = <Map<String, dynamic>>[];
+                      for (final raw in _tagReaderRawJsons[statusId]!) {
+                        allRecords.addAll(_parseNfcTagContent(raw));
+                      }
+                      _tagReaderData[statusId] = allRecords;
+                    } else {
+                      // Modo normal: reemplazar
+                      _tagReaderRawJsons.remove(statusId);
+                      _tagReaderData[statusId] = parsedData;
+                    }
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                     _tagReaderProductName[statusId] = productName;
                   });
+
+                  // Determinar el statusResponse a guardar
+                  final statusResponseToSave = isNoRemove
+                      ? jsonEncode(_tagReaderRawJsons[statusId])
+                      : nfcContent;
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
                   // Buscar el índice existente o agregar nuevo
@@ -1873,11 +2326,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     }
                   }
 
-                  // Extraer valores necesarios del status
-                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
-                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-
                   if (existingIndex >= 0) {
                     FFAppState().updateVisitDetailsAtIndex(
                       existingIndex,
@@ -1886,7 +2334,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -1901,7 +2349,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -1910,7 +2358,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       ),
                     );
                   }
-                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)${isNoRemove ? " [NO_REMOVE: ${_tagReaderRawJsons[statusId]!.length} tags acumulados]" : ""}');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -2031,7 +2479,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           ),
                         ],
                       ),
-                      backgroundColor: Color(0xFF00a86b),
+                      backgroundColor: Color(0xFFB45309),
                       duration: Duration(seconds: 3),
                     ),
                   );
@@ -2059,6 +2507,58 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
+            // tag-transfer-adb-server: tap intenta habilitar el socket (solo desktop)
+            if (isTagTransferAdbServerType) {
+              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+                await AdbNfcBridgeService.instance.start();
+                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+              }
+              return;
+            }
+
+            // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
+            if (isTagTransferAdbFromType) {
+              if (!Platform.isWindows) {
+                if (!AdbNfcClientService.instance.isConnected) {
+                  final connected = await AdbNfcClientService.instance.connect();
+                  if (!mounted) return;
+                  setState(() => _adbClientConnected = connected);
+                  if (!connected) return;
+                }
+                if (!mounted) return;
+                await showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) => const Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: false,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                final nfcContent = FFAppState().nfcRead;
+                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                  if (!mounted) return;
+                  // Mostrar resumen inline en el dispositivo Android también
+                  setState(() {
+                    _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
+                    _tagReaderProductName[statusId] = '';
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('📡 Tag enviado al servidor desktop'),
+                    backgroundColor: Color(0xFFB45309),
+                    duration: Duration(seconds: 3),
+                  ));
+                }
+              }
+              return;
+            }
+
             // Si es tipo numbers-operation, calcular el valor automáticamente
             if (isNumbersOperationType) {
               final formula =
@@ -2069,25 +2569,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 if (result != null) {
                   setState(() {
                     _calculatedValues[statusId] = result;
-                    // Marcar que esta operación fue calculada al menos una vez
                     _numbersOperationCalculated[statusId] = true;
                   });
                   debugPrint('🧮 Operación calculada: $formula = $result');
                 }
               }
-              await _onStatusSelected(parentStep, status);
+              // No llamar _onStatusSelected — no debe marcarse visualmente como seleccionado
               setState(() {});
               return;
             }
 
             // Si es tipo headquarter-weight, cargar weights desde SQLite y calcular
             if (isHeadquarterWeightType) {
-              // Buscar el tag-reader previo en el árbol de steps
-              // Obtener todos los headquarterIds del tag-reader más reciente
               final List<int> headquarterIds = [];
               int? tagReaderStatusId;
 
-              // Buscar en _tagReaderData el status anterior
               for (var entry in _tagReaderData.entries) {
                 tagReaderStatusId = entry.key;
                 final tagData = entry.value;
@@ -2099,18 +2595,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 }
               }
 
-              // Cargar weights desde SQLite
               if (headquarterIds.isNotEmpty) {
                 await _loadHeadquarterWeights(headquarterIds);
-
-                // Calcular peso total: resultados x weight por cada headquarter
                 if (tagReaderStatusId != null) {
                   _calculateHeadquarterWeightResults(
                       tagReaderStatusId, 'tag-reader');
                 }
               }
 
-              await _onStatusSelected(parentStep, status);
+              // No llamar _onStatusSelected — no debe marcarse visualmente como seleccionado
               setState(() {});
               return;
             }
@@ -2123,9 +2616,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             }
 
             // Si es tipo distance-extractor, calcular distancia automáticamente
+            // No llamar _onStatusSelected — no debe marcarse visualmente como seleccionado
             if (isDistanceExtractorType) {
               await _calculateDistance(statusId, status, parentStep);
-              await _onStatusSelected(parentStep, status);
               setState(() {});
               return;
             }
@@ -2397,7 +2890,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: (isTagTransferAdbFromType && !Platform.isWindows)
+                ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
+                : (isDateType || isTimeType)
+                    ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
+                    : const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -2406,14 +2903,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         !isNumberType &&
                         !isTagWriterType &&
                         !isTagReaderType &&
-                        !isDistanceExtractorType)
+                        !isDistanceExtractorType &&
+                        !isHeadquarterWeightType &&
+                        !isNumbersOperationType &&
+                        !isDateType &&
+                        !isTimeType)
                     ? [
-                        const Color(0xFF00a86b),
-                        const Color(0xFF00d980),
+                        const Color(0xFFB45309),
+                        const Color(0xFF92400E),
                       ]
                     : [
-                        const Color(0xFFF1F8F4),
-                        const Color(0xFFFAFDFB),
+                        const Color(0xFF0D2B1A),
+                        const Color(0xFF0A1F12),
                       ],
               ),
               borderRadius: BorderRadius.circular(12),
@@ -2423,169 +2924,182 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         !isTextType &&
                         !isTagWriterType &&
                         !isTagReaderType &&
-                        !isDistanceExtractorType)
-                    ? const Color(0xFF00a86b)
-                    : const Color(0xFFE8F5E9),
+                        !isDistanceExtractorType &&
+                        !isHeadquarterWeightType &&
+                        !isNumbersOperationType &&
+                        !isDateType &&
+                        !isTimeType)
+                    ? const Color(0xFFB45309)
+                    : const Color(0xFF1A4A2E),
                 width: 2,
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // Radio button visual (no mostrar para tag-transfer, text, photo, video, number, users-list)
-                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType)
-                      Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
-                                    !isNumberType &&
-                                    !isTagWriterType &&
-                                    !isTagReaderType)
-                                ? Colors.white
-                                : const Color(0xFF00a86b),
-                            width: 3,
-                          ),
-                          color: (isReferenceListType ? hasSelectedRefChild : isSelected)
-                              ? Colors.white
-                              : Colors.transparent,
-                        ),
-                        child: (isReferenceListType ? hasSelectedRefChild : isSelected)
-                            ? Center(
-                                child: Container(
-                                  width: 12,
-                                  height: 12,
-                                  decoration: const BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Color(0xFF00a86b),
-                                  ),
-                                ),
-                              )
-                            : null,
-                      ),
-                    if (!isTagTransferType && !isTextType && !isPhotoType && !isVideoType && !isNumberType && !isUsersListType && !isDateType && !isTimeType && !isReferenceListType && !isLabelInfoType && !isDistanceExtractorType && !isHeadquarterWeightType && !isNumbersOperationType) const SizedBox(width: 12),
-                    // Icono específico para photo y video, indicador de color para otros tipos (excepto number, users-list, text, date, time, reference-list, label-info, distance-extractor, headquarter-weight, numbers-operation)
-                    if (!isTagReaderType && !isTagWriterType && !isTagTransferType && !isNumberType && !isUsersListType && !isTextType && !isDateType && !isTimeType && !isReferenceListType && !isLabelInfoType && !isDistanceExtractorType && !isHeadquarterWeightType && !isNumbersOperationType)
-                      // Para photo y video: solo mostrar icono sin contenedor de fondo cuando no está seleccionado
-                      (isPhotoType || isVideoType) && !isSelected
-                          ? Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Icon(
-                                isPhotoType
-                                    ? Icons.photo_camera_rounded
-                                    : Icons.videocam_rounded,
-                                color: const Color(0xFF00a86b), // Verde oscuro consistente
-                                size: 24,
-                              ),
-                            )
-                          : Container(
-                              width: 32,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                color: (isDateType || isTimeType || isPhotoType || isVideoType)
-                                    ? (isSelected
-                                        ? Colors.white.withValues(alpha: 0.2)
-                                        : ((isPhotoType || isVideoType)
-                                            ? const Color(0xFF00a86b).withValues(alpha: 0.2)
-                                            : color.withValues(alpha: 0.2)))
-                                    : color,
-                                borderRadius: BorderRadius.circular(6),
-                                border: (isDateType || isTimeType || isPhotoType || isVideoType)
-                                    ? Border.all(
-                                        color: isSelected
-                                            ? Colors.white
-                                            : ((isPhotoType || isVideoType)
-                                                ? const Color(0xFF00a86b)
-                                                : color),
-                                        width: 2,
-                                      )
-                                    : null,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: (isSelected
-                                        ? Colors.white
-                                        : ((isPhotoType || isVideoType)
-                                            ? const Color(0xFF00a86b)
-                                            : color)).withValues(alpha: 0.6),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 3),
-                                  ),
-                                ],
-                              ),
-                              child: isDateType
-                                  ? Icon(
-                                      Icons.calendar_today_rounded,
-                                      color: isSelected ? Colors.white : color,
-                                      size: 18,
-                                    )
-                                  : isTimeType
-                                      ? Icon(
-                                          Icons.access_time_rounded,
-                                          color: isSelected ? Colors.white : color,
-                                          size: 20,
-                                        )
-                                      : isPhotoType
-                                          ? Icon(
-                                              Icons.photo_camera_rounded,
-                                              color: isSelected ? Colors.white : const Color(0xFF00a86b),
-                                              size: 20,
-                                            )
-                                          : isVideoType
-                                              ? Icon(
-                                                  Icons.videocam_rounded,
-                                                  color: isSelected ? Colors.white : const Color(0xFF00a86b),
-                                                  size: 20,
-                                                )
-                                              : null,
-                            ),
-                    if (!isTagReaderType && !isTagWriterType && !isTextType)
-                      const SizedBox(width: 14),
+            child: Builder(builder: (context) {
+              // Icono representativo del tipo de status
+              final bool active = (isReferenceListType ? hasSelectedRefChild : isSelected);
+              final bool alwaysWhiteIcon = isTagTransferType ||
+                  isTagTransferAdbServerType ||
+                  typeStatus.toLowerCase() == 'tag-transfer-adb-from' ||
+                  isDistanceExtractorType;
+              final Color iconColor = (active || alwaysWhiteIcon) ? Colors.white : const Color(0xFFB45309);
+              IconData iconData;
+              if (isDateType) {
+                iconData = Icons.calendar_today_rounded;
+              } else if (isTimeType) {
+                iconData = Icons.access_time_rounded;
+              } else if (isNumberType) {
+                iconData = Icons.pin_rounded;
+              } else if (isTextType) {
+                iconData = Icons.text_fields_rounded;
+              } else if (isTagReaderType) {
+                iconData = Icons.nfc_rounded;
+              } else if (isTagWriterType) {
+                iconData = Icons.edit_note_rounded;
+              } else if (isTagTransferType) {
+                iconData = Icons.swap_horiz_rounded;
+              } else if (isTagTransferAdbServerType) {
+                iconData = Icons.wifi_tethering_rounded;
+              } else if (typeStatus.toLowerCase() == 'tag-transfer-adb-from') {
+                iconData = Icons.wifi_tethering_rounded;
+              } else if (isPhotoType) {
+                iconData = Icons.photo_camera_rounded;
+              } else if (isVideoType) {
+                iconData = Icons.videocam_rounded;
+              } else if (isReferenceListType) {
+                iconData = Icons.list_alt_rounded;
+              } else if (isLabelInfoType) {
+                iconData = Icons.info_outline_rounded;
+              } else if (isDistanceExtractorType) {
+                iconData = Icons.social_distance_rounded;
+              } else if (isHeadquarterWeightType) {
+                iconData = Icons.scale_rounded;
+              } else if (isNumbersOperationType) {
+                iconData = Icons.calculate_rounded;
+              } else if (isUsersListType) {
+                iconData = Icons.people_rounded;
+              } else {
+                iconData = Icons.radio_button_unchecked_rounded;
+              }
+
+              final Widget iconBadge = Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: (active || alwaysWhiteIcon)
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : const Color(0xFFB45309).withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: (active || alwaysWhiteIcon)
+                        ? Colors.white.withValues(alpha: 0.5)
+                        : const Color(0xFFB45309).withValues(alpha: 0.4),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(iconData, size: 15, color: iconColor),
+              );
+
+              final bool isAnyTagTransfer = isTagTransferType ||
+                  isTagTransferAdbServerType ||
+                  typeStatus.toLowerCase() == 'tag-transfer-adb-from';
+
+              // Bloque de contenido del status (sin el icono de tipo para tag-transfer)
+              Widget bodyContent = Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                    if (!isAnyTagTransfer) ...[
+                      iconBadge,
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           // Fila superior: nombre + control numérico compacto + valores de fecha/hora
+                          if (isNumberType)
+                            // Layout especial para number: título izquierda, número centrado absoluto, botones derecha
+                            Builder(builder: (context) {
+                              final numStatusId = getJsonField(status, r'''$.id_activity_status''');
+                              final defaultStatus = getJsonField(status, r'''$.default_status''').toString();
+                              final currentValue = _getCurrentNumberValue(numStatusId, defaultStatus);
+                              final usedUpDown = _numberUsedUpDown[numStatusId] ?? false;
+                              return Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  // Fila extremos: título izquierda, botones derecha
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          statusName,
+                                          style: const TextStyle(
+                                            fontFamily: 'Roboto',
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                            letterSpacing: 0.2,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                          maxLines: 2,
+                                        ),
+                                      ),
+                                      _buildCompactInlineNumberControlForStatus(
+                                        parentStep: parentStep,
+                                        status: status,
+                                        showValue: false,
+                                      ),
+                                    ],
+                                  ),
+                                  // Número superpuesto en el centro real del contenedor
+                                  IgnorePointer(
+                                    child: Text(
+                                      _formatColombianNumber(currentValue),
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 32,
+                                        fontWeight: FontWeight.w900,
+                                        color: usedUpDown ? Colors.white : const Color(0xFFB45309),
+                                        letterSpacing: -1,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            })
+                          else
                           Row(
                             children: [
                               Expanded(
-                                child: Row(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Flexible(
-                                      child: Text(
-                                        statusName,
-                                        style: TextStyle(
-                                          fontFamily: 'Roboto',
-                                          fontSize: 19,
-                                          fontWeight: FontWeight.w800,
-                                          color: (isDistanceExtractorType &&
-                                                  (_distanceExtractorCalculated[
-                                                          statusId] ??
-                                                      false))
-                                              ? const Color(0xFF00695C)
-                                              : ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
-                                                      !isNumberType &&
-                                                      !isTagWriterType &&
-                                                      !isTagReaderType &&
-                                                      !isDistanceExtractorType)
-                                                  ? Colors.white
-                                                  : const Color(0xFF00a86b),
-                                          letterSpacing: 0.3,
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                        maxLines: 2,
+                                    Text(
+                                      statusName,
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: (typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time') ? 13 : 19,
+                                        fontWeight: FontWeight.w800,
+                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isDistanceExtractorType)
+                                                ? Colors.white
+                                                : ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
+                                                            !isTagWriterType &&
+                                                            !isTagReaderType)
+                                                        ? Colors.white
+                                                        : const Color(0xFFB45309),
+                                        letterSpacing: 0.3,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
+                                      maxLines: 2,
                                     ),
-                                    // Mostrar fecha seleccionada para tipo date (con IgnorePointer para que no bloquee taps)
+                                    // Mostrar fecha seleccionada para tipo date (línea separada)
                                     if (typeStatus.toLowerCase() == 'date')
                                       IgnorePointer(
                                         child: _buildDateValueDisplay(
                                             statusId, parentStepId),
                                       ),
-                                    // Mostrar hora seleccionada para tipo time (con IgnorePointer para que no bloquee taps)
+                                    // Mostrar hora seleccionada para tipo time (línea separada)
                                     if (typeStatus.toLowerCase() == 'time')
                                       IgnorePointer(
                                         child: _buildTimeValueDisplay(
@@ -2594,16 +3108,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   ],
                                 ),
                               ),
-                              // Control numérico compacto inline (- [número] +) al lado del nombre
-                              if (typeStatus.toLowerCase() == 'number')
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child:
-                                      _buildCompactInlineNumberControlForStatus(
-                                    parentStep: parentStep,
-                                    status: status,
-                                  ),
-                                ),
                             ],
                           ),
                           // Opción seleccionada para reference-list - DEBAJO del título
@@ -2636,6 +3140,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildTagReaderSummary(statusId: statusId),
+                            ),
+                          // Resumen ADB server en Windows (compact view)
+                          if (isTagTransferAdbServerType && _tagReaderData.containsKey(statusId))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: _buildAdbServerTagInlineSummary(statusId: statusId),
                             ),
                           // Resumen del tag-writer (solo para tipo tag-writer) - DEBAJO
                           if (isTagWriterType &&
@@ -2710,9 +3220,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 status: status,
                               ),
                             ),
-                          // Display para distance-extractor - DEBAJO
-                          if (isDistanceExtractorType &&
-                              _calculatedDistances.containsKey(statusId))
+                          // Display para distance-extractor - siempre visible
+                          if (isDistanceExtractorType)
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildDistanceExtractorDisplay(
@@ -2721,21 +3230,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             ),
                           // TextField INLINE para headquarter-weight (muestra fórmula evaluada)
                           if (isHeadquarterWeightType &&
-                              _calculatedHeadquarterWeights.containsKey(statusId))
+                              _calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildHeadquarterWeightInlineDisplay(
-                                statusId: statusId,
+                                statusId: statusId is int ? statusId : (statusId as num).toInt(),
                                 status: status,
                               ),
                             ),
                           // Resumen de weights of headquarters - DEBAJO
                           if (isHeadquarterWeightType &&
-                              (_calculatedHeadquarterWeights.containsKey(statusId) ||
+                              (_calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()) ||
                                   _headquartersWithoutWeight.isNotEmpty))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
-                              child: _buildHeadquarterWeightsDisplay(statusId),
+                              child: _buildHeadquarterWeightsDisplay(statusId is int ? statusId : (statusId as num).toInt()),
                             ),
                           // Distribución proporcional de peso - DEBAJO
                           if (isHeadquarterWeightType &&
@@ -2775,7 +3284,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           padding: const EdgeInsets.all(7),
                           decoration: BoxDecoration(
                             color: (_searchBoxExpansionState[statusId] ?? false)
-                                ? const Color(0xFF00a86b).withValues(alpha: 0.25)
+                                ? const Color(0xFFB45309).withValues(alpha: 0.25)
                                 : Colors.transparent,
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
@@ -2797,12 +3306,26 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             : Icons.chevron_right_rounded,
                         size: 32,
                         weight: 700,
-                        color: const Color(0xFF00a86b),
+                        color: const Color(0xFFB45309),
                       ),
                   ],
-                ),
-              ],
-            ),
+                );
+
+              // Para tag-transfer: icono badge en esquina superior derecha
+              if (isAnyTagTransfer) {
+                return Stack(
+                  children: [
+                    bodyContent,
+                    Positioned(
+                      top: 0,
+                      right: 0,
+                      child: iconBadge,
+                    ),
+                  ],
+                );
+              }
+              return bodyContent;
+            }),
           ),
         ),
 
@@ -2918,7 +3441,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         final hex = hexColor.replaceAll('#', '');
         return Color(int.parse('FF$hex', radix: 16));
       } catch (e) {
-        return const Color(0xFF00ff9f); // Color por defecto
+        return const Color(0xFF92400E); // Color por defecto
       }
     }
 
@@ -2951,6 +3474,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         typeStatus.toLowerCase() == 'distance-extractor';
     final isDynamicPrintingType =
         typeStatus.toLowerCase() == 'dynamic-printing';
+    final isTagTransferAdbServerType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-server';
+    final isTagTransferAdbFromType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-from';
 
     // Calcular progreso de steps hijos requeridos
     int totalRequired = 0;
@@ -3086,13 +3613,41 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
                   final productName = await _fetchProductNameFromRfid(nfcContent);
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+                  final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
                   setState(() {
-                    _tagReaderData[statusId] = parsedData;
+                    if (isNoRemove) {
+                      // Modo acumulativo: agregar al array de raw JSONs
+                      if (!_tagReaderRawJsons.containsKey(statusId)) {
+                        _tagReaderRawJsons[statusId] = [];
+                      }
+                      _tagReaderRawJsons[statusId]!.add(nfcContent);
+                      // Aplanar todos los records acumulados para _tagReaderData
+                      final allRecords = <Map<String, dynamic>>[];
+                      for (final raw in _tagReaderRawJsons[statusId]!) {
+                        allRecords.addAll(_parseNfcTagContent(raw));
+                      }
+                      _tagReaderData[statusId] = allRecords;
+                    } else {
+                      // Modo normal: reemplazar
+                      _tagReaderRawJsons.remove(statusId);
+                      _tagReaderData[statusId] = parsedData;
+                    }
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                     _tagReaderProductName[statusId] = productName;
                   });
+
+                  // Determinar el statusResponse a guardar
+                  final statusResponseToSave = isNoRemove
+                      ? jsonEncode(_tagReaderRawJsons[statusId])
+                      : nfcContent;
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
                   // Buscar el índice existente o agregar nuevo
@@ -3104,11 +3659,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     }
                   }
 
-                  // Extraer valores necesarios del status
-                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
-                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-
                   if (existingIndex >= 0) {
                     FFAppState().updateVisitDetailsAtIndex(
                       existingIndex,
@@ -3117,7 +3667,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -3132,7 +3682,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -3141,7 +3691,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       ),
                     );
                   }
-                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)${isNoRemove ? " [NO_REMOVE: ${_tagReaderRawJsons[statusId]!.length} tags acumulados]" : ""}');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -3341,7 +3891,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             ),
                           ],
                         ),
-                        backgroundColor: Color(0xFF00a86b),
+                        backgroundColor: Color(0xFFB45309),
                         duration: Duration(seconds: 3),
                       ),
                     );
@@ -3377,6 +3927,58 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
+            // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
+            if (isTagTransferAdbServerType) {
+              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+                await AdbNfcBridgeService.instance.start();
+                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+              }
+              return;
+            }
+
+            // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
+            if (isTagTransferAdbFromType) {
+              if (!Platform.isWindows) {
+                if (!AdbNfcClientService.instance.isConnected) {
+                  final connected = await AdbNfcClientService.instance.connect();
+                  if (!mounted) return;
+                  setState(() => _adbClientConnected = connected);
+                  if (!connected) return;
+                }
+                if (!mounted) return;
+                await showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) => const Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: false,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                final nfcContent = FFAppState().nfcRead;
+                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                  if (!mounted) return;
+                  // Mostrar resumen inline en el dispositivo Android también
+                  setState(() {
+                    _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
+                    _tagReaderProductName[statusId] = '';
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('📡 Tag enviado al servidor desktop'),
+                    backgroundColor: Color(0xFFB45309),
+                    duration: Duration(seconds: 3),
+                  ));
+                }
+              }
+              return;
+            }
+
             if (hasChildren) {
               setState(() {
                 // COLAPSAR todos los status hermanos antes de alternar este
@@ -3403,13 +4005,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             decoration: BoxDecoration(
               // Reemplazado gradiente por color sólido para mejor rendimiento
               color: (hasValue && !isNumberType && !isTagWriterType)
-                  ? const Color(0xFF00a86b)
-                  : const Color(0xFFF1F8F4),
+                  ? const Color(0xFFB45309)
+                  : const Color(0xFF0D2B1A),
               borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: (hasValue && !isNumberType && !isTagWriterType)
-                    ? const Color(0xFF00a86b)
-                    : const Color(0xFFE8F5E9),
+                    ? const Color(0xFFB45309)
+                    : const Color(0xFF1A4A2E),
                 width: 2,
               ),
               // BoxShadow removido para mejor rendimiento
@@ -3424,13 +4026,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         : Icons.chevron_right_rounded,
                     color: (hasValue && !isNumberType && !isTagWriterType)
                         ? Colors.white
-                        : const Color(0xFF00a86b),
+                        : const Color(0xFFB45309),
                     size: 36,
                   ),
                 if (!hasChildren &&
                     typeStatus != 'tag-writer' &&
                     typeStatus != 'tag-reader' &&
-                    typeStatus != 'tag-transfer')
+                    typeStatus != 'tag-transfer' &&
+                    typeStatus != 'tag-transfer-adb-server')
                   // Mostrar indicador de color para unique-option y unique_choice
                   (typeStatus.toLowerCase() == 'unique-option' || typeStatus.toLowerCase() == 'unique_choice')
                       ? Container(
@@ -3460,7 +4063,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                           : Icons.check_circle_outline_rounded,
                           color: (hasValue && !isNumberType && !isTagWriterType)
                               ? Colors.white
-                              : const Color(0xFF00a86b),
+                              : const Color(0xFFB45309),
                           size: 28,
                         ),
                 const SizedBox(width: 8),
@@ -3486,7 +4089,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                     ? const Color(0xFF00695C)
                                     : (hasValue && !isNumberType && !isTagWriterType && !isDistanceExtractorType)
                                         ? Colors.white
-                                        : const Color(0xFF00a86b),
+                                        : const Color(0xFFB45309),
                               ),
                             ),
                           ),
@@ -3558,6 +4161,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 status: status,
                               ),
                             ),
+                          // Badge inline para tag-transfer-adb-server (desktop)
+                          if (isTagTransferAdbServerType)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildAdbServerBadge(statusId: statusId),
+                            ),
+                          // Badge compacto adb-from solo en desktop (móvil usa card completa debajo)
+                          if (isTagTransferAdbFromType && Platform.isWindows)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: _buildAdbFromBadge(statusId: statusId),
+                            ),
                         ],
                       ),
                       // Mostrar valor de fecha
@@ -3571,6 +4186,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildTagReaderSummary(statusId: statusId),
+                        ),
+                      // Tarjeta grande adb-from (solo móvil)
+                      if (isTagTransferAdbFromType && !Platform.isWindows)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildAdbFromCard(statusId: statusId, context: context, status: status),
+                        ),
+                      // Resumen ADB server en Windows
+                      if (isTagTransferAdbServerType && _tagReaderData.containsKey(statusId))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: _buildAdbServerTagInlineSummary(statusId: statusId),
                         ),
                       // Resumen del tag-writer
                       if (isTagWriterType && _tagWriterData.containsKey(statusId))
@@ -3600,28 +4227,28 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             status: status,
                           ),
                         ),
-                      // Display para distance-extractor
-                      if (isDistanceExtractorType && _calculatedDistances.containsKey(statusId))
+                      // Display para distance-extractor - siempre visible
+                      if (isDistanceExtractorType)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildDistanceExtractorDisplay(statusId: statusId),
                         ),
                       // TextField INLINE para headquarter-weight (muestra fórmula evaluada)
                       if (isHeadquarterWeightType &&
-                          _calculatedHeadquarterWeights.containsKey(statusId))
+                          _calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildHeadquarterWeightInlineDisplay(
-                            statusId: statusId,
+                            statusId: statusId is int ? statusId : (statusId as num).toInt(),
                             status: status,
                           ),
                         ),
                       // Resumen de weights de headquarters
                       if (isHeadquarterWeightType &&
-                          (_calculatedHeadquarterWeights.containsKey(statusId) || _headquartersWithoutWeight.isNotEmpty))
+                          (_calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()) || _headquartersWithoutWeight.isNotEmpty))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: _buildHeadquarterWeightsDisplay(statusId),
+                          child: _buildHeadquarterWeightsDisplay(statusId is int ? statusId : (statusId as num).toInt()),
                         ),
                       // Distribución proporcional de peso - DEBAJO
                       if (isHeadquarterWeightType &&
@@ -3661,8 +4288,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     margin: const EdgeInsets.only(right: 8),
                     decoration: BoxDecoration(
                       color: totalCompleted == totalRequired
-                          ? const Color(0xFF1B5E20)
-                          : const Color(0xFFF57C00),
+                          ? const Color(0xFF16A34A)
+                          : const Color(0xFFD97706),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
@@ -3761,6 +4388,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final isDateType = typeStatus.toLowerCase() == 'date';
     final isTimeType = typeStatus.toLowerCase() == 'time';
     final isUsersListType = typeStatus.toLowerCase() == 'users-list';
+    final isTagTransferAdbServerType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-server';
+    final isTagTransferAdbFromType =
+        typeStatus.toLowerCase() == 'tag-transfer-adb-from';
 
     // Convertir color hex a Color
     Color parseColor(String hexColor) {
@@ -3768,7 +4399,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         final hex = hexColor.replaceAll('#', '');
         return Color(int.parse('FF$hex', radix: 16));
       } catch (e) {
-        return const Color(0xFF00ff9f); // Color por defecto
+        return const Color(0xFF92400E); // Color por defecto
       }
     }
 
@@ -3887,13 +4518,41 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   // Parsear el contenido del tag
                   final parsedData = _parseNfcTagContent(nfcContent);
                   final productName = await _fetchProductNameFromRfid(nfcContent);
+
+                  // Extraer valores necesarios del status
+                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+                  final isNoRemove = defaultStatus.contains('=ACTIONS:NO_REMOVE');
+
                   setState(() {
-                    _tagReaderData[statusId] = parsedData;
+                    if (isNoRemove) {
+                      // Modo acumulativo: agregar al array de raw JSONs
+                      if (!_tagReaderRawJsons.containsKey(statusId)) {
+                        _tagReaderRawJsons[statusId] = [];
+                      }
+                      _tagReaderRawJsons[statusId]!.add(nfcContent);
+                      // Aplanar todos los records acumulados para _tagReaderData
+                      final allRecords = <Map<String, dynamic>>[];
+                      for (final raw in _tagReaderRawJsons[statusId]!) {
+                        allRecords.addAll(_parseNfcTagContent(raw));
+                      }
+                      _tagReaderData[statusId] = allRecords;
+                    } else {
+                      // Modo normal: reemplazar
+                      _tagReaderRawJsons.remove(statusId);
+                      _tagReaderData[statusId] = parsedData;
+                    }
                     _tagReaderGeolocations[statusId] = geolocation;
                     _lastTagReaderLocation =
                         geolocation; // Guardar para distance-extractor
                     _tagReaderProductName[statusId] = productName;
                   });
+
+                  // Determinar el statusResponse a guardar
+                  final statusResponseToSave = isNoRemove
+                      ? jsonEncode(_tagReaderRawJsons[statusId])
+                      : nfcContent;
 
                   // Guardar el contenido en status_response del visit detail (en memoria)
                   // Buscar el índice existente o agregar nuevo
@@ -3905,11 +4564,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     }
                   }
 
-                  // Extraer valores necesarios del status
-                  final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
-                  final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
-                  final typeStatus = getJsonField(status, r'''$.type_status''').toString();
-
                   if (existingIndex >= 0) {
                     FFAppState().updateVisitDetailsAtIndex(
                       existingIndex,
@@ -3918,7 +4572,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -3933,7 +4587,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: statusName,
-                        statusResponse: nfcContent,
+                        statusResponse: statusResponseToSave,
                         idStepParent: 0,
                         rememberStatus: rememberStatus,
                         defaultStatus: defaultStatus,
@@ -3942,7 +4596,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       ),
                     );
                   }
-                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('💾 TAG-READER: Contenido guardado en status_response (en memoria)${isNoRemove ? " [NO_REMOVE: ${_tagReaderRawJsons[statusId]!.length} tags acumulados]" : ""}');
 
                   // VALIDACIÓN DE PESO PROMEDIO: Solo validar si hay status de tipo 'headquarters-weights'
                   if (_hasHeadquartersWeightsStatus()) {
@@ -4058,6 +4712,58 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               }
 
               setState(() {});
+              return;
+            }
+
+            // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
+            if (isTagTransferAdbServerType) {
+              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+                await AdbNfcBridgeService.instance.start();
+                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+              }
+              return;
+            }
+
+            // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
+            if (isTagTransferAdbFromType) {
+              if (!Platform.isWindows) {
+                if (!AdbNfcClientService.instance.isConnected) {
+                  final connected = await AdbNfcClientService.instance.connect();
+                  if (!mounted) return;
+                  setState(() => _adbClientConnected = connected);
+                  if (!connected) return;
+                }
+                if (!mounted) return;
+                await showDialog(
+                  barrierDismissible: false,
+                  context: context,
+                  builder: (dialogContext) => const Dialog(
+                    elevation: 0,
+                    insetPadding: EdgeInsets.zero,
+                    backgroundColor: Colors.transparent,
+                    child: NfcReadDialogWidget(
+                      autoStart: true,
+                      isTagTransferMode: false,
+                    ),
+                  ),
+                );
+                if (!mounted) return;
+                final nfcContent = FFAppState().nfcRead;
+                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                  if (!mounted) return;
+                  // Mostrar resumen inline en el dispositivo Android también
+                  setState(() {
+                    _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
+                    _tagReaderProductName[statusId] = '';
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text('📡 Tag enviado al servidor desktop'),
+                    backgroundColor: Color(0xFFB45309),
+                    duration: Duration(seconds: 3),
+                  ));
+                }
+              }
               return;
             }
 
@@ -4177,12 +4883,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         !isTagReaderType &&
                         !isDistanceExtractorType)
                     ? [
-                        const Color(0xFF00a86b),
-                        const Color(0xFF00d980),
+                        const Color(0xFFB45309),
+                        const Color(0xFF92400E),
                       ]
                     : [
-                        const Color(0xFFF1F8F4),
-                        const Color(0xFFFAFDFB),
+                        const Color(0xFF0D2B1A),
+                        const Color(0xFF0A1F12),
                       ],
               ),
               borderRadius: BorderRadius.circular(12),
@@ -4194,8 +4900,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         !isTagWriterType &&
                         !isTagReaderType &&
                         !isDistanceExtractorType)
-                    ? const Color(0xFF00a86b)
-                    : const Color(0xFFE8F5E9),
+                    ? const Color(0xFFB45309)
+                    : const Color(0xFF1A4A2E),
                 width: 2,
               ),
             ),
@@ -4214,7 +4920,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 !isTagWriterType &&
                                 !isTagReaderType)
                             ? Colors.white
-                            : const Color(0xFF00a86b),
+                            : const Color(0xFFB45309),
                         width: 3,
                       ),
                       color: isSelected ? Colors.white : Colors.transparent,
@@ -4226,7 +4932,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               height: 12,
                               decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
-                                color: Color(0xFF00a86b),
+                                color: Color(0xFFB45309),
                               ),
                             ),
                           )
@@ -4315,11 +5021,23 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   !isTagReaderType &&
                                   !isDistanceExtractorType)
                               ? Colors.white
-                              : const Color(0xFF00a86b),
+                              : const Color(0xFFB45309),
                       letterSpacing: 0.3,
                     ),
                   ),
                 ),
+                // Badge inline para tag-transfer-adb-server
+                if (isTagTransferAdbServerType)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _buildAdbServerBadge(statusId: statusId),
+                  ),
+                // Badge compacto adb-from solo en desktop
+                if (isTagTransferAdbFromType && Platform.isWindows)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: _buildAdbFromBadge(statusId: statusId),
+                  ),
                 if (hasChildren)
                   Icon(
                     isExpanded
@@ -4327,7 +5045,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         : Icons.chevron_right_rounded,
                     size: 32,
                     weight: 700,
-                    color: const Color(0xFF00a86b),
+                    color: const Color(0xFFB45309),
                   ),
               ],
             ),
@@ -4775,6 +5493,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   }
 
   Widget _buildNavigationButtons() {
+
+    // ── Modo normal (o último tab): mostrar Cancelar/Guardar ─────────────────
     // Usar activitySelected (ActivitiesStruct tipado desde SQLite) — fuente de verdad fiable
     final isSync = FFAppState().activitySelected.isSync;
 
@@ -5024,7 +5744,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             ],
                           ),
                           duration: const Duration(seconds: 3),
-                          backgroundColor: const Color(0xFF00a86b),
+                          backgroundColor: const Color(0xFFB45309),
                           behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -5110,7 +5830,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             ],
                           ),
                           duration: const Duration(seconds: 3),
-                          backgroundColor: const Color(0xFF00a86b),
+                          backgroundColor: const Color(0xFFB45309),
                           behavior: SnackBarBehavior.floating,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -5303,7 +6023,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   color: const Color(0xFF1A1A2E),
                   borderRadius: BorderRadius.circular(24),
                   border: Border.all(
-                    color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+                    color: const Color(0xFFB45309).withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
@@ -5316,16 +6036,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       height: 100,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: const Color(0xFF00a86b).withValues(alpha: 0.1),
+                        color: const Color(0xFFB45309).withValues(alpha: 0.1),
                         border: Border.all(
-                          color: const Color(0xFF00a86b),
+                          color: const Color(0xFFB45309),
                           width: 3,
                         ),
                       ),
                       child: const Icon(
                         Icons.nfc_rounded,
                         size: 50,
-                        color: Color(0xFF00a86b),
+                        color: Color(0xFFB45309),
                       ),
                     ),
                     const SizedBox(height: 24),
@@ -5388,7 +6108,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         height: 40,
                         child: CircularProgressIndicator(
                           strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB45309)),
                         ),
                       ),
                     const SizedBox(height: 24),
@@ -5433,7 +6153,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 await startNfcReading();
                               },
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF00a86b),
+                                backgroundColor: const Color(0xFFB45309),
                                 padding: const EdgeInsets.symmetric(vertical: 14),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
@@ -6165,12 +6885,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         decoration: BoxDecoration(
           // INVERTIDO: Verde cuando expandido
           color: isExpanded
-              ? const Color(0xFF00a86b).withValues(alpha: 0.2)
+              ? const Color(0xFFB45309).withValues(alpha: 0.2)
               : Colors.white.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isExpanded
-                ? const Color(0xFF00a86b).withValues(alpha: 0.4)
+                ? const Color(0xFFB45309).withValues(alpha: 0.4)
                 : Colors.white.withValues(alpha: 0.15),
             width: 1,
           ),
@@ -6179,7 +6899,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           Icons.search_rounded,
           size: 16,
           // Blanco cuando el step tiene valor (fondo verde), verde en caso contrario
-          color: hasValue ? Colors.white : const Color(0xFF00a86b),
+          color: hasValue ? Colors.white : const Color(0xFFB45309),
         ),
       ),
     );
@@ -6221,7 +6941,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     ? FlutterFlowTheme.of(context)
                         .primary
                         .withValues(alpha: 0.8)
-                    : const Color(0xFF00a86b),
+                    : const Color(0xFFB45309),
               ),
             ),
 
@@ -6686,18 +7406,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)], // Verde oscuro
               )
             : const LinearGradient(
-                colors: [Color(0xFFF1F8F4), Color(0xFFFAFDFB)],
+                colors: [Color(0xFF0D2B1A), Color(0xFF0A1F12)],
               ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: usedUpDown ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
+          color: usedUpDown ? const Color(0xFF1B4332) : const Color(0xFF1A4A2E),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
             color: usedUpDown
                 ? const Color(0xFF1B4332).withValues(alpha: 0.4)
-                : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
+                : const Color(0xFF1A4A2E).withValues(alpha: 0.4),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -6729,7 +7449,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
               child: Icon(
                 Icons.remove_rounded,
-                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFFB45309),
                 size: 20,
               ),
             ),
@@ -6746,7 +7466,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   fontFamily: 'Roboto',
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
+                  color: usedUpDown ? Colors.white : const Color(0xFFB45309),
                   letterSpacing: -0.5,
                 ),
               ),
@@ -6774,7 +7494,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
               child: Icon(
                 Icons.add_rounded,
-                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFFB45309),
                 size: 20,
               ),
             ),
@@ -6826,26 +7546,26 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       end: Alignment.bottomRight,
                       colors: isSelected
                           ? [
-                              const Color(0xFF00a86b),
-                              const Color(0xFF00d980),
+                              const Color(0xFFB45309),
+                              const Color(0xFF92400E),
                             ]
                           : [
-                              const Color(0xFFF1F8F4),
-                              const Color(0xFFFAFDFB),
+                              const Color(0xFF0D2B1A),
+                              const Color(0xFF0A1F12),
                             ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF00a86b)
-                          : const Color(0xFFE8F5E9),
+                          ? const Color(0xFFB45309)
+                          : const Color(0xFF1A4A2E),
                       width: 2,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: isSelected
-                            ? const Color(0xFF00a86b).withValues(alpha: 0.5)
-                            : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
+                            ? const Color(0xFFB45309).withValues(alpha: 0.5)
+                            : const Color(0xFF1A4A2E).withValues(alpha: 0.5),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -6859,7 +7579,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color:
-                            isSelected ? Colors.white : const Color(0xFF00a86b),
+                            isSelected ? Colors.white : const Color(0xFFB45309),
                       ),
                     ),
                   ),
@@ -6928,6 +7648,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   Widget _buildCompactInlineNumberControlForStatus({
     required dynamic parentStep,
     required dynamic status,
+    bool showValue = true,
   }) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
@@ -6943,18 +7664,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)], // Verde oscuro
               )
             : const LinearGradient(
-                colors: [Color(0xFFF1F8F4), Color(0xFFFAFDFB)],
+                colors: [Color(0xFF0D2B1A), Color(0xFF0A1F12)],
               ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: usedUpDown ? const Color(0xFF1B4332) : const Color(0xFFE8F5E9),
+          color: usedUpDown ? const Color(0xFF1B4332) : const Color(0xFF1A4A2E),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
             color: usedUpDown
                 ? const Color(0xFF1B4332).withValues(alpha: 0.4)
-                : const Color(0xFFE8F5E9).withValues(alpha: 0.4),
+                : const Color(0xFF1A4A2E).withValues(alpha: 0.4),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -6986,29 +7707,30 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
               child: Icon(
                 Icons.remove_rounded,
-                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFFB45309),
                 size: 20,
               ),
             ),
           ),
 
-          // Display del número
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            constraints: const BoxConstraints(minWidth: 50),
-            child: Center(
-              child: Text(
-                _formatColombianNumber(currentValue),
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
-                  letterSpacing: -0.5,
+          // Display del número (solo si showValue es true)
+          if (showValue)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              constraints: const BoxConstraints(minWidth: 50),
+              child: Center(
+                child: Text(
+                  _formatColombianNumber(currentValue),
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: usedUpDown ? Colors.white : const Color(0xFFB45309),
+                    letterSpacing: -0.5,
+                  ),
                 ),
               ),
             ),
-          ),
 
           // Botón +
           InkWell(
@@ -7031,7 +7753,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
               child: Icon(
                 Icons.add_rounded,
-                color: usedUpDown ? Colors.white : const Color(0xFF00a86b),
+                color: usedUpDown ? Colors.white : const Color(0xFFB45309),
                 size: 20,
               ),
             ),
@@ -7086,26 +7808,26 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       end: Alignment.bottomRight,
                       colors: isSelected
                           ? [
-                              const Color(0xFF00a86b),
-                              const Color(0xFF00d980),
+                              const Color(0xFFB45309),
+                              const Color(0xFF92400E),
                             ]
                           : [
-                              const Color(0xFFF1F8F4),
-                              const Color(0xFFFAFDFB),
+                              const Color(0xFF0D2B1A),
+                              const Color(0xFF0A1F12),
                             ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isSelected
-                          ? const Color(0xFF00a86b)
-                          : const Color(0xFFE8F5E9),
+                          ? const Color(0xFFB45309)
+                          : const Color(0xFF1A4A2E),
                       width: 2,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: isSelected
-                            ? const Color(0xFF00a86b).withValues(alpha: 0.5)
-                            : const Color(0xFFE8F5E9).withValues(alpha: 0.5),
+                            ? const Color(0xFFB45309).withValues(alpha: 0.5)
+                            : const Color(0xFF1A4A2E).withValues(alpha: 0.5),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -7119,7 +7841,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color:
-                            isSelected ? Colors.white : const Color(0xFF00a86b),
+                            isSelected ? Colors.white : const Color(0xFFB45309),
                       ),
                     ),
                   ),
@@ -7487,12 +8209,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
+            colors: [Color(0xFFB45309), Color(0xFF81C784)],
           ),
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF4CAF50).withValues(alpha: 0.4),
+              color: const Color(0xFFB45309).withValues(alpha: 0.4),
               blurRadius: 8,
               offset: const Offset(0, 3),
             ),
@@ -7522,7 +8244,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFA500), Color(0xFFFFB74D)],
+          colors: [Color(0xFFFFA500), Color(0xFFD97706)],
         ),
         borderRadius: BorderRadius.circular(8),
         boxShadow: [
@@ -7563,6 +8285,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   onPressed: () {
                     setState(() {
                       _tagReaderData.remove(statusId);
+                      _tagReaderRawJsons.remove(statusId);
                       _tagReaderGeolocations.remove(statusId);
                       _headquartersWithoutWeight.clear();
                       _headquarterWeights.clear();
@@ -7729,6 +8452,738 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           Icons.delete_rounded,
           color: Colors.white,
           size: 20,
+        ),
+      ),
+    );
+  }
+
+  // ===== ADB SERVER INLINE SUMMARY (enriquecido con SQLite) =====
+
+  Widget _buildAdbServerTagInlineSummary({required int statusId}) {
+    final rawJsons = _adbServerCardsRawJson[statusId];
+    if (rawJsons == null || rawJsons.isEmpty) return const SizedBox.shrink();
+
+    final selectedIndex = _selectedAdbTagIndex.clamp(0, rawJsons.length - 1);
+    final rawJson = rawJsons[selectedIndex];
+
+    // Parsear Read_info y Visits del JSON
+    Map<String, dynamic>? readInfo;
+    try {
+      final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
+      readInfo = decoded['Read_info'] as Map<String, dynamic>?;
+    } catch (_) {}
+
+    final idProduct = readInfo?['Id_product'] as int?;
+    final tagFrom = (readInfo?['tag_from'] as String? ?? '').trim();
+    final idUser = readInfo?['US'] as int?;
+    final nameProductDirect = readInfo?['Name_product'] as String? ?? '';
+
+    // Lookup origen (Id_product → Products)
+    final String originName;
+    if (idProduct != null && _productByIdCache.containsKey(idProduct)) {
+      originName = _productByIdCache[idProduct]!.isNotEmpty
+          ? _productByIdCache[idProduct]!
+          : nameProductDirect;
+    } else {
+      originName = nameProductDirect;
+      if (idProduct != null) _loadProductById(idProduct);
+    }
+
+    // Lookup destino (tag_from RFID → Products)
+    final String destName;
+    if (tagFrom.isNotEmpty && _productByRfidCache.containsKey(tagFrom)) {
+      destName = _productByRfidCache[tagFrom]!;
+    } else {
+      destName = '';
+      if (tagFrom.isNotEmpty) _loadProductByRfid(tagFrom);
+    }
+
+    // Lookup conductor (US id_user → Users, usa caché existente)
+    // Mostrar: "Nombre (operID)" si se resuelve el nombre, o solo el operID
+    String driverName = '—';
+    if (idUser != null) {
+      final resolvedName = _getUserName(idUser.toString());
+      final isResolved = resolvedName.isNotEmpty && resolvedName != idUser.toString();
+      driverName = isResolved ? '$resolvedName ($idUser)' : '$idUser';
+    }
+
+    // Parsear visitas para el árbol
+    final visitData = _parseNfcTagContent(rawJson);
+
+    return _buildAdbServerTagCard(
+      statusId: statusId,
+      originName: originName,
+      destName: destName.isNotEmpty ? destName : (tagFrom.isNotEmpty ? tagFrom : '—'),
+      driverName: driverName.isNotEmpty ? driverName : '—',
+      visitData: visitData,
+    );
+  }
+
+  Widget _buildAdbServerTagCard({
+    required int statusId,
+    required String originName,
+    required String destName,
+    required String driverName,
+    required List<Map<String, dynamic>> visitData,
+  }) {
+    // Agrupar visitas por lote (mismo que árbol existente)
+    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
+    for (final record in visitData) {
+      final heId = record['headquarterId'] as int? ?? 0;
+      groupedByHeadquarter.putIfAbsent(heId, () => []).add(record);
+    }
+
+    Widget infoRow(IconData icon, String label, String value, Color iconColor) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Icon(icon, size: 15, color: iconColor),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                fontFamily: 'Roboto',
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Roboto',
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B4332),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.25),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // ── Header con Origen / Destino / Conductor ──────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                infoRow(Icons.inventory_2_outlined, 'ORIGEN', originName, const Color(0xFFB45309)),
+                infoRow(Icons.move_to_inbox_outlined, 'DESTINO', destName, const Color(0xFFB45309)),
+                infoRow(Icons.person_outline_rounded, 'CONDUCTOR', driverName, const Color(0xFF42A5F5)),
+              ],
+            ),
+          ),
+          // ── Separador ─────────────────────────────────────────
+          if (groupedByHeadquarter.isNotEmpty)
+            Divider(
+              height: 1,
+              thickness: 1,
+              color: Colors.white.withValues(alpha: 0.08),
+            ),
+          // ── Árbol de visitas por lote ─────────────────────────
+          if (groupedByHeadquarter.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: groupedByHeadquarter.entries.map((entry) {
+                  return _buildHeadquarterGroup(entry.key, entry.value);
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ===== ADB SERVER TOP PANEL =====
+
+  /// Panel lateral izquierdo ADB — reemplaza el antiguo panel horizontal superior.
+  /// Muestra el estado de conexión, el botón SOLICITAR LECTURA y las tarjetas
+  /// leídas en lista vertical con scroll.
+  Widget _buildAdbSidePanel() {
+    final sid = _adbServerStatusId;
+    final tagCount = sid != null ? (_adbServerCardsData[sid]?.length ?? 0) : 0;
+
+    final isConnected = _adbServerStatus == AdbBridgeStatus.clientConnected;
+    final badgeColor = isConnected ? const Color(0xFF92400E) : const Color(0xFFE53935);
+    final badgeIcon = isConnected ? Icons.usb_rounded : Icons.usb_off_rounded;
+
+    return Container(
+      width: 200,
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.28),
+        border: Border(
+          right: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Badge USB/ADB ────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
+            child: GestureDetector(
+              onTap: () async {
+                if (!AdbNfcBridgeService.instance.isServerRunning) {
+                  await AdbNfcBridgeService.instance.start();
+                  if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+                }
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: badgeColor.withValues(alpha: 0.5), blurRadius: 10)],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(badgeIcon, color: Colors.white, size: 16),
+                    const SizedBox(width: 6),
+                    Text(
+                      isConnected ? 'USB CONECTADO' : 'ADB ESPERANDO',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Botón SOLICITAR LECTURA ──────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            child: GestureDetector(
+              onTap: isConnected
+                  ? () {
+                      final sent = AdbNfcBridgeService.instance.sendRequestRead();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(sent
+                                ? '📲 Solicitud enviada al Android'
+                                : '⚠️ No hay dispositivo Android conectado'),
+                            backgroundColor:
+                                sent ? const Color(0xFFB45309) : const Color(0xFFE53935),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    }
+                  : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isConnected
+                      ? const Color(0xFF1565C0)
+                      : Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: isConnected
+                      ? [BoxShadow(
+                          color: const Color(0xFF1565C0).withValues(alpha: 0.5),
+                          blurRadius: 8,
+                        )]
+                      : [],
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.nfc_rounded,
+                      color: isConnected
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.25),
+                      size: 15,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      'SOLICITAR',
+                      style: TextStyle(
+                        color: isConnected
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.25),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        fontFamily: 'Roboto',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ── Separador con label ──────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              children: [
+                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1), height: 1)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    'TAGS LEÍDOS',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: 'Roboto',
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+                Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.1), height: 1)),
+              ],
+            ),
+          ),
+
+          // ── Lista vertical de tarjetas ───────────────────────────────────
+          Expanded(
+            child: tagCount == 0
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        'Esperando\nlectura NFC...',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.3),
+                          fontSize: 12,
+                          fontFamily: 'Roboto',
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                    itemCount: tagCount,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) => _buildAdbTagCard(index),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAdbTagCard(int index) {
+    final isSelected = _selectedAdbTagIndex == index;
+    final ts = index < _adbTagTimestamps.length ? _adbTagTimestamps[index] : null;
+    String timeStr = '--';
+    if (ts != null) {
+      final hour12 = ts.hour % 12 == 0 ? 12 : ts.hour % 12;
+      final period = ts.hour < 12 ? 'am' : 'pm';
+      timeStr =
+          '${ts.day.toString().padLeft(2, '0')}/${ts.month.toString().padLeft(2, '0')}/${ts.year} '
+          '${hour12.toString().padLeft(2, '0')}:${ts.minute.toString().padLeft(2, '0')}:${ts.second.toString().padLeft(2, '0')} $period';
+    }
+
+    // Obtener el nombre del producto desde el JSON de la tarjeta
+    String cardTitle = 'Tarjeta leída ${index + 1}';
+    final sid = _adbServerStatusId;
+    if (sid != null) {
+      // Intentar obtener Name_product del raw JSON
+      final rawJsons = _adbServerCardsRawJson[sid];
+      if (rawJsons != null && index < rawJsons.length) {
+        try {
+          final decoded = jsonDecode(rawJsons[index]) as Map<String, dynamic>;
+          final readInfo = decoded['Read_info'] as Map<String, dynamic>?;
+          final nameFromJson = readInfo?['Name_product'] as String? ?? '';
+          if (nameFromJson.isNotEmpty) {
+            cardTitle = nameFromJson;
+          } else {
+            // Fallback al productName del payload
+            final pn = _adbServerCardsProductName[sid]?[index] ?? '';
+            if (pn.isNotEmpty) cardTitle = pn;
+          }
+        } catch (_) {
+          final pn = _adbServerCardsProductName[sid]?[index] ?? '';
+          if (pn.isNotEmpty) cardTitle = pn;
+        }
+      }
+    }
+
+    return GestureDetector(
+      onTap: () => setState(() {
+        _selectedAdbTagIndex = index;
+        // Actualizar árbol inline con los datos de la tarjeta seleccionada
+        final sid = _adbServerStatusId;
+        if (sid != null) {
+          final cards = _adbServerCardsData[sid];
+          if (cards != null && index < cards.length) {
+            _tagReaderData[sid] = cards[index];
+            _tagReaderProductName[sid] = _adbServerCardsProductName[sid]?[index] ?? '';
+            _tagReaderRawJsons.remove(sid);
+          }
+        }
+      }),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          gradient: isSelected
+              ? const LinearGradient(
+                  colors: [Color(0xFFB45309), Color(0xFFB45309)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          color: isSelected ? null : Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFF59E0B) : Colors.white.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [BoxShadow(color: const Color(0xFFB45309).withValues(alpha: 0.5), blurRadius: 10)]
+              : [],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              cardTitle,
+              style: TextStyle(
+                color: isSelected ? Colors.white : Colors.white.withValues(alpha: 0.9),
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+            ),
+            Text(
+              timeStr,
+              style: TextStyle(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.9)
+                    : Colors.white.withValues(alpha: 0.55),
+                fontSize: 11,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ===== ADB NFC BRIDGE BADGES =====
+
+  Widget _buildAdbServerBadge({required int statusId}) {
+    Color bgColor;
+    IconData icon;
+    String label;
+    switch (_adbServerStatus) {
+      case AdbBridgeStatus.clientConnected:
+        bgColor = const Color(0xFFB45309);
+        icon = Icons.usb_rounded;
+        label = 'Conectado';
+        break;
+      case AdbBridgeStatus.waitingForClient:
+        bgColor = const Color(0xFFB45309);
+        icon = Icons.usb_off_rounded;
+        label = 'Esperando';
+        break;
+      case AdbBridgeStatus.serverDown:
+        bgColor = const Color(0xFFE53935);
+        icon = Icons.usb_rounded;
+        label = 'Inactivo';
+        break;
+    }
+    return GestureDetector(
+      onTap: () async {
+        if (!AdbNfcBridgeService.instance.isServerRunning) {
+          await AdbNfcBridgeService.instance.start();
+          if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: bgColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Roboto')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAdbFromBadge({required int statusId}) {
+    final connected = _adbClientConnected;
+    final bgColor = connected ? const Color(0xFFB45309) : const Color(0xFFE53935);
+    final icon = connected ? Icons.wifi_tethering_rounded : Icons.wifi_tethering_off_rounded;
+    final label = connected ? 'Conectado' : 'Sin conexión';
+    return GestureDetector(
+      onTap: () async {
+        if (!AdbNfcClientService.instance.isConnected) {
+          final ok = await AdbNfcClientService.instance.connect();
+          if (mounted) setState(() => _adbClientConnected = ok);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: bgColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: bgColor.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 3))],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 4),
+            Text(label, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, fontFamily: 'Roboto')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Tarjeta grande para tag-transfer-adb-from — estado de conexión + animación + botón re-lectura.
+  Widget _buildAdbFromCard({required int statusId, required BuildContext context, required dynamic status}) {
+    final connected = _adbClientConnected;
+    final hasData = _tagReaderData.containsKey(statusId);
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: connected
+              ? [const Color(0xFF0D1B2A), const Color(0xFF1A2F45)]
+              : [const Color(0xFF1A0A0A), const Color(0xFF2A1010)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: connected ? const Color(0xFF00E5FF).withValues(alpha: 0.4) : const Color(0xFFE53935).withValues(alpha: 0.4),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: connected ? const Color(0xFF00E5FF).withValues(alpha: 0.15) : const Color(0xFFE53935).withValues(alpha: 0.15),
+            blurRadius: 20,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Header: iconos animados + estado ──
+            Row(
+              children: [
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.85, end: 1.0),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeInOut,
+                  builder: (_, scale, child) => Transform.scale(scale: scale, child: child),
+                  onEnd: () => setState(() {}),
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF00E5FF).withValues(alpha: 0.12),
+                      border: Border.all(color: const Color(0xFF00E5FF).withValues(alpha: 0.5), width: 1.5),
+                    ),
+                    child: const Icon(Icons.nfc_rounded, color: Color(0xFF00E5FF), size: 26),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                TweenAnimationBuilder<double>(
+                  tween: Tween(begin: 0.0, end: 1.0),
+                  duration: const Duration(milliseconds: 600),
+                  curve: Curves.easeInOut,
+                  builder: (_, t, __) => Opacity(
+                    opacity: (t < 0.5 ? t * 2 : (1.0 - t) * 2).clamp(0.3, 1.0),
+                    child: Icon(Icons.sync_alt_rounded,
+                        color: connected ? const Color(0xFF00E5FF) : const Color(0xFFE53935), size: 28),
+                  ),
+                  onEnd: () => setState(() {}),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Transferencia NFC',
+                          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15, fontWeight: FontWeight.w700, letterSpacing: 0.3)),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            width: 8, height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: connected ? const Color(0xFFF59E0B) : const Color(0xFFE53935),
+                              boxShadow: [BoxShadow(color: (connected ? const Color(0xFFF59E0B) : const Color(0xFFE53935)).withValues(alpha: 0.6), blurRadius: 6)],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            connected ? 'Servidor conectado' : 'Sin conexión al servidor',
+                            style: TextStyle(color: connected ? const Color(0xFFF59E0B) : const Color(0xFFE53935), fontSize: 12, fontWeight: FontWeight.w500),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (!connected)
+                  GestureDetector(
+                    onTap: () async {
+                      final ok = await AdbNfcClientService.instance.connect();
+                      if (mounted) setState(() => _adbClientConnected = ok);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE53935).withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE53935).withValues(alpha: 0.5)),
+                      ),
+                      child: const Text('Reintentar', style: TextStyle(color: Color(0xFFE53935), fontSize: 11, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+              ],
+            ),
+
+            if (!hasData) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.touch_app_rounded, color: Colors.white.withValues(alpha: 0.4), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        connected ? 'Toca para leer un tag NFC y transferirlo' : 'Conecta al servidor para habilitar la lectura',
+                        style: TextStyle(color: Colors.white.withValues(alpha: 0.55), fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            if (hasData) ...[
+              const SizedBox(height: 12),
+              _buildTagReaderSummary(statusId: statusId),
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: connected ? () async {
+                  if (!AdbNfcClientService.instance.isConnected) {
+                    final ok = await AdbNfcClientService.instance.connect();
+                    if (!mounted) return;
+                    setState(() => _adbClientConnected = ok);
+                    if (!ok) return;
+                  }
+                  if (!mounted) return;
+                  final ctx = context;
+                  await showDialog(
+                    barrierDismissible: false,
+                    context: ctx,
+                    builder: (_) => const Dialog(
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      backgroundColor: Colors.transparent,
+                      child: NfcReadDialogWidget(autoStart: true, isTagTransferMode: false),
+                    ),
+                  );
+                  if (!mounted) return;
+                  final nfcContent = FFAppState().nfcRead;
+                  if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+                    await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
+                    if (!mounted) return;
+                    setState(() {
+                      _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
+                      _tagReaderProductName[statusId] = '';
+                    });
+                  }
+                } : null,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    gradient: connected ? const LinearGradient(colors: [Color(0xFF0284C7), Color(0xFF075985)]) : null,
+                    color: connected ? null : Colors.white.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: connected ? [const BoxShadow(color: Color(0x440284C7), blurRadius: 12, offset: Offset(0, 4))] : [],
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.nfc_rounded, color: connected ? Colors.white : Colors.white38, size: 18),
+                      const SizedBox(width: 8),
+                      Text('Leer otro tag',
+                          style: TextStyle(color: connected ? Colors.white : Colors.white38, fontSize: 14, fontWeight: FontWeight.w700, letterSpacing: 0.5)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
@@ -8887,7 +10342,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
         if (typeStatus.toLowerCase() == 'headquarter-weight') {
           totalHeadquarterWeights++;
-          final statusId = getJsonField(status, r'''$.id_activity_status''');
+          final statusIdRaw = getJsonField(status, r'''$.id_activity_status''');
+          final statusId = statusIdRaw is int ? statusIdRaw : (statusIdRaw as num).toInt();
           final statusName =
               getJsonField(status, r'''$.status_name''')?.toString() ?? '';
           final defaultStatus =
@@ -9130,7 +10586,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   }
 
   /// Evalúa una fórmula de headquarter-weight
-  /// Ejemplo: =(TARE-DESTARE)/TAG_READER:Lectura en TAG
+  /// Evalúa una fórmula de tipo headquarter-weight que contiene TAG_READER.
+  /// Si la fórmula es exactamente "=(TARE-DESTARE)/TAG_READER:<nombre>", calcula
+  /// por lote (un resultado por HE). Para cualquier otra fórmula usa el cálculo
+  /// global original (un único resultado).
   Future<void> _evaluateHeadquarterWeightFormula(
     int statusId,
     String formula,
@@ -9143,195 +10602,240 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       debugPrint('📋 StatusId: $statusId');
       debugPrint('📝 Fórmula original: "$formula"');
 
-      // 1. Obtener el valor de TAG_READER (total de RESULTS)
-      final tagReaderValue = await _getTotalResultsFromTagReader();
-      debugPrint('📊 TAG_READER total results: $tagReaderValue');
-
-      if (tagReaderValue == 0) {
-        debugPrint('⚠️ TAG_READER es 0, no se puede calcular');
-        debugPrint('🧮 ===== FIN EVALUACIÓN (ERROR) =====');
-        debugPrint('');
-        return;
-      }
-
-      // 2. Obtener valores de variables del formulario (TARE, DESTARE, etc.)
-      debugPrint('');
-      debugPrint('🔍 Buscando variables del formulario...');
-      debugPrint('   Total visitDetails: ${FFAppState().visitDetails.length}');
-
-      final Map<String, double> formVariables = {};
-
-      // Listar todos los campos disponibles para debug
-      debugPrint('   Total visitDetails: ${FFAppState().visitDetails.length}');
-      for (var detail in FFAppState().visitDetails) {
-        final isStepRecord = detail.idActivityStatus == 0;
-        final recordType = isStepRecord ? 'STEP' : 'STATUS';
-        debugPrint('   📌 [$recordType] Campo: "${detail.statusOption}" = "${detail.statusResponse}"');
-      }
-
-      // Buscar TARE - Buscar exactamente por el nombre del campo
-      var tareDetail = FFAppState().visitDetails.firstWhere(
-            (d) => d.statusOption.toUpperCase() == 'TARE',
-            orElse: () => VisitsDetailsStruct(),
-          );
-
-      // Si no se encuentra exactamente, buscar que contenga TARE
-      if (tareDetail.statusResponse.isEmpty) {
-        tareDetail = FFAppState().visitDetails.firstWhere(
-              (d) => d.statusOption.toUpperCase().contains('TARE') &&
-                     !d.statusOption.toUpperCase().contains('DESTARE'),
-              orElse: () => VisitsDetailsStruct(),
-            );
-      }
-
-      if (tareDetail.statusResponse.isNotEmpty) {
-        final tareValue = double.tryParse(tareDetail.statusResponse) ?? 0.0;
-        formVariables['TARE'] = tareValue;
-        debugPrint('   ✅ TARE encontrado: ${tareDetail.statusOption} = $tareValue');
-      } else {
-        debugPrint('   ⚠️ TARE no encontrado en visitDetails');
-      }
-
-      // Buscar DESTARE - Buscar exactamente por el nombre del campo
-      var destareDetail = FFAppState().visitDetails.firstWhere(
-            (d) => d.statusOption.toUpperCase() == 'DESTARE',
-            orElse: () => VisitsDetailsStruct(),
-          );
-
-      // Si no se encuentra exactamente, buscar que contenga DESTARE
-      if (destareDetail.statusResponse.isEmpty) {
-        destareDetail = FFAppState().visitDetails.firstWhere(
-              (d) => d.statusOption.toUpperCase().contains('DESTARE'),
-              orElse: () => VisitsDetailsStruct(),
-            );
-      }
-
-      if (destareDetail.statusResponse.isNotEmpty) {
-        final destareValue = double.tryParse(destareDetail.statusResponse) ?? 0.0;
-        formVariables['DESTARE'] = destareValue;
-        debugPrint('   ✅ DESTARE encontrado: ${destareDetail.statusOption} = $destareValue');
-      } else {
-        debugPrint('   ⚠️ DESTARE no encontrado en visitDetails');
-      }
-
-      if (formVariables.isEmpty) {
-        debugPrint('');
-        debugPrint('❌ No se encontraron variables (TARE, DESTARE) para evaluar la fórmula');
-        debugPrint('🧮 ===== FIN EVALUACIÓN (ERROR) =====');
-        debugPrint('');
-        return;
-      }
-
-      debugPrint('');
-      debugPrint('🔄 Procesando fórmula...');
-
-      // 3. Reemplazar TAG_READER:... con su valor
-      // El patrón captura desde TAG_READER: hasta el final de la palabra/frase
-      String processedFormula = formula;
-
-      // Primero remover el signo = inicial si existe
-      if (processedFormula.startsWith('=')) {
-        processedFormula = processedFormula.substring(1);
-      }
-
-      // Reemplazar TAG_READER con case insensitive y capturar todo después de ":"
-      final tagReaderPattern = RegExp(
-        r'TAG_READER:[^\s\)]+(?:\s+[^\s\)]+)*',
+      // ── Detectar si es la fórmula por-lote: =(TARE-DESTARE)/TAG_READER:<nombre> ──
+      final isPerLoteFormula = RegExp(
+        r'^\s*=\s*\(\s*TARE\s*-\s*DESTARE\s*\)\s*/\s*TAG_READER:',
         caseSensitive: false,
-      );
+      ).hasMatch(formula);
 
-      final match = tagReaderPattern.firstMatch(processedFormula);
-      if (match != null) {
-        debugPrint('   TAG_READER encontrado: "${match.group(0)}"');
-        processedFormula = processedFormula.replaceAll(
-          tagReaderPattern,
-          tagReaderValue.toString()
-        );
-        debugPrint('   Reemplazado por: $tagReaderValue');
+      debugPrint('📊 Modo per-lote: $isPerLoteFormula');
+
+      if (isPerLoteFormula) {
+        await _evaluateHeadquarterWeightFormulaPerLote(
+          statusId, formula, tagReaderName, statusName: statusName);
       } else {
-        debugPrint('   ⚠️ No se encontró patrón TAG_READER en la fórmula');
+        await _evaluateHeadquarterWeightFormulaGlobal(
+          statusId, formula, tagReaderName, statusName: statusName);
       }
-
-      debugPrint('   Fórmula después de TAG_READER: "$processedFormula"');
-
-      // 4. Reemplazar variables del formulario
-      // Crear dos versiones: una para calcular (sin formato) y otra para mostrar (con formato)
-      String displayFormula = processedFormula;
-
-      for (var entry in formVariables.entries) {
-        final variableName = entry.key;
-        final variableValue = entry.value;
-
-        // Para CÁLCULO: usar valor sin formato
-        processedFormula = processedFormula.replaceAllMapped(
-          RegExp('\\b$variableName\\b', caseSensitive: false),
-          (match) => variableValue.toString(),
-        );
-
-        // Para DISPLAY: usar valor formateado con separador de miles
-        final formattedValue = _formatNumberForFormula(variableValue);
-        displayFormula = displayFormula.replaceAllMapped(
-          RegExp('\\b$variableName\\b', caseSensitive: false),
-          (match) => formattedValue,
-        );
-
-        debugPrint('   $variableName reemplazado por: $formattedValue');
-      }
-
-      debugPrint('   Fórmula para cálculo: "$processedFormula"');
-      debugPrint('   Fórmula para display: "$displayFormula"');
-
-      // 5. Evaluar la expresión matemática (sin formato, sin comas)
-      debugPrint('');
-      debugPrint('🧮 Evaluando expresión matemática...');
-      final result = _evaluateMathExpressionWithParentheses(processedFormula);
-      debugPrint('✅ Resultado: $result kg');
-
-      // 6. Guardar resultado en el estado
-      _calculatedHeadquarterWeights[statusId] = {
-        'isFormulaResult': true,
-        'formulaResult': result,
-        'grandTotal': result,
-        'formula': formula,
-        'evaluatedFormula': displayFormula, // Fórmula formateada para mostrar
-      };
-
-      _saveHqWeightToVisitDetails(statusId, statusName, {
-        'calculationType': 'formula',
-        'grandTotal': result,
-        'formula': formula,
-        'evaluatedFormula': displayFormula,
-      });
-
-      debugPrint('');
-      debugPrint('🧮 ===== FIN EVALUACIÓN (ÉXITO) =====');
-      debugPrint('');
-
-      setState(() {});
     } catch (e, stackTrace) {
-      debugPrint('');
-      debugPrint('❌ Error evaluando fórmula: $e');
-      debugPrint('Stack trace: $stackTrace');
+      debugPrint('❌ Error evaluando fórmula: $e\n$stackTrace');
       debugPrint('🧮 ===== FIN EVALUACIÓN (ERROR) =====');
-      debugPrint('');
     }
+  }
+
+  /// Cálculo global original: un único resultado para toda la lectura.
+  Future<void> _evaluateHeadquarterWeightFormulaGlobal(
+    int statusId,
+    String formula,
+    String tagReaderName, {
+    String statusName = '',
+  }) async {
+    debugPrint('📊 Modo global (un único resultado)');
+
+    // 1. Total de RESULTS
+    int tagReaderValue = 0;
+    for (final entry in _tagReaderData.entries) {
+      for (final record in entry.value) {
+        tagReaderValue += record['results'] as int? ?? 0;
+      }
+    }
+    debugPrint('📊 TAG_READER total results: $tagReaderValue');
+
+    if (tagReaderValue == 0) {
+      debugPrint('⚠️ TAG_READER es 0, no se puede calcular');
+      return;
+    }
+
+    // 2. Variables del formulario
+    final formVariables = _collectFormVariables();
+    if (formVariables.isEmpty) {
+      debugPrint('❌ No se encontraron variables (TARE, DESTARE)');
+      return;
+    }
+
+    // 3. Procesar fórmula
+    final tagReaderPattern = RegExp(
+      r'TAG_READER:[^\s\)]+(?:\s+[^\s\)]+)*',
+      caseSensitive: false,
+    );
+    String processedFormula = formula.startsWith('=') ? formula.substring(1) : formula;
+    processedFormula = processedFormula.replaceAll(tagReaderPattern, tagReaderValue.toString());
+    String displayFormula = processedFormula;
+
+    for (final e in formVariables.entries) {
+      final pattern = RegExp('\\b${e.key}\\b', caseSensitive: false);
+      processedFormula = processedFormula.replaceAllMapped(pattern, (_) => e.value.toString());
+      displayFormula = displayFormula.replaceAllMapped(pattern, (_) => _formatNumberForFormula(e.value));
+    }
+
+    debugPrint('   Fórmula para cálculo: "$processedFormula"');
+    final result = _evaluateMathExpressionWithParentheses(processedFormula);
+    debugPrint('✅ Resultado: $result kg');
+
+    _calculatedHeadquarterWeights[statusId] = {
+      'isFormulaResult': true,
+      'grandTotal': result,
+      'formula': formula,
+      'evaluatedFormula': displayFormula,
+    };
+    _saveHqWeightToVisitDetails(statusId, statusName, {
+      'calculationType': 'formula',
+      'grandTotal': result,
+      'formula': formula,
+      'evaluatedFormula': displayFormula,
+    });
+
+    debugPrint('🧮 ===== FIN EVALUACIÓN (ÉXITO - GLOBAL) =====');
+    setState(() {});
+  }
+
+  /// Cálculo por lote: =(TARE-DESTARE)/TAG_READER:<nombre>
+  /// Sustituye TAG_READER por los racimos de cada HE y produce un resultado por lote.
+  Future<void> _evaluateHeadquarterWeightFormulaPerLote(
+    int statusId,
+    String formula,
+    String tagReaderName, {
+    String statusName = '',
+  }) async {
+    debugPrint('🏢 Modo per-lote');
+
+    // 1. Agrupar RESULTS por HE desde _tagReaderData.
+    //    _tagReaderData ya contiene los datos de los tags ADB y físicos parseados.
+    //    NO usar _adbServerCardsRawJson porque produciría doble conteo.
+    final Map<int, int> racimosPorLote = {};
+
+    for (final entry in _tagReaderData.entries) {
+      for (final record in entry.value) {
+        final heId = record['headquarterId'] as int? ?? 0;
+        if (heId == 0) continue;
+        racimosPorLote[heId] = (racimosPorLote[heId] ?? 0) + (record['results'] as int? ?? 0);
+      }
+    }
+
+    debugPrint('📊 Racimos por lote: $racimosPorLote');
+    if (racimosPorLote.isEmpty) {
+      debugPrint('⚠️ Sin datos de racimos por lote');
+      return;
+    }
+
+    // 2. Variables del formulario
+    final formVariables = _collectFormVariables();
+
+    // 3. Nombres de lote — misma fuente que _buildHeadquarterGroup: headquartersList
+    final Map<int, String> loteNames = {};
+    for (final hq in FFAppState().headquartersList) {
+      if (hq.nameHeadquarter.isNotEmpty) loteNames[hq.idHeadquarter] = hq.nameHeadquarter;
+    }
+    for (final hq in FFAppState().headquartersSelectedList) {
+      if (hq.nameHeadquarter.isNotEmpty) loteNames[hq.idHeadquarter] ??= hq.nameHeadquarter;
+    }
+
+    final tagReaderPattern = RegExp(
+      r'TAG_READER:[^\s\)]+(?:\s+[^\s\)]+)*',
+      caseSensitive: false,
+    );
+
+    // 4. Calcular por lote
+    final List<Map<String, dynamic>> lotesResult = [];
+    double grandTotal = 0.0;
+
+    for (final loteEntry in racimosPorLote.entries) {
+      final heId = loteEntry.key;
+      final racimos = loteEntry.value;
+      if (racimos == 0) continue;
+
+      final loteName = loteNames[heId] ?? 'Lote #$heId';
+      String calcF = formula.startsWith('=') ? formula.substring(1) : formula;
+      calcF = calcF.replaceAll(tagReaderPattern, racimos.toString());
+      String dispF = calcF;
+
+      for (final varEntry in formVariables.entries) {
+        final pat = RegExp('\\b${varEntry.key}\\b', caseSensitive: false);
+        calcF = calcF.replaceAllMapped(pat, (_) => varEntry.value.toString());
+        dispF = dispF.replaceAllMapped(pat, (_) => _formatNumberForFormula(varEntry.value));
+      }
+
+      debugPrint('   🏢 $loteName: racimos=$racimos, fórmula=$calcF');
+      final result = _evaluateMathExpressionWithParentheses(calcF);
+      debugPrint('   ✅ $result kg');
+
+      lotesResult.add({
+        'headquarterId': heId,
+        'headquarterName': loteName,
+        'totalRacimos': racimos,
+        'weight': result,
+        'evaluatedFormula': '$dispF = ${_formatDecimal(result)} kg',
+      });
+      grandTotal += result;
+    }
+
+    if (lotesResult.isEmpty) {
+      debugPrint('⚠️ Sin resultados por lote');
+      return;
+    }
+
+    final summaryDisplay = lotesResult.length == 1
+        ? lotesResult.first['evaluatedFormula'] as String
+        : lotesResult.map((l) => '${l['headquarterName']}: ${_formatDecimal(l['weight'] as double)} kg').join(' | ');
+
+    _calculatedHeadquarterWeights[statusId] = {
+      'isFormulaResult': true,
+      'calculationType': 'formula_per_lote',
+      'grandTotal': grandTotal,
+      'formula': formula,
+      'evaluatedFormula': summaryDisplay,
+      'lotes': lotesResult,
+    };
+    _saveHqWeightToVisitDetails(statusId, statusName, {
+      'calculationType': 'formula',
+      'grandTotal': grandTotal,
+      'formula': formula,
+      'evaluatedFormula': summaryDisplay,
+      'lotes': lotesResult,
+    });
+
+    debugPrint('✅ grandTotal: $grandTotal kg | ${lotesResult.length} lote(s)');
+    debugPrint('🧮 ===== FIN EVALUACIÓN (ÉXITO - PER LOTE) =====');
+    setState(() {});
+  }
+
+  /// Extrae TARE y DESTARE de visitDetails como Map<String, double>.
+  Map<String, double> _collectFormVariables() {
+    final Map<String, double> vars = {};
+
+    var tareDetail = FFAppState().visitDetails.firstWhere(
+          (d) => d.statusOption.toUpperCase() == 'TARE',
+          orElse: () => VisitsDetailsStruct(),
+        );
+    if (tareDetail.statusResponse.isEmpty) {
+      tareDetail = FFAppState().visitDetails.firstWhere(
+            (d) => d.statusOption.toUpperCase().contains('TARE') &&
+                   !d.statusOption.toUpperCase().contains('DESTARE'),
+            orElse: () => VisitsDetailsStruct(),
+          );
+    }
+    if (tareDetail.statusResponse.isNotEmpty) {
+      vars['TARE'] = double.tryParse(tareDetail.statusResponse) ?? 0.0;
+    }
+
+    var destareDetail = FFAppState().visitDetails.firstWhere(
+          (d) => d.statusOption.toUpperCase() == 'DESTARE',
+          orElse: () => VisitsDetailsStruct(),
+        );
+    if (destareDetail.statusResponse.isEmpty) {
+      destareDetail = FFAppState().visitDetails.firstWhere(
+            (d) => d.statusOption.toUpperCase().contains('DESTARE'),
+            orElse: () => VisitsDetailsStruct(),
+          );
+    }
+    if (destareDetail.statusResponse.isNotEmpty) {
+      vars['DESTARE'] = double.tryParse(destareDetail.statusResponse) ?? 0.0;
+    }
+
+    return vars;
   }
 
   /// Obtiene el total de RESULTS de todos los registros del TAG_READER
-  Future<int> _getTotalResultsFromTagReader() async {
-    int totalResults = 0;
-
-    // Sumar todos los RESULTS de todas las entradas del tag
-    for (var entry in _tagReaderData.entries) {
-      for (var record in entry.value) {
-        final results = record['results'] as int? ?? 0;
-        totalResults += results;
-      }
-    }
-
-    return totalResults;
-  }
-
   /// Evalúa una expresión matemática simple con paréntesis
   /// Soporta: +, -, *, /, ()
   double _evaluateMathExpressionWithParentheses(String expression) {
@@ -9409,7 +10913,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             getJsonField(status, r'''$.type_status''')?.toString() ?? '';
 
         if (typeStatus.toLowerCase() == 'headquarter-weight') {
-          final statusId = getJsonField(status, r'''$.id_activity_status''');
+          final statusIdRaw = getJsonField(status, r'''$.id_activity_status''');
+          final statusId = statusIdRaw is int ? statusIdRaw : (statusIdRaw as num).toInt();
           final statusName =
               getJsonField(status, r'''$.status_name''')?.toString() ?? '';
           final defaultStatus =
@@ -9875,8 +11380,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         );
         final activityStatus = activityStatusRaw?.toList() ?? [];
 
-        // Buscar el statusId del tag-reader por nombre
+        // Buscar el statusId del tag-reader (o tag-transfer-adb-server/from) por nombre
         int? targetTagReaderId;
+        // Tipos de status que actúan como origen de tag
+        const tagOriginTypes = {
+          'tag-reader',
+          'tag-transfer-adb-server',
+          'tag-transfer-adb-from',
+          'tag-writer',
+        };
 
         // Buscar en root status
         for (var status in activityStatus) {
@@ -9884,12 +11396,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               getJsonField(status, r'''$.status_name''')?.toString() ?? '';
           final typeStatus =
               getJsonField(status, r'''$.type_status''')?.toString() ?? '';
-          if (typeStatus.toLowerCase() == 'tag-reader' &&
+          if (tagOriginTypes.contains(typeStatus.toLowerCase()) &&
               statusName.toLowerCase() == tagReaderName.toLowerCase()) {
             targetTagReaderId =
                 getJsonField(status, r'''$.id_activity_status''');
+            final rawId = targetTagReaderId;
+            targetTagReaderId = rawId is int ? rawId : (rawId as num?)?.toInt();
             debugPrint(
-                '   ✅ Encontrado en root status: "$statusName" (ID: $targetTagReaderId)');
+                '   ✅ Encontrado en root status: "$statusName" tipo=$typeStatus (ID: $targetTagReaderId)');
             break;
           }
         }
@@ -9904,12 +11418,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   getJsonField(status, r'''$.status_name''')?.toString() ?? '';
               final typeStatus =
                   getJsonField(status, r'''$.type_status''')?.toString() ?? '';
-              if (typeStatus.toLowerCase() == 'tag-reader' &&
+              if (tagOriginTypes.contains(typeStatus.toLowerCase()) &&
                   statusName.toLowerCase() == tagReaderName.toLowerCase()) {
-                targetTagReaderId =
-                    getJsonField(status, r'''$.id_activity_status''');
+                final rawId = getJsonField(status, r'''$.id_activity_status''');
+                targetTagReaderId = rawId is int ? rawId : (rawId as num?)?.toInt();
                 debugPrint(
-                    '   ✅ Encontrado en step: "$statusName" (ID: $targetTagReaderId)');
+                    '   ✅ Encontrado en step: "$statusName" tipo=$typeStatus (ID: $targetTagReaderId)');
                 break;
               }
             }
@@ -9919,22 +11433,20 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
         if (targetTagReaderId == null) {
           debugPrint(
-              '⚠️ No se encontró status TAG_READER con nombre "$tagReaderName"');
-          return;
+              '⚠️ No se encontró status TAG_READER/ADB con nombre "$tagReaderName" — procediendo sin coordenadas de origen');
+          // No retornar: la Opción 2 (desde producto) aún puede calcularse
         }
 
         // Ahora buscar las coordenadas en _tagReaderGeolocations usando el ID
-        if (_tagReaderGeolocations.containsKey(targetTagReaderId)) {
+        if (targetTagReaderId != null &&
+            _tagReaderGeolocations.containsKey(targetTagReaderId)) {
           final geolocation = _tagReaderGeolocations[targetTagReaderId]!;
           originLat = geolocation.latitude;
           originLng = geolocation.longitude;
           debugPrint('✅ Coordenadas encontradas: ($originLat, $originLng)');
         } else {
           debugPrint(
-              '⚠️ TAG_READER "$tagReaderName" (ID: $targetTagReaderId) no tiene coordenadas en _tagReaderGeolocations');
-          debugPrint(
-              '   IDs disponibles: ${_tagReaderGeolocations.keys.toList()}');
-          return;
+              '⚠️ No hay coordenadas en _tagReaderGeolocations para ID $targetTagReaderId — solo se calculará Opción 2 (desde producto)');
         }
       } else if (_lastTagReaderLocation != null) {
         // Usar última ubicación de tag-reader como fallback
@@ -9981,53 +11493,111 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
 
       // Calcular distancia OPCIÓN 1 (desde TAG) usando fórmula de Haversine
-      double distanceFromTag = _calculateHaversineDistance(
-          originLat, originLng, extractoraLat, extractoraLng);
+      // Solo si se tienen coordenadas de origen (puede ser null para ADB sin geolocalización)
+      double distanceFromTag = 0.0;
+      if (originLat != null && originLng != null) {
+        distanceFromTag = _calculateHaversineDistance(
+            originLat, originLng, extractoraLat, extractoraLng);
+        debugPrint(
+            '📐 Distancia calculada (OPCIÓN 1 - desde TAG): ${distanceFromTag.toStringAsFixed(2)} metros (${(distanceFromTag / 1000).toStringAsFixed(2)} km)');
+      } else {
+        debugPrint('ℹ️ Sin coordenadas de origen — Opción 1 omitida, solo Opción 2');
+      }
 
-      debugPrint(
-          '📐 Distancia calculada (OPCIÓN 1 - desde TAG): ${distanceFromTag.toStringAsFixed(2)} metros (${(distanceFromTag / 1000).toStringAsFixed(2)} km)');
-
-      // OPCIÓN 2: SIEMPRE calcular distancia desde Products para CADA lote SELECCIONADO
+      // OPCIÓN 2: calcular distancia desde el punto virtual más bajo (Línea 1, Palma 1) de cada lote
       debugPrint('');
       debugPrint(
           '📦 ===== CALCULANDO OPCIÓN 2 (desde Producto por cada lote) =====');
 
-      // Obtener lotes SELECCIONADOS de FFAppState().headquartersSelectedList
+      // Obtener lotes: primero desde headquartersSelectedList, y si está vacío,
+      // extraer IDs únicos de HE de los datos de los tags ADB recibidos.
       final selectedHeadquarters = FFAppState().headquartersSelectedList;
       debugPrint(
-          '📋 Lotes seleccionados en headquartersSelectedList: ${selectedHeadquarters.length}');
-      for (var hq in selectedHeadquarters) {
-        debugPrint('   - Lote ${hq.idHeadquarter}: ${hq.nameHeadquarter}');
+          '📋 Lotes en headquartersSelectedList: ${selectedHeadquarters.length}');
+
+      // Construir lista de (id, nombre) para los lotes a procesar
+      // Formato: List<({int id, String name})>
+      final List<({int id, String name})> lotesToProcess = [];
+
+      if (selectedHeadquarters.isNotEmpty) {
+        for (final hq in selectedHeadquarters) {
+          lotesToProcess.add((id: hq.idHeadquarter, name: hq.nameHeadquarter.isNotEmpty ? hq.nameHeadquarter : 'Lote #${hq.idHeadquarter}'));
+          debugPrint('   - Lote ${hq.idHeadquarter}: ${hq.nameHeadquarter}');
+        }
+      } else {
+        // Extraer HE únicos de todos los tags ADB recibidos
+        debugPrint('⚠️ headquartersSelectedList vacío — extrayendo HE de tags ADB...');
+        final Set<int> uniqueHeIds = {};
+        for (final rawList in _adbServerCardsRawJson.values) {
+          for (final rawJson in rawList) {
+            try {
+              final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
+              final visits = decoded['Visits'] as List<dynamic>?;
+              if (visits != null) {
+                for (final visit in visits) {
+                  final he = visit['HE'];
+                  if (he != null) {
+                    final heId = he is int ? he : (he as num).toInt();
+                    uniqueHeIds.add(heId);
+                  }
+                }
+              }
+            } catch (_) {}
+          }
+        }
+        debugPrint('   HE únicos extraídos de tags: $uniqueHeIds');
+        // Los nombres se obtendrán de SQLite (tabla Headquarters)
+        for (final heId in uniqueHeIds) {
+          lotesToProcess.add((id: heId, name: '')); // nombre se rellena abajo
+        }
       }
 
       // Lista para almacenar las distancias de cada lote
       final List<Map<String, dynamic>> distancesFromProducts = [];
 
-      if (selectedHeadquarters.isEmpty) {
-        debugPrint('⚠️ No hay lotes seleccionados en headquartersSelectedList');
-        debugPrint('   No se puede calcular OPCIÓN 2');
+      if (lotesToProcess.isEmpty) {
+        debugPrint('⚠️ No hay lotes para calcular — Opción 2 omitida');
       } else {
-        // Leer productos desde SQLite usando la MISMA ruta que sync_install_module
+        // Leer productos desde SQLite
         try {
-          // Obtener la ruta de la base de datos (misma que usa sync_install_module)
-          final Directory? externalDir = await getExternalStorageDirectory();
-          if (externalDir == null) {
-            throw Exception('No se pudo acceder al almacenamiento externo');
+          late Directory baseDir;
+          if (Platform.isAndroid) {
+            final Directory? externalDir = await getExternalStorageDirectory();
+            if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+            baseDir = externalDir;
+          } else {
+            baseDir = await getApplicationDocumentsDirectory();
           }
-          final String basePath = '${externalDir.path}/ClickPalmData';
+          final String basePath = '${baseDir.path}/ClickPalmData';
           final String dbPath = path.join(basePath, 'clickpalm_database.db');
 
           debugPrint('📂 Ruta de SQLite: $dbPath');
 
-          // Abrir la base de datos
           final db = await openDatabase(dbPath);
 
-          // Calcular distancia para CADA lote seleccionado
-          for (final selectedHq in selectedHeadquarters) {
-            final loteHeadquarterId = selectedHq.idHeadquarter;
-            final loteName = selectedHq.nameHeadquarter.isNotEmpty
-                ? selectedHq.nameHeadquarter
-                : 'Lote #$loteHeadquarterId';
+          // Calcular distancia para CADA lote
+          for (final loteEntry in lotesToProcess) {
+            final loteHeadquarterId = loteEntry.id;
+            // Si no tenemos el nombre, consultarlo de la tabla Headquarters
+            String loteName = loteEntry.name;
+            if (loteName.isEmpty) {
+              try {
+                final hqRows = await db.query(
+                  'Headquarters',
+                  columns: ['Name_headquarter'],
+                  where: 'Id_headquarter = ?',
+                  whereArgs: [loteHeadquarterId],
+                  limit: 1,
+                );
+                if (hqRows.isNotEmpty) {
+                  loteName = hqRows.first['Name_headquarter'] as String? ?? 'Lote #$loteHeadquarterId';
+                } else {
+                  loteName = 'Lote #$loteHeadquarterId';
+                }
+              } catch (_) {
+                loteName = 'Lote #$loteHeadquarterId';
+              }
+            }
 
             debugPrint('');
             debugPrint(
@@ -10108,7 +11678,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               debugPrint(
                   '❌ Producto encontrado pero sin coordenadas (Location_raw vacío o null)');
             }
-          } // fin del for de lotes seleccionados
+          } // fin del for de lotes
 
           // Cerrar la base de datos
           await db.close();
@@ -10116,7 +11686,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         } catch (e) {
           debugPrint('❌ Error consultando SQLite: $e');
         }
-      }
+      } // fin del bloque de cálculo
 
       // Guardar TODAS las distancias
       setState(() {
@@ -10147,7 +11717,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           SnackBar(
             content: Text(
                 '✅ Distancia calculada: ${(distanceFromTag / 1000).toStringAsFixed(2)} km'),
-            backgroundColor: const Color(0xFF00a86b),
+            backgroundColor: const Color(0xFFB45309),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -10411,7 +11981,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     if (!showManualInput) ...[
                       // ── Vista de espera ──
                       const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+                        valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB45309)),
                       ),
                       const SizedBox(height: 16),
                       const Text(
@@ -10612,7 +12182,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         child: ElevatedButton(
                           onPressed: confirmManual,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF00a86b),
+                            backgroundColor: const Color(0xFFB45309),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(10)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -10826,6 +12396,52 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
   }
 
+  /// Carga el nombre del producto desde SQLite por Id_product
+  Future<void> _loadProductById(int productId) async {
+    if (_productByIdCache.containsKey(productId)) return;
+    try {
+      final db = await GlobalDbSingleton().database;
+      final rows = await db.query(
+        'Products',
+        columns: ['Name_product'],
+        where: 'Id_product = ?',
+        whereArgs: [productId],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        final name = rows.first['Name_product'] as String? ?? '';
+        if (mounted) setState(() => _productByIdCache[productId] = name);
+      } else {
+        if (mounted) setState(() => _productByIdCache[productId] = '');
+      }
+    } catch (e) {
+      debugPrint('❌ _loadProductById: Error: $e');
+    }
+  }
+
+  /// Carga el nombre del producto desde SQLite por RFID (columna Rfid)
+  Future<void> _loadProductByRfid(String rfid) async {
+    if (_productByRfidCache.containsKey(rfid)) return;
+    try {
+      final db = await GlobalDbSingleton().database;
+      final rows = await db.query(
+        'Products',
+        columns: ['Name_product'],
+        where: 'Rfid = ?',
+        whereArgs: [rfid],
+        limit: 1,
+      );
+      if (rows.isNotEmpty) {
+        final name = rows.first['Name_product'] as String? ?? '';
+        if (mounted) setState(() => _productByRfidCache[rfid] = name);
+      } else {
+        if (mounted) setState(() => _productByRfidCache[rfid] = '');
+      }
+    } catch (e) {
+      debugPrint('❌ _loadProductByRfid: Error: $e');
+    }
+  }
+
   /// Pre-carga TODOS los nombres de usuarios desde SQLite al caché en un solo query.
   /// Se ejecuta en initState para que el árbol de tags tenga nombres listos al expandir.
   Future<void> _preloadUserNamesFromSQLite() async {
@@ -10884,6 +12500,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         .toList();
     for (final statusId in tagReaderIdsToRemove) {
       _tagReaderData.remove(statusId);
+      _tagReaderRawJsons.remove(statusId);
       debugPrint('   ❌ Limpiado _tagReaderData[$statusId]');
       cleanedCount++;
     }
@@ -11328,93 +12945,168 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // ===== RESUMEN DEL TAG READER AGRUPADO POR LOTE =====
 
-  Widget _buildTagReaderSummary({required int statusId}) {
-    final tagData = _tagReaderData[statusId] ?? [];
-    if (tagData.isEmpty) return const SizedBox.shrink();
+  String _extractTagProductName(String rawJson) {
+    try {
+      final parsed = actions.parseNfcJson(rawJson);
+      return (parsed?['Read_info']?['Name_product'] as String?) ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
 
-    // Agrupar por lote (headquarterId)
-    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
-    for (var record in tagData) {
-      final heId = record['headquarterId'] as int? ?? 0;
-      if (!groupedByHeadquarter.containsKey(heId)) {
-        groupedByHeadquarter[heId] = [];
-      }
-      groupedByHeadquarter[heId]!.add(record);
+  Widget _buildTagReaderSummary({required int statusId, bool isAdbServer = false}) {
+    final rawJsons = _tagReaderRawJsons[statusId];
+    final isMulti = rawJsons != null && rawJsons.length > 1;
+
+    if (isMulti) {
+      // Modo NO_REMOVE: una sección por cada tag leído
+      return Column(
+        children: rawJsons.asMap().entries.map((entry) {
+          final index = entry.key;
+          final raw = entry.value;
+          final sectionData = _parseNfcTagContent(raw);
+          final sectionProductName = _extractTagProductName(raw);
+          return _buildTagReaderSummarySection(
+            sectionData: sectionData,
+            productName: sectionProductName,
+            tagIndex: index + 1,
+            statusId: statusId,
+            isAdbServer: isAdbServer,
+          );
+        }).toList(),
+      );
     }
 
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B4332), // Verde oscuro
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    // Modo normal (un solo tag): comportamiento original
+    final tagData = _tagReaderData[statusId] ?? [];
+    if (tagData.isEmpty) return const SizedBox.shrink();
+    return _buildTagReaderSummarySection(
+      sectionData: tagData,
+      productName: _tagReaderProductName[statusId] ?? '',
+      tagIndex: 0,
+      statusId: statusId,
+      isAdbServer: isAdbServer,
+    );
+  }
+
+  Widget _buildTagReaderSummarySection({
+    required List<Map<String, dynamic>> sectionData,
+    required String productName,
+    required int tagIndex,
+    required int statusId,
+    bool isAdbServer = false,
+  }) {
+    if (sectionData.isEmpty) return const SizedBox.shrink();
+
+    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
+    for (var record in sectionData) {
+      final heId = record['headquarterId'] as int? ?? 0;
+      groupedByHeadquarter.putIfAbsent(heId, () => []).add(record);
+    }
+
+    final checkKey = tagIndex;
+    final isChecked = isAdbServer && (_adbTagChecked[statusId]?.contains(checkKey) ?? false);
+
+    final treeContent = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (tagIndex > 0) ...[
           Row(
             children: [
-              const Icon(
-                Icons.summarize_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                (_tagReaderProductName[statusId]?.isNotEmpty == true)
-                    ? _tagReaderProductName[statusId]!
-                    : 'Resumen del TAG',
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+              Icon(Icons.nfc, color: Colors.white.withValues(alpha: 0.7), size: 14),
+              const SizedBox(width: 4),
+              Text('Tag #$tagIndex', style: TextStyle(fontFamily: 'Roboto', fontSize: 12, color: Colors.white.withValues(alpha: 0.7))),
+              const SizedBox(width: 8),
+              Expanded(child: Divider(color: Colors.white.withValues(alpha: 0.24), height: 1)),
+            ],
+          ),
+          const SizedBox(height: 8),
+        ],
+        Row(
+          children: [
+            const Icon(Icons.summarize_rounded, color: Colors.white, size: 18),
+            const SizedBox(width: 6),
+            Text(productName.isNotEmpty ? productName : 'Resumen del TAG',
+                style: const TextStyle(fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+            if (tagIndex <= 1 && _tagReaderGeolocations.containsKey(statusId)) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.location_on, color: Colors.white.withValues(alpha: 0.7), size: 12),
+                    const SizedBox(width: 3),
+                    Text(
+                      '${_tagReaderGeolocations[statusId]!.latitude.toStringAsFixed(5)}, ${_tagReaderGeolocations[statusId]!.longitude.toStringAsFixed(5)}',
+                      style: TextStyle(fontFamily: 'Roboto', fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+                    ),
+                  ],
                 ),
               ),
-              // Mostrar geolocalización de forma sutil si está disponible
-              if (_tagReaderGeolocations.containsKey(statusId)) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        color: Colors.white.withValues(alpha: 0.7),
-                        size: 12,
+            ],
+          ],
+        ),
+        const SizedBox(height: 12),
+        ...groupedByHeadquarter.entries.map((entry) => _buildHeadquarterGroup(entry.key, entry.value)),
+      ],
+    );
+
+    return Container(
+      margin: tagIndex > 0 ? const EdgeInsets.only(bottom: 8) : EdgeInsets.zero,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B4332),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
+      ),
+      child: isAdbServer
+          ? Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: treeContent),
+                const SizedBox(width: 16),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _adbTagChecked[statusId] ??= {};
+                      if (isChecked) {
+                        _adbTagChecked[statusId]!.remove(checkKey);
+                      } else {
+                        _adbTagChecked[statusId]!.add(checkKey);
+                      }
+                    });
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeInOut,
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: isChecked
+                          ? const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFFF59E0B), Color(0xFF92400E)],
+                            )
+                          : null,
+                      color: isChecked ? null : Colors.transparent,
+                      border: Border.all(
+                        color: isChecked ? const Color(0xFFF59E0B) : Colors.white.withValues(alpha: 0.4),
+                        width: 2,
                       ),
-                      const SizedBox(width: 3),
-                      Text(
-                        '${_tagReaderGeolocations[statusId]!.latitude.toStringAsFixed(5)}, ${_tagReaderGeolocations[statusId]!.longitude.toStringAsFixed(5)}',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 10,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
+                      boxShadow: isChecked
+                          ? [BoxShadow(color: const Color(0xFFF59E0B).withValues(alpha: 0.5), blurRadius: 10, spreadRadius: 1)]
+                          : [],
+                    ),
+                    child: isChecked ? const Icon(Icons.check_rounded, color: Colors.white, size: 18) : null,
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...groupedByHeadquarter.entries.map((entry) {
-            final headquarterId = entry.key;
-            final records = entry.value;
-            return _buildHeadquarterGroup(headquarterId, records);
-          }),
-        ],
-      ),
+            )
+          : treeContent,
     );
   }
 
@@ -11538,7 +13230,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   fontFamily: 'Roboto',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF74C69D),
+                                  color: Color(0xFFFBBF24),
                                 ),
                               ),
                               TextSpan(
@@ -11555,74 +13247,82 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         ),
                         const SizedBox(height: 6),
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  width: 1,
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    width: 1,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'Visitas: ',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white.withValues(alpha: 0.7),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Vis: ',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    '$totalVisits',
-                                    style: const TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                    Text(
+                                      '$totalVisits',
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: Colors.white.withValues(alpha: 0.3),
-                                  width: 1,
+                            const SizedBox(width: 4),
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: Colors.white.withValues(alpha: 0.3),
+                                    width: 1,
+                                  ),
                                 ),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '$_unityLabel: ',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w500,
-                                      color: Colors.white.withValues(alpha: 0.7),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        '$_unityLabel: ',
+                                        style: TextStyle(
+                                          fontFamily: 'Roboto',
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: Colors.white.withValues(alpha: 0.7),
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
                                     ),
-                                  ),
-                                  Text(
-                                    '$totalResults',
-                                    style: const TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                    Text(
+                                      '$totalResults',
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
                             ),
                           ],
@@ -11681,7 +13381,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         color: const Color(0xFF2D6A4F).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF52B788).withValues(alpha: 0.4),
+          color: const Color(0xFFD97706).withValues(alpha: 0.4),
           width: 1,
         ),
       ),
@@ -11705,7 +13405,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   fontFamily: 'Roboto',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF74C69D),
+                                  color: Color(0xFFFBBF24),
                                 ),
                               ),
                               TextSpan(
@@ -12003,7 +13703,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   fontFamily: 'Roboto',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF74C69D),
+                                  color: Color(0xFFFBBF24),
                                 ),
                               ),
                               TextSpan(
@@ -12389,12 +14089,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF00a86b), Color(0xFF008c5a)],
+                  colors: [Color(0xFFB45309), Color(0xFF008c5a)],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                    color: const Color(0xFFB45309).withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -12551,7 +14251,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           ),
                         ],
                       ),
-                      backgroundColor: Color(0xFF00a86b),
+                      backgroundColor: Color(0xFFB45309),
                       duration: Duration(seconds: 3),
                     ),
                   );
@@ -12707,7 +14407,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   fontFamily: 'Roboto',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF74C69D),
+                                  color: Color(0xFFFBBF24),
                                 ),
                               ),
                               TextSpan(
@@ -12999,11 +14699,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           ]; // Blanco/Gris claro
 
     final borderColor = hasBeenCalculated
-        ? const Color(0xFF40916C).withValues(alpha: 0.5)
+        ? const Color(0xFF451A03).withValues(alpha: 0.5)
         : const Color(0xFFBDBDBD).withValues(alpha: 0.5);
 
     final iconColor =
-        hasBeenCalculated ? const Color(0xFF52B788) : const Color(0xFF9E9E9E);
+        hasBeenCalculated ? const Color(0xFFD97706) : const Color(0xFF9E9E9E);
 
     final textColor = hasBeenCalculated
         ? Colors.white.withValues(alpha: 0.9)
@@ -13130,11 +14830,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF2E7D32), Color(0xFF43A047)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0D2B1A), Color(0xFF0A1F12)],
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF66BB6A).withValues(alpha: 0.3),
+          color: const Color(0xFF1A4A2E),
           width: 1,
         ),
       ),
@@ -13142,7 +14844,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         children: [
           const Icon(
             Icons.info_outline_rounded,
-            color: Color(0xFF66BB6A),
+            color: Colors.white,
             size: 24,
           ),
           const SizedBox(width: 12),
@@ -13208,10 +14910,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F8F4),
+        color: const Color(0xFF0D2B1A),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+          color: const Color(0xFFB45309).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -13221,13 +14923,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         style: const TextStyle(
           fontFamily: 'Roboto',
           fontSize: 20,
-          color: Color(0xFF00a86b),
+          color: Color(0xFFB45309),
           fontWeight: FontWeight.w700,
         ),
         decoration: InputDecoration(
           hintText: 'Escribe aquí...',
           hintStyle: TextStyle(
-            color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+            color: const Color(0xFFB45309).withValues(alpha: 0.5),
           ),
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
@@ -13290,18 +14992,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFFF1F8F4),
-            Color(0xFFFAFDFB),
+            Color(0xFF0D2B1A),
+            Color(0xFF0A1F12),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+          color: const Color(0xFFB45309).withValues(alpha: 0.3),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF00a86b).withValues(alpha: 0.1),
+            color: const Color(0xFFB45309).withValues(alpha: 0.1),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -13318,14 +15020,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [
-                    Color(0xFF00a86b),
-                    Color(0xFF00d980),
+                    Color(0xFFB45309),
+                    Color(0xFF92400E),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                    color: const Color(0xFFB45309).withValues(alpha: 0.4),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -13396,7 +15098,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+                      color: const Color(0xFFB45309).withValues(alpha: 0.3),
                       width: 1.5,
                     ),
                   ),
@@ -13406,25 +15108,25 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 15,
-                      color: Color(0xFF00a86b),
+                      color: Color(0xFFB45309),
                       fontWeight: FontWeight.w600,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Buscar usuario...',
                       hintStyle: TextStyle(
-                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                        color: const Color(0xFFB45309).withValues(alpha: 0.4),
                         fontWeight: FontWeight.w500,
                       ),
                       prefixIcon: const Icon(
                         Icons.search,
-                        color: Color(0xFF00a86b),
+                        color: Color(0xFFB45309),
                         size: 22,
                       ),
                       suffixIcon: _usersSearchControllers[statusId]!.text.isNotEmpty
                           ? IconButton(
                               icon: Icon(
                                 Icons.clear,
-                                color: const Color(0xFF00a86b).withValues(alpha: 0.6),
+                                color: const Color(0xFFB45309).withValues(alpha: 0.6),
                                 size: 20,
                               ),
                               onPressed: () {
@@ -13457,14 +15159,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        Color(0xFFB45309),
+                        Color(0xFF92400E),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                        color: const Color(0xFFB45309).withValues(alpha: 0.4),
                         blurRadius: 8,
                         offset: const Offset(0, 3),
                       ),
@@ -13514,7 +15216,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     fontFamily: 'Roboto',
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF00a86b).withValues(alpha: 0.7),
+                    color: const Color(0xFFB45309).withValues(alpha: 0.7),
                   ),
                 ),
               ),
@@ -13538,12 +15240,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+            color: const Color(0xFFB45309).withValues(alpha: 0.2),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00a86b).withValues(alpha: 0.08),
+              color: const Color(0xFFB45309).withValues(alpha: 0.08),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -13557,8 +15259,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Color(0xFF00a86b),
-                    Color(0xFF00d980),
+                    Color(0xFFB45309),
+                    Color(0xFF92400E),
                   ],
                 ),
                 shape: BoxShape.circle,
@@ -13586,7 +15288,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       fontFamily: 'Roboto',
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF00a86b),
+                      color: Color(0xFFB45309),
                       letterSpacing: -0.2,
                     ),
                     maxLines: 1,
@@ -13599,7 +15301,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       fontFamily: 'Roboto',
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
-                      color: const Color(0xFF00a86b).withValues(alpha: 0.6),
+                      color: const Color(0xFFB45309).withValues(alpha: 0.6),
                     ),
                   ),
                 ],
@@ -13607,7 +15309,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             ),
             Icon(
               Icons.chevron_right,
-              color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+              color: const Color(0xFFB45309).withValues(alpha: 0.5),
               size: 20,
             ),
           ],
@@ -13806,10 +15508,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF1F8F4),
+        color: const Color(0xFF0D2B1A),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+          color: const Color(0xFFB45309).withValues(alpha: 0.3),
           width: 1.5,
         ),
       ),
@@ -13823,7 +15525,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               height: 60,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                  color: const Color(0xFFB45309).withValues(alpha: 0.5),
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(8),
@@ -13857,7 +15559,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   children: [
                     Icon(
                       Icons.check_circle_rounded,
-                      color: Color(0xFF00a86b),
+                      color: Color(0xFFB45309),
                       size: 16,
                     ),
                     SizedBox(width: 4),
@@ -13867,7 +15569,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF00a86b),
+                        color: Color(0xFFB45309),
                       ),
                     ),
                   ],
@@ -13879,7 +15581,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF00a86b),
+                    color: Color(0xFFB45309),
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -13952,10 +15654,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: const Color(0xFFF1F8F4),
+          color: const Color(0xFF0D2B1A),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+            color: const Color(0xFFB45309).withValues(alpha: 0.3),
             width: 1.5,
           ),
         ),
@@ -13969,7 +15671,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               height: 60,
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
+                  color: const Color(0xFFB45309).withValues(alpha: 0.5),
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(8),
@@ -14008,7 +15710,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   children: [
                     Icon(
                       Icons.check_circle_rounded,
-                      color: Color(0xFF00a86b),
+                      color: Color(0xFFB45309),
                       size: 16,
                     ),
                     SizedBox(width: 4),
@@ -14018,7 +15720,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF00a86b),
+                        color: Color(0xFFB45309),
                       ),
                     ),
                   ],
@@ -14030,7 +15732,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF00a86b),
+                    color: Color(0xFFB45309),
                   ),
                   overflow: TextOverflow.ellipsis,
                   maxLines: 1,
@@ -14155,10 +15857,37 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   }
 
   Widget _buildDistanceExtractorDisplay({required int statusId}) {
+    final hasData = _calculatedDistances.containsKey(statusId);
     final distanceFromTag = _calculatedDistances[statusId] ?? 0.0;
     final distancesFromProducts = _calculatedDistancesFromProduct[statusId];
-
     final distanceFromTagKm = distanceFromTag / 1000;
+
+    // Sin datos: mostrar placeholder hasta que se reciba un tag
+    if (!hasData) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1B4332),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.social_distance_rounded, size: 16, color: Colors.white.withValues(alpha: 0.4)),
+            const SizedBox(width: 8),
+            Text(
+              'Esperando lectura de TAG para calcular distancia...',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 11,
+                color: Colors.white.withValues(alpha: 0.45),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -14530,7 +16259,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         ),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: const Color(0xFF40916C).withValues(alpha: 0.3),
+          color: const Color(0xFF451A03).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -14541,7 +16270,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             children: [
               const Icon(
                 Icons.analytics_rounded,
-                color: Color(0xFF52B788),
+                color: Color(0xFFD97706),
                 size: 24,
               ),
               const SizedBox(width: 12),
@@ -14569,7 +16298,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 color: Colors.black.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFF52B788).withValues(alpha: 0.3),
+                  color: const Color(0xFFD97706).withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
@@ -14585,7 +16314,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             horizontal: 16, vertical: 10),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                            colors: [Color(0xFFD97706), Color(0xFF451A03)],
                           ),
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -14628,7 +16357,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       color: Colors.black.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(
-                        color: const Color(0xFF52B788).withValues(alpha: 0.3),
+                        color: const Color(0xFFD97706).withValues(alpha: 0.3),
                         width: 1,
                       ),
                     ),
@@ -14718,7 +16447,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                     horizontal: 10, vertical: 6),
                                 decoration: BoxDecoration(
                                   gradient: const LinearGradient(
-                                    colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                                    colors: [Color(0xFFD97706), Color(0xFF451A03)],
                                   ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
@@ -14747,7 +16476,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   gradient: const LinearGradient(
-                    colors: [Color(0xFF52B788), Color(0xFF40916C)],
+                    colors: [Color(0xFFD97706), Color(0xFF451A03)],
                   ),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
@@ -14915,7 +16644,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         ),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: const Color(0xFF40916C).withValues(alpha: 0.3),
+          color: const Color(0xFF451A03).withValues(alpha: 0.3),
         ),
       ),
       child: Column(
@@ -14929,7 +16658,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.analytics_rounded, color: Color(0xFF52B788), size: 20),
+                    Icon(Icons.analytics_rounded, color: Color(0xFFD97706), size: 20),
                     SizedBox(width: 8),
                     Text(
                       'Distribución de Peso',
@@ -14949,13 +16678,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     _buildDistBadge(
                       label: 'Peso neto',
                       value: '${_formatDecimal(pesoNeto)} kg',
-                      color: const Color(0xFF52B788),
+                      color: const Color(0xFFD97706),
                     ),
                     const SizedBox(width: 8),
                     _buildDistBadge(
                       label: 'Factor',
                       value: factor.toStringAsFixed(4),
-                      color: const Color(0xFF40916C),
+                      color: const Color(0xFF451A03),
                     ),
                   ],
                 ),
@@ -14963,7 +16692,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             ),
           ),
 
-          const Divider(color: Color(0xFF40916C), height: 1, thickness: 0.5),
+          const Divider(color: Color(0xFF451A03), height: 1, thickness: 0.5),
 
           // Lotes (expandibles)
           ...lotes.entries.map((loteEntry) {
@@ -14989,7 +16718,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       children: [
                         Icon(
                           isExpanded ? Icons.expand_more : Icons.chevron_right,
-                          color: const Color(0xFF52B788),
+                          color: const Color(0xFFD97706),
                           size: 20,
                         ),
                         const SizedBox(width: 6),
@@ -15014,7 +16743,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         _buildDistBadge(
                           label: '',
                           value: '${_formatDecimal(pesoAsignado)} kg',
-                          color: const Color(0xFF52B788).withValues(alpha: 0.7),
+                          color: const Color(0xFFD97706).withValues(alpha: 0.7),
                           compact: true,
                         ),
                       ],
@@ -15036,7 +16765,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         padding: const EdgeInsets.fromLTRB(40, 8, 16, 8),
                         child: Row(
                           children: [
-                            const Icon(Icons.person_outline, color: Color(0xFF74C69D), size: 16),
+                            const Icon(Icons.person_outline, color: Color(0xFFFBBF24), size: 16),
                             const SizedBox(width: 6),
                             Expanded(
                               child: Column(
@@ -15057,7 +16786,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                       style: const TextStyle(
                                         fontFamily: 'Roboto',
                                         fontSize: 11,
-                                        color: Color(0xFF74C69D),
+                                        color: Color(0xFFFBBF24),
                                       ),
                                     ),
                                 ],
@@ -15073,7 +16802,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             _buildDistBadge(
                               label: '',
                               value: '${_formatDecimal(pesoOp)} kg',
-                              color: const Color(0xFF52B788).withValues(alpha: 0.5),
+                              color: const Color(0xFFD97706).withValues(alpha: 0.5),
                               compact: true,
                             ),
                           ],
@@ -15082,7 +16811,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     );
                   }),
 
-                const Divider(color: Color(0xFF40916C), height: 1, thickness: 0.3),
+                const Divider(color: Color(0xFF451A03), height: 1, thickness: 0.3),
               ],
             );
           }),
@@ -15106,7 +16835,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     fontFamily: 'Roboto',
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF74C69D),
+                    color: Color(0xFFFBBF24),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -15114,9 +16843,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF52B788).withValues(alpha: 0.25),
+                    color: const Color(0xFFD97706).withValues(alpha: 0.25),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: const Color(0xFF52B788).withValues(alpha: 0.5)),
+                    border: Border.all(color: const Color(0xFFD97706).withValues(alpha: 0.5)),
                   ),
                   child: Text(
                     '${_formatDecimal(grandTotal)} kg',
@@ -15193,54 +16922,150 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     required int statusId,
     required dynamic status,
   }) {
-    // Obtener el dato para este statusId
     final data = _calculatedHeadquarterWeights[statusId];
-    if (data == null) {
-      return const SizedBox.shrink();
-    }
+    if (data == null) return const SizedBox.shrink();
 
     final evaluatedFormula = data['evaluatedFormula'] as String? ?? '';
+    if (evaluatedFormula.isEmpty) return const SizedBox.shrink();
 
-    if (evaluatedFormula.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final lotes = data['lotes'] as List<dynamic>?;
+    final grandTotal = data['grandTotal'] as double? ?? 0.0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFF1B4332), // Verde oscuro igual que tag-reader
+        color: const Color(0xFF1B4332),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF40916C).withValues(alpha: 0.3),
+          color: const Color(0xFF451A03).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Fórmula evaluada con valores reemplazados
+          // Encabezado
           Row(
             children: [
-              const Icon(
-                Icons.calculate_outlined,
-                color: Color(0xFF52B788),
-                size: 18,
+              const Icon(Icons.calculate_outlined, color: Color(0xFFD97706), size: 16),
+              const SizedBox(width: 6),
+              const Text(
+                'Peso por lote',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFFD97706),
+                ),
               ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  evaluatedFormula,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto Mono',
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                    letterSpacing: 0.5,
-                  ),
+              const Spacer(),
+              // Total general
+              Text(
+                '${_formatDecimal(grandTotal)} kg total',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
                 ),
               ),
             ],
           ),
+          // Filas por lote
+          if (lotes != null && lotes.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...lotes.map((lote) {
+              final m = lote as Map<String, dynamic>;
+              final loteName = m['headquarterName'] as String? ?? '';
+              final racimos = m['totalRacimos'] as int? ?? 0;
+              final weight = m['weight'] as double? ?? 0.0;
+              final evalF = m['evaluatedFormula'] as String? ?? '';
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.25),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: const Color(0xFFD97706).withValues(alpha: 0.25),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Lote + racimos
+                      Row(
+                        children: [
+                          Text(
+                            loteName,
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2196F3).withValues(alpha: 0.3),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              '$racimos racimos',
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '${_formatDecimal(weight)} kg',
+                            style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFFD97706),
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Fórmula evaluada pequeña
+                      if (evalF.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          evalF,
+                          style: TextStyle(
+                            fontFamily: 'Roboto Mono',
+                            fontSize: 10,
+                            color: Colors.white.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ] else ...[
+            // Fallback: una sola línea con la fórmula
+            const SizedBox(height: 6),
+            Text(
+              evaluatedFormula,
+              style: const TextStyle(
+                fontFamily: 'Roboto Mono',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -15284,15 +17109,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       final formattedDate = '$capitalizedDay $day de $capitalizedMonth $year';
 
       return Padding(
-        padding: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.only(top: 4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.35),
-              width: 1.5,
+              width: 1,
             ),
           ),
           child: Text(
@@ -15301,10 +17126,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             maxLines: 1,
             style: const TextStyle(
               fontFamily: 'Roboto',
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
-              letterSpacing: 0.3,
+              letterSpacing: 0.2,
             ),
           ),
         ),
@@ -15366,25 +17191,25 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           '${hour12.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
 
       return Padding(
-        padding: const EdgeInsets.only(left: 8),
+        padding: const EdgeInsets.only(top: 4),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: Colors.white.withValues(alpha: 0.35),
-              width: 1.5,
+              width: 1,
             ),
           ),
           child: Text(
             formattedTime,
             style: const TextStyle(
               fontFamily: 'Roboto',
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
               color: Colors.white,
-              letterSpacing: 0.3,
+              letterSpacing: 0.2,
             ),
           ),
         ),
@@ -15500,7 +17325,7 @@ class _FullScreenNumericKeyboardDialogState
                         fontFamily: 'Roboto',
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF00ff9f),
+                        color: Colors.white,
                       ),
                     ),
                     IconButton(
@@ -15532,7 +17357,7 @@ class _FullScreenNumericKeyboardDialogState
                       ),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: const Color(0xFF52B788).withValues(alpha: 0.5),
+                        color: const Color(0xFF40916C).withValues(alpha: 0.6),
                         width: 2,
                       ),
                     ),
@@ -15542,7 +17367,7 @@ class _FullScreenNumericKeyboardDialogState
                         fontFamily: 'Roboto',
                         fontSize: 64,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF52B788),
+                        color: Color(0xFF74C69D),
                         letterSpacing: 4,
                       ),
                       textAlign: TextAlign.center,
@@ -15614,7 +17439,7 @@ class _FullScreenNumericKeyboardDialogState
                               '⌫',
                               Icons.backspace_rounded,
                               _onBackspace,
-                              const Color(0xFFFFA726),
+                              const Color(0xFF40916C),
                             ),
                           ],
                         ),
@@ -15628,12 +17453,12 @@ class _FullScreenNumericKeyboardDialogState
                           height: 70,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFF00a86b), Color(0xFF00d980)],
+                              colors: [Color(0xFF2D6A4F), Color(0xFF1B4332)],
                             ),
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFF00a86b)
+                                color: const Color(0xFF2D6A4F)
                                     .withValues(alpha: 0.5),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
@@ -15686,14 +17511,14 @@ class _FullScreenNumericKeyboardDialogState
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Color(0xFF2D6A4F),
                 Color(0xFF40916C),
+                Color(0xFF1B4332),
               ],
             ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF2D6A4F).withValues(alpha: 0.5),
+                color: const Color(0xFF1B4332).withValues(alpha: 0.5),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
               ),
@@ -15962,7 +17787,7 @@ class _FullScreenUserSearchDialogState
                     ? const Center(
                         child: CircularProgressIndicator(
                           valueColor:
-                              AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+                              AlwaysStoppedAnimation<Color>(Color(0xFFB45309)),
                         ),
                       )
                     : _searchResults.isEmpty
@@ -15976,9 +17801,9 @@ class _FullScreenUserSearchDialogState
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        const Color(0xFF00a86b)
+                                        const Color(0xFFB45309)
                                             .withValues(alpha: 0.2),
-                                        const Color(0xFF00d980)
+                                        const Color(0xFF92400E)
                                             .withValues(alpha: 0.2),
                                       ],
                                     ),
@@ -16078,14 +17903,14 @@ class _FullScreenUserSearchDialogState
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        Color(0xFFB45309),
+                        Color(0xFF92400E),
                       ],
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Color(0xFF00a86b),
+                        color: Color(0xFFB45309),
                         blurRadius: 12,
                         offset: Offset(0, 4),
                       ),
@@ -16130,13 +17955,13 @@ class _FullScreenUserSearchDialogState
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              const Color(0xFF00a86b).withValues(alpha: 0.3),
-                              const Color(0xFF00d980).withValues(alpha: 0.3),
+                              const Color(0xFFB45309).withValues(alpha: 0.3),
+                              const Color(0xFF92400E).withValues(alpha: 0.3),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                            color: const Color(0xFF00a86b)
+                            color: const Color(0xFFB45309)
                                 .withValues(alpha: 0.5),
                             width: 1,
                           ),
@@ -16147,7 +17972,7 @@ class _FullScreenUserSearchDialogState
                             const Icon(
                               Icons.tag,
                               size: 14,
-                              color: Color(0xFF00d980),
+                              color: Color(0xFF92400E),
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -16172,8 +17997,8 @@ class _FullScreenUserSearchDialogState
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Color(0xFF00a86b),
-                        Color(0xFF00d980),
+                        Color(0xFFB45309),
+                        Color(0xFF92400E),
                       ],
                     ),
                     shape: BoxShape.circle,
@@ -16295,7 +18120,7 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
         child: const Center(
           child: CircularProgressIndicator(
             strokeWidth: 2,
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF00a86b)),
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB45309)),
           ),
         ),
       );
@@ -16318,7 +18143,7 @@ class _VideoThumbnailState extends State<_VideoThumbnail> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// TabBar moderna para formularios EXTRACTORA
+// Control de Pasos moderno para formularios EXTRACTORA
 // ─────────────────────────────────────────────────────────────────────────────
 class _ModernTabBar extends StatefulWidget {
   final TabController controller;
@@ -16337,16 +18162,40 @@ class _ModernTabBar extends StatefulWidget {
   State<_ModernTabBar> createState() => _ModernTabBarState();
 }
 
-class _ModernTabBarState extends State<_ModernTabBar> {
+class _ModernTabBarState extends State<_ModernTabBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnim;
+
+  // Iconos por índice de paso (se repite si hay más de 8 pasos)
+  static const List<IconData> _stepIcons = [
+    Icons.description_outlined,
+    Icons.local_shipping_outlined,
+    Icons.warehouse_outlined,
+    Icons.analytics_outlined,
+    Icons.verified_outlined,
+    Icons.rule_outlined,
+    Icons.science_outlined,
+    Icons.star_outline_rounded,
+  ];
+
   @override
   void initState() {
     super.initState();
     widget.controller.addListener(_onTabChanged);
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
   }
 
   @override
   void dispose() {
     widget.controller.removeListener(_onTabChanged);
+    _pulseController.dispose();
     super.dispose();
   }
 
@@ -16361,99 +18210,181 @@ class _ModernTabBarState extends State<_ModernTabBar> {
     final count = steps.length;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: Colors.transparent,
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.07)),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: List.generate(count, (i) {
-              final step = steps[i];
-              final stepName =
-                  widget.getJsonField(step, r'''$.name_step''').toString();
-              final stepId =
-                  widget.getJsonField(step, r'''$.id_activity_step''');
-              final isRequired =
-                  widget.getJsonField(step, r'''$.is_required''') == true;
-              final isCompleted =
-                  widget.getCachedValue(stepId as int, 'STEP');
-              final isSelected = i == currentIndex;
-
-              // Radio de esquinas: solo externas (primera y última)
-              final radius = Radius.circular(12);
-              final borderRadius = i == 0
-                  ? BorderRadius.only(topLeft: radius, bottomLeft: radius)
-                  : i == count - 1
-                      ? BorderRadius.only(topRight: radius, bottomRight: radius)
-                      : BorderRadius.zero;
-
-              return GestureDetector(
-                onTap: () => widget.controller.animateTo(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  curve: Curves.easeInOut,
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? const Color(0xFF00a86b)
-                        : const Color(0xFFF1F8F4),
-                    borderRadius: borderRadius,
-                    border: isSelected
-                        ? null
-                        : Border.all(
-                            color: const Color(0xFF00a86b),
-                            width: 1,
-                          ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Ícono de estado (requerido)
-                      if (isRequired) ...[
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 200),
-                          child: Icon(
-                            isCompleted
-                                ? Icons.check_circle_rounded
-                                : Icons.radio_button_unchecked_rounded,
-                            key: ValueKey('$stepId-$isCompleted'),
-                            size: 15,
-                            color: isSelected
-                                ? Colors.white
-                                : (isCompleted
-                                    ? const Color(0xFF00a86b)
-                                    : const Color(0xFF00a86b)
-                                        .withValues(alpha: 0.4)),
-                          ),
-                        ),
-                        const SizedBox(width: 5),
-                      ],
-                      // Nombre del tab
-                      ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: 120),
-                        child: Text(
-                          stepName,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: TextStyle(
-                            fontFamily: 'Roboto',
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: isSelected
-                                ? Colors.white
-                                : const Color(0xFF00a86b),
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ],
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: List.generate(count * 2 - 1, (rawIndex) {
+            // Indices pares = pasos, impares = conectores
+            if (rawIndex.isOdd) {
+              final leftIndex = rawIndex ~/ 2;
+              final leftCompleted = () {
+                final s = steps[leftIndex];
+                final id = widget.getJsonField(s, r'''$.id_activity_step''') as int?;
+                return id != null && widget.getCachedValue(id, 'STEP');
+              }();
+              // ── Línea conectora ──────────────────────────────────────
+              return SizedBox(
+                width: 36,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 22),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 400),
+                    height: 2,
+                    decoration: BoxDecoration(
+                      gradient: leftCompleted
+                          ? const LinearGradient(
+                              colors: [Color(0xFF92400E), Color(0xFFB45309)],
+                            )
+                          : null,
+                      color: leftCompleted ? null : Colors.white.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(1),
+                    ),
                   ),
                 ),
               );
-            }),
-          ),
+            }
+
+            final i = rawIndex ~/ 2;
+            final step = steps[i];
+            final stepName = widget.getJsonField(step, r'''$.name_step''').toString();
+            final stepId = widget.getJsonField(step, r'''$.id_activity_step''') as int?;
+            final isCompleted = stepId != null && widget.getCachedValue(stepId, 'STEP');
+            final isSelected = i == currentIndex;
+            final icon = _stepIcons[i % _stepIcons.length];
+
+            return GestureDetector(
+              onTap: () => widget.controller.animateTo(i),
+              child: SizedBox(
+                width: 72,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ── Círculo del paso ──────────────────────────────
+                    AnimatedBuilder(
+                      animation: _pulseAnim,
+                      builder: (context, child) {
+                        final scale = isSelected && !isCompleted ? _pulseAnim.value : 1.0;
+                        return Transform.scale(
+                          scale: scale,
+                          child: child,
+                        );
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.easeOutBack,
+                        width: 46,
+                        height: 46,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: isCompleted
+                              ? const LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [Color(0xFFF59E0B), Color(0xFF92400E)],
+                                )
+                              : isSelected
+                                  ? const LinearGradient(
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                      colors: [Color(0xFFFF8C00), Color(0xFFB45309)],
+                                    )
+                                  : null,
+                          color: isCompleted || isSelected
+                              ? null
+                              : Colors.white.withValues(alpha: 0.08),
+                          border: Border.all(
+                            color: isCompleted
+                                ? const Color(0xFFF59E0B)
+                                : isSelected
+                                    ? const Color(0xFFF59E0B)
+                                    : Colors.white.withValues(alpha: 0.25),
+                            width: isSelected ? 2.5 : 1.5,
+                          ),
+                          boxShadow: isCompleted
+                              ? [
+                                  BoxShadow(
+                                    color: const Color(0xFF92400E).withValues(alpha: 0.45),
+                                    blurRadius: 14,
+                                    spreadRadius: 1,
+                                  ),
+                                ]
+                              : isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: const Color(0xFFB45309).withValues(alpha: 0.5),
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                      ),
+                                    ]
+                                  : const [
+                                      BoxShadow(
+                                        color: Colors.transparent,
+                                        blurRadius: 16,
+                                        spreadRadius: 2,
+                                      ),
+                                    ],
+                        ),
+                        child: Center(
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 250),
+                            transitionBuilder: (child, anim) => ScaleTransition(
+                              scale: anim,
+                              child: child,
+                            ),
+                            child: isCompleted
+                                ? const Icon(
+                                    Icons.check_rounded,
+                                    key: ValueKey('check'),
+                                    color: Colors.white,
+                                    size: 22,
+                                  )
+                                : Icon(
+                                    icon,
+                                    key: ValueKey('icon_$i'),
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.white.withValues(alpha: 0.45),
+                                    size: 20,
+                                  ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 7),
+                    // ── Nombre del paso ───────────────────────────────
+                    AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 10,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isCompleted
+                            ? const Color(0xFFF59E0B)
+                            : isSelected
+                                ? const Color(0xFFF59E0B)
+                                : Colors.white.withValues(alpha: 0.45),
+                        letterSpacing: 0.2,
+                        height: 1.3,
+                      ),
+                      child: Text(
+                        stepName,
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }),
         ),
       ),
     );

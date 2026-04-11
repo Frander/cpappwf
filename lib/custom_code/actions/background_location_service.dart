@@ -19,6 +19,7 @@ import 'get_location_list.dart';
 
 /// Inicializa y configura el servicio de segundo plano
 Future<void> initializeBackgroundLocationService() async {
+  if (Platform.isWindows) return; // No soportado en Windows
   final service = FlutterBackgroundService();
 
   // Crear canal de notificaciones para Android
@@ -147,39 +148,40 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
   Timer? stabilizationWatchdog;
 
   try {
-    // Configurar acelerómetro
-    accelSub = accelerometerEventStream(
-            samplingPeriod: const Duration(milliseconds: 200))
-        .listen((event) {
-      lastAccelEvent = event;
-      movementDetector.updateAccelerometer(event);
-    });
+    // Configurar acelerómetro y giroscopio (solo en plataformas móviles)
+    if (!Platform.isWindows) {
+      accelSub = accelerometerEventStream(
+              samplingPeriod: const Duration(milliseconds: 200))
+          .listen((event) {
+        lastAccelEvent = event;
+        movementDetector.updateAccelerometer(event);
+      });
 
-    // Configurar giroscopio
-    gyroSub =
-        gyroscopeEventStream(samplingPeriod: const Duration(milliseconds: 200))
-            .listen((event) {
-      if (lastAccelEvent != null && lastSensorUpdate != null) {
-        final now = DateTime.now();
-        final dt = now.difference(lastSensorUpdate!).inMilliseconds / 1000.0;
+      gyroSub = gyroscopeEventStream(
+              samplingPeriod: const Duration(milliseconds: 200))
+          .listen((event) {
+        if (lastAccelEvent != null && lastSensorUpdate != null) {
+          final now = DateTime.now();
+          final dt = now.difference(lastSensorUpdate!).inMilliseconds / 1000.0;
 
-        if (dt > 0 && dt < 1.0) {
-          imuIntegrator.updateOrientation(event, dt);
-          imuIntegrator.updatePosition(
-            lastAccelEvent!,
-            event,
-            dt,
-            !movementDetector.isCurrentlyStatic(),
-            movementDetector.isCurrentlyStatic(),
-          );
-          imuIntegrator.detectBrushChange();
+          if (dt > 0 && dt < 1.0) {
+            imuIntegrator.updateOrientation(event, dt);
+            imuIntegrator.updatePosition(
+              lastAccelEvent!,
+              event,
+              dt,
+              !movementDetector.isCurrentlyStatic(),
+              movementDetector.isCurrentlyStatic(),
+            );
+            imuIntegrator.detectBrushChange();
+          }
+
+          lastSensorUpdate = now;
+        } else {
+          lastSensorUpdate ??= DateTime.now();
         }
-
-        lastSensorUpdate = now;
-      } else {
-        lastSensorUpdate ??= DateTime.now();
-      }
-    });
+      });
+    }
 
     // Verificar permisos - IMPORTANTE: NO solicitar permisos aquí
     // porque el servicio de segundo plano no tiene Activity/UI
@@ -650,6 +652,7 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 
 /// Función pública para iniciar el servicio
 Future<void> startBackgroundLocationService() async {
+  if (Platform.isWindows) return; // No soportado en Windows
   final service = FlutterBackgroundService();
 
   // IMPORTANTE: Verificar permisos ANTES de iniciar el servicio
@@ -693,6 +696,7 @@ Future<void> startBackgroundLocationService() async {
 
 /// Función pública para detener el servicio
 Future<void> stopBackgroundLocationService() async {
+  if (Platform.isWindows) return; // No soportado en Windows
   final service = FlutterBackgroundService();
   service.invoke('stopService');
   debugPrint('🛑 Servicio de geolocalización en segundo plano DETENIDO');

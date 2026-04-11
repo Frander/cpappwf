@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'dart:io';
+import 'dart:io' show Platform, File, Directory;
 import 'dart:math' as math;
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
@@ -174,15 +174,20 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   /// Obtiene la ruta de la base de datos
   Future<String> _getDatabasePath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
-    return path.join('${externalDir.path}/ClickPalmData', 'clickpalm_database.db');
+    return path.join('${baseDir.path}/ClickPalmData', 'clickpalm_database.db');
   }
 
   /// Lee el TAG NFC y obtiene su ID
   Future<void> _readTag() async {
+    if (Platform.isWindows) return; // NFC no disponible en Windows
     setState(() {
       _isReading = true;
       _tagId = '';

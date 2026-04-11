@@ -1857,12 +1857,16 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
 
   /// Obtiene la mejor ruta para el almacenamiento de datos
   Future<String> _getBestDocumentsPath() async {
-    final Directory? externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      throw Exception('No se pudo acceder al almacenamiento externo');
+    late Directory baseDir;
+    if (Platform.isAndroid) {
+      final Directory? externalDir = await getExternalStorageDirectory();
+      if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
+      baseDir = externalDir;
+    } else {
+      baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final String customPath = '${externalDir.path}/ClickPalmData';
+    final String customPath = '${baseDir.path}/ClickPalmData';
     final Directory targetDir = Directory(customPath);
 
     if (!await targetDir.exists()) {
