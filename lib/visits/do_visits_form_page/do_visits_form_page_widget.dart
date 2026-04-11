@@ -5730,6 +5730,170 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   /// Crea una visita directamente usando el TAG NFC leído y las últimas 3 geolocalizaciones del AppState
+  /// Muestra un bottom sheet elegante para que el usuario seleccione
+  /// el lote cuando la ubicación cae fuera de todos los polígonos.
+  Future<HeadquartersStruct?> _showSelectLotDialog(
+    BuildContext context,
+    List<actions.HeadquarterDistance> nearestList,
+  ) async {
+    return showModalBottomSheet<HeadquartersStruct>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: FlutterFlowTheme.of(context).primaryBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Ícono y título
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.location_searching_rounded,
+                  color: FlutterFlowTheme.of(context).primary,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '¿En cuál lote estás?',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: FlutterFlowTheme.of(context).primaryText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tu ubicación está fuera de los polígonos registrados.\nSelecciona el lote más cercano:',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13,
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Lista de lotes cercanos
+              ...nearestList.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                final distLabel = item.distanceMeters == double.infinity
+                    ? 'Sin distancia'
+                    : item.distanceMeters < 1000
+                        ? '${item.distanceMeters.toStringAsFixed(0)} m'
+                        : '${(item.distanceMeters / 1000).toStringAsFixed(2)} km';
+                final colors = [
+                  Colors.green.shade600,
+                  Colors.orange.shade600,
+                  Colors.red.shade400,
+                ];
+                final color = colors[index.clamp(0, 2)];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.pop(ctx, item.headquarter),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: color.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        color: color.withOpacity(0.06),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color.withOpacity(0.15),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontWeight: FontWeight.bold,
+                                  color: color,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.headquarter.nameHeadquarter,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Icon(Icons.near_me_rounded,
+                                        size: 14, color: color),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      distLabel,
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 13,
+                                        color: color,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: color),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<bool> _createVisitWithNfc(String nfcTagId) async {
     try {
       debugPrint('📱 ===== CREANDO VISITA CON NFC =====');
@@ -5850,16 +6014,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         }
       }
 
-      // Obtener el Id_headquarter del lote actual
-      int idHeadquarter = 0;
-      final headquartersList = FFAppState().headquartersSelectedList;
-      if (headquartersList.isNotEmpty) {
-        idHeadquarter = headquartersList.first.idHeadquarter;
-        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
-      } else {
-        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
-      }
-
       // Obtener geolocalizaciones de los últimos 5 segundos desde geoLocationsList
       final allGeoLocations = FFAppState().geoLocationsList;
       if (allGeoLocations.isEmpty) {
@@ -5908,6 +6062,31 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final mainLocation = locationsToSave.last;
       debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
       debugPrint('📍 Total geolocalizaciones de los últimos 5 segundos: ${locationsToSave.length}');
+
+      // Verificar polígono y obtener Id_headquarter
+      int idHeadquarter = 0;
+      final headquartersList = FFAppState().headquartersSelectedList;
+      if (headquartersList.isNotEmpty) {
+        final checkResult = await actions.checkLocationInPolygons(
+          mainLocation.latitude,
+          mainLocation.longitude,
+          headquartersList,
+        );
+
+        if (checkResult.insideHeadquarter != null) {
+          idHeadquarter = checkResult.insideHeadquarter!.idHeadquarter;
+          debugPrint('✅ Dentro del polígono del lote: ${checkResult.insideHeadquarter!.nameHeadquarter} (ID: $idHeadquarter)');
+        } else {
+          debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
+          if (!mounted) return false;
+          final selected = await _showSelectLotDialog(context, checkResult.nearestList);
+          if (selected == null) return false;
+          idHeadquarter = selected.idHeadquarter;
+          debugPrint('✅ Lote seleccionado por usuario: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
+        }
+      } else {
+        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
+      }
 
       // Obtener visitDetails filtrados
       final visitDetails = FFAppState().visitDetails;
@@ -6061,16 +6240,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final userSelected = FFAppState().userSelected;
       final deviceDefault = FFAppState().deviceDefault;
 
-      // Obtener el Id_headquarter del lote actual
-      int idHeadquarter = 0;
-      final headquartersList = FFAppState().headquartersSelectedList;
-      if (headquartersList.isNotEmpty) {
-        idHeadquarter = headquartersList.first.idHeadquarter;
-        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
-      } else {
-        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
-      }
-
       // Obtener geolocalizaciones de los últimos 5 segundos desde geoLocationsList
       final allGeoLocations = FFAppState().geoLocationsList;
       if (allGeoLocations.isEmpty) {
@@ -6119,6 +6288,31 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final mainLocation = locationsToSave.last;
       debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
       debugPrint('📍 Total geolocalizaciones de los últimos 5 segundos: ${locationsToSave.length}');
+
+      // Verificar polígono y obtener Id_headquarter
+      int idHeadquarter = 0;
+      final headquartersList = FFAppState().headquartersSelectedList;
+      if (headquartersList.isNotEmpty) {
+        final checkResult = await actions.checkLocationInPolygons(
+          mainLocation.latitude,
+          mainLocation.longitude,
+          headquartersList,
+        );
+
+        if (checkResult.insideHeadquarter != null) {
+          idHeadquarter = checkResult.insideHeadquarter!.idHeadquarter;
+          debugPrint('✅ Dentro del polígono del lote: ${checkResult.insideHeadquarter!.nameHeadquarter} (ID: $idHeadquarter)');
+        } else {
+          debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
+          if (!mounted) return false;
+          final selected = await _showSelectLotDialog(context, checkResult.nearestList);
+          if (selected == null) return false;
+          idHeadquarter = selected.idHeadquarter;
+          debugPrint('✅ Lote seleccionado por usuario: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
+        }
+      } else {
+        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
+      }
 
       // Obtener visitDetails filtrados
       final visitDetails = FFAppState().visitDetails;

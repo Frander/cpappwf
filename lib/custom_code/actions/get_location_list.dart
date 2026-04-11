@@ -838,22 +838,26 @@ class PositionValidator {
 
 /// Calculador de Ruido de Proceso Adaptativo
 class AdaptiveProcessNoise {
-  /// Calcula el ruido de proceso según el estado dinámico del sistema
+  /// Calcula el ruido de proceso según el estado dinámico del sistema.
+  /// Unidades: metros² (el UKF opera en UTM).
+  /// Un operario de campo camina ~1 m/s entre palmas (7-9 m por árbol),
+  /// por eso el ruido no puede ser inferior a ~0.5 m² ni siquiera en reposo.
   static double calculate(double speed, double acceleration, bool isStatic) {
-    // Caso 1: Dispositivo estático
+    // Caso 1: Dispositivo estático o velocidad muy baja
+    // 0.5 m² permite que el filtro siga actualizando aunque el operario
+    // esté quieto registrando una visita y luego camine al siguiente árbol.
     if (isStatic || speed < 0.5) {
-      return 0.001; // Ruido muy bajo
+      return 0.5;
     }
 
     // Caso 2: Movimiento constante (poca aceleración)
+    // Ruido crece linealmente con velocidad (base 2.0 para caminar ~1 m/s → ~2.2 m²)
     if (acceleration.abs() < 0.3) {
-      // Ruido crece linealmente con velocidad
-      return 0.003 * (1 + speed / 10.0);
+      return 2.0 * (1 + speed / 10.0);
     }
 
     // Caso 3: Acelerando o frenando
-    // Ruido crece con la magnitud de aceleración
-    return 0.01 * (1 + acceleration.abs() / 5.0);
+    return 5.0 * (1 + acceleration.abs() / 5.0);
   }
 }
 

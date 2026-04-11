@@ -22,6 +22,8 @@ class AdbNfcBridgeService {
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<AdbBridgeStatus> _statusController =
       StreamController<AdbBridgeStatus>.broadcast();
+  final StreamController<Map<String, dynamic>> _geoLocationController =
+      StreamController<Map<String, dynamic>>.broadcast();
 
   Stream<Map<String, dynamic>> get onTagReceived => _tagController.stream;
   Stream<AdbBridgeStatus> get onStatusChanged => _statusController.stream;
@@ -122,9 +124,35 @@ class AdbNfcBridgeService {
         final payload = msg['payload'] as Map<String, dynamic>;
         debugPrint('📡 AdbNfcBridgeService: NFC tag received: $payload');
         _tagController.add(payload);
+      } else if (msg['type'] == 'geo_location_response') {
+        final payload = msg['payload'] as Map<String, dynamic>;
+        debugPrint('📍 AdbNfcBridgeService: GPS response received: $payload');
+        _geoLocationController.add(payload);
       }
     } catch (e) {
       debugPrint('❌ AdbNfcBridgeService: Invalid message: $e');
+    }
+  }
+
+  /// Solicita la geolocalización actual al cliente Android y espera la respuesta.
+  /// Retorna null si no hay cliente conectado o se agota el tiempo de espera.
+  Future<Map<String, dynamic>?> requestAndWaitGeoLocation({
+    Duration timeout = const Duration(seconds: 6),
+  }) async {
+    if (_client == null) {
+      debugPrint('⚠️ AdbNfcBridgeService: requestAndWaitGeoLocation — no hay cliente conectado');
+      return null;
+    }
+    try {
+      final future = _geoLocationController.stream.first
+          .timeout(timeout, onTimeout: () => <String, dynamic>{});
+      _client!.add(jsonEncode({'type': 'request_geo_location'}));
+      debugPrint('📤 AdbNfcBridgeService: request_geo_location enviado al Android');
+      final result = await future;
+      return result.isEmpty ? null : result;
+    } catch (e) {
+      debugPrint('❌ AdbNfcBridgeService: requestAndWaitGeoLocation falló: $e');
+      return null;
     }
   }
 

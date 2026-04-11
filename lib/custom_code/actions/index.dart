@@ -49,7 +49,12 @@ export 'sync_base_data.dart' show syncBaseData;
 export 'load_app_state_from_sqlite.dart' show loadAppStateFromSqlite;
 export 'get_device_model.dart' show getDeviceModel;
 export 'get_android_serial_id.dart' show getAndroidSerialId;
-export 'calculate_current_headquarter.dart' show calculateCurrentHeadquarter;
+export 'calculate_current_headquarter.dart'
+    show
+        calculateCurrentHeadquarter,
+        checkLocationInPolygons,
+        HeadquarterCheckResult,
+        HeadquarterDistance;
 export 'write_n_f_c_tag.dart' show writeNFCTag;
 export 'calculate_activity_results.dart' show calculateActivityResults;
 export 'cleanup_step_records.dart' show cleanupStepRecords;

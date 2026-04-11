@@ -93,6 +93,32 @@ class AdbNfcClientService {
     }
   }
 
+  /// Envía la geolocalización actual al servidor Windows en respuesta a un request_geo_location.
+  Future<bool> sendGeoLocation({
+    required double latitude,
+    required double longitude,
+    double altitude = 0,
+    double errorHorizontal = 0,
+  }) async {
+    if (_socket == null) return false;
+    try {
+      _socket!.add(jsonEncode({
+        'type': 'geo_location_response',
+        'payload': {
+          'latitude': latitude,
+          'longitude': longitude,
+          'altitude': altitude,
+          'errorHorizontal': errorHorizontal,
+        },
+      }));
+      debugPrint('📍 AdbNfcClientService: geo_location_response enviado al servidor');
+      return true;
+    } catch (e) {
+      debugPrint('❌ AdbNfcClientService: sendGeoLocation falló: $e');
+      return false;
+    }
+  }
+
   Future<void> disconnect() async {
     await _socket?.close();
     _socket = null;

@@ -296,3 +296,84 @@ class _LatLng {
 
   _LatLng(this.lat, this.lon);
 }
+
+// ============================================================
+// VERIFICACIÓN DE POLÍGONO PARA DETECCIÓN DE CAMBIO DE LOTE
+// ============================================================
+
+/// Resultado de la verificación de ubicación contra polígonos de lotes
+class HeadquarterCheckResult {
+  /// Lote cuyo polígono contiene la ubicación actual, o null si está fuera de todos
+  final HeadquartersStruct? insideHeadquarter;
+
+  /// Top-3 lotes más cercanos ordenados por distancia ascendente
+  final List<HeadquarterDistance> nearestList;
+
+  HeadquarterCheckResult({
+    this.insideHeadquarter,
+    required this.nearestList,
+  });
+}
+
+/// Par de lote + distancia en metros
+class HeadquarterDistance {
+  final HeadquartersStruct headquarter;
+  final double distanceMeters;
+
+  HeadquarterDistance(this.headquarter, this.distanceMeters);
+}
+
+/// Verifica si la ubicación [latitude]/[longitude] cae dentro de algún
+/// polígono de [hqList]. Devuelve:
+/// - [insideHeadquarter] != null si el punto está dentro de ese lote.
+/// - [insideHeadquarter] == null si está fuera de todos; [nearestList]
+///   contiene los 3 lotes más cercanos con su distancia en metros.
+Future<HeadquarterCheckResult> checkLocationInPolygons(
+  double latitude,
+  double longitude,
+  List<HeadquartersStruct> hqList,
+) async {
+  final point = _LatLng(latitude, longitude);
+
+  // Filtrar lotes con polígono válido (≥3 vértices)
+  final hqConPoligono = hqList
+      .where((hq) => hq.polygon.isNotEmpty && _isValidPolygon(hq.polygon))
+      .toList();
+
+  // Verificar si el punto está DENTRO de algún polígono
+  for (var hq in hqConPoligono) {
+    final polygon = _parsePolygon(hq.polygon);
+    if (_isPointInPolygon(point, polygon)) {
+      final allDistances = _computeHqDistances(point, hqConPoligono);
+      return HeadquarterCheckResult(
+        insideHeadquarter: hq,
+        nearestList: allDistances.take(3).toList(),
+      );
+    }
+  }
+
+  // Fuera de todos → calcular distancias y retornar top-3
+  final source = hqConPoligono.isNotEmpty ? hqConPoligono : hqList;
+  final allDistances = _computeHqDistances(point, source);
+  return HeadquarterCheckResult(
+    insideHeadquarter: null,
+    nearestList: allDistances.take(3).toList(),
+  );
+}
+
+/// Calcula la distancia mínima del punto a cada lote y ordena ascendente
+List<HeadquarterDistance> _computeHqDistances(
+  _LatLng point,
+  List<HeadquartersStruct> hqList,
+) {
+  final distances = <HeadquarterDistance>[];
+  for (var hq in hqList) {
+    final polygon = _parsePolygon(hq.polygon);
+    final dist = polygon.length >= 2
+        ? _distanceToPolygon(point, polygon)
+        : double.infinity;
+    distances.add(HeadquarterDistance(hq, dist));
+  }
+  distances.sort((a, b) => a.distanceMeters.compareTo(b.distanceMeters));
+  return distances;
+}

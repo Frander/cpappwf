@@ -14,6 +14,10 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:battery_plus/battery_plus.dart';
+import '/custom_code/actions/calculate_current_headquarter.dart'
+    show checkLocationInPolygons, HeadquarterDistance;
+import '/backend/schema/structs/index.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 
 // ============================================================================
 // MODELO DE DATOS GPS
@@ -647,14 +651,37 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       final database = await openDatabase(dbPath);
 
-      // Obtener el Id_headquarter del lote actual
-      // Prioridad 1: Usar el primer lote de headquartersSelectedList
+      // Obtener el Id_headquarter verificando polígonos
       int idHeadquarter = 0;
       final headquartersList = FFAppState().headquartersSelectedList;
 
       if (headquartersList.isNotEmpty) {
-        idHeadquarter = headquartersList.first.idHeadquarter;
-        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+        final checkResult = await checkLocationInPolygons(
+          mainGPSPoint.latitude,
+          mainGPSPoint.longitude,
+          headquartersList,
+        );
+
+        if (checkResult.insideHeadquarter != null) {
+          // Dentro de un polígono → asignar automáticamente
+          idHeadquarter = checkResult.insideHeadquarter!.idHeadquarter;
+          debugPrint('✅ Dentro del polígono del lote: ${checkResult.insideHeadquarter!.nameHeadquarter} (ID: $idHeadquarter)');
+        } else {
+          // Fuera de todos los polígonos → mostrar diálogo de selección
+          debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
+          if (!mounted) return;
+          final selected = await _showSelectLotDialog(context, checkResult.nearestList);
+          if (selected == null) {
+            // Usuario canceló → abortar guardado
+            setState(() {
+              _isProcessing = false;
+              _statusMessage = 'Guardado cancelado';
+            });
+            return;
+          }
+          idHeadquarter = selected.idHeadquarter;
+          debugPrint('✅ Lote seleccionado por usuario: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
+        }
       } else {
         debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
       }
@@ -705,7 +732,14 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
             .where((point) => point.createdAt.isAfter(sixSecondsAgo))
             .toList();
         recentPoints.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        final pointsToSave = recentPoints.take(10).toList();
+        List<GPSPoint> pointsToSave = recentPoints.take(10).toList();
+
+        // Fallback: si no hay puntos recientes, usar el más reciente disponible
+        if (pointsToSave.isEmpty && _gpsPoints.isNotEmpty) {
+          final allSorted = List<GPSPoint>.from(_gpsPoints)
+            ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          pointsToSave = [allSorted.last];
+        }
 
         for (var gpsPoint in pointsToSave) {
           await txn.rawInsert('''
@@ -746,6 +780,170 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         _errorMessage = 'Error al crear la visita:\n$e';
       });
     }
+  }
+
+  /// Muestra un bottom sheet elegante para que el usuario seleccione
+  /// el lote cuando la ubicación cae fuera de todos los polígonos.
+  Future<HeadquartersStruct?> _showSelectLotDialog(
+    BuildContext context,
+    List<HeadquarterDistance> nearestList,
+  ) async {
+    return showModalBottomSheet<HeadquartersStruct>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      isDismissible: false,
+      enableDrag: false,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: FlutterFlowTheme.of(context).primaryBackground,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle bar
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade400,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Ícono y título
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.location_searching_rounded,
+                  color: FlutterFlowTheme.of(context).primary,
+                  size: 36,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '¿En cuál lote estás?',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: FlutterFlowTheme.of(context).primaryText,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Tu ubicación está fuera de los polígonos registrados.\nSelecciona el lote más cercano:',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 13,
+                  color: FlutterFlowTheme.of(context).secondaryText,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Lista de lotes cercanos
+              ...nearestList.asMap().entries.map((entry) {
+                final index = entry.key;
+                final item = entry.value;
+                final distLabel = item.distanceMeters == double.infinity
+                    ? 'Sin distancia'
+                    : item.distanceMeters < 1000
+                        ? '${item.distanceMeters.toStringAsFixed(0)} m'
+                        : '${(item.distanceMeters / 1000).toStringAsFixed(2)} km';
+                final colors = [
+                  Colors.green.shade600,
+                  Colors.orange.shade600,
+                  Colors.red.shade400,
+                ];
+                final color = colors[index.clamp(0, 2)];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(16),
+                    onTap: () => Navigator.pop(ctx, item.headquarter),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: color.withOpacity(0.4),
+                          width: 1.5,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        color: color.withOpacity(0.06),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: color.withOpacity(0.15),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${index + 1}',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontWeight: FontWeight.bold,
+                                  color: color,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  item.headquarter.nameHeadquarter,
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Row(
+                                  children: [
+                                    Icon(Icons.near_me_rounded,
+                                        size: 14, color: color),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      distLabel,
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 13,
+                                        color: color,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: color),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override

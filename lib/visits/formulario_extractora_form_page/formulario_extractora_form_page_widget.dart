@@ -124,6 +124,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   final Map<int, Map<String, dynamic>> _adbReceivedTagData = {};
   bool _adbClientConnected = false;
   StreamSubscription<bool>? _adbClientConnSub;
+  StreamSubscription<Map<String, dynamic>>? _adbServerCommandSub;
   // Panel superior ADB
   bool _hasAdbServerField = false;
   int? _adbServerStatusId;
@@ -338,6 +339,19 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           _autoCalculateRelatedDistances(entry.id, entry.name);
           _autoCalculateRelatedHeadquarterWeights(entry.id, entry.name);
         }
+
+        // Auto-guardar visita en SQLite al recibir cada tag
+        final tagContent = payload['tagContent'] as String? ?? '';
+        if (tagContent.isNotEmpty) {
+          final allServerStatuses = allStatuses.where((s) =>
+              (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() ==
+              'tag-transfer-adb-server');
+          for (final s in allServerStatuses) {
+            final id = getJsonField(s, r'''$.id_activity_status''') as int?;
+            if (id == null) continue;
+            unawaited(_autoSaveVisitFromAdbTag(id, tagContent));
+          }
+        }
       });
       AdbNfcBridgeService.instance.start().then((_) {
         if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
@@ -350,6 +364,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       });
       AdbNfcClientService.instance.connect().then((connected) {
         if (mounted) setState(() => _adbClientConnected = connected);
+      });
+      // Responder solicitudes de geolocalización del servidor Windows
+      _adbServerCommandSub = AdbNfcClientService.instance.onServerCommand.listen((cmd) {
+        if (cmd['type'] == 'request_geo_location') {
+          final geoList = FFAppState().geoLocationsList;
+          if (geoList.isEmpty) return;
+          final latest = geoList.reduce((a, b) =>
+              (a.dateHourRead?.isAfter(b.dateHourRead ?? DateTime(0)) ?? false) ? a : b);
+          AdbNfcClientService.instance.sendGeoLocation(
+            latitude: latest.latitude,
+            longitude: latest.longitude,
+            altitude: latest.altitude,
+            errorHorizontal: latest.errorHorizontal,
+          );
+        }
       });
     }
   }
@@ -576,6 +605,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     _adbStatusSub?.cancel();
     _adbTagSub?.cancel();
     _adbClientConnSub?.cancel();
+    _adbServerCommandSub?.cancel();
     if (Platform.isWindows) {
       AdbNfcBridgeService.instance.stop();
     } else {
@@ -2940,7 +2970,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               final bool alwaysWhiteIcon = isTagTransferType ||
                   isTagTransferAdbServerType ||
                   typeStatus.toLowerCase() == 'tag-transfer-adb-from' ||
-                  isDistanceExtractorType;
+                  isDistanceExtractorType ||
+                  isLabelInfoType;
               final Color iconColor = (active || alwaysWhiteIcon) ? Colors.white : const Color(0xFFB45309);
               IconData iconData;
               if (isDateType) {
@@ -3081,7 +3112,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                         fontFamily: 'Roboto',
                                         fontSize: (typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time') ? 13 : 19,
                                         fontWeight: FontWeight.w800,
-                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isDistanceExtractorType)
+                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isDistanceExtractorType || isLabelInfoType)
                                                 ? Colors.white
                                                 : ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                                                             !isTagWriterType &&
@@ -6722,6 +6753,296 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
       return false;
     }
+  }
+
+  // ============================================================================
+  // AUTO-GUARDADO AL RECIBIR TAG ADB (tag-transfer-adb-server)
+  // ============================================================================
+
+  /// Guarda automáticamente una visita en SQLite cada vez que se recibe un tag
+  /// desde Android vía el puente ADB. No limpia visitDetails (el usuario puede
+  /// seguir usando el formulario y generar más visitas).
+  Future<void> _autoSaveVisitFromAdbTag(int adbStatusId, String rawTagJson) async {
+    try {
+      debugPrint('💾 ===== AUTO-GUARDANDO VISITA DESDE ADB TAG (statusId=$adbStatusId) =====');
+      final currentActivity = FFAppState().currentActivity;
+      final idActivity = getJsonField(currentActivity, r'$.id_activity');
+      final userSelected = FFAppState().userSelected;
+      final deviceDefault = FFAppState().deviceDefault;
+
+      // 1. GPS: solicitar a Android vía ADB (Windows) o usar FFAppState (Android)
+      Map<String, dynamic>? geoData;
+      if (Platform.isWindows) {
+        geoData = await AdbNfcBridgeService.instance.requestAndWaitGeoLocation();
+      }
+      if (geoData == null) {
+        final geoList = FFAppState().geoLocationsList;
+        if (geoList.isNotEmpty) {
+          final latest = geoList.reduce((a, b) =>
+              (a.dateHourRead?.isAfter(b.dateHourRead ?? DateTime(0)) ?? false) ? a : b);
+          geoData = {
+            'latitude': latest.latitude,
+            'longitude': latest.longitude,
+            'altitude': latest.altitude,
+            'errorHorizontal': latest.errorHorizontal,
+          };
+        }
+      }
+      final lat = (geoData?['latitude'] as num?)?.toDouble() ?? 0.0;
+      final lon = (geoData?['longitude'] as num?)?.toDouble() ?? 0.0;
+      final alt = (geoData?['altitude'] as num?)?.toDouble() ?? 0.0;
+      final errH = (geoData?['errorHorizontal'] as num?)?.toDouble() ?? 0.0;
+      debugPrint('📍 GPS obtenido: lat=$lat, lon=$lon');
+
+      // 2. Parsear rawTagJson → RFID del tag destino (tag_from en Read_info)
+      String tagFromRfid = '';
+      try {
+        final decoded = jsonDecode(rawTagJson) as Map<String, dynamic>;
+        tagFromRfid = ((decoded['Read_info'] as Map?)?['tag_from'] as String? ?? '').trim();
+      } catch (_) {}
+      debugPrint('🏷️  Tag destino RFID: "$tagFromRfid"');
+
+      final dbPath = FFAppState().pathDatabase;
+      final database = await openDatabase(dbPath);
+
+      // 3. Id_product desde Products WHERE Rfid = tag_from
+      int idProduct = 0;
+      if (tagFromRfid.isNotEmpty) {
+        final rows = await database.rawQuery(
+            'SELECT Id_product FROM Products WHERE Rfid = ? LIMIT 1', [tagFromRfid]);
+        if (rows.isNotEmpty) idProduct = (rows.first['Id_product'] as int?) ?? 0;
+      }
+      debugPrint('📦 Id_product: $idProduct');
+
+      // 4. Coordenadas de referencia para VP: usar Products_coordinates del producto destino
+      double refLat = lat, refLon = lon;
+      if (idProduct > 0) {
+        final coordRows = await database.rawQuery(
+            'SELECT Latitude, Longitude FROM Products_coordinates WHERE Id_product = ? LIMIT 1',
+            [idProduct]);
+        if (coordRows.isNotEmpty) {
+          refLat = (coordRows.first['Latitude'] as num?)?.toDouble() ?? lat;
+          refLon = (coordRows.first['Longitude'] as num?)?.toDouble() ?? lon;
+        }
+      }
+
+      // 5. Id_virtual_point: punto virtual más cercano a las coordenadas de referencia
+      int idVirtualPoint = 0;
+      final vpRows = await database.rawQuery(
+          'SELECT Id_virtual_point, Latitude, Longitude FROM Virtual_points '
+          'WHERE Latitude IS NOT NULL AND Longitude IS NOT NULL');
+      double minVpDist = double.infinity;
+      for (final vp in vpRows) {
+        final vpLat = (vp['Latitude'] as num?)?.toDouble() ?? 0.0;
+        final vpLon = (vp['Longitude'] as num?)?.toDouble() ?? 0.0;
+        if (vpLat == 0.0 && vpLon == 0.0) continue;
+        final d = _calcHaversineAdb(refLat, refLon, vpLat, vpLon);
+        if (d < minVpDist) {
+          minVpDist = d;
+          idVirtualPoint = (vp['Id_virtual_point'] as int?) ?? 0;
+        }
+      }
+      debugPrint('📌 Id_virtual_point: $idVirtualPoint (dist: ${minVpDist.toStringAsFixed(0)} m)');
+
+      // 6. Id_headquarter por verificación de polígono
+      int idHeadquarter = 0;
+      final hqList = FFAppState().headquartersSelectedList;
+      if (hqList.isNotEmpty) {
+        if (lat != 0.0 || lon != 0.0) {
+          final check = await actions.checkLocationInPolygons(lat, lon, hqList);
+          idHeadquarter = check.insideHeadquarter?.idHeadquarter
+              ?? (check.nearestList.isNotEmpty
+                  ? check.nearestList.first.headquarter.idHeadquarter
+                  : hqList.first.idHeadquarter);
+        } else {
+          idHeadquarter = hqList.first.idHeadquarter;
+        }
+      }
+      debugPrint('🏢 Id_headquarter: $idHeadquarter');
+
+      // 7. Construir lista de Visits_details desde el estado actual del formulario
+      final detailsToInsert = _buildAllVisitDetails(adbStatusId, rawTagJson);
+
+      // 8. Insertar Visits + Visits_details en una transacción
+      int visitId = 0;
+      await database.transaction((txn) async {
+        visitId = await txn.rawInsert('''
+          INSERT INTO Visits (
+            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+            Id_user, Id_device, Id_status, Created_at, Battery,
+            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
+          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ''', [
+          userSelected.idCompany,
+          idActivity,
+          idHeadquarter,
+          idProduct,
+          0,
+          userSelected.idUser,
+          deviceDefault.idDevice,
+          0,
+          DateTime.now().toIso8601String(),
+          100,
+          lat,
+          lon,
+          alt,
+          errH,
+          idVirtualPoint > 0 ? idVirtualPoint : null,
+          0,
+          tagFromRfid.isNotEmpty ? tagFromRfid : null,
+        ]);
+
+        debugPrint('✅ Visita ADB creada con ID: $visitId');
+
+        int insertedDetails = 0;
+        for (final d in detailsToInsert) {
+          final statusCheck = await txn.rawQuery(
+              'SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?',
+              [d['id_activity_status']]);
+          if (statusCheck.isEmpty) continue;
+          await txn.rawInsert(
+              'INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response) '
+              'VALUES (?,?,?,?)',
+              [visitId, d['id_activity_status'], d['status_option'], d['status_response']]);
+          insertedDetails++;
+        }
+        debugPrint('✅ $insertedDetails detalles de visita insertados');
+      });
+
+      await database.close();
+
+      FFAppState().update(() => FFAppState().visitCount = FFAppState().visitCount + 1);
+      debugPrint('✅ Auto-visita ADB guardada exitosamente. ID: $visitId');
+      unawaited(actions.announceVisitVoice());
+    } catch (e) {
+      debugPrint('❌ _autoSaveVisitFromAdbTag error: $e');
+    }
+  }
+
+  /// Construye la lista de detalles a insertar en Visits_details recopilando
+  /// los valores actuales de todos los status del formulario.
+  List<Map<String, dynamic>> _buildAllVisitDetails(int adbStatusId, String rawTagJson) {
+    final now = DateTime.now();
+    final results = <Map<String, dynamic>>[];
+
+    // Recolectar todos los statuses: raíz + dentro de cada step
+    final List<dynamic> allStatuses = [..._cachedActivityStatus];
+    for (final step in _cachedActivitySteps) {
+      final stepStatuses = getJsonField(step, r'$.activities_status');
+      if (stepStatuses is List) allStatuses.addAll(stepStatuses);
+    }
+
+    for (final s in allStatuses) {
+      final typeStatus =
+          (getJsonField(s, r'$.type_status')?.toString() ?? '').toLowerCase();
+      final statusId = getJsonField(s, r'$.id_activity_status') as int?;
+      final statusName = getJsonField(s, r'$.status_name')?.toString() ?? '';
+      final defaultStatus =
+          getJsonField(s, r'$.default_status')?.toString() ?? '';
+      if (statusId == null) continue;
+
+      final statusResponse = _buildStatusResponse(
+        typeStatus: typeStatus,
+        statusId: statusId,
+        statusName: statusName,
+        defaultStatus: defaultStatus,
+        adbStatusId: adbStatusId,
+        rawTagJson: rawTagJson,
+        now: now,
+      );
+
+      if (statusResponse == null) continue;
+
+      results.add({
+        'id_activity_status': statusId,
+        'status_option': statusName,
+        'status_response': statusResponse,
+      });
+    }
+    return results;
+  }
+
+  /// Genera el status_response apropiado para cada tipo de campo del formulario.
+  /// Retorna null si el tipo no tiene valor disponible aún (se omite ese detalle).
+  String? _buildStatusResponse({
+    required String typeStatus,
+    required int statusId,
+    required String statusName,
+    required String defaultStatus,
+    required int adbStatusId,
+    required String rawTagJson,
+    required DateTime now,
+  }) {
+    String pad2(int v) => v.toString().padLeft(2, '0');
+
+    switch (typeStatus) {
+      case 'date':
+        return '${pad2(now.day)}/${pad2(now.month)}/${now.year}';
+
+      case 'time':
+        return '${pad2(now.hour)}:${pad2(now.minute)}:${pad2(now.second)}';
+
+      case 'tag-transfer-adb-server':
+        final cards = _adbServerCardsRawJson[statusId];
+        if (cards != null && cards.isNotEmpty) return cards.last;
+        if (statusId == adbStatusId) return rawTagJson;
+        return null;
+
+      case 'number':
+        final detail = FFAppState()
+            .visitDetails
+            .where((d) => d.idActivityStatus == statusId)
+            .firstOrNull;
+        if (detail != null && detail.statusResponse.isNotEmpty) {
+          return detail.statusResponse;
+        }
+        final text = _textControllers[statusId]?.text ?? '';
+        return text.isNotEmpty ? text : null;
+
+      case 'numbers-operation':
+        return _calculatedValues[statusId]?.toStringAsFixed(2);
+
+      case 'label-info':
+        final text = defaultStatus.startsWith('=')
+            ? defaultStatus.substring(1)
+            : defaultStatus;
+        return text.isNotEmpty ? text : (statusName.isNotEmpty ? statusName : null);
+
+      case 'distance-extractor':
+        if (!(_distanceExtractorCalculated[statusId] ?? false)) return null;
+        return jsonEncode({
+          'distanceFromTag': _calculatedDistances[statusId] ?? 0.0,
+          'distancesFromProducts': _calculatedDistancesFromProduct[statusId] ?? [],
+        });
+
+      case 'headquarter-weight':
+        final hwData = _calculatedHeadquarterWeights[statusId];
+        return hwData != null ? jsonEncode(hwData) : null;
+
+      default:
+        // Para tipos no listados buscar en visitDetails
+        final detail = FFAppState()
+            .visitDetails
+            .where((d) => d.idActivityStatus == statusId)
+            .firstOrNull;
+        if (detail != null && detail.statusResponse.isNotEmpty) {
+          return detail.statusResponse;
+        }
+        return null;
+    }
+  }
+
+  /// Fórmula de Haversine para uso interno del auto-guardado ADB.
+  double _calcHaversineAdb(double lat1, double lon1, double lat2, double lon2) {
+    const R = 6371000.0;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLon = (lon2 - lon1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) *
+            math.cos(lat2 * math.pi / 180) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
 
   void _updateNumberValue(
