@@ -395,6 +395,9 @@ class CompassVoiceController {
     }
   }
 
+  /// Habla un mensaje inmediatamente (sin cooldown ni cola).
+  Future<void> speakNow(String text) => _tts.speakImmediately(text);
+
   Future<void> dispose() async {
     await _tts.dispose();
   }
@@ -797,6 +800,97 @@ class _CompassClickpalmState extends State<CompassClickpalm>
   }
 
   // ──────────────────────────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────────────────────────
+  // FAB — "¿Dónde estoy?" con voz
+  // ──────────────────────────────────────────────────────────────────────────
+
+  bool _isAnnouncingLocation = false;
+
+  /// Encuentra el punto más cercano entre todas las direcciones cardinales
+  /// y lo anuncia por voz.
+  Future<void> _announceCurrentLocation() async {
+    if (_isAnnouncingLocation) return;
+    setState(() => _isAnnouncingLocation = true);
+
+    try {
+      // Buscar el punto más cercano entre los 4 cardinales
+      CardinalDirection? nearest;
+      for (final dir in _cardinalDirections.values) {
+        if (dir.point == null) continue;
+        if (nearest == null || dir.distanceMeters < nearest.distanceMeters) {
+          nearest = dir;
+        }
+      }
+
+      String message;
+      if (nearest?.point != null) {
+        final p = nearest!.point!;
+        final dist = nearest.distanceMeters.round();
+        message = 'Ubicación actual: Línea ${p.lineNumber}, '
+                  'Palma ${p.pointNumber}, a $dist metros al ${_directionName(nearest.direction)}';
+      } else {
+        message = 'No se detectan palmas cercanas';
+      }
+
+      await _voiceController.speakNow(message);
+    } finally {
+      if (mounted) setState(() => _isAnnouncingLocation = false);
+    }
+  }
+
+  String _directionName(String dir) {
+    switch (dir) {
+      case 'N': return 'Norte';
+      case 'S': return 'Sur';
+      case 'E': return 'Este';
+      case 'O': return 'Oeste';
+      default:  return dir;
+    }
+  }
+
+  Widget _buildWhereAmIButton() {
+    return GestureDetector(
+      onTap: _announceCurrentLocation,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        width: 56,
+        height: 56,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: _isAnnouncingLocation
+              ? const Color(0xFF00E676).withOpacity(0.3)
+              : const Color(0xFF00E676).withOpacity(0.15),
+          border: Border.all(
+            color: const Color(0xFF00E676).withOpacity(0.7),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF00E676).withOpacity(0.3),
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: _isAnnouncingLocation
+            ? const Center(
+                child: SizedBox(
+                  width: 22, height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Color(0xFF00E676),
+                  ),
+                ),
+              )
+            : const Icon(
+                Icons.record_voice_over_rounded,
+                color: Color(0xFF00E676),
+                size: 26,
+              ),
+      ),
+    );
+  }
+
   // UI — DARK TACTICAL HUD
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -811,27 +905,37 @@ class _CompassClickpalmState extends State<CompassClickpalm>
     if (_isLoading) return _buildLoadingState();
     if (_errorMessage != null) return _buildErrorState();
 
-    return Container(
-      width:  widget.width  ?? double.infinity,
-      height: widget.height ?? double.infinity,
-      decoration: const BoxDecoration(
-        gradient: RadialGradient(
-          center: Alignment.center,
-          radius: 1.2,
-          colors: [_kBg1, _kBg2],
-        ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            _buildHeader(),
-            Expanded(
-              child: Center(child: _buildCompassCircle()),
+    return Stack(
+      children: [
+        Container(
+          width:  widget.width  ?? double.infinity,
+          height: widget.height ?? double.infinity,
+          decoration: const BoxDecoration(
+            gradient: RadialGradient(
+              center: Alignment.center,
+              radius: 1.2,
+              colors: [_kBg1, _kBg2],
             ),
-            _buildLocationBar(),
-          ],
+          ),
+          child: SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: Center(child: _buildCompassCircle()),
+                ),
+                _buildLocationBar(),
+              ],
+            ),
+          ),
         ),
-      ),
+        // FAB — "¿Dónde estoy?"
+        Positioned(
+          bottom: 24,
+          right: 24,
+          child: _buildWhereAmIButton(),
+        ),
+      ],
     );
   }
 

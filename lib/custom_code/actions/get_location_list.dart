@@ -26,6 +26,7 @@ import 'package:path/path.dart' as path;
 import 'dart:io';
 import 'package:battery_plus/battery_plus.dart';
 import '/backend/sqlite/global_db_singleton.dart';
+import '/custom_code/actions/enriched_geo_buffer.dart';
 
 /// Vector 3D simple para cálculos IMU
 class Vector3 {
@@ -1705,7 +1706,22 @@ Future<void> getLocationList(BuildContext context) async {
           dateHourRead: DateTime.now(),
         );
 
-        // debugPrint('📍 Struct creada: lat=${filteredGeo.y.toStringAsFixed(6)}, lon=${filteredGeo.x.toStringAsFixed(6)}, speed=${filteredSpeed.toStringAsFixed(2)}m/s'); // SILENCIADO - funcionando correctamente
+        // Alimentar buffer enriquecido con datos completos del UKF/IMU
+        EnrichedGeoBuffer().add(EnrichedGeoPoint(
+          latitude: filteredGeo.y,
+          longitude: filteredGeo.x,
+          altitude: filteredAlt,
+          errorHorizontal: finalError,
+          timestamp: DateTime.now(),
+          speed: filteredSpeed,
+          heading: gpsHeading,
+          acceleration: currentAccel,
+          isStatic: movementDetector.isCurrentlyStatic(),
+          vx: ukfState['vx']!,
+          vy: ukfState['vy']!,
+          ukfPositionError: baseError,
+          isBrushChange: imuIntegrator.isBrushChange,
+        ));
 
         // NUEVA OPTIMIZACION CON SQFLITE DIRECTAMENTE
         // Configuración: Insertar cada 1 minuto (60 segundos / 1.5 segundos por lectura = ~40 registros)
@@ -1734,55 +1750,47 @@ Future<void> getLocationList(BuildContext context) async {
             // Obtener nivel de batería desde caché (se actualiza cada minuto)
             final batteryLevel = await batteryCache.getBatteryLevel();
 
+            // Depurar geolocalizaciones antes de insertar (agrupar puntos dentro de 2m)
+            final depurados = _depurarGeolocalizaciones(toSave, filteredSpeed, batteryLevel);
+
             // Ejecutar operación SQLite asíncrona (sin bloqueo)
             await DatabaseManager.executeOperation<void>((database) async {
-              // Preparar batch para inserción múltiple
               final Batch batch = database.batch();
 
-              for (ReadGeoStruct location in toSave) {
-                double lat = location.latitude ?? 0.0;
-                double lon = location.longitude ?? 0.0;
-                double alt = location.altitude ?? 0.0;
-                double err = location.errorHorizontal ?? 0.0;
-                String date = location.dateHourRead?.toIso8601String() ??
-                    DateTime.now().toIso8601String();
-
-                // Usar INSERT OR IGNORE para prevenir duplicados basados en CreatedAt
+              for (final loc in depurados) {
                 batch.rawInsert('''
                 INSERT OR IGNORE INTO Location_tracking
-                (Id_company, Imei, Latitude, Longitude, Altitude, HorizontalError, Speed, Battery, CreatedAt, SyncedAt, batch_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (Id_company, Imei, Latitude, Longitude, Altitude, HorizontalError,
+                 Speed, Battery, CreatedAt, SyncedAt, batch_id,
+                 date_start, date_finish, evaluated_radius, point_count,
+                 Id_user, Id_activity)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ''', [
-                  0, // Id_company
-                  '', // Imei
-                  lat,
-                  lon,
-                  alt,
-                  err,
-                  filteredSpeed,
-                  batteryLevel,
-                  date,
-                  date,
-                  null, // batch_id
+                  loc['Id_company'],
+                  loc['Imei'],
+                  loc['Latitude'],
+                  loc['Longitude'],
+                  loc['Altitude'],
+                  loc['HorizontalError'],
+                  loc['Speed'],
+                  loc['Battery'],
+                  loc['CreatedAt'],
+                  loc['SyncedAt'],
+                  loc['batch_id'],
+                  loc['date_start'],
+                  loc['date_finish'],
+                  loc['evaluated_radius'],
+                  loc['point_count'],
+                  loc['Id_user'],
+                  loc['Id_activity'],
                 ]);
               }
 
-              // Ejecutar batch y obtener resultados
               final results = await batch.commit(noResult: false);
-
-              // Contar cuántas se insertaron realmente (las que no fueron duplicadas)
               int insertedCount =
                   results.whereType<int>().where((id) => id > 0).length;
-              int duplicatesIgnored = toSave.length - insertedCount;
-
-              // Logs comentados - muy verbosos en producción
-              // if (duplicatesIgnored > 0) {
-              //   debugPrint(
-              //       '✅ Guardadas $insertedCount/${toSave.length} geolocalizaciones en SQLite ($duplicatesIgnored duplicados ignorados) (batería: $batteryLevel%, velocidad: ${filteredSpeed.toStringAsFixed(2)}m/s)');
-              // } else {
-              //   debugPrint(
-              //       '✅ Guardadas ${toSave.length} geolocalizaciones en Location_tracking SQLite (batería: $batteryLevel%, velocidad: ${filteredSpeed.toStringAsFixed(2)}m/s)');
-              // }
+              debugPrint(
+                  '💾 $insertedCount/${depurados.length} registros depurados insertados en SQLite (de ${toSave.length} puntos originales)');
             });
 
             // Actualizar el estado con solo los registros recientes (con throttling)
@@ -1831,6 +1839,121 @@ Future<void> getLocationList(BuildContext context) async {
   );
 
   debugPrint('✅ Listener de posiciones GPS registrado correctamente');
+}
+
+// ============================================================================
+// DEPURACIÓN DE GEOLOCALIZACIONES (agrupación por proximidad de 2m)
+// ============================================================================
+
+/// Depura geolocalizaciones agrupando puntos dentro de un radio de 2 metros.
+/// Produce registros consolidados con centroide, radio evaluado y conteo de puntos.
+List<Map<String, dynamic>> _depurarGeolocalizaciones(
+    List<ReadGeoStruct> locations, double speed, int battery) {
+  if (locations.isEmpty) return [];
+
+  if (locations.length == 1) {
+    return [_crearRegistroDepurado([locations.first], speed, battery)];
+  }
+
+  const double radioUmbral = 2.0; // metros
+  final List<Map<String, dynamic>> resultado = [];
+
+  // Ordenar por fecha
+  final sortedLocations = List<ReadGeoStruct>.from(locations)
+    ..sort((a, b) => (a.dateHourRead ?? DateTime.now())
+        .compareTo(b.dateHourRead ?? DateTime.now()));
+
+  // Agrupar puntos consecutivos dentro del radio umbral
+  List<ReadGeoStruct> grupoActual = [sortedLocations.first];
+
+  for (int i = 1; i < sortedLocations.length; i++) {
+    final puntoActual = sortedLocations[i];
+    final centroide = _calcularCentroide(grupoActual);
+
+    final distancia = _haversineDistanceDepuracion(
+      centroide['lat']!, centroide['lon']!,
+      puntoActual.latitude, puntoActual.longitude,
+    );
+
+    if (distancia <= radioUmbral) {
+      grupoActual.add(puntoActual);
+    } else {
+      resultado.add(_crearRegistroDepurado(grupoActual, speed, battery));
+      grupoActual = [puntoActual];
+    }
+  }
+
+  if (grupoActual.isNotEmpty) {
+    resultado.add(_crearRegistroDepurado(grupoActual, speed, battery));
+  }
+
+  return resultado;
+}
+
+Map<String, double> _calcularCentroide(List<ReadGeoStruct> puntos) {
+  double sumLat = 0, sumLon = 0;
+  for (final p in puntos) {
+    sumLat += p.latitude;
+    sumLon += p.longitude;
+  }
+  return {'lat': sumLat / puntos.length, 'lon': sumLon / puntos.length};
+}
+
+Map<String, dynamic> _crearRegistroDepurado(
+    List<ReadGeoStruct> grupo, double speed, int battery) {
+  final centroide = _calcularCentroide(grupo);
+  final int count = grupo.length;
+
+  double sumAlt = 0, sumErr = 0;
+  for (final p in grupo) {
+    sumAlt += p.altitude;
+    sumErr += p.errorHorizontal;
+  }
+
+  // Radio máximo: distancia del centroide al punto más lejano
+  double maxRadius = 0.0;
+  for (final p in grupo) {
+    final dist = _haversineDistanceDepuracion(
+      centroide['lat']!, centroide['lon']!, p.latitude, p.longitude,
+    );
+    if (dist > maxRadius) maxRadius = dist;
+  }
+
+  final dateStart = grupo.first.dateHourRead ?? DateTime.now();
+  final dateFinish = grupo.last.dateHourRead ?? DateTime.now();
+
+  return {
+    'Id_company': FFAppState().companyDefault.idCompany,
+    'Imei': FFAppState().deviceDefault.imeI1,
+    'Latitude': centroide['lat'],
+    'Longitude': centroide['lon'],
+    'Altitude': sumAlt / count,
+    'HorizontalError': sumErr / count,
+    'Speed': speed,
+    'Battery': battery,
+    'CreatedAt': dateStart.toIso8601String(),
+    'SyncedAt': DateTime.now().toIso8601String(),
+    'batch_id': null,
+    'date_start': dateStart.toIso8601String(),
+    'date_finish': dateFinish.toIso8601String(),
+    'evaluated_radius': maxRadius,
+    'point_count': count,
+    'Id_user': FFAppState().userSelected.idUser,
+    'Id_activity': FFAppState().activitySelected.idActivity,
+  };
+}
+
+double _haversineDistanceDepuracion(
+    double lat1, double lon1, double lat2, double lon2) {
+  const double R = 6371000.0;
+  final double lat1Rad = lat1 * pi / 180;
+  final double lat2Rad = lat2 * pi / 180;
+  final double dLat = (lat2 - lat1) * pi / 180;
+  final double dLon = (lon2 - lon1) * pi / 180;
+  final double a = (sin(dLat / 2) * sin(dLat / 2)) +
+      (cos(lat1Rad) * cos(lat2Rad) * sin(dLon / 2) * sin(dLon / 2));
+  final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
+  return R * c;
 }
 
 /// Obtener ruta de la base de datos usando el mismo patrón de los otros archivos

@@ -18,6 +18,7 @@ import '/custom_code/actions/calculate_current_headquarter.dart'
     show checkLocationInPolygons, HeadquarterDistance;
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
+import '/custom_code/actions/enriched_geo_buffer.dart';
 
 // ============================================================================
 // MODELO DE DATOS GPS
@@ -125,6 +126,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
   // GPS Points
   List<GPSPoint> _gpsPoints = [];
+  OptimalPosition? _optimalPosition;
   int _retryAttempts = 0;
   static const int _maxRetryAttempts = 3;
 
@@ -308,7 +310,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
   /// Obtiene puntos válidos desde AppState con un umbral de error configurable.
   Future<List<GPSPoint>> _getValidPointsFromAppState({double maxError = _maxHorizontalError}) async {
-    final geoList = FFAppState().geoLocationsList;
+    final geoList = List<ReadGeoStruct>.from(FFAppState().geoLocationsList);
     if (geoList.isEmpty) return [];
 
     int batteryLevel = 100;
@@ -357,6 +359,13 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     }
   }
 
+  /// Calcula posición óptima desde el buffer enriquecido (últimos 60s de datos con speed/heading/accel).
+  OptimalPosition? _computeOptimalFromBuffer() {
+    final points = EnrichedGeoBuffer().getLastSeconds(60);
+    if (points.length < 3) return null;
+    return OptimalPositionCalculator.compute(points);
+  }
+
   Future<void> _checkGPSPoints() async {
     debugPrint('🌐🌐🌐 INICIO DE _checkGPSPoints()');
 
@@ -367,6 +376,17 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     });
 
     try {
+      // ── PASO 0: Buffer enriquecido (posición óptima calculada) ─────────────
+      debugPrint('📍 PASO 0: Calculando posición óptima desde buffer enriquecido...');
+      _optimalPosition = _computeOptimalFromBuffer();
+      if (_optimalPosition != null) {
+        debugPrint('✅ RUTA 0 (EnrichedBuffer): método=${_optimalPosition!.method}, '
+            'puntos=${_optimalPosition!.pointsUsed}, rechazados=${_optimalPosition!.pointsRejected}, '
+            'error=${_optimalPosition!.errorHorizontal.toStringAsFixed(2)}m');
+      } else {
+        debugPrint('⚠️ Buffer enriquecido insuficiente (<3 puntos), usando flujo estándar');
+      }
+
       // ── PASO 1: AppState inmediato ──────────────────────────────────────────
       debugPrint('📍 PASO 1: Revisando AppState...');
       _gpsPoints = await _getValidPointsFromAppState();
@@ -636,7 +656,26 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         throw Exception('ID de actividad no encontrado');
       }
 
-      final mainGPSPoint = _gpsPoints.first;
+      // Usar posición óptima del buffer enriquecido si está disponible,
+      // sino caer al primer punto de la lista (comportamiento original)
+      final GPSPoint mainGPSPoint;
+      if (_optimalPosition != null) {
+        mainGPSPoint = GPSPoint(
+          latitude: _optimalPosition!.latitude,
+          longitude: _optimalPosition!.longitude,
+          altitude: _optimalPosition!.altitude,
+          horizontalError: _optimalPosition!.errorHorizontal,
+          createdAt: DateTime.now().toUtc(),
+          battery: _gpsPoints.first.battery,
+        );
+        debugPrint('🎯 Usando posición ÓPTIMA (${_optimalPosition!.method}): '
+            'lat=${mainGPSPoint.latitude.toStringAsFixed(8)}, '
+            'lon=${mainGPSPoint.longitude.toStringAsFixed(8)}, '
+            'err=${mainGPSPoint.horizontalError.toStringAsFixed(2)}m');
+      } else {
+        mainGPSPoint = _gpsPoints.first;
+        debugPrint('⚠️ Sin posición óptima, usando primer punto de AppState');
+      }
 
       late Directory baseDir;
       if (Platform.isAndroid) {
@@ -653,7 +692,35 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
       // Obtener el Id_headquarter verificando polígonos
       int idHeadquarter = 0;
-      final headquartersList = FFAppState().headquartersSelectedList;
+      List<HeadquartersStruct> headquartersList = FFAppState().headquartersSelectedList;
+
+      // Si no hay lotes seleccionados, cargar TODOS los lotes de la compañía desde SQLite
+      if (headquartersList.isEmpty) {
+        debugPrint('⚠️ No hay lotes seleccionados, cargando todos los lotes desde SQLite...');
+        try {
+          final idCompany = FFAppState().userSelected.idCompany;
+          final rows = await database.rawQuery('''
+            SELECT
+              h.Id_headquarter       AS id_headquarter,
+              h.Id_zone              AS id_zone,
+              h.Created_at           AS created_at,
+              h.Name_headquarter     AS name_headquarter,
+              h.Density_headquarter  AS density_headquarter,
+              h.Seed_time            AS seed_time,
+              h.State_headquarter    AS state_headquarter,
+              h.Area_headquarter     AS area_headquarter,
+              h.Polygon              AS polygon
+            FROM Headquarters h
+            JOIN Zones z ON h.Id_zone = z.Id_zone
+            WHERE z.Id_company = ?
+            ORDER BY h.Name_headquarter ASC
+          ''', [idCompany]);
+          headquartersList = rows.map((map) => HeadquartersStruct.fromMap(map)).toList();
+          debugPrint('📍 Cargados ${headquartersList.length} lotes desde SQLite');
+        } catch (e) {
+          debugPrint('❌ Error cargando lotes desde SQLite: $e');
+        }
+      }
 
       if (headquartersList.isNotEmpty) {
         final checkResult = await checkLocationInPolygons(
@@ -666,24 +733,20 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
           // Dentro de un polígono → asignar automáticamente
           idHeadquarter = checkResult.insideHeadquarter!.idHeadquarter;
           debugPrint('✅ Dentro del polígono del lote: ${checkResult.insideHeadquarter!.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (headquartersList.length == 1) {
+          // Solo 1 lote seleccionado y está fuera → asignar automáticamente el único disponible
+          idHeadquarter = headquartersList.first.idHeadquarter;
+          debugPrint('✅ Solo 1 lote disponible, asignando automáticamente: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
         } else {
-          // Fuera de todos los polígonos → mostrar diálogo de selección
+          // Fuera de todos los polígonos con múltiples lotes → mostrar diálogo de selección
           debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
           if (!mounted) return;
           final selected = await _showSelectLotDialog(context, checkResult.nearestList);
-          if (selected == null) {
-            // Usuario canceló → abortar guardado
-            setState(() {
-              _isProcessing = false;
-              _statusMessage = 'Guardado cancelado';
-            });
-            return;
-          }
           idHeadquarter = selected.idHeadquarter;
-          debugPrint('✅ Lote seleccionado por usuario: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
+          debugPrint('✅ Lote asignado: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
         }
       } else {
-        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
+        debugPrint('⚠️ No hay lotes disponibles en la base de datos, Id_headquarter será 0');
       }
 
       int visitId = 0;
@@ -726,19 +789,15 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
         debugPrint('✅ $insertedCount detalles de visita insertados');
 
-        final now = DateTime.now().toUtc();
-        final sixSecondsAgo = now.subtract(const Duration(seconds: 6));
-        final recentPoints = _gpsPoints
-            .where((point) => point.createdAt.isAfter(sixSecondsAgo))
-            .toList();
-        recentPoints.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-        List<GPSPoint> pointsToSave = recentPoints.take(10).toList();
+        // Usar todos los puntos disponibles (ordenados por calidad: menor error primero),
+        // en vez de solo los últimos 6 segundos, para aprovechar el historial completo
+        final allSorted = List<GPSPoint>.from(_gpsPoints)
+          ..sort((a, b) => a.horizontalError.compareTo(b.horizontalError));
+        List<GPSPoint> pointsToSave = allSorted.take(10).toList();
 
-        // Fallback: si no hay puntos recientes, usar el más reciente disponible
+        // Fallback: si no hay puntos, usar el más reciente disponible
         if (pointsToSave.isEmpty && _gpsPoints.isNotEmpty) {
-          final allSorted = List<GPSPoint>.from(_gpsPoints)
-            ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
-          pointsToSave = [allSorted.last];
+          pointsToSave = [_gpsPoints.last];
         }
 
         for (var gpsPoint in pointsToSave) {
@@ -782,168 +841,32 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     }
   }
 
-  /// Muestra un bottom sheet elegante para que el usuario seleccione
-  /// el lote cuando la ubicación cae fuera de todos los polígonos.
-  Future<HeadquartersStruct?> _showSelectLotDialog(
+  /// Muestra un bottom sheet para que el usuario seleccione el lote.
+  /// Se cierra automáticamente después de 4 segundos asignando el más cercano.
+  /// Retorna el lote seleccionado (nunca null - siempre asigna el más cercano como fallback).
+  Future<HeadquartersStruct> _showSelectLotDialog(
     BuildContext context,
     List<HeadquarterDistance> nearestList,
   ) async {
-    return showModalBottomSheet<HeadquartersStruct>(
+    // El más cercano siempre es el primero (lista ordenada por distancia)
+    final nearestHq = nearestList.first.headquarter;
+
+    final selected = await showModalBottomSheet<HeadquartersStruct>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       isDismissible: false,
       enableDrag: false,
       builder: (ctx) {
-        return Container(
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).primaryBackground,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle bar
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade400,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              // Ícono y título
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  Icons.location_searching_rounded,
-                  color: FlutterFlowTheme.of(context).primary,
-                  size: 36,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                '¿En cuál lote estás?',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: FlutterFlowTheme.of(context).primaryText,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Tu ubicación está fuera de los polígonos registrados.\nSelecciona el lote más cercano:',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 13,
-                  color: FlutterFlowTheme.of(context).secondaryText,
-                ),
-              ),
-              const SizedBox(height: 16),
-              // Lista de lotes cercanos
-              ...nearestList.asMap().entries.map((entry) {
-                final index = entry.key;
-                final item = entry.value;
-                final distLabel = item.distanceMeters == double.infinity
-                    ? 'Sin distancia'
-                    : item.distanceMeters < 1000
-                        ? '${item.distanceMeters.toStringAsFixed(0)} m'
-                        : '${(item.distanceMeters / 1000).toStringAsFixed(2)} km';
-                final colors = [
-                  Colors.green.shade600,
-                  Colors.orange.shade600,
-                  Colors.red.shade400,
-                ];
-                final color = colors[index.clamp(0, 2)];
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(16),
-                    onTap: () => Navigator.pop(ctx, item.headquarter),
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        border: Border.all(
-                          color: color.withOpacity(0.4),
-                          width: 1.5,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        color: color.withOpacity(0.06),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: color.withOpacity(0.15),
-                            ),
-                            child: Center(
-                              child: Text(
-                                '${index + 1}',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontWeight: FontWeight.bold,
-                                  color: color,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  item.headquarter.nameHeadquarter,
-                                  style: const TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 15,
-                                  ),
-                                ),
-                                const SizedBox(height: 3),
-                                Row(
-                                  children: [
-                                    Icon(Icons.near_me_rounded,
-                                        size: 14, color: color),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      distLabel,
-                                      style: TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontSize: 13,
-                                        color: color,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded, color: color),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ],
-          ),
+        return _SelectLotSheetContent(
+          nearestList: nearestList,
+          parentContext: context,
         );
       },
     );
+
+    // Si se cerró por timer o cancelar, retornar el más cercano
+    return selected ?? nearestHq;
   }
 
   @override
@@ -2486,6 +2409,230 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         ),
         elevation: 8,
         shadowColor: color.withValues(alpha:0.5),
+      ),
+    );
+  }
+}
+
+// ============================================================================
+// WIDGET DE SELECCIÓN DE LOTE CON AUTO-CLOSE (4 segundos)
+// ============================================================================
+
+class _SelectLotSheetContent extends StatefulWidget {
+  final List<HeadquarterDistance> nearestList;
+  final BuildContext parentContext;
+
+  const _SelectLotSheetContent({
+    required this.nearestList,
+    required this.parentContext,
+  });
+
+  @override
+  State<_SelectLotSheetContent> createState() => _SelectLotSheetContentState();
+}
+
+class _SelectLotSheetContentState extends State<_SelectLotSheetContent> {
+  int _secondsRemaining = 4;
+  Timer? _autoCloseTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _autoCloseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _secondsRemaining--;
+      });
+      if (_secondsRemaining <= 0) {
+        timer.cancel();
+        // Auto-close: retorna null → el caller asigna el más cercano
+        Navigator.pop(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _autoCloseTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = FlutterFlowTheme.of(widget.parentContext);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.primaryBackground,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade400,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Ícono y título
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: theme.primary.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.location_searching_rounded,
+              color: theme.primary,
+              size: 36,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '¿En cuál lote estás?',
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: theme.primaryText,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Tu ubicación está fuera de los polígonos registrados.\nSelecciona el lote o se asignará el más cercano en ${_secondsRemaining}s',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 13,
+              color: theme.secondaryText,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Lista de lotes cercanos
+          ...widget.nearestList.asMap().entries.map((entry) {
+            final index = entry.key;
+            final item = entry.value;
+            final distLabel = item.distanceMeters == double.infinity
+                ? 'Sin distancia'
+                : item.distanceMeters < 1000
+                    ? '${item.distanceMeters.toStringAsFixed(0)} m'
+                    : '${(item.distanceMeters / 1000).toStringAsFixed(2)} km';
+            final colors = [
+              Colors.green.shade600,
+              Colors.orange.shade600,
+              Colors.red.shade400,
+            ];
+            final color = colors[index.clamp(0, 2)];
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: () => Navigator.pop(context, item.headquarter),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: color.withValues(alpha: 0.4),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    color: color.withValues(alpha: 0.06),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: color.withValues(alpha: 0.15),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${index + 1}',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.bold,
+                              color: color,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.headquarter.nameHeadquarter,
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontWeight: FontWeight.w600,
+                                fontSize: 15,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Icon(Icons.near_me_rounded,
+                                    size: 14, color: color),
+                                const SizedBox(width: 4),
+                                Text(
+                                  distLabel,
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 13,
+                                    color: color,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, color: color),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+          const SizedBox(height: 12),
+          // Botón Cancelar
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  side: BorderSide(color: Colors.grey.shade300),
+                ),
+              ),
+              child: Text(
+                'Cancelar (asignar más cercano)',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 14,
+                  color: theme.secondaryText,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

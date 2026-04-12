@@ -59,6 +59,8 @@ export 'write_n_f_c_tag.dart' show writeNFCTag;
 export 'calculate_activity_results.dart' show calculateActivityResults;
 export 'cleanup_step_records.dart' show cleanupStepRecords;
 export 'clear_n_f_c_tag.dart' show clearNFCTag;
+export 'enriched_geo_buffer.dart'
+    show EnrichedGeoPoint, EnrichedGeoBuffer, OptimalPositionCalculator, OptimalPosition;
 export 'background_location_service.dart'
     show
         initializeBackgroundLocationService,

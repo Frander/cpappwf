@@ -7,7 +7,6 @@ import '/custom_code/actions/index.dart';
 import '/backend/schema/structs/read_geo_struct.dart';
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -118,7 +117,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
   StreamSubscription<Map<String, dynamic>?>? _locationServiceSubscription;
 
   // Timer para procesar ubicaciones cada 60 segundos
-  Timer? _locationProcessingTimer;
+  // Timer de procesamiento eliminado - la inserción a SQLite se hace en get_location_list.dart
 
   @override
   void initState() {
@@ -225,7 +224,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
     _calibrationTimer?.cancel();
     _gpsServiceSubscription?.cancel();
     _locationServiceSubscription?.cancel();
-    _locationProcessingTimer?.cancel();
     _model.dispose();
     _userBadgeController.dispose();
     _activityBadgeController.dispose();
@@ -294,230 +292,11 @@ class _HomePageWidgetState extends State<HomePageWidget>
     });
     debugPrint('   ✅ Listener "newLocation" configurado');
 
-    // Timer para procesar y depurar ubicaciones cada 60 segundos
-    _locationProcessingTimer =
-        Timer.periodic(const Duration(seconds: 60), (timer) async {
-      await _processAndInsertLocations();
-    });
+    // Nota: La depuración e inserción a SQLite se maneja directamente
+    // en el servicio en segundo plano (get_location_list.dart)
 
     debugPrint(
-        '✅ Listeners de GPS configurados + Timer de procesamiento cada 60s');
-  }
-
-  /// Procesa las ubicaciones acumuladas, las depura y las inserta en SQLite
-  /// Estrategia de prevención de duplicados:
-  /// - Siempre mantiene al menos 1 registro en geoLocationsList
-  /// - Procesa e inserta todos los registros EXCEPTO el último
-  /// - El último registro se procesará en el siguiente ciclo de 60s
-  Future<void> _processAndInsertLocations() async {
-    try {
-      // Tomar una copia atómica de la lista
-      final allLocations = List<ReadGeoStruct>.from(FFAppState().geoLocationsList);
-
-      // Validar que hay suficientes registros para procesar
-      if (allLocations.isEmpty) {
-        debugPrint('⏭️ Sin ubicaciones para procesar');
-        return;
-      }
-
-      if (allLocations.length < 2) {
-        debugPrint('⏭️ Solo hay ${allLocations.length} ubicación(es), esperando más puntos para procesar...');
-        debugPrint('   Se necesitan al menos 2 registros para mantener 1 en AppState y procesar el resto');
-        return;
-      }
-
-      // Procesar todos EXCEPTO el último para evitar duplicados en el próximo ciclo
-      final locationsToProcess = allLocations.sublist(0, allLocations.length - 1);
-
-      // Depurar las ubicaciones a procesar (agrupar puntos dentro de 2 metros)
-      final depurados = _depurarGeolocalizaciones(locationsToProcess);
-
-      // Insertar a SQLite
-      await _insertDepuradosToSQLite(depurados);
-
-      // Limpiar solo los procesados, mantener el último
-      FFAppState().geoLocationsList = [allLocations.last];
-    } catch (e) {
-      debugPrint('❌ Error en _processAndInsertLocations: $e');
-    }
-  }
-
-  /// Depura geolocalizaciones agrupando puntos dentro de un radio de 2 metros
-  List<Map<String, dynamic>> _depurarGeolocalizaciones(
-      List<ReadGeoStruct> locations) {
-    if (locations.isEmpty) return [];
-
-    if (locations.length == 1) {
-      final loc = locations.first;
-      return [
-        _crearRegistroDepurado([loc]),
-      ];
-    }
-
-    const double radioUmbral = 2.0; // metros
-    final List<Map<String, dynamic>> resultado = [];
-
-    // Ordenar por fecha
-    final sortedLocations = List<ReadGeoStruct>.from(locations)
-      ..sort((a, b) =>
-          (a.dateHourRead ?? DateTime.now())
-              .compareTo(b.dateHourRead ?? DateTime.now()));
-
-    // Iniciar primer grupo
-    List<ReadGeoStruct> grupoActual = [sortedLocations.first];
-
-    for (int i = 1; i < sortedLocations.length; i++) {
-      final puntoActual = sortedLocations[i];
-      final centroide = _calcularCentroide(grupoActual);
-
-      final distancia = _haversineDistance(
-        centroide['lat']!,
-        centroide['lon']!,
-        puntoActual.latitude,
-        puntoActual.longitude,
-      );
-
-      if (distancia <= radioUmbral) {
-        // Agregar al grupo actual
-        grupoActual.add(puntoActual);
-      } else {
-        // Finalizar grupo y crear registro depurado
-        resultado.add(_crearRegistroDepurado(grupoActual));
-        // Iniciar nuevo grupo
-        grupoActual = [puntoActual];
-      }
-    }
-
-    // Procesar último grupo
-    if (grupoActual.isNotEmpty) {
-      resultado.add(_crearRegistroDepurado(grupoActual));
-    }
-
-    return resultado;
-  }
-
-  /// Calcula el centroide (punto promedio) de un grupo de ubicaciones
-  Map<String, double> _calcularCentroide(List<ReadGeoStruct> puntos) {
-    double sumLat = 0, sumLon = 0;
-    for (final p in puntos) {
-      sumLat += p.latitude;
-      sumLon += p.longitude;
-    }
-    return {
-      'lat': sumLat / puntos.length,
-      'lon': sumLon / puntos.length,
-    };
-  }
-
-  /// Crea un registro depurado a partir de un grupo de puntos
-  Map<String, dynamic> _crearRegistroDepurado(List<ReadGeoStruct> grupo) {
-    final centroide = _calcularCentroide(grupo);
-
-    // Calcular promedios
-    double sumAlt = 0, sumErr = 0;
-    for (final p in grupo) {
-      sumAlt += p.altitude;
-      sumErr += p.errorHorizontal;
-    }
-
-    final int count = grupo.length;
-
-    // Calcular radio máximo (distancia del centroide al punto más lejano)
-    double maxRadius = 0.0;
-    for (final p in grupo) {
-      final dist = _haversineDistance(
-        centroide['lat']!,
-        centroide['lon']!,
-        p.latitude,
-        p.longitude,
-      );
-      if (dist > maxRadius) maxRadius = dist;
-    }
-
-    final dateStart = grupo.first.dateHourRead ?? DateTime.now();
-    final dateFinish = grupo.last.dateHourRead ?? DateTime.now();
-
-    return {
-      'Id_company': FFAppState().companyDefault.idCompany,
-      'Imei': FFAppState().deviceDefault.imeI1,
-      'Latitude': centroide['lat'],
-      'Longitude': centroide['lon'],
-      'Altitude': sumAlt / count,
-      'HorizontalError': sumErr / count,
-      'Speed': 0.0, // Promedio no disponible en ReadGeoStruct
-      'Battery': 0, // No disponible en ReadGeoStruct
-      'CreatedAt': dateStart.toIso8601String(),
-      'SyncedAt': DateTime.now().toIso8601String(),
-      'batch_id': null,
-      'date_start': dateStart.toIso8601String(),
-      'date_finish': dateFinish.toIso8601String(),
-      'evaluated_radius': maxRadius,
-      'point_count': count,
-      'Id_user': FFAppState().userSelected.idUser,
-      'Id_activity': FFAppState().activitySelected.idActivity,
-    };
-  }
-
-  /// Calcula distancia Haversine entre dos puntos en metros
-  double _haversineDistance(double lat1, double lon1, double lat2, double lon2) {
-    const double R = 6371000.0; // Radio de la Tierra en metros
-    final double lat1Rad = lat1 * 3.141592653589793 / 180;
-    final double lat2Rad = lat2 * 3.141592653589793 / 180;
-    final double dLat = (lat2 - lat1) * 3.141592653589793 / 180;
-    final double dLon = (lon2 - lon1) * 3.141592653589793 / 180;
-
-    final double a = (sin(dLat / 2) * sin(dLat / 2)) +
-        (cos(lat1Rad) * cos(lat2Rad) * sin(dLon / 2) * sin(dLon / 2));
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-    return R * c;
-  }
-
-  /// Inserta los registros depurados en SQLite
-  Future<void> _insertDepuradosToSQLite(
-      List<Map<String, dynamic>> depurados) async {
-    if (depurados.isEmpty) return;
-
-    int insertados = 0;
-
-    try {
-      await globalDb.executeOperation((db) async {
-        for (final loc in depurados) {
-          // Usar INSERT OR IGNORE para evitar errores de duplicados
-          final result = await db.rawInsert('''
-            INSERT OR IGNORE INTO Location_tracking
-            (Id_company, Imei, Latitude, Longitude, Altitude, HorizontalError,
-             Speed, Battery, CreatedAt, SyncedAt, batch_id,
-             date_start, date_finish, evaluated_radius, point_count,
-             Id_user, Id_activity)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ''', [
-            loc['Id_company'],
-            loc['Imei'],
-            loc['Latitude'],
-            loc['Longitude'],
-            loc['Altitude'],
-            loc['HorizontalError'],
-            loc['Speed'],
-            loc['Battery'],
-            loc['CreatedAt'],
-            loc['SyncedAt'],
-            loc['batch_id'],
-            loc['date_start'],
-            loc['date_finish'],
-            loc['evaluated_radius'],
-            loc['point_count'],
-            loc['Id_user'],
-            loc['Id_activity'],
-          ]);
-          if (result > 0) insertados++;
-        }
-      });
-
-      debugPrint('💾 $insertados/${depurados.length} registros insertados en SQLite');
-    } catch (e) {
-      debugPrint('❌ Error insertando en SQLite: $e');
-    }
+        '✅ Listeners de GPS configurados');
   }
 
   // ============================================================================

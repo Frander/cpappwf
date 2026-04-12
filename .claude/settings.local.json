@@ -85,7 +85,8 @@
       "WebFetch(domain:api.flutter.dev)",
       "WebFetch(domain:www.codestudy.net)",
       "WebFetch(domain:dev.to)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(find \"e:/RepositoriosFix/ClickPalmAPP\" -name \"pubspec.yaml\" -type f -exec grep -l \"flutter_tts\" {} \\\\;)"
     ],
     "deny": [],
     "ask": [],
