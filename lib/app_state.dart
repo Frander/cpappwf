@@ -26,6 +26,9 @@ class FFAppState extends ChangeNotifier {
       _isSync = prefs.getBool('ff_isSync') ?? _isSync;
     });
     _safeInit(() {
+      _gpsMode = prefs.getString('ff_gpsMode') ?? _gpsMode;
+    });
+    _safeInit(() {
       final ms = prefs.getInt('ff_lastSyncBase');
       if (ms != null) _lastSyncBase = DateTime.fromMillisecondsSinceEpoch(ms);
     });
@@ -374,6 +377,9 @@ class FFAppState extends ChangeNotifier {
       _pathPmtiles = prefs.getString('ff_pathPmtiles') ?? _pathPmtiles;
     });
     _safeInit(() {
+      _hasOrtomosaics = prefs.getBool('ff_hasOrtomosaics') ?? _hasOrtomosaics;
+    });
+    _safeInit(() {
       _routeConfigStartLine =
           prefs.getInt('ff_routeConfigStartLine') ?? _routeConfigStartLine;
     });
@@ -417,6 +423,16 @@ class FFAppState extends ChangeNotifier {
   set isSync(bool value) {
     _isSync = value;
     prefs.setBool('ff_isSync', value);
+  }
+
+  // Modo GPS activo: 'LITE' (básico, bajo consumo) o 'ADVANCED' (UKF+IMU, preciso).
+  // Default LITE para usuarios existentes. Reactivo en UI vía notifyListeners.
+  String _gpsMode = 'LITE';
+  String get gpsMode => _gpsMode;
+  set gpsMode(String value) {
+    _gpsMode = value;
+    prefs.setString('ff_gpsMode', value);
+    notifyListeners();
   }
 
   DateTime? _lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
@@ -1311,6 +1327,13 @@ class FFAppState extends ChangeNotifier {
   set pathPmtiles(String value) {
     _pathPmtiles = value;
     prefs.setString('ff_pathPmtiles', value);
+  }
+
+  bool _hasOrtomosaics = false;
+  bool get hasOrtomosaics => _hasOrtomosaics;
+  set hasOrtomosaics(bool value) {
+    _hasOrtomosaics = value;
+    prefs.setBool('ff_hasOrtomosaics', value);
   }
 
   int _routeConfigStartLine = 0;

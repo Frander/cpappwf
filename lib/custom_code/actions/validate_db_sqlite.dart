@@ -46,7 +46,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          26, // v26: Code_user, State_user, Rol_user en Users
+          27, // v27: columna Method en Location_tracking y Visits_locations
       onCreate: (Database db, int version) async {
         await createClickPalmTables(db);
       },
@@ -483,7 +483,8 @@ Future<void> createClickPalmTables(Database db) async {
         evaluated_radius REAL,
         point_count INTEGER DEFAULT 1,
         Id_user INTEGER,
-        Id_activity INTEGER
+        Id_activity INTEGER,
+        Method TEXT DEFAULT 'UNKNOWN'
     );
   ''');
 
@@ -513,6 +514,7 @@ Future<void> createClickPalmTables(Database db) async {
         Altitude DECIMAL(8,2) NOT NULL DEFAULT 0,
         HorizontalError DECIMAL(8,2) NOT NULL DEFAULT 0,
         CreatedAt DATETIME NOT NULL DEFAULT (datetime('now', 'utc')),
+        Method TEXT DEFAULT 'UNKNOWN',
         FOREIGN KEY (Id_visit) REFERENCES Visits(Id_visit)
     );
   ''');
@@ -2270,6 +2272,31 @@ Future<void> upgradeClickPalmDatabase(
         debugPrint('✅ Migración a versión 26 completada');
       } catch (e) {
         debugPrint('❌ Error en migración a versión 26: $e');
+      }
+    }
+
+    // Migración v26 a v27: columna Method en Location_tracking y Visits_locations
+    if (oldVersion < 27) {
+      debugPrint('📦 Aplicando migración a versión 27...');
+      try {
+        final locCols = (await db.rawQuery('PRAGMA table_info(Location_tracking);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!locCols.contains('Method')) {
+          await db.execute(
+              "ALTER TABLE Location_tracking ADD COLUMN Method TEXT DEFAULT 'UNKNOWN';");
+          debugPrint('   ✅ Columna Method agregada a Location_tracking');
+        }
+
+        final visLocCols = (await db.rawQuery('PRAGMA table_info(Visits_locations);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!visLocCols.contains('Method')) {
+          await db.execute(
+              "ALTER TABLE Visits_locations ADD COLUMN Method TEXT DEFAULT 'UNKNOWN';");
+          debugPrint('   ✅ Columna Method agregada a Visits_locations');
+        }
+        debugPrint('✅ Migración a versión 27 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 27: $e');
       }
     }
   } catch (e) {

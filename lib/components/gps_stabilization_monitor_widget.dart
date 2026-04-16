@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import '/app_state.dart';
+import '/flutter_flow/nav/nav.dart';
 
 /// Monitor en tiempo real del proceso de estabilización GPS.
 /// Muestra métricas detalladas: precisión, fase, lecturas válidas,
@@ -12,9 +13,13 @@ class GPSStabilizationMonitor extends StatefulWidget {
   const GPSStabilizationMonitor({super.key});
 
   /// Abre el monitor como un bottom sheet modal.
+  /// Usa el navigator global (`appNavigatorKey`) porque el indicador GPS vive
+  /// en el `builder` de MaterialApp.router — su contexto está POR ENCIMA del
+  /// Navigator, así que `Navigator.of(context)` fallaría.
   static void show(BuildContext context) {
+    final navCtx = appNavigatorKey.currentContext ?? context;
     showModalBottomSheet(
-      context: context,
+      context: navCtx,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black54,

@@ -19,6 +19,7 @@ import '/custom_code/actions/calculate_current_headquarter.dart'
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/custom_code/actions/enriched_geo_buffer.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // ============================================================================
 // MODELO DE DATOS GPS
@@ -308,10 +309,29 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
     });
   }
 
+  /// Ventana temporal adaptativa según velocidad promedio reciente (Fix 3).
+  /// Caminata rápida → ventana corta (evita promediar posiciones obsoletas).
+  /// Estacionario → ventana larga (máximo de puntos para promediar).
+  int _adaptiveWindowSeconds() {
+    final recent = EnrichedGeoBuffer().getLastSeconds(10);
+    if (recent.isEmpty) return 120;
+    final avgSpeed =
+        recent.map((p) => p.speed).fold<double>(0.0, (a, b) => a + b) /
+            recent.length;
+    if (avgSpeed > 0.8) return 30;
+    if (avgSpeed > 0.4) return 60;
+    return 120;
+  }
+
   /// Obtiene puntos válidos desde AppState con un umbral de error configurable.
   Future<List<GPSPoint>> _getValidPointsFromAppState({double maxError = _maxHorizontalError}) async {
     final geoList = List<ReadGeoStruct>.from(FFAppState().geoLocationsList);
     if (geoList.isEmpty) return [];
+
+    // Ventana temporal adaptativa (Fix 3) — refleja la posición ACTUAL.
+    final windowSeconds = _adaptiveWindowSeconds();
+    final cutoff =
+        DateTime.now().toUtc().subtract(Duration(seconds: windowSeconds));
 
     int batteryLevel = 100;
     try {
@@ -327,7 +347,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
               createdAt: g.dateHourRead ?? DateTime.now().toUtc(),
               battery: batteryLevel,
             ))
-        .where((p) => p.horizontalError <= maxError)
+        .where((p) => p.horizontalError <= maxError && p.createdAt.isAfter(cutoff))
         .toList();
   }
 
@@ -737,11 +757,17 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
           // Solo 1 lote seleccionado y está fuera → asignar automáticamente el único disponible
           idHeadquarter = headquartersList.first.idHeadquarter;
           debugPrint('✅ Solo 1 lote disponible, asignando automáticamente: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (checkResult.nearestList.length == 1) {
+          // Solo 1 candidato cercano → auto-asignar
+          idHeadquarter = checkResult.nearestList.first.headquarter.idHeadquarter;
+          debugPrint('✅ Único lote cercano, auto-asignado: ${checkResult.nearestList.first.headquarter.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (checkResult.nearestList.isEmpty) {
+          debugPrint('⚠️ No hay lotes cercanos, Id_headquarter será 0');
         } else {
-          // Fuera de todos los polígonos con múltiples lotes → mostrar diálogo de selección
-          debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
+          // Fuera de todos los polígonos con múltiples lotes → recordar o mostrar diálogo
+          debugPrint('⚠️ Fuera de todos los polígonos, verificando selección del día');
           if (!mounted) return;
-          final selected = await _showSelectLotDialog(context, checkResult.nearestList);
+          final selected = await _showSelectLotDialogOrRecall(context, checkResult.nearestList);
           idHeadquarter = selected.idHeadquarter;
           debugPrint('✅ Lote asignado: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
         }
@@ -789,24 +815,89 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 
         debugPrint('✅ $insertedCount detalles de visita insertados');
 
-        // Usar todos los puntos disponibles (ordenados por calidad: menor error primero),
-        // en vez de solo los últimos 6 segundos, para aprovechar el historial completo
-        final allSorted = List<GPSPoint>.from(_gpsPoints)
-          ..sort((a, b) => a.horizontalError.compareTo(b.horizontalError));
-        List<GPSPoint> pointsToSave = allSorted.take(10).toList();
+        // Para Visits_locations usamos EnrichedGeoBuffer (ventana adaptativa)
+        // porque tiene ukfPositionError — la covarianza UKF pura antes de factores
+        // heurísticos — más precisa para el centroide ponderado en sync.
+        //
+        // Fix 2: si el usuario NO está realmente estático, usamos solo el punto
+        // UKF más reciente (mejor estimación puntual) en vez del centroide, que
+        // quedaría sesgado al promediar el recorrido.
+        // Fix 3: ventana temporal adaptativa según velocidad.
+        final windowSeconds = _adaptiveWindowSeconds();
+        final enrichedPoints = EnrichedGeoBuffer().getLastSeconds(windowSeconds);
+        final List<GPSPoint> pointsToSave;
 
-        // Fallback: si no hay puntos, usar el más reciente disponible
-        if (pointsToSave.isEmpty && _gpsPoints.isNotEmpty) {
-          pointsToSave = [_gpsPoints.last];
+        // Detección de "realmente estático" en los últimos 15s (Fix 2)
+        final lastFifteen = EnrichedGeoBuffer().getLastSeconds(15);
+        bool isReallyStatic = false;
+        if (lastFifteen.isNotEmpty) {
+          final avgSpeed = lastFifteen
+                  .map((p) => p.speed)
+                  .fold<double>(0.0, (a, b) => a + b) /
+              lastFifteen.length;
+          final staticRatio =
+              lastFifteen.where((p) => p.isStatic).length / lastFifteen.length;
+          isReallyStatic = avgSpeed < 0.3 && staticRatio > 0.7;
         }
+
+        GPSPoint toGPSPoint(EnrichedGeoPoint p) => GPSPoint(
+              latitude: p.latitude,
+              longitude: p.longitude,
+              altitude: p.altitude,
+              horizontalError: p.ukfPositionError > 0
+                  ? p.ukfPositionError
+                  : p.errorHorizontal,
+              createdAt: p.timestamp,
+              battery: mainGPSPoint.battery,
+            );
+
+        if (enrichedPoints.isNotEmpty) {
+          if (isReallyStatic) {
+            // Centroide ponderado: tomar los 10 más recientes de la ventana
+            final sorted = List<EnrichedGeoPoint>.from(enrichedPoints)
+              ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+            pointsToSave = sorted.take(10).map(toGPSPoint).toList();
+            debugPrint(
+                '📍 Visits_locations: estático (${enrichedPoints.length} pts, ventana ${windowSeconds}s) → centroide');
+          } else {
+            // En movimiento: solo el punto UKF más reciente
+            final all = EnrichedGeoBuffer().getAll();
+            pointsToSave = [toGPSPoint(all.last)];
+            debugPrint(
+                '📍 Visits_locations: en movimiento → último punto UKF únicamente');
+          }
+        } else {
+          // Fallback: geoLocationsList si el buffer aún no tiene datos (inicio de sesión)
+          final locationCutoff = DateTime.now().toUtc().subtract(const Duration(seconds: 120));
+          final seenTs = <String>{};
+          final fallback = List<ReadGeoStruct>.from(FFAppState().geoLocationsList)
+              .where((g) => (g.dateHourRead ?? DateTime(2000)).isAfter(locationCutoff))
+              .map((g) => GPSPoint(
+                    latitude: g.latitude,
+                    longitude: g.longitude,
+                    altitude: g.altitude,
+                    horizontalError: g.errorHorizontal,
+                    createdAt: g.dateHourRead ?? DateTime.now().toUtc(),
+                    battery: mainGPSPoint.battery,
+                  ))
+              .where((p) => seenTs.add(p.createdAt.toIso8601String()))
+              .toList()
+            ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          pointsToSave = fallback.take(10).toList();
+        }
+
+        // Método GPS activo — misma fuente que usó el servicio background.
+        // Si ADVANCED usó UKF_IMU; si LITE usó el filtro básico.
+        final currentMethod = FFAppState().gpsMode == 'ADVANCED' ? 'UKF_IMU' : 'LITE';
 
         for (var gpsPoint in pointsToSave) {
           await txn.rawInsert('''
-            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
-            VALUES (?, ?, ?, ?, ?, ?)
+            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt, Method)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
           ''', [
             visitId, gpsPoint.latitude, gpsPoint.longitude, gpsPoint.altitude,
             gpsPoint.horizontalError, gpsPoint.createdAt.toIso8601String(),
+            currentMethod,
           ]);
         }
 
@@ -839,6 +930,48 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         _errorMessage = 'Error al crear la visita:\n$e';
       });
     }
+  }
+
+  // ── Claves SharedPreferences para recordar el lote seleccionado por día ──
+  static const String _kLotIdKey   = 'selected_lot_id_day';
+  static const String _kLotNameKey = 'selected_lot_name_day';
+  static const String _kLotDateKey = 'selected_lot_date_day';
+
+  Future<HeadquartersStruct?> _getCachedLotForToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString(_kLotDateKey);
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    if (savedDate != today) return null;
+    final id   = prefs.getInt(_kLotIdKey);
+    final name = prefs.getString(_kLotNameKey);
+    if (id == null || name == null) return null;
+    return HeadquartersStruct(idHeadquarter: id, nameHeadquarter: name);
+  }
+
+  Future<void> _cacheLotForToday(HeadquartersStruct lot) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    await prefs.setString(_kLotDateKey, today);
+    await prefs.setInt(_kLotIdKey,      lot.idHeadquarter);
+    await prefs.setString(_kLotNameKey, lot.nameHeadquarter);
+    debugPrint('💾 Lote guardado para hoy ($today): ${lot.nameHeadquarter} (ID: ${lot.idHeadquarter})');
+  }
+
+  /// Retorna el lote a usar cuando la GPS está fuera del polígono:
+  /// - Mismo día → reutiliza la selección sin mostrar diálogo.
+  /// - Primera vez hoy → muestra diálogo, guarda y retorna.
+  Future<HeadquartersStruct> _showSelectLotDialogOrRecall(
+    BuildContext context,
+    List<HeadquarterDistance> nearestList,
+  ) async {
+    final cached = await _getCachedLotForToday();
+    if (cached != null) {
+      debugPrint('♻️ Lote recordado del día: ${cached.nameHeadquarter} (ID: ${cached.idHeadquarter})');
+      return cached;
+    }
+    final selected = await _showSelectLotDialog(context, nearestList);
+    await _cacheLotForToday(selected);
+    return selected;
   }
 
   /// Muestra un bottom sheet para que el usuario seleccione el lote.

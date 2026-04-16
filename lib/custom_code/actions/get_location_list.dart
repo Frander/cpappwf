@@ -1751,7 +1751,7 @@ Future<void> getLocationList(BuildContext context) async {
             final batteryLevel = await batteryCache.getBatteryLevel();
 
             // Depurar geolocalizaciones antes de insertar (agrupar puntos dentro de 2m)
-            final depurados = _depurarGeolocalizaciones(toSave, filteredSpeed, batteryLevel);
+            final depurados = depurarGeolocalizaciones(toSave, filteredSpeed, batteryLevel);
 
             // Ejecutar operación SQLite asíncrona (sin bloqueo)
             await DatabaseManager.executeOperation<void>((database) async {
@@ -1763,8 +1763,8 @@ Future<void> getLocationList(BuildContext context) async {
                 (Id_company, Imei, Latitude, Longitude, Altitude, HorizontalError,
                  Speed, Battery, CreatedAt, SyncedAt, batch_id,
                  date_start, date_finish, evaluated_radius, point_count,
-                 Id_user, Id_activity)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 Id_user, Id_activity, Method)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ''', [
                   loc['Id_company'],
                   loc['Imei'],
@@ -1783,6 +1783,7 @@ Future<void> getLocationList(BuildContext context) async {
                   loc['point_count'],
                   loc['Id_user'],
                   loc['Id_activity'],
+                  loc['Method'] ?? 'UNKNOWN',
                 ]);
               }
 
@@ -1847,7 +1848,8 @@ Future<void> getLocationList(BuildContext context) async {
 
 /// Depura geolocalizaciones agrupando puntos dentro de un radio de 2 metros.
 /// Produce registros consolidados con centroide, radio evaluado y conteo de puntos.
-List<Map<String, dynamic>> _depurarGeolocalizaciones(
+/// Pública para que main.dart pueda usarla en el timer de persistencia global.
+List<Map<String, dynamic>> depurarGeolocalizaciones(
     List<ReadGeoStruct> locations, double speed, int battery) {
   if (locations.isEmpty) return [];
 
@@ -1922,6 +1924,10 @@ Map<String, dynamic> _crearRegistroDepurado(
   final dateStart = grupo.first.dateHourRead ?? DateTime.now();
   final dateFinish = grupo.last.dateHourRead ?? DateTime.now();
 
+  // Método GPS del grupo: si todos coinciden usar ese, si no 'MIXED'.
+  final methods = grupo.map((p) => p.method).toSet();
+  final groupMethod = methods.length == 1 ? methods.first : 'MIXED';
+
   return {
     'Id_company': FFAppState().companyDefault.idCompany,
     'Imei': FFAppState().deviceDefault.imeI1,
@@ -1940,6 +1946,7 @@ Map<String, dynamic> _crearRegistroDepurado(
     'point_count': count,
     'Id_user': FFAppState().userSelected.idUser,
     'Id_activity': FFAppState().activitySelected.idActivity,
+    'Method': groupMethod,
   };
 }
 

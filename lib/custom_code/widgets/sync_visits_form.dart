@@ -1427,6 +1427,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
             'locations_add': <String>[],
             'location_default':
                 'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}',
+            '_locations_raw': <Map<String, double>>[],
             '_details_ids': <int>{},
             '_location_ids': <int>{},
           };
@@ -1454,12 +1455,19 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           final int locationId = row['location_id'];
           if (!visit['_location_ids'].contains(locationId)) {
             visit['_location_ids'].add(locationId);
-            final String locationString =
-                'LAT:${row['location_latitude']?.toDouble() ?? 0.0};'
-                'LON:${row['location_longitude']?.toDouble() ?? 0.0};'
-                'ALT:${row['location_altitude']?.toDouble() ?? 0.0};'
-                'ERH:${row['location_horizontal_error']?.toDouble() ?? 0.0}';
-            visit['locations_add'].add(locationString);
+            final double locLat = row['location_latitude']?.toDouble() ?? 0.0;
+            final double locLon = row['location_longitude']?.toDouble() ?? 0.0;
+            final double locAlt = row['location_altitude']?.toDouble() ?? 0.0;
+            final double locErr = row['location_horizontal_error']?.toDouble() ?? 0.0;
+            visit['locations_add'].add(
+              'LAT:${locLat.toStringAsFixed(8)};LON:${locLon.toStringAsFixed(8)};ALT:${locAlt.toStringAsFixed(2)};ERH:${locErr.toStringAsFixed(2)}',
+            );
+            (visit['_locations_raw'] as List<Map<String, double>>).add({
+              'lat': locLat,
+              'lon': locLon,
+              'alt': locAlt,
+              'err': locErr,
+            });
           }
         }
       }
@@ -1468,6 +1476,11 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
 
       final List<Map<String, dynamic>> visitsFormatted =
           visitsMap.values.map((visit) {
+        final rawList = visit['_locations_raw'] as List<Map<String, double>>;
+        if (rawList.isNotEmpty) {
+          visit['location_default'] = _computeWeightedLocationForm(rawList);
+        }
+        visit.remove('_locations_raw');
         visit.remove('_details_ids');
         visit.remove('_location_ids');
         return visit;
@@ -1480,6 +1493,26 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       debugPrint('❌ Error en _getVisitsAddFromSQLiteForJson: $e');
       return [];
     }
+  }
+
+  /// Centroide ponderado por inverso del error horizontal al cuadrado.
+  String _computeWeightedLocationForm(List<Map<String, double>> points) {
+    double totalWeight = 0;
+    double wLat = 0, wLon = 0, wAlt = 0, wErr = 0;
+    for (final p in points) {
+      final err = p['err']!;
+      final w = 1.0 / (err * err + 0.01);
+      wLat += p['lat']! * w;
+      wLon += p['lon']! * w;
+      wAlt += p['alt']! * w;
+      wErr += err * w;
+      totalWeight += w;
+    }
+    final lat = wLat / totalWeight;
+    final lon = wLon / totalWeight;
+    final alt = wAlt / totalWeight;
+    final err = wErr / totalWeight;
+    return 'LAT:${lat.toStringAsFixed(8)};LON:${lon.toStringAsFixed(8)};ALT:${alt.toStringAsFixed(2)};ERH:${err.toStringAsFixed(2)}';
   }
 
   /// Limpia los datos de SQLite después de una sincronización exitosa

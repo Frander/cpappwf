@@ -64,6 +64,14 @@ class MapDownloadService {
   double get progress => _progress;
   int get downloadedBytes => _downloadedBytes;
   int get totalBytes => _totalBytes;
+
+  /// Consulta el tamaño real del archivo en S3 via HEAD request.
+  /// Actualiza [totalBytes] y emite estado. Llamar una vez en init.
+  Future<void> fetchRemoteSize() async {
+    if (_totalBytes > 0) return; // ya conocido (descarga en curso o completada)
+    await _getFileSize();
+    _emitState();
+  }
   String get speed => _speed;
   String get timeRemaining => _timeRemaining;
   String get filePath => _filePath;

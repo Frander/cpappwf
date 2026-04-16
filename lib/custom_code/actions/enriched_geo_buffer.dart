@@ -19,6 +19,8 @@ class EnrichedGeoPoint {
   final double vy;
   final double ukfPositionError;
   final bool isBrushChange;
+  // Método de obtención: 'LITE' (filtro básico) o 'UKF_IMU' (pipeline completo)
+  final String method;
 
   const EnrichedGeoPoint({
     required this.latitude,
@@ -34,6 +36,7 @@ class EnrichedGeoPoint {
     required this.vy,
     required this.ukfPositionError,
     required this.isBrushChange,
+    this.method = 'UNKNOWN',
   });
 }
 
@@ -49,9 +52,23 @@ class EnrichedGeoBuffer {
   final Queue<EnrichedGeoPoint> _buffer = Queue<EnrichedGeoPoint>();
   static const int maxSize = 60; // ~90 segundos a 1.5s/lectura
 
+  // Set de claves (timestamp + lat + lon) ya vistas para rechazar duplicados
+  // (ej. doble-emit del broadcast stream de flutter_background_service).
+  // Clave compuesta resiste clock drift del isolate.
+  final Set<String> _seenKeys = {};
+
+  static String _keyOf(EnrichedGeoPoint p) =>
+      '${p.timestamp.toIso8601String()}_${p.latitude.toStringAsFixed(7)}_${p.longitude.toStringAsFixed(7)}';
+
   void add(EnrichedGeoPoint point) {
+    final key = _keyOf(point);
+    if (_seenKeys.contains(key)) return; // ignorar duplicado exacto
+    _seenKeys.add(key);
+
     _buffer.addLast(point);
-    if (_buffer.length > maxSize) _buffer.removeFirst();
+    if (_buffer.length > maxSize) {
+      _seenKeys.remove(_keyOf(_buffer.removeFirst()));
+    }
   }
 
   List<EnrichedGeoPoint> getAll() => _buffer.toList();

@@ -237,6 +237,11 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           builder: (context, params) => HistoryGeoPageWidget(),
         ),
         FFRoute(
+          name: HistoryGeoSqlitePageWidget.routeName,
+          path: HistoryGeoSqlitePageWidget.routePath,
+          builder: (context, params) => HistoryGeoSqlitePageWidget(),
+        ),
+        FFRoute(
           name: SettingsPageWidget.routeName,
           path: SettingsPageWidget.routePath,
           builder: (context, params) => SettingsPageWidget(),

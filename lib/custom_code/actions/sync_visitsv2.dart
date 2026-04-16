@@ -501,6 +501,7 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
           'locations_add': <String>[],
           'location_default':
               'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}',
+          '_locations_raw': <Map<String, double>>[],
           '_details_ids': <int>{},
           '_location_ids': <int>{},
         };
@@ -559,6 +560,12 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
             row['location_horizontal_error']?.toDouble() ?? 0.0,
           );
           visit['locations_add'].add(locationString);
+          (visit['_locations_raw'] as List<Map<String, double>>).add({
+            'lat': row['location_latitude']?.toDouble() ?? 0.0,
+            'lon': row['location_longitude']?.toDouble() ?? 0.0,
+            'alt': row['location_altitude']?.toDouble() ?? 0.0,
+            'err': row['location_horizontal_error']?.toDouble() ?? 0.0,
+          });
         }
       }
     }
@@ -567,6 +574,11 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
 
     final List<Map<String, dynamic>> visitsFormatted =
         visitsMap.values.map((visit) {
+      final rawList = visit['_locations_raw'] as List<Map<String, double>>;
+      if (rawList.isNotEmpty) {
+        visit['location_default'] = _computeWeightedLocation(rawList);
+      }
+      visit.remove('_locations_raw');
       visit.remove('_details_ids');
       visit.remove('_location_ids');
       return visit;
@@ -806,6 +818,7 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
           'locations_add': <String>[],
           'location_default':
               'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}',
+          '_locations_raw': <Map<String, double>>[],
           '_details_ids': <int>{},
           '_location_ids': <int>{},
         };
@@ -864,12 +877,23 @@ Future<List<int>> _getVisitsFromSQLiteAndCompress(
             row['location_horizontal_error']?.toDouble() ?? 0.0,
           );
           visit['locations_add'].add(locationString);
+          (visit['_locations_raw'] as List<Map<String, double>>).add({
+            'lat': row['location_latitude']?.toDouble() ?? 0.0,
+            'lon': row['location_longitude']?.toDouble() ?? 0.0,
+            'alt': row['location_altitude']?.toDouble() ?? 0.0,
+            'err': row['location_horizontal_error']?.toDouble() ?? 0.0,
+          });
         }
       }
     }
 
     final List<Map<String, dynamic>> visitsWithDetails =
         visitsMap.values.map((visit) {
+      final rawList = visit['_locations_raw'] as List<Map<String, double>>;
+      if (rawList.isNotEmpty) {
+        visit['location_default'] = _computeWeightedLocation(rawList);
+      }
+      visit.remove('_locations_raw');
       visit.remove('_details_ids');
       visit.remove('_location_ids');
       return visit;
@@ -1138,6 +1162,30 @@ String _formatLocationString(
   double horizontalError,
 ) {
   return 'LAT:${latitude.toStringAsFixed(8)};LON:${longitude.toStringAsFixed(8)};ALT:${altitude.toStringAsFixed(2)};ERH:${horizontalError.toStringAsFixed(2)}';
+}
+
+/// Calcula centroide ponderado por inverso del error horizontal al cuadrado.
+/// Puntos con menor error tienen mayor peso.
+String _computeWeightedLocation(List<Map<String, double>> points) {
+  double totalWeight = 0;
+  double wLat = 0, wLon = 0, wAlt = 0, wErr = 0;
+
+  for (final p in points) {
+    final err = p['err']!;
+    final w = 1.0 / (err * err + 0.01);
+    wLat += p['lat']! * w;
+    wLon += p['lon']! * w;
+    wAlt += p['alt']! * w;
+    wErr += err * w;
+    totalWeight += w;
+  }
+
+  final lat = wLat / totalWeight;
+  final lon = wLon / totalWeight;
+  final alt = wAlt / totalWeight;
+  final err = wErr / totalWeight;
+
+  return 'LAT:${lat.toStringAsFixed(8)};LON:${lon.toStringAsFixed(8)};ALT:${alt.toStringAsFixed(2)};ERH:${err.toStringAsFixed(2)}';
 }
 
 /// Comprime el contenido base64 de una foto con GZIP

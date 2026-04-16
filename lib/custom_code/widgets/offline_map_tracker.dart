@@ -27,6 +27,8 @@ import 'package:vector_tile_renderer/vector_tile_renderer.dart' as vtr;
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:connectivity_plus/connectivity_plus.dart';
+import '/services/ortomosaic_download_service.dart';
+import '/services/ortomosaic_tile_provider.dart';
 
 // ============================================================================
 // ENUMS Y CLASES DE DATOS
@@ -809,6 +811,11 @@ class _OfflineMapTrackerState extends State<OfflineMapTracker>
   VectorTileProvider? _vectorTileProvider;
   double _currentZoom = 18.0;
 
+  // Ortomosaicos personalizados
+  final _ortService = OrtomosaicDownloadService();
+  List<OrtomosaicInfo> _ortomosaics = [];
+  String? _ortosBasePath;
+
   // Sistema de navegación por voz
   late ProximityOptimizer _proximityOptimizer;
   late TTSQueueManager _ttsManager;
@@ -1545,6 +1552,21 @@ class _OfflineMapTrackerState extends State<OfflineMapTracker>
 
       _vectorTileProvider = _PMTilesVectorTileProvider(_pmtilesArchive!);
       debugPrint('✅ VectorTileProvider creado');
+
+      // Cargar ortomosaicos descargados
+      try {
+        final ortomosaics = await _ortService.getDownloadedOrtomosaics();
+        final basePath = await _ortService.getTilesBasePath();
+        if (mounted) {
+          setState(() {
+            _ortomosaics = ortomosaics;
+            _ortosBasePath = basePath;
+          });
+        }
+        debugPrint('🛰️ Ortomosaicos disponibles: ${ortomosaics.length}');
+      } catch (e) {
+        debugPrint('⚠️ No se pudieron cargar ortomosaicos: $e');
+      }
 
       if (mounted) {
         setState(() {
@@ -4447,6 +4469,22 @@ class _OfflineMapTrackerState extends State<OfflineMapTracker>
                   theme: _createVectorTheme(),
                   maximumZoom: 22,
                 ),
+
+              // Capas de ortomosaicos personalizados (superpuestas sobre el mapa base)
+              if (_ortosBasePath != null)
+                for (final ort in _ortomosaics)
+                  TileLayer(
+                    tileProvider: OrtomosaicFileTileProvider(
+                      basePath: _ortosBasePath!,
+                      relativePath: ort.path,
+                    ),
+                    tms: true,
+                    minNativeZoom: ort.minZoom,
+                    maxNativeZoom: ort.maxZoom,
+                    minZoom: ort.minZoom.toDouble(),
+                    maxZoom: ort.maxZoom.toDouble(),
+                    panBuffer: 1,
+                  ),
 
               // Polígono del lote
               if (_showPolygon && _polygonPoints.isNotEmpty)

@@ -2038,12 +2038,19 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           vd.Status_option as detail_status_option,
           vd.Status_response as detail_status_response,
 
-          ast.Type_status as detail_type_status
+          ast.Type_status as detail_type_status,
+
+          vl.Id_visit_location as location_id,
+          vl.Latitude as location_latitude,
+          vl.Longitude as location_longitude,
+          vl.Altitude as location_altitude,
+          vl.HorizontalError as location_horizontal_error
         FROM Visits v
         LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
         LEFT JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
+        LEFT JOIN Visits_locations vl ON v.Id_visit = vl.Id_visit
         WHERE v.Id_company = ?
-        ORDER BY v.Created_at DESC, vd.Id_visit_detail ASC
+        ORDER BY v.Created_at DESC, vd.Id_visit_detail ASC, vl.Id_visit_location ASC
       ''', [idCompany]);
 
       // NO cerrar la BD todavía - la necesitamos para obtener Visits_locations
@@ -2074,34 +2081,6 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             debugPrint('⚠️ Error parseando created_at para visita $visitId: $e');
           }
 
-          // Obtener las últimas 3 ubicaciones desde la tabla Visits_locations
-          final locationRows = await db.rawQuery('''
-            SELECT Latitude, Longitude, Altitude, HorizontalError, CreatedAt
-            FROM Visits_locations
-            WHERE Id_visit = ?
-            ORDER BY CreatedAt DESC
-            LIMIT 3
-          ''', [visitId]);
-
-          debugPrint('📍 Visita $visitId: ${locationRows.length} ubicaciones encontradas en Visits_locations');
-
-          // Construir location_default desde los campos de la tabla Visits
-          final String locationDefault = 'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}';
-
-          // Construir locations_add: primero location_default, luego las últimas 3 de Visits_locations
-          final List<String> locationsAddList = [locationDefault];
-
-          // Agregar las últimas 3 ubicaciones de Visits_locations
-          locationsAddList.addAll(locationRows.map((locRow) {
-            final lat = locRow['Latitude'] ?? 0.0;
-            final lon = locRow['Longitude'] ?? 0.0;
-            final alt = locRow['Altitude'] ?? 0.0;
-            final erh = locRow['HorizontalError'] ?? 0.0;
-            return 'LAT:$lat;LON:$lon;ALT:$alt;ERH:$erh';
-          }).toList());
-
-          debugPrint('📍 locations_add total: ${locationsAddList.length} ubicaciones (1 default + ${locationRows.length} adicionales)');
-
           visitsMap[visitId] = {
             'created_at': createdAt,
             'id_visit': row['id_visit'],
@@ -2113,9 +2092,12 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             'id_device': row['id_device'],
             'rfid': row['rfid'],
             'visits_details': <Map<String, dynamic>>[],
-            'locations_add': locationsAddList,
-            'location_default': locationDefault,
+            'locations_add': <String>[],
+            'location_default':
+                'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}',
+            '_locations_raw': <Map<String, double>>[],
             '_details_ids': <int>{},
+            '_location_ids': <int>{},
           };
         }
 
@@ -2153,11 +2135,37 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             });
           }
         }
+
+        if (row['location_id'] != null) {
+          final int locationId = row['location_id'];
+          if (!(visit['_location_ids'] as Set<int>).contains(locationId)) {
+            (visit['_location_ids'] as Set<int>).add(locationId);
+            final double locLat = row['location_latitude']?.toDouble() ?? 0.0;
+            final double locLon = row['location_longitude']?.toDouble() ?? 0.0;
+            final double locAlt = row['location_altitude']?.toDouble() ?? 0.0;
+            final double locErr = row['location_horizontal_error']?.toDouble() ?? 0.0;
+            visit['locations_add'].add(
+              'LAT:${locLat.toStringAsFixed(8)};LON:${locLon.toStringAsFixed(8)};ALT:${locAlt.toStringAsFixed(2)};ERH:${locErr.toStringAsFixed(2)}',
+            );
+            (visit['_locations_raw'] as List<Map<String, double>>).add({
+              'lat': locLat,
+              'lon': locLon,
+              'alt': locAlt,
+              'err': locErr,
+            });
+          }
+        }
       }
 
       final List<Map<String, dynamic>> visitsFormatted =
           visitsMap.values.map((visit) {
+        final rawList = visit['_locations_raw'] as List<Map<String, double>>;
+        if (rawList.isNotEmpty) {
+          visit['location_default'] = _computeWeightedLocationSync(rawList);
+        }
+        visit.remove('_locations_raw');
         visit.remove('_details_ids');
+        visit.remove('_location_ids');
         return visit;
       }).toList();
 
@@ -2178,6 +2186,26 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   }
 
   /// Limpia datos de SQLite después de sincronización exitosa
+  /// Centroide ponderado por inverso del error horizontal al cuadrado.
+  String _computeWeightedLocationSync(List<Map<String, double>> points) {
+    double totalWeight = 0;
+    double wLat = 0, wLon = 0, wAlt = 0, wErr = 0;
+    for (final p in points) {
+      final err = p['err']!;
+      final w = 1.0 / (err * err + 0.01);
+      wLat += p['lat']! * w;
+      wLon += p['lon']! * w;
+      wAlt += p['alt']! * w;
+      wErr += err * w;
+      totalWeight += w;
+    }
+    final lat = wLat / totalWeight;
+    final lon = wLon / totalWeight;
+    final alt = wAlt / totalWeight;
+    final err = wErr / totalWeight;
+    return 'LAT:${lat.toStringAsFixed(8)};LON:${lon.toStringAsFixed(8)};ALT:${alt.toStringAsFixed(2)};ERH:${err.toStringAsFixed(2)}';
+  }
+
   Future<void> _cleanupSQLiteDataAfterSync() async {
     try {
       final String dbPath = await _getDatabasePath();

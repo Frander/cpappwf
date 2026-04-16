@@ -112,9 +112,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
   bool _voiceBannerDismissed = false;
   bool _voiceModelReady = false;
 
-  // Suscripción al servicio de background para eventos GPS
-  StreamSubscription<Map<String, dynamic>?>? _gpsServiceSubscription;
-  StreamSubscription<Map<String, dynamic>?>? _locationServiceSubscription;
+  // Nota: los listeners GPS (newLocation, gpsStabilized) fueron movidos a
+  // _MyAppState en main.dart para que sean globales e independientes de esta página.
 
   // Timer para procesar ubicaciones cada 60 segundos
   // Timer de procesamiento eliminado - la inserción a SQLite se hace en get_location_list.dart
@@ -134,8 +133,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
       }
     });
 
-    // Escuchar eventos del servicio de background (GPS estabilizado)
-    _setupGpsServiceListener();
+    // Nota: el listener GPS y el reset de geoLocationsList se hacen en main.dart
+    // (_MyAppState._setupGlobalGpsListeners) al iniciar la app.
 
     // Controllers de animación
     _userBadgeController = AnimationController(
@@ -222,8 +221,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
   void dispose() {
     _mapDownloadSubscription?.cancel();
     _calibrationTimer?.cancel();
-    _gpsServiceSubscription?.cancel();
-    _locationServiceSubscription?.cancel();
     _model.dispose();
     _userBadgeController.dispose();
     _activityBadgeController.dispose();
@@ -233,71 +230,6 @@ class _HomePageWidgetState extends State<HomePageWidget>
     super.dispose();
   }
 
-  // Configurar listener para eventos del servicio de background GPS
-  void _setupGpsServiceListener() {
-    if (Platform.isWindows) return; // Background service no disponible en Windows
-    debugPrint('🔧 Configurando listeners del servicio de GPS...');
-    final service = FlutterBackgroundService();
-
-    // Listener para evento de GPS estabilizado
-    _gpsServiceSubscription = service.on('gpsStabilized').listen((event) {
-      if (event != null && event['stabilized'] == true) {
-        debugPrint('📡 Evento recibido: GPS estabilizado');
-        if (mounted) {
-          FFAppState().update(() {
-            FFAppState().isStabilized = true;
-          });
-        }
-      }
-    });
-    debugPrint('   ✅ Listener "gpsStabilized" configurado');
-
-    // Listener para recibir ubicaciones del servicio de background
-    _locationServiceSubscription = service.on('newLocation').listen((event) {
-      if (event != null && mounted) {
-        try {
-          final geoStruct = ReadGeoStruct(
-            latitude: (event['latitude'] as num?)?.toDouble(),
-            longitude: (event['longitude'] as num?)?.toDouble(),
-            altitude: (event['altitude'] as num?)?.toDouble(),
-            errorHorizontal: (event['horizontalError'] as num?)?.toDouble(),
-            dateHourRead: DateTime.tryParse(event['createdAt'] ?? ''),
-          );
-
-          // Agregar a la lista en AppState
-          FFAppState().update(() {
-            FFAppState().geoLocationsList.add(geoStruct);
-
-            // Si están llegando ubicaciones, el GPS YA está estabilizado
-            // (el servicio solo envía ubicaciones después de estabilizar)
-            if (!FFAppState().isStabilized) {
-              FFAppState().isStabilized = true;
-              debugPrint('📡 GPS marcado como estabilizado (ubicaciones llegando)');
-            }
-          });
-
-          // Log cada 20 ubicaciones para no saturar la consola
-          if (FFAppState().geoLocationsList.length % 20 == 0) {
-            debugPrint(
-                '📍 ${FFAppState().geoLocationsList.length} puntos GPS acumulados en AppState');
-          }
-        } catch (e) {
-          debugPrint('❌ Error procesando ubicación recibida: $e');
-        }
-      }
-    }, onError: (error) {
-      debugPrint('❌ Error en listener "newLocation": $error');
-    }, onDone: () {
-      debugPrint('⚠️ Listener "newLocation" cerrado');
-    });
-    debugPrint('   ✅ Listener "newLocation" configurado');
-
-    // Nota: La depuración e inserción a SQLite se maneja directamente
-    // en el servicio en segundo plano (get_location_list.dart)
-
-    debugPrint(
-        '✅ Listeners de GPS configurados');
-  }
 
   // ============================================================================
   // BANNER DE MAPAS OFFLINE
@@ -1009,7 +941,8 @@ class _HomePageWidgetState extends State<HomePageWidget>
   // ============================================================================
 
   Widget _buildMapBanner() {
-    final mapReady = FFAppState().pathPmtiles.trim().isNotEmpty;
+    final mapReady = FFAppState().pathPmtiles.trim().isNotEmpty ||
+        FFAppState().hasOrtomosaics;
     if (mapReady || _mapBannerDismissed) return const SizedBox.shrink();
 
     return Padding(

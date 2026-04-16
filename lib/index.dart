@@ -35,6 +35,8 @@ export '/installation/headquarters_install_page/headquarters_install_page_widget
     show HeadquartersInstallPageWidget;
 export '/configuration/history_geo_page/history_geo_page_widget.dart'
     show HistoryGeoPageWidget;
+export '/configuration/history_geo_sqlite_page/history_geo_sqlite_page_widget.dart'
+    show HistoryGeoSqlitePageWidget;
 export '/configuration/settings_page/settings_page_widget.dart'
     show SettingsPageWidget;
 export '/visits/map_visits_page/map_visits_page_widget.dart'

@@ -5729,6 +5729,54 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
+  // ── Claves SharedPreferences para recordar el lote seleccionado por día ──
+  static const String _kLotIdKey   = 'selected_lot_id_day';
+  static const String _kLotNameKey = 'selected_lot_name_day';
+  static const String _kLotDateKey = 'selected_lot_date_day';
+
+  /// Devuelve el lote guardado si es del día de hoy, o null si expiró / no existe.
+  Future<HeadquartersStruct?> _getCachedLotForToday() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedDate = prefs.getString(_kLotDateKey);
+    final today = DateTime.now().toIso8601String().substring(0, 10); // 'yyyy-MM-dd'
+    if (savedDate != today) return null;
+    final id   = prefs.getInt(_kLotIdKey);
+    final name = prefs.getString(_kLotNameKey);
+    if (id == null || name == null) return null;
+    return HeadquartersStruct(idHeadquarter: id, nameHeadquarter: name);
+  }
+
+  /// Guarda la selección del lote para el día de hoy.
+  Future<void> _cacheLotForToday(HeadquartersStruct lot) async {
+    final prefs = await SharedPreferences.getInstance();
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    await prefs.setString(_kLotDateKey, today);
+    await prefs.setInt(_kLotIdKey,      lot.idHeadquarter);
+    await prefs.setString(_kLotNameKey, lot.nameHeadquarter);
+    debugPrint('💾 Lote guardado para hoy ($today): ${lot.nameHeadquarter} (ID: ${lot.idHeadquarter})');
+  }
+
+  /// Retorna el lote a usar cuando la GPS está fuera del polígono:
+  /// - Si ya hay una selección del día → la reutiliza sin mostrar el diálogo.
+  /// - Si no → muestra el diálogo, guarda la selección y la retorna.
+  Future<HeadquartersStruct?> _showSelectLotDialogOrRecall(
+    BuildContext context,
+    List<actions.HeadquarterDistance> nearestList,
+  ) async {
+    // 1. ¿Hay selección guardada de hoy?
+    final cached = await _getCachedLotForToday();
+    if (cached != null) {
+      debugPrint('♻️ Lote recordado del día: ${cached.nameHeadquarter} (ID: ${cached.idHeadquarter})');
+      return cached;
+    }
+
+    // 2. Primera vez hoy → mostrar diálogo
+    if (!mounted) return null;
+    final selected = await _showSelectLotDialog(context, nearestList);
+    if (selected != null) await _cacheLotForToday(selected);
+    return selected;
+  }
+
   /// Crea una visita directamente usando el TAG NFC leído y las últimas 3 geolocalizaciones del AppState
   /// Muestra un bottom sheet elegante para que el usuario seleccione
   /// el lote cuando la ubicación cae fuera de todos los polígonos.
@@ -6076,13 +6124,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         if (checkResult.insideHeadquarter != null) {
           idHeadquarter = checkResult.insideHeadquarter!.idHeadquarter;
           debugPrint('✅ Dentro del polígono del lote: ${checkResult.insideHeadquarter!.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (headquartersList.length == 1) {
+          // Solo 1 lote preseleccionado → auto-asignar sin preguntar
+          idHeadquarter = headquartersList.first.idHeadquarter;
+          debugPrint('✅ Único lote preseleccionado, auto-asignado: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (checkResult.nearestList.length == 1) {
+          // Solo hay 1 candidato cercano → auto-asignar
+          idHeadquarter = checkResult.nearestList.first.headquarter.idHeadquarter;
+          debugPrint('✅ Único lote cercano, auto-asignado: ${checkResult.nearestList.first.headquarter.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (checkResult.nearestList.isEmpty) {
+          debugPrint('⚠️ No hay lotes cercanos, Id_headquarter será 0');
         } else {
-          debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
+          // Más de 1 lote y GPS fuera de todos los polígonos → recordar o mostrar diálogo
+          debugPrint('⚠️ Múltiples lotes y GPS fuera de polígonos, verificando selección del día');
           if (!mounted) return false;
-          final selected = await _showSelectLotDialog(context, checkResult.nearestList);
+          final selected = await _showSelectLotDialogOrRecall(context, checkResult.nearestList);
           if (selected == null) return false;
           idHeadquarter = selected.idHeadquarter;
-          debugPrint('✅ Lote seleccionado por usuario: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
+          debugPrint('✅ Lote asignado: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
         }
       } else {
         debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
@@ -6302,13 +6361,24 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         if (checkResult.insideHeadquarter != null) {
           idHeadquarter = checkResult.insideHeadquarter!.idHeadquarter;
           debugPrint('✅ Dentro del polígono del lote: ${checkResult.insideHeadquarter!.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (headquartersList.length == 1) {
+          // Solo 1 lote preseleccionado → auto-asignar sin preguntar
+          idHeadquarter = headquartersList.first.idHeadquarter;
+          debugPrint('✅ Único lote preseleccionado, auto-asignado: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (checkResult.nearestList.length == 1) {
+          // Solo hay 1 candidato cercano → auto-asignar
+          idHeadquarter = checkResult.nearestList.first.headquarter.idHeadquarter;
+          debugPrint('✅ Único lote cercano, auto-asignado: ${checkResult.nearestList.first.headquarter.nameHeadquarter} (ID: $idHeadquarter)');
+        } else if (checkResult.nearestList.isEmpty) {
+          debugPrint('⚠️ No hay lotes cercanos, Id_headquarter será 0');
         } else {
-          debugPrint('⚠️ Fuera de todos los polígonos, mostrando diálogo de selección de lote');
+          // Más de 1 lote y GPS fuera de todos los polígonos → recordar o mostrar diálogo
+          debugPrint('⚠️ Múltiples lotes y GPS fuera de polígonos, verificando selección del día');
           if (!mounted) return false;
-          final selected = await _showSelectLotDialog(context, checkResult.nearestList);
+          final selected = await _showSelectLotDialogOrRecall(context, checkResult.nearestList);
           if (selected == null) return false;
           idHeadquarter = selected.idHeadquarter;
-          debugPrint('✅ Lote seleccionado por usuario: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
+          debugPrint('✅ Lote asignado: ${selected.nameHeadquarter} (ID: $idHeadquarter)');
         }
       } else {
         debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');

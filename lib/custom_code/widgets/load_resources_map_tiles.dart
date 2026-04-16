@@ -14,17 +14,26 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import '/services/map_download_service.dart';
-import '/components/download_progress_overlay.dart';
+import '/services/ortomosaic_download_service.dart';
 
-/// Widget para gestionar la descarga de mapas PMTiles
-/// Ahora permite navegación libre mientras la descarga continúa en segundo plano
+// ─────────────────────────────────────────────────────────────────────────────
+// TEMA DE COLORES (dark green)
+// ─────────────────────────────────────────────────────────────────────────────
+const _bg = Color(0xFF0D1521);
+const _cardBg = Color(0xFF1A2535);
+const _cardBorder = Color(0xFF004629);
+const _green = Color(0xFF004629);
+const _greenLight = Color(0xFF00a86b);
+const _greenNeon = Color(0xFF00ff9f);
+const _textPrimary = Colors.white;
+const _textSecondary = Color(0xFF8A9BB0);
+const _errorColor = Color(0xFFE53935);
+const _successColor = Color(0xFF00a86b);
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 class LoadResourcesMapTiles extends StatefulWidget {
-  const LoadResourcesMapTiles({
-    super.key,
-    this.width,
-    this.height,
-  });
-
+  const LoadResourcesMapTiles({super.key, this.width, this.height});
   final double? width;
   final double? height;
 
@@ -33,36 +42,49 @@ class LoadResourcesMapTiles extends StatefulWidget {
 }
 
 class _LoadResourcesMapTilesState extends State<LoadResourcesMapTiles>
-    with SingleTickerProviderStateMixin {
-  final MapDownloadService _downloadService = MapDownloadService();
-  StreamSubscription<MapDownloadState>? _subscription;
+    with TickerProviderStateMixin {
+  final _mapService = MapDownloadService();
+  final _ortService = OrtomosaicDownloadService();
 
-  late AnimationController _animationController;
-  late Animation<double> _pulseAnimation;
+  StreamSubscription<MapDownloadState>? _mapSub;
+  StreamSubscription<Map<String, OrtomosaicDownloadProgress>>? _ortSub;
 
-  bool _isChecking = true;
-  bool _mapExists = false;
+  // Estado mapa base
+  bool _checkingBase = true;
+
+  // Estado ortomosaicos
+  bool _loadingZones = false;
+  bool _loadingSizes = false;
+  String? _zonesError;
+  List<ZoneTile> _zones = [];
+  Map<String, OrtomosaicInfo?> _downloadedInfo = {};
+  Map<String, int> _zoneSizes = {}; // bytes esperados por zona (del endpoint S3Files)
+
+  // Progreso de todas las descargas activas
+  Map<String, OrtomosaicDownloadProgress> _activeDownloads = {};
 
   @override
   void initState() {
     super.initState();
+    _initBase();
+    _initZones();
 
-    _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
-      vsync: this,
-    )..repeat(reverse: true);
+    _mapSub = _mapService.stateStream.listen((_) {
+      if (mounted) setState(() {});
+    });
 
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
+    // Solo actualizar UI local — el SnackBar global lo maneja el servicio
+    _ortSub = _ortService.progressStream.listen((downloads) {
+      if (!mounted) return;
+      setState(() => _activeDownloads = downloads);
 
-    _checkMapStatus();
-
-    // Escuchar cambios del servicio
-    _subscription = _downloadService.stateStream.listen((state) {
-      if (mounted) {
-        setState(() {
-          _mapExists = state.isComplete;
+      // Cuando terminan descargas, actualizar estado descargado
+      final finished = downloads.values
+          .where((p) => p.isComplete || p.hasError || p.isCancelled);
+      if (finished.isNotEmpty) {
+        Future.delayed(const Duration(seconds: 2), () {
+          _ortService.clearFinished();
+          _refreshDownloadedInfo();
         });
       }
     });
@@ -70,844 +92,694 @@ class _LoadResourcesMapTilesState extends State<LoadResourcesMapTiles>
 
   @override
   void dispose() {
-    _animationController.dispose();
-    _subscription?.cancel();
+    _mapSub?.cancel();
+    _ortSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _checkMapStatus() async {
-    final exists = await _downloadService.checkExistingFile();
-    if (mounted) {
-      setState(() {
-        _isChecking = false;
-        _mapExists = exists;
-      });
+  // ── Inicialización ─────────────────────────────────────────────────────
+
+  Future<void> _initBase() async {
+    await _mapService.checkExistingFile();
+    if (mounted) setState(() => _checkingBase = false);
+    // Obtener tamaño real del PMTiles en background (HEAD request a S3)
+    _mapService.fetchRemoteSize();
+  }
+
+  Future<void> _initZones() async {
+    if (mounted) setState(() { _loadingZones = true; _zonesError = null; });
+    try {
+      final zones = await _ortService.fetchActiveZones();
+      // Consultar estado descargado (solo SQLite, sin peticiones S3)
+      final info = <String, OrtomosaicInfo?>{};
+      for (final z in zones) {
+        info[z.relativePath] = await _ortService.getOrtomosaicInfo(z.relativePath);
+      }
+      if (mounted) setState(() { _zones = zones; _downloadedInfo = info; });
+
+      // Cargar tamaños reales en background (endpoint S3Files, ~1 call por carpeta raíz)
+      _fetchSizesInBackground(zones);
+    } catch (e) {
+      if (mounted) setState(() => _zonesError = e.toString());
+    } finally {
+      if (mounted) setState(() => _loadingZones = false);
     }
   }
 
-  void _startBackgroundDownload() {
-    // Iniciar descarga en segundo plano
-    _downloadService.startDownload();
-
-    // Mostrar overlay de progreso
-    DownloadProgressOverlay.show(context);
-
-    // Navegar hacia atrás para permitir al usuario usar la app
-    Navigator.pop(context);
+  Future<void> _fetchSizesInBackground(List<ZoneTile> zones) async {
+    if (mounted) setState(() => _loadingSizes = true);
+    try {
+      final sizes = await _ortService.fetchFolderSizes(zones);
+      if (mounted) setState(() => _zoneSizes = sizes);
+    } catch (_) {
+      // Silencioso — sin tamaños disponibles
+    } finally {
+      if (mounted) setState(() => _loadingSizes = false);
+    }
   }
 
-  /// Elimina el archivo PMTiles descargado y permite volver a descargarlo
-  Future<void> _deleteAndRedownload() async {
-    // Mostrar diálogo de confirmación
-    final confirm = await showDialog<bool>(
+  Future<void> _refreshDownloadedInfo() async {
+    for (final z in _zones) {
+      final info = await _ortService.getOrtomosaicInfo(z.relativePath);
+      if (mounted) setState(() => _downloadedInfo[z.relativePath] = info);
+    }
+  }
+
+  // ── Acciones mapa base ─────────────────────────────────────────────────
+
+  void _startBaseDownload() {
+    _mapService.startDownload();
+    if (mounted) setState(() {});
+    _showSimpleSnack('Descargando mapa base en segundo plano...', _green);
+  }
+
+  Future<void> _deleteBaseMap() async {
+    final ok = await _confirmDialog(
+      title: 'Eliminar mapa base',
+      message: '¿Eliminar el mapa base de Colombia?\nDeberás volver a descargarlo.',
+    );
+    if (ok != true) return;
+    final fp = _mapService.filePath;
+    if (fp.isNotEmpty) {
+      final f = File(fp);
+      if (await f.exists()) await f.delete();
+      final pf = File('$fp.partial');
+      if (await pf.exists()) await pf.delete();
+    }
+    _mapService.resetState();
+    FFAppState().update(() => FFAppState().pathPmtiles = '');
+    if (mounted) setState(() {});
+  }
+
+  // ── Acciones ortomosaicos ──────────────────────────────────────────────
+
+  Future<void> _startOrtDownload(ZoneTile zone) async {
+    await _ortService.downloadZone(zone);
+  }
+
+  Future<void> _deleteOrt(ZoneTile zone) async {
+    final ok = await _confirmDialog(
+      title: 'Eliminar ortomosaico',
+      message: '¿Eliminar "${zone.displayName}"?\nDeberás volver a descargarlo.',
+    );
+    if (ok != true) return;
+    await _ortService.deleteZone(zone.relativePath);
+    await _refreshDownloadedInfo();
+    _showSimpleSnack('${zone.displayName} eliminado', _errorColor);
+  }
+
+
+  void _showSimpleSnack(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg, style: const TextStyle(color: Colors.white)),
+      backgroundColor: color,
+      duration: const Duration(seconds: 3),
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ));
+  }
+
+  Future<bool?> _confirmDialog({required String title, required String message}) {
+    return showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: FlutterFlowTheme.of(context).secondaryBackground,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber_rounded,
-                color: FlutterFlowTheme.of(context).warning, size: 28),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                'Eliminar Mapa',
-                style: TextStyle(
-                  color: FlutterFlowTheme.of(context).primaryText,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          '¿Estás seguro de que deseas eliminar el mapa descargado?\n\nEsto liberará espacio en tu dispositivo y tendrás que volver a descargarlo para usar el mapa offline.',
-          style: TextStyle(
-            color: FlutterFlowTheme.of(context).secondaryText,
-            fontSize: 14,
-            height: 1.5,
-          ),
-        ),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _cardBg,
+        shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: _cardBorder.withValues(alpha: 0.5))),
+        title: Text(title, style: const TextStyle(color: _textPrimary, fontSize: 17, fontWeight: FontWeight.bold)),
+        content: Text(message, style: const TextStyle(color: _textSecondary, fontSize: 14, height: 1.5)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(
-              'Cancelar',
-              style: TextStyle(color: FlutterFlowTheme.of(context).secondaryText),
-            ),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar', style: TextStyle(color: _textSecondary)),
           ),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: FlutterFlowTheme.of(context).error,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            ),
-            child: const Text('Eliminar'),
+                backgroundColor: _errorColor, foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
+            child: const Text('Confirmar'),
           ),
         ],
       ),
     );
-
-    if (confirm != true) return;
-
-    setState(() => _isChecking = true);
-
-    try {
-      // Obtener la ruta del archivo
-      final filePath = _downloadService.filePath;
-
-      if (filePath.isNotEmpty) {
-        final file = File(filePath);
-        if (await file.exists()) {
-          await file.delete();
-          debugPrint('🗑️ Archivo PMTiles eliminado: $filePath');
-        }
-
-        // También eliminar archivo parcial si existe
-        final partialFile = File('$filePath.partial');
-        if (await partialFile.exists()) {
-          await partialFile.delete();
-          debugPrint('🗑️ Archivo parcial eliminado');
-        }
-      }
-
-      // Limpiar estado del servicio
-      _downloadService.resetState();
-
-      // Limpiar AppState
-      FFAppState().update(() {
-        FFAppState().pathPmtiles = '';
-      });
-
-      if (mounted) {
-        setState(() {
-          _isChecking = false;
-          _mapExists = false;
-        });
-
-        // Mostrar mensaje de éxito
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                const SizedBox(width: 12),
-                const Text('Mapa eliminado correctamente'),
-              ],
-            ),
-            backgroundColor: FlutterFlowTheme.of(context).success,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('❌ Error eliminando archivo: $e');
-
-      if (mounted) {
-        setState(() => _isChecking = false);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                Icon(Icons.error, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(child: Text('Error al eliminar: $e')),
-              ],
-            ),
-            backgroundColor: FlutterFlowTheme.of(context).error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      }
-    }
   }
 
-  String _formatBytes(int bytes) {
-    if (bytes < 1024) {
-      return '$bytes B';
-    } else if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    } else if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(2)} MB';
-    } else {
-      return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-    }
-  }
+  // ─────────────────────────────────────────────────────────────────────────
+  // BUILD
+  // ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: widget.width,
       height: widget.height,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            FlutterFlowTheme.of(context).secondaryBackground,
-            FlutterFlowTheme.of(context).alternate,
-          ],
-        ),
-      ),
+      color: _bg,
       child: SafeArea(
         child: Column(
           children: [
             _buildHeader(),
             Expanded(
-              child: _isChecking
-                  ? _buildLoadingScreen()
-                  : _mapExists
-                      ? _buildCompleteScreen()
-                      : _downloadService.isDownloading
-                          ? _buildDownloadingScreen()
-                          : _buildReadyScreen(),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 16),
+                    _buildBaseSection(),
+                    const SizedBox(height: 20),
+                    _buildOrtSection(),
+                  ],
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+
+  // ── Header ───────────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            FlutterFlowTheme.of(context).primary,
-            FlutterFlowTheme.of(context).secondary,
-          ],
+        color: _cardBg,
+        border: Border(bottom: BorderSide(color: _cardBorder.withValues(alpha: 0.4))),
+      ),
+      child: Row(children: [
+        _iconBox(Icons.map_rounded, const [Color(0xFF004D40), Color(0xFF00695C)]),
+        const SizedBox(width: 14),
+        const Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Gestión de Mapas',
+                style: TextStyle(color: _textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 2),
+            Text('Descarga y administra tus mapas offline',
+                style: TextStyle(color: _textSecondary, fontSize: 12)),
+          ]),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.map_rounded,
-              color: FlutterFlowTheme.of(context).info,
-              size: 28,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Mapa Offline',
-                  style: TextStyle(
-                    color: FlutterFlowTheme.of(context).info,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Colombia - PMTiles',
-                  style: TextStyle(
-                    color: FlutterFlowTheme.of(context).info.withValues(alpha: 0.7),
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.close, color: FlutterFlowTheme.of(context).info),
-            tooltip: 'Cerrar',
-          ),
-        ],
-      ),
+      ]),
     );
   }
 
-  Widget _buildLoadingScreen() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          CircularProgressIndicator(
-            color: FlutterFlowTheme.of(context).primary,
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Verificando mapa...',
-            style: TextStyle(
-              fontSize: 16,
-              color: FlutterFlowTheme.of(context).secondaryText,
-            ),
-          ),
-        ],
-      ),
+  // ── Sección mapa base ─────────────────────────────────────────────────────
+
+  Widget _buildBaseSection() {
+    return _Card(
+      icon: Icons.public_rounded,
+      title: 'Mapa Base',
+      subtitle: 'Colombia completa · Cartografía general',
+      child: _checkingBase ? _spinner() : _buildBaseContent(),
     );
   }
 
-  Widget _buildReadyScreen() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Icono principal
-            ScaleTransition(
-              scale: _pulseAnimation,
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      FlutterFlowTheme.of(context).primary,
-                      FlutterFlowTheme.of(context).secondary,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(32),
-                  boxShadow: [
-                    BoxShadow(
-                      color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.4),
-                      blurRadius: 30,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.cloud_download_rounded,
-                  color: FlutterFlowTheme.of(context).info,
-                  size: 70,
-                ),
-              ),
-            ),
+  Widget _buildBaseContent() {
+    final isComplete = _mapService.isComplete;
+    final isDownloading = _mapService.isDownloading && !_mapService.isPaused;
+    final isPaused = _mapService.isPaused;
+    final progress = _mapService.progress;
+    final dlBytes = _mapService.downloadedBytes;
+    final totalBytes = _mapService.totalBytes;
+    final speed = _mapService.speed;
 
-            const SizedBox(height: 40),
-
-            Text(
-              'Listo para Descargar',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: FlutterFlowTheme.of(context).primaryText,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              'Descarga el mapa de Colombia para usar sin conexión.\nPuedes seguir usando la app mientras se descarga.',
-              style: TextStyle(
-                fontSize: 14,
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 32),
-
-            // Información del archivo
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: FlutterFlowTheme.of(context).secondaryBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: FlutterFlowTheme.of(context).alternate,
-                  width: 1,
-                ),
-              ),
-              child: Column(
-                children: [
-                  _buildInfoRow(Icons.insert_drive_file_rounded, 'Archivo', 'colombia.pmtiles'),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(Icons.storage_rounded, 'Tamaño aprox.', '~200 MB'),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(Icons.map_rounded, 'Región', 'Colombia'),
-                  const SizedBox(height: 12),
-                  _buildInfoRow(Icons.wifi_rounded, 'Recomendado', 'WiFi'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Nota sobre descarga en segundo plano
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: FlutterFlowTheme.of(context).accent1.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.info_outline_rounded,
-                    color: FlutterFlowTheme.of(context).primary,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'La descarga continuará en segundo plano. Puedes navegar libremente por la app.',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: FlutterFlowTheme.of(context).primaryText,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Botón de descarga
-            Container(
-              width: double.infinity,
-              height: 60,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).primary,
-                    FlutterFlowTheme.of(context).secondary,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: ElevatedButton(
-                onPressed: _startBackgroundDownload,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.download_rounded,
-                      color: FlutterFlowTheme.of(context).info,
-                      size: 24,
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Iniciar Descarga',
-                      style: TextStyle(
-                        color: FlutterFlowTheme.of(context).info,
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDownloadingScreen() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Icono de descarga
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).primary,
-                    FlutterFlowTheme.of(context).secondary,
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: [
-                  BoxShadow(
-                    color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  SizedBox(
-                    width: 80,
-                    height: 80,
-                    child: CircularProgressIndicator(
-                      value: _downloadService.progress,
-                      strokeWidth: 6,
-                      backgroundColor: Colors.white.withValues(alpha: 0.3),
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
-                  Text(
-                    '${(_downloadService.progress * 100).toInt()}%',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            Text(
-              'Descargando en Segundo Plano',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: FlutterFlowTheme.of(context).primaryText,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              'Puedes cerrar esta pantalla y seguir usando la app.\nEl progreso se mostrará en la barra inferior.',
-              style: TextStyle(
-                fontSize: 14,
-                color: FlutterFlowTheme.of(context).secondaryText,
-                height: 1.5,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Estadísticas
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: FlutterFlowTheme.of(context).secondaryBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: FlutterFlowTheme.of(context).alternate,
-                ),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Descargado',
-                        style: TextStyle(
-                          color: FlutterFlowTheme.of(context).secondaryText,
-                        ),
-                      ),
-                      Text(
-                        '${_formatBytes(_downloadService.downloadedBytes)} / ${_formatBytes(_downloadService.totalBytes)}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: FlutterFlowTheme.of(context).primaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Velocidad',
-                        style: TextStyle(
-                          color: FlutterFlowTheme.of(context).secondaryText,
-                        ),
-                      ),
-                      Text(
-                        _downloadService.speed.isNotEmpty ? _downloadService.speed : '--',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: FlutterFlowTheme.of(context).primaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Tiempo restante',
-                        style: TextStyle(
-                          color: FlutterFlowTheme.of(context).secondaryText,
-                        ),
-                      ),
-                      Text(
-                        _downloadService.timeRemaining.isNotEmpty
-                            ? _downloadService.timeRemaining
-                            : 'Calculando...',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: FlutterFlowTheme.of(context).primaryText,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Botón para ver el overlay
-            OutlinedButton.icon(
-              onPressed: () {
-                DownloadProgressOverlay.show(context);
-                Navigator.pop(context);
-              },
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Volver y Ver Progreso'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: FlutterFlowTheme.of(context).primary,
-                side: BorderSide(color: FlutterFlowTheme.of(context).primary),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompleteScreen() {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    FlutterFlowTheme.of(context).success,
-                    FlutterFlowTheme.of(context).success.withValues(alpha: 0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(32),
-                boxShadow: [
-                  BoxShadow(
-                    color: FlutterFlowTheme.of(context).success.withValues(alpha: 0.4),
-                    blurRadius: 30,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.check_circle_rounded,
-                color: FlutterFlowTheme.of(context).info,
-                size: 70,
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            Text(
-              'Mapa Descargado',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: FlutterFlowTheme.of(context).primaryText,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 12),
-
-            Text(
-              'El mapa de Colombia está listo para usar sin conexión',
-              style: TextStyle(
-                fontSize: 14,
-                color: FlutterFlowTheme.of(context).secondaryText,
-              ),
-              textAlign: TextAlign.center,
-            ),
-
-            const SizedBox(height: 8),
-
-            Text(
-              _formatBytes(_downloadService.totalBytes),
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: FlutterFlowTheme.of(context).primary,
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            Container(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: FlutterFlowTheme.of(context).success,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  'Continuar',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Botón para eliminar y volver a descargar
-            Container(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: _deleteAndRedownload,
-                icon: Icon(
-                  Icons.refresh_rounded,
-                  color: FlutterFlowTheme.of(context).error,
-                  size: 20,
-                ),
-                label: Text(
-                  'Eliminar y Volver a Descargar',
-                  style: TextStyle(
-                    color: FlutterFlowTheme.of(context).error,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(
-                    color: FlutterFlowTheme.of(context).error.withValues(alpha: 0.5),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // Texto explicativo
-            Text(
-              'Usa esta opción si el mapa no carga correctamente',
-              style: TextStyle(
-                fontSize: 12,
-                color: FlutterFlowTheme.of(context).secondaryText,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(
-            icon,
-            color: FlutterFlowTheme.of(context).primary,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: FlutterFlowTheme.of(context).secondaryText,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: FlutterFlowTheme.of(context).primaryText,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Wrap(spacing: 6, runSpacing: 6, children: [
+        _Chip(Icons.storage_rounded,
+            totalBytes > 0 ? _fmtBytes(totalBytes) : '— MB'),
+        _Chip(Icons.wifi_rounded, 'Recomendado WiFi'),
+        _Chip(Icons.place_rounded, 'Colombia'),
+      ]),
+      const SizedBox(height: 14),
+      if (isComplete) ...[
+        _StatusBadge(Icons.check_circle_rounded,
+            'Descargado · ${_fmtBytes(totalBytes)}', _successColor),
+        const SizedBox(height: 12),
+        _DangerBtn('Eliminar y re-descargar', Icons.delete_outline_rounded, _deleteBaseMap),
+      ] else if (isDownloading || isPaused) ...[
+        _ProgressBar(progress),
+        const SizedBox(height: 6),
+        Row(children: [
+          Text('${_fmtBytes(dlBytes)} / ${_fmtBytes(totalBytes)} · ${(progress * 100).toStringAsFixed(0)}%',
+              style: const TextStyle(color: _greenNeon, fontSize: 12)),
+          const Spacer(),
+          if (speed.isNotEmpty)
+            Text(speed, style: const TextStyle(color: _textSecondary, fontSize: 11)),
+        ]),
+        const SizedBox(height: 10),
+        if (isPaused)
+          _GreenBtn('Reanudar', Icons.play_arrow_rounded,
+              _mapService.resumeDownload, fullWidth: false)
+        else
+          _GreenBtn('Pausar', Icons.pause_rounded,
+              _mapService.pauseDownload, fullWidth: false),
+      ] else ...[
+        _GreenBtn('Descargar mapa base', Icons.download_rounded,
+            _startBaseDownload, fullWidth: true),
       ],
+    ]);
+  }
+
+  // ── Sección ortomosaicos ──────────────────────────────────────────────────
+
+  Widget _buildOrtSection() {
+    return _Card(
+      icon: Icons.satellite_alt_rounded,
+      title: 'Ortomosaicos de Vuelos',
+      subtitle: 'Imágenes detalladas por zona · Zoom 16–21',
+      trailingAction: _loadingZones
+          ? const SizedBox(width: 18, height: 18,
+              child: CircularProgressIndicator(color: _greenLight, strokeWidth: 2))
+          : GestureDetector(
+              onTap: _initZones,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: _green.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.refresh_rounded, color: _greenLight, size: 18),
+              )),
+      child: Column(children: [
+        if (_zonesError != null) _buildZonesError(),
+        if (_zones.isEmpty && !_loadingZones && _zonesError == null) _buildZonesEmpty(),
+        ..._zones.map(_buildZoneCard),
+      ]),
     );
   }
+
+  Widget _buildZonesError() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: _errorColor.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _errorColor.withValues(alpha: 0.3)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.wifi_off_rounded, color: _errorColor, size: 16),
+        const SizedBox(width: 8),
+        const Expanded(
+            child: Text('No se pudieron cargar las zonas.',
+                style: TextStyle(color: _textSecondary, fontSize: 13))),
+        GestureDetector(
+            onTap: _initZones,
+            child: const Text('Reintentar',
+                style: TextStyle(color: _greenLight, fontSize: 12, fontWeight: FontWeight.w600))),
+      ]),
+    );
+  }
+
+  Widget _buildZonesEmpty() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: Column(children: [
+        Icon(Icons.layers_clear_rounded, color: _textSecondary.withValues(alpha: 0.3), size: 36),
+        const SizedBox(height: 8),
+        const Text('No hay ortomosaicos activos',
+            style: TextStyle(color: _textSecondary, fontSize: 13)),
+      ]),
+    );
+  }
+
+  Widget _buildZoneCard(ZoneTile zone) {
+    final path = zone.relativePath;
+    final info = _downloadedInfo[path];
+    final isDownloaded = info != null;
+    final progress = _activeDownloads[path];
+    final isActive = progress?.isActive ?? false;
+    final isError = progress?.hasError ?? false;
+    final isComplete = progress?.isComplete ?? false;
+    final isCancelled = progress?.isCancelled ?? false;
+
+    // Color de borde según estado
+    Color borderColor;
+    if (isActive) borderColor = _greenLight.withValues(alpha: 0.5);
+    else if (isDownloaded) borderColor = _greenLight.withValues(alpha: 0.25);
+    else if (isError) borderColor = _errorColor.withValues(alpha: 0.35);
+    else borderColor = _cardBorder.withValues(alpha: 0.2);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isActive
+            ? const Color(0xFF0E2A1A)
+            : const Color(0xFF111E2E),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: borderColor),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── Encabezado ──
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _zoneIcon(isDownloaded, isActive, isError),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(zone.displayName,
+                  style: const TextStyle(color: _textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 3),
+              _zoneSubtitle(path, info, progress, isActive, isDownloaded, isError, isCancelled),
+            ]),
+          ),
+          // Badge de estado
+          if (isActive)
+            _badge('Descargando', _greenNeon)
+          else if (isComplete)
+            _badge('Completado', _successColor)
+          else if (isDownloaded)
+            _badge('Disponible', _greenLight)
+          else if (isError)
+            _badge('Error', _errorColor),
+        ]),
+
+        // ── Progreso inline ──
+        if (isActive && progress != null) ...[
+          const SizedBox(height: 12),
+          _ProgressBar(progress.fraction),
+          const SizedBox(height: 5),
+          Row(children: [
+            Text(
+              progress.expectedTotalBytes > 0
+                  ? '${progress.downloadedMB} MB / ${progress.totalMB} MB'
+                  : '${progress.downloadedTiles} / ${progress.totalTiles} tiles · ${progress.downloadedMB} MB',
+              style: const TextStyle(color: _greenNeon, fontSize: 11),
+            ),
+            const Spacer(),
+            Text(progress.percent,
+                style: const TextStyle(color: _greenLight, fontSize: 11, fontWeight: FontWeight.bold)),
+          ]),
+        ],
+
+        // ── Botones ──
+        const SizedBox(height: 12),
+        _zoneActions(zone, isDownloaded, isActive, isError),
+      ]),
+    );
+  }
+
+  Widget _zoneIcon(bool isDownloaded, bool isActive, bool isError) {
+    Color bg;
+    IconData icon;
+    Color iconColor;
+    if (isActive) {
+      bg = _greenNeon.withValues(alpha: 0.12);
+      icon = Icons.download_rounded;
+      iconColor = _greenNeon;
+    } else if (isDownloaded) {
+      bg = _greenLight.withValues(alpha: 0.12);
+      icon = Icons.check_rounded;
+      iconColor = _greenNeon;
+    } else if (isError) {
+      bg = _errorColor.withValues(alpha: 0.12);
+      icon = Icons.error_outline_rounded;
+      iconColor = _errorColor;
+    } else {
+      bg = _textSecondary.withValues(alpha: 0.08);
+      icon = Icons.terrain_rounded;
+      iconColor = _textSecondary;
+    }
+    return Container(
+      width: 34, height: 34,
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(9)),
+      child: Icon(icon, color: iconColor, size: 17),
+    );
+  }
+
+  Widget _zoneSubtitle(
+      String zonePath, OrtomosaicInfo? info, OrtomosaicDownloadProgress? progress,
+      bool isActive, bool isDownloaded, bool isError, bool isCancelled) {
+    if (isActive && progress != null) {
+      final total = progress.totalMB != '?' ? '/ ${progress.totalMB} MB' : '';
+      return Text('Descargando... ${progress.downloadedMB} MB $total',
+          style: const TextStyle(color: _greenLight, fontSize: 11));
+    }
+    if (isError && progress != null) {
+      return Text('Error: ${progress.errorMessage ?? "desconocido"}',
+          style: const TextStyle(color: _errorColor, fontSize: 11),
+          maxLines: 2, overflow: TextOverflow.ellipsis);
+    }
+    if (isCancelled) {
+      return const Text('Cancelado',
+          style: TextStyle(color: _textSecondary, fontSize: 11));
+    }
+    if (isDownloaded && info != null) {
+      return Text(
+          '${info.tileCount} tiles · ${_fmtBytes(info.totalBytes)} · Zoom ${info.minZoom}–${info.maxZoom}',
+          style: const TextStyle(color: _textSecondary, fontSize: 11));
+    }
+    // Sin descargar: mostrar tamaño real si ya lo tenemos
+    final sizeBytes = _zoneSizes[zonePath] ?? 0;
+    if (sizeBytes > 0) {
+      return Text(
+        '~${_fmtBytes(sizeBytes)} · Zoom 16–21',
+        style: const TextStyle(color: _textSecondary, fontSize: 11),
+      );
+    }
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      const Text('Zoom 16–21', style: TextStyle(color: _textSecondary, fontSize: 11)),
+      if (_loadingSizes) ...[
+        const SizedBox(width: 6),
+        const SizedBox(width: 10, height: 10,
+            child: CircularProgressIndicator(strokeWidth: 1.5, color: _textSecondary)),
+      ],
+    ]);
+  }
+
+  Widget _badge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  Widget _zoneActions(ZoneTile zone, bool isDownloaded, bool isActive, bool isError) {
+    final path = zone.relativePath;
+
+    if (isActive) {
+      return _DangerBtn('Cancelar descarga', Icons.stop_rounded,
+          () => _ortService.cancelDownload(path), compact: true);
+    }
+
+    if (isDownloaded) {
+      return Row(children: [
+        Expanded(child: _DangerBtn('Eliminar', Icons.delete_outline_rounded,
+            () => _deleteOrt(zone), compact: true)),
+        const SizedBox(width: 8),
+        Expanded(child: _GreenBtn('Re-descargar', Icons.refresh_rounded,
+            () async {
+              await _ortService.deleteZone(path);
+              await _refreshDownloadedInfo();
+              await _startOrtDownload(zone);
+            }, compact: true)),
+      ]);
+    }
+
+    if (isError) {
+      return _GreenBtn('Reintentar', Icons.replay_rounded,
+          () => _startOrtDownload(zone), fullWidth: true, compact: true);
+    }
+
+    return _GreenBtn('Descargar esta zona', Icons.download_rounded,
+        () => _startOrtDownload(zone), fullWidth: true, compact: true);
+  }
+
+  // ── Utilidades ────────────────────────────────────────────────────────────
+
+  String _fmtBytes(int bytes) {
+    if (bytes <= 0) return '0 B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
+  }
+
+  Widget _spinner() => const Padding(
+      padding: EdgeInsets.symmetric(vertical: 20),
+      child: Center(child: CircularProgressIndicator(color: _greenLight, strokeWidth: 2)));
+
+  Widget _iconBox(IconData icon, List<Color> grad) => Container(
+        width: 42, height: 42,
+        decoration: BoxDecoration(
+            gradient: LinearGradient(colors: grad, begin: Alignment.topLeft, end: Alignment.bottomRight),
+            borderRadius: BorderRadius.circular(12)),
+        child: Icon(icon, color: Colors.white, size: 22));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// COMPONENTES REUTILIZABLES
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _Card extends StatelessWidget {
+  final IconData icon;
+  final String title, subtitle;
+  final Widget child;
+  final Widget? trailingAction;
+  const _Card({required this.icon, required this.title, required this.subtitle,
+      required this.child, this.trailingAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: _cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _cardBorder.withValues(alpha: 0.3)),
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4))],
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_green.withValues(alpha: 0.18), Colors.transparent],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            border: Border(bottom: BorderSide(color: _cardBorder.withValues(alpha: 0.25))),
+          ),
+          child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(7),
+              decoration: BoxDecoration(color: _green.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(8)),
+              child: Icon(icon, color: _greenNeon, size: 17),
+            ),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(color: _textPrimary, fontSize: 15, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 1),
+              Text(subtitle, style: const TextStyle(color: _textSecondary, fontSize: 11)),
+            ])),
+            if (trailingAction != null) trailingAction!,
+          ]),
+        ),
+        Padding(padding: const EdgeInsets.all(14), child: child),
+      ]),
+    );
+  }
+}
+
+class _Chip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _Chip(this.icon, this.label);
+  @override
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+          color: _green.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _green.withValues(alpha: 0.3))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 11, color: _greenLight),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(color: _textSecondary, fontSize: 11)),
+      ]));
+}
+
+class _StatusBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  const _StatusBadge(this.icon, this.label, this.color);
+  @override
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: color.withValues(alpha: 0.35))),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, color: color, size: 16),
+        const SizedBox(width: 8),
+        Text(label, style: TextStyle(color: color, fontSize: 13, fontWeight: FontWeight.w600)),
+      ]));
+}
+
+class _ProgressBar extends StatelessWidget {
+  final double value;
+  const _ProgressBar(this.value);
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: LinearProgressIndicator(
+          value: value.clamp(0.0, 1.0),
+          backgroundColor: const Color(0xFF1A3A2A),
+          color: _greenNeon,
+          minHeight: 5));
+}
+
+class _GreenBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool fullWidth, compact;
+  const _GreenBtn(this.label, this.icon, this.onTap,
+      {this.fullWidth = false, this.compact = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    Widget btn = GestureDetector(
+      onTap: disabled ? null : onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14, vertical: compact ? 9 : 12),
+        decoration: BoxDecoration(
+          gradient: disabled ? null : const LinearGradient(
+              colors: [Color(0xFF004D40), Color(0xFF00695C)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight),
+          color: disabled ? const Color(0xFF1A2535) : null,
+          borderRadius: BorderRadius.circular(10),
+          border: disabled ? Border.all(color: _cardBorder.withValues(alpha: 0.2)) : null,
+          boxShadow: disabled ? null : [
+            BoxShadow(color: const Color(0xFF004D40).withValues(alpha: 0.35),
+                blurRadius: 8, offset: const Offset(0, 3)),
+          ],
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+            children: [
+              Icon(icon, color: disabled ? _textSecondary : Colors.white, size: 15),
+              const SizedBox(width: 7),
+              Text(label, style: TextStyle(
+                  color: disabled ? _textSecondary : Colors.white,
+                  fontSize: compact ? 12 : 13,
+                  fontWeight: FontWeight.w600)),
+            ]),
+      ),
+    );
+    return fullWidth ? SizedBox(width: double.infinity, child: btn) : btn;
+  }
+}
+
+class _DangerBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool compact;
+  const _DangerBtn(this.label, this.icon, this.onTap, {this.compact = false});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+      onTap: onTap,
+      child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14, vertical: compact ? 9 : 11),
+          decoration: BoxDecoration(
+              color: _errorColor.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _errorColor.withValues(alpha: 0.35))),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(icon, color: _errorColor, size: 14),
+            const SizedBox(width: 6),
+            Text(label, style: TextStyle(
+                color: _errorColor, fontSize: compact ? 12 : 13, fontWeight: FontWeight.w600)),
+          ])));
 }

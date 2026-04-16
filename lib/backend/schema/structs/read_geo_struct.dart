@@ -13,11 +13,17 @@ class ReadGeoStruct extends BaseStruct {
     double? altitude,
     double? errorHorizontal,
     DateTime? dateHourRead,
+    String? method,
+    double? speed,
+    int? battery,
   })  : _latitude = latitude,
         _longitude = longitude,
         _altitude = altitude,
         _errorHorizontal = errorHorizontal,
-        _dateHourRead = dateHourRead;
+        _dateHourRead = dateHourRead,
+        _method = method,
+        _speed = speed,
+        _battery = battery;
 
   // "latitude" field.
   double? _latitude;
@@ -63,12 +69,34 @@ class ReadGeoStruct extends BaseStruct {
 
   bool hasDateHourRead() => _dateHourRead != null;
 
+  // "method" field — origen del punto ('LITE' | 'UKF_IMU' | 'UNKNOWN').
+  String? _method;
+  String get method => _method ?? 'UNKNOWN';
+  set method(String? val) => _method = val;
+
+  bool hasMethod() => _method != null;
+
+  // "speed" field.
+  double? _speed;
+  double get speed => _speed ?? 0.0;
+  set speed(double? val) => _speed = val;
+  bool hasSpeed() => _speed != null;
+
+  // "battery" field.
+  int? _battery;
+  int get battery => _battery ?? 0;
+  set battery(int? val) => _battery = val;
+  bool hasBattery() => _battery != null;
+
   static ReadGeoStruct fromMap(Map<String, dynamic> data) => ReadGeoStruct(
         latitude: castToType<double>(data['latitude']),
         longitude: castToType<double>(data['longitude']),
         altitude: castToType<double>(data['altitude']),
         errorHorizontal: castToType<double>(data['errorHorizontal']),
         dateHourRead: data['dateHourRead'] as DateTime?,
+        method: data['method'] as String?,
+        speed: castToType<double>(data['speed']),
+        battery: castToType<int>(data['battery']),
       );
 
   static ReadGeoStruct? maybeFromMap(dynamic data) =>
@@ -80,6 +108,9 @@ class ReadGeoStruct extends BaseStruct {
         'altitude': _altitude,
         'errorHorizontal': _errorHorizontal,
         'dateHourRead': _dateHourRead,
+        'method': _method,
+        'speed': _speed,
+        'battery': _battery,
       }.withoutNulls;
 
   @override
@@ -103,6 +134,18 @@ class ReadGeoStruct extends BaseStruct {
         'dateHourRead': serializeParam(
           _dateHourRead,
           ParamType.DateTime,
+        ),
+        'method': serializeParam(
+          _method,
+          ParamType.String,
+        ),
+        'speed': serializeParam(
+          _speed,
+          ParamType.double,
+        ),
+        'battery': serializeParam(
+          _battery,
+          ParamType.int,
         ),
       }.withoutNulls;
 
@@ -133,6 +176,21 @@ class ReadGeoStruct extends BaseStruct {
           ParamType.DateTime,
           false,
         ),
+        method: deserializeParam(
+          data['method'],
+          ParamType.String,
+          false,
+        ),
+        speed: deserializeParam(
+          data['speed'],
+          ParamType.double,
+          false,
+        ),
+        battery: deserializeParam(
+          data['battery'],
+          ParamType.int,
+          false,
+        ),
       );
 
   @override
@@ -145,12 +203,15 @@ class ReadGeoStruct extends BaseStruct {
         longitude == other.longitude &&
         altitude == other.altitude &&
         errorHorizontal == other.errorHorizontal &&
-        dateHourRead == other.dateHourRead;
+        dateHourRead == other.dateHourRead &&
+        method == other.method &&
+        speed == other.speed &&
+        battery == other.battery;
   }
 
   @override
-  int get hashCode => const ListEquality()
-      .hash([latitude, longitude, altitude, errorHorizontal, dateHourRead]);
+  int get hashCode => const ListEquality().hash(
+      [latitude, longitude, altitude, errorHorizontal, dateHourRead, method, speed, battery]);
 }
 
 ReadGeoStruct createReadGeoStruct({
@@ -159,6 +220,9 @@ ReadGeoStruct createReadGeoStruct({
   double? altitude,
   double? errorHorizontal,
   DateTime? dateHourRead,
+  String? method,
+  double? speed,
+  int? battery,
 }) =>
     ReadGeoStruct(
       latitude: latitude,
@@ -166,4 +230,7 @@ ReadGeoStruct createReadGeoStruct({
       altitude: altitude,
       errorHorizontal: errorHorizontal,
       dateHourRead: dateHourRead,
+      method: method,
+      speed: speed,
+      battery: battery,
     );

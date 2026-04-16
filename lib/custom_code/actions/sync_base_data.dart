@@ -4,6 +4,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 // Imports other custom actions
 // Imports custom functions
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show compute;
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -96,14 +97,14 @@ Future<bool> syncBaseData(
     // LOTE 1: activities, headquarters, zones (0% → 25%)
     // Users y Devices NO se descargan aquí — syncLogin los gestiona obligatoriamente.
     // ─────────────────────────────────────────────────────────────────────────
+    // ── LOTE 1: actividades, lotes, zonas (pequeños, paralelo) ───────────────
     onProgress?.call(0.03, 'Descargando actividades, lotes y zonas...');
-    debugPrint('');
-    debugPrint('📦 LOTE 1: activities | headquarters | zones');
+    debugPrint('\n📦 LOTE 1: activities | headquarters | zones');
 
     final batch1 = await Future.wait([
-      _sbFetchList('activities',   currentToken, {'idCompany': '$idCompany', 'idDevice': '$idDevice'}),
-      _sbFetchList('headquarters', currentToken, {'idCompany': '$idCompany'}),
-      _sbFetchList('zones',        currentToken, {'idCompany': '$idCompany'}),
+      _sbFetchList('activities',   currentToken, {'idCompany': '$idCompany', 'idDevice': '$idDevice'}, imei: imei),
+      _sbFetchList('headquarters', currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('zones',        currentToken, {'idCompany': '$idCompany'}, imei: imei),
     ]);
 
     final activitiesData   = batch1[0];
@@ -113,70 +114,91 @@ Future<bool> syncBaseData(
     debugPrint('   activities:   ${activitiesData?.length ?? "❌ Error"}');
     debugPrint('   headquarters: ${headquartersData?.length ?? "❌ Error"}');
     debugPrint('   zones:        ${zonesData?.length ?? "❌ Error"}');
-    onProgress?.call(0.25, 'Lote 1 completo (actividades, lotes, zonas)');
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // LOTE 2: products, news, companies (25% → 50%)
-    // ─────────────────────────────────────────────────────────────────────────
-    onProgress?.call(0.27, 'Descargando productos, noticias y empresa...');
-    debugPrint('');
-    debugPrint('📦 LOTE 2: products | news | companies');
+    // ── Fix 3: Validar endpoints críticos del Lote 1 ─────────────────────────
+    final lote1Errors = <String>[];
+    if (activitiesData   == null) lote1Errors.add('activities');
+    if (headquartersData == null) lote1Errors.add('headquarters');
+    if (zonesData        == null) lote1Errors.add('zones');
+    if (lote1Errors.isNotEmpty) {
+      debugPrint('❌ [SyncBase] Endpoints críticos fallaron: $lote1Errors → abortando');
+      return false;
+    }
+    onProgress?.call(0.22, 'Lote 1 completo');
 
+    // ── PRODUCTS solo — separado para no solapar RAM con Virtual_points ───────
+    onProgress?.call(0.24, 'Descargando productos...');
+    debugPrint('\n📦 PRODUCTS (descarga independiente — ~200k registros)');
+    final productsData = await _sbFetchList('products', currentToken, {'idCompany': '$idCompany'}, imei: imei);
+    debugPrint('   products: ${productsData?.length ?? "❌ Error"}');
+
+    if (productsData == null) {
+      debugPrint('❌ [SyncBase] Endpoint crítico products falló → abortando');
+      return false;
+    }
+    onProgress?.call(0.44, 'Productos descargados');
+
+    // ── LOTE 2: news + companies (pequeños, paralelo) ─────────────────────────
+    onProgress?.call(0.45, 'Descargando noticias y empresa...');
+    debugPrint('\n📦 LOTE 2: news | companies');
     final batch2 = await Future.wait([
-      _sbFetchList('products',  currentToken, {'idCompany': '$idCompany'}),
-      _sbFetchList('news',      currentToken, {'idCompany': '$idCompany'}),
-      _sbFetchList('companies', currentToken, {'idCompany': '$idCompany'}),
+      _sbFetchList('news',      currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('companies', currentToken, {'idCompany': '$idCompany'}, imei: imei),
     ]);
-
-    final productsData  = batch2[0];
-    final newsData      = batch2[1];
-    final companiesData = batch2[2];
-
-    debugPrint('   products:  ${productsData?.length ?? "❌ Error"}');
+    final newsData      = batch2[0];
+    final companiesData = batch2[1];
     debugPrint('   news:      ${newsData?.length ?? "❌ Error"}');
     debugPrint('   companies: ${companiesData?.length ?? "❌ Error"}');
-    onProgress?.call(0.50, 'Lote 2 completo (productos, noticias, empresa)');
+    // news y companies son opcionales — no se aborta si fallan
+    onProgress?.call(0.55, 'Lote 2 completo');
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // LOTE 3: headquarters-weights, types-points, virtual-points (50% → 75%)
-    // ─────────────────────────────────────────────────────────────────────────
-    onProgress?.call(0.52, 'Descargando pesos, tipos de puntos y puntos virtuales...');
-    debugPrint('');
-    debugPrint('📦 LOTE 3: headquarters-weights | types-points | virtual-points');
-
+    // ── LOTE 3: pesos + tipos de puntos (medianos, paralelo) ──────────────────
+    onProgress?.call(0.56, 'Descargando pesos y tipos de puntos...');
+    debugPrint('\n📦 LOTE 3: headquarters-weights | types-points');
     final prevMonth = DateTime(syncNow.year, syncNow.month - 1);
     final batch3 = await Future.wait([
       _sbFetchList('headquarters-weights', currentToken, {
         'idCompany': '$idCompany',
         'year':      '${prevMonth.year}',
         'month':     '${prevMonth.month}',
-      }),
-      _sbFetchList('types-points',   currentToken, {'idCompany': '$idCompany'}),
-      _sbFetchList('virtual-points', currentToken, {'idCompany': '$idCompany'}),
+      }, imei: imei),
+      _sbFetchList('types-points', currentToken, {'idCompany': '$idCompany'}, imei: imei),
     ]);
-
     final hqWeightsData   = batch3[0];
     final typesPointsData = batch3[1];
-    final virtualPointsData = batch3[2];
+    debugPrint('   hq-weights:   ${hqWeightsData?.length ?? "❌ Error"}');
+    debugPrint('   types-points: ${typesPointsData?.length ?? "❌ Error"}');
 
-    debugPrint('   hq-weights:     ${hqWeightsData?.length ?? "❌ Error"}');
-    debugPrint('   types-points:   ${typesPointsData?.length ?? "❌ Error"}');
+    if (typesPointsData == null) {
+      debugPrint('❌ [SyncBase] Endpoint crítico types-points falló → abortando');
+      return false;
+    }
+    onProgress?.call(0.66, 'Lote 3 completo');
+
+    // ── VIRTUAL-POINTS solo — separado para no solapar RAM con Products ───────
+    onProgress?.call(0.67, 'Descargando puntos virtuales...');
+    debugPrint('\n📦 VIRTUAL-POINTS (descarga independiente — ~150k registros)');
+    final virtualPointsData = await _sbFetchList('virtual-points', currentToken, {'idCompany': '$idCompany'}, imei: imei);
     debugPrint('   virtual-points: ${virtualPointsData?.length ?? "❌ Error"}');
-    onProgress?.call(0.75, 'Lote 3 completo (pesos, tipos, puntos virtuales)');
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // LOTE 4: headquarters-coordinates (75% → 90%)
-    // Users y Devices NO se descargan — syncLogin los gestiona obligatoriamente.
-    // ─────────────────────────────────────────────────────────────────────────
-    onProgress?.call(0.77, 'Descargando zonas de exclusión...');
-    debugPrint('');
-    debugPrint('📦 LOTE 4: headquarters-coordinates');
+    if (virtualPointsData == null) {
+      debugPrint('❌ [SyncBase] Endpoint crítico virtual-points falló → abortando');
+      return false;
+    }
+    onProgress?.call(0.82, 'Puntos virtuales descargados');
 
-    final hqCoordinatesData = await _sbFetchList(
-      'headquarters-coordinates', currentToken, {'idCompany': '$idCompany'},
-    );
-
-    debugPrint('   hq-coordinates: ${hqCoordinatesData?.length ?? "❌ Error"}');
+    // ── LOTE 4: hq-coordinates + products-coordinates (paralelo) ─────────────
+    onProgress?.call(0.83, 'Descargando coordenadas...');
+    debugPrint('\n📦 LOTE 4: headquarters-coordinates | products-coordinates');
+    final batch4 = await Future.wait([
+      _sbFetchList('headquarters-coordinates', currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('products-coordinates',     currentToken, {'idCompany': '$idCompany'}, imei: imei),
+    ]);
+    final hqCoordinatesData  = batch4[0];
+    final productsCoordsData = batch4[1];
+    debugPrint('   hq-coordinates:       ${hqCoordinatesData?.length ?? "❌ Error"}');
+    debugPrint('   products-coordinates: ${productsCoordsData?.length ?? "❌ Error"}');
+    // hq-coordinates y products-coordinates son opcionales — no se aborta si fallan
     onProgress?.call(0.90, 'Todos los datos descargados. Guardando en base de datos...');
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -186,26 +208,23 @@ Future<bool> syncBaseData(
     debugPrint('💾 Guardando datos en SQLite...');
     await _sbSetIncomplete(); // marcamos como pendiente antes de escribir
 
+    // Sin timeout global en SQLite — cada chunk cede el event loop con Future.delayed(Duration.zero),
+    // lo que previene ANR. Un timeout externo cancelaría la transacción dejando datos corruptos.
     final saved = await _sbSyncToSQLite(
-      idCompany:          idCompany,
-      imei:               imei,
-      activitiesData:     activitiesData,
-      headquartersData:   headquartersData,
-      zonesData:          zonesData,
-      productsData:       productsData,
-      newsData:           newsData,
-      hqWeightsData:      hqWeightsData,
-      typesPointsData:    typesPointsData,
-      companiesData:      companiesData,
-      virtualPointsData:  virtualPointsData,
-      hqCoordinatesData:  hqCoordinatesData,
-      onProgress:         onProgress,
-    ).timeout(
-      const Duration(seconds: 120),
-      onTimeout: () {
-        debugPrint('⏱️ [SyncBase] TIMEOUT guardando en SQLite (120s)');
-        return false;
-      },
+      idCompany:           idCompany,
+      imei:                imei,
+      activitiesData:      activitiesData,
+      headquartersData:    headquartersData,
+      zonesData:           zonesData,
+      productsData:        productsData,
+      newsData:            newsData,
+      hqWeightsData:       hqWeightsData,
+      typesPointsData:     typesPointsData,
+      companiesData:       companiesData,
+      virtualPointsData:   virtualPointsData,
+      hqCoordinatesData:   hqCoordinatesData,
+      productsCoordsData:  productsCoordsData,
+      onProgress:          onProgress,
     );
 
     if (!saved) {
@@ -255,44 +274,79 @@ int? _sbToInt(dynamic v) {
 // FETCH CON GZIP
 // ============================================================================
 
+/// Descarga un endpoint con reintentos automáticos (hasta 3) y renovación de token en 401.
+/// - Backoff exponencial: 2s, 4s, 8s entre intentos
+/// - HTTP 401: renueva token una vez y reintenta inmediatamente
+/// - Timeout por intento: 4 min (endpoints grandes como products ~82 MB)
 Future<List<dynamic>?> _sbFetchList(
   String endpoint,
   String authToken,
-  Map<String, String> queryParams,
-) async {
-  try {
-    final uri = Uri.parse('https://api.clickpalm.com/Users/login-data/$endpoint')
-        .replace(queryParameters: queryParams);
+  Map<String, String> queryParams, {
+  String imei = '',
+}) async {
+  const int maxAttempts = 3;
+  String token = authToken;
 
-    debugPrint('   📡 GET /login-data/$endpoint ...');
-    final response = await http
-        .get(uri, headers: {'Authorization': 'Bearer $authToken'})
-        .timeout(const Duration(minutes: 3));
+  for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      final uri = Uri.parse('https://api.clickpalm.com/Users/login-data/$endpoint')
+          .replace(queryParameters: queryParams);
 
-    debugPrint('   → HTTP ${response.statusCode} | ${response.bodyBytes.length} bytes');
-
-    if (response.statusCode == 200) {
-      final data = _sbDecodeGzipList(response.bodyBytes);
-      if (data != null) {
-        debugPrint('   ✅ $endpoint: ${data.length} elementos');
-        return data;
+      if (attempt == 1) {
+        debugPrint('   📡 GET /login-data/$endpoint ...');
+      } else {
+        debugPrint('   🔄 GET /login-data/$endpoint (intento $attempt/$maxAttempts)...');
       }
-      // Intentar como objeto único (companies puede retornar objeto)
-      final single = _sbDecodeGzipObject(response.bodyBytes);
-      if (single != null) {
-        debugPrint('   ✅ $endpoint: objeto único → wrapped en lista');
-        return [single];
+
+      final response = await http
+          .get(uri, headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(minutes: 4));
+
+      debugPrint('   → HTTP ${response.statusCode} | ${response.bodyBytes.length} bytes');
+
+      // ── 401: token expirado → renovar y reintentar inmediatamente ──────────
+      if (response.statusCode == 401) {
+        debugPrint('   🔑 [SyncBase] Token expirado en $endpoint, renovando...');
+        if (imei.isNotEmpty) {
+          final renewed = await _sbRenewAuthToken(imei);
+          if (renewed != null) {
+            token = renewed;
+            debugPrint('   ✅ Token renovado, reintentando $endpoint...');
+            continue; // reintenta sin contar este intento como fallo
+          }
+        }
+        debugPrint('   ❌ No se pudo renovar token para $endpoint');
+        return null;
       }
-      debugPrint('   ⚠️ $endpoint: respuesta no es lista ni objeto válido');
-      return null;
+
+      if (response.statusCode == 200) {
+        final data = await compute(_sbDecodeGzipAsListOrSingle, response.bodyBytes);
+        if (data != null) {
+          debugPrint('   ✅ $endpoint: ${data.length} elementos');
+          return data;
+        }
+        debugPrint('   ⚠️ $endpoint: respuesta no es lista ni objeto válido');
+        return null;
+      }
+
+      debugPrint('   ❌ $endpoint → HTTP ${response.statusCode}');
+      // No reintentar en errores 4xx (excepto 401 ya manejado)
+      if (response.statusCode >= 400 && response.statusCode < 500) return null;
+
+    } catch (e) {
+      debugPrint('   ❌ Error en $endpoint (intento $attempt/$maxAttempts): $e');
     }
 
-    debugPrint('   ❌ $endpoint → HTTP ${response.statusCode}');
-    return null;
-  } catch (e) {
-    debugPrint('   ❌ Error en $endpoint: $e');
-    return null;
+    // Backoff exponencial antes del siguiente intento
+    if (attempt < maxAttempts) {
+      final waitSeconds = attempt * 2; // 2s, 4s
+      debugPrint('   ⏳ Esperando ${waitSeconds}s antes de reintentar $endpoint...');
+      await Future.delayed(Duration(seconds: waitSeconds));
+    }
   }
+
+  debugPrint('   ❌ $endpoint: falló tras $maxAttempts intentos');
+  return null;
 }
 
 bool _sbIsGzip(List<int> bytes) =>
@@ -312,6 +366,15 @@ Map<String, dynamic>? _sbDecodeGzipObject(List<int> bodyBytes) {
     final data = jsonDecode(utf8.decode(jsonBytes));
     return data is Map<String, dynamic> ? data : null;
   } catch (_) { return null; }
+}
+
+/// Wrapper top-level para compute(): decodifica GZIP+JSON y normaliza a List.
+/// Debe ser top-level (no closure) para poder ejecutarse en un isolate separado.
+List<dynamic>? _sbDecodeGzipAsListOrSingle(List<int> bodyBytes) {
+  final list = _sbDecodeGzipList(bodyBytes);
+  if (list != null) return list;
+  final obj = _sbDecodeGzipObject(bodyBytes);
+  return obj != null ? [obj] : null; // companies puede retornar objeto único
 }
 
 // ============================================================================
@@ -376,11 +439,18 @@ Future<bool> _sbSyncToSQLite({
   List<dynamic>? companiesData,
   List<dynamic>? virtualPointsData,
   List<dynamic>? hqCoordinatesData,
+  List<dynamic>? productsCoordsData,
   void Function(double, String)? onProgress,
 }) async {
   try {
     final String dbPath = await _sbGetDatabasePath();
     final Database db  = await openDatabase(dbPath);
+
+    // Optimizar escrituras para esta sesión de sync masivo
+    // sqflite requiere rawQuery (no execute) para PRAGMAs
+    await db.rawQuery('PRAGMA synchronous=NORMAL');   // fsync solo en checkpoint, no en cada write
+    await db.rawQuery('PRAGMA busy_timeout=30000');   // 30s de espera en bloqueos (vs 0 por defecto)
+    await db.rawQuery('PRAGMA cache_size=-32000');    // 32 MB de caché de páginas en RAM
 
     await db.transaction((txn) async {
       debugPrint('🔄 [SyncBase] Transacción iniciada');
@@ -431,16 +501,30 @@ Future<bool> _sbSyncToSQLite({
         await _sbInsertNews(txn, newsData);
       }
 
-      // ── 11. Products + Products_coordinates ───────────────────────────
+      // ── 11. Products ──────────────────────────────────────────────────
       if (productsData != null && productsData.isNotEmpty) {
         onProgress?.call(0.97, 'Guardando productos/tags (${productsData.length})...');
+        // Full-sync: limpiar antes de insertar → INSERT INTO es 2-3x más rápido que INSERT OR REPLACE
+        await txn.execute('DELETE FROM Products_coordinates');
+        await txn.execute('DELETE FROM Products');
         await _sbInsertProducts(txn, productsData);
+        productsData.clear(); // liberar ~200k items de RAM
+      }
+
+      // ── 11b. Products_coordinates (endpoint independiente) ────────────
+      if (productsCoordsData != null && productsCoordsData.isNotEmpty) {
+        onProgress?.call(0.975, 'Guardando coordenadas de productos (${productsCoordsData.length})...');
+        await _sbInsertProductsCoordinates(txn, productsCoordsData);
+        productsCoordsData.clear();
       }
 
       // ── 12. Virtual_points ────────────────────────────────────────────
       if (virtualPointsData != null && virtualPointsData.isNotEmpty) {
         onProgress?.call(0.98, 'Guardando puntos virtuales...');
+        // Full-sync: limpiar antes de insertar → evita conflict check + double index update por fila
+        await txn.execute('DELETE FROM Virtual_points');
         await _sbInsertVirtualPoints(txn, virtualPointsData);
+        virtualPointsData.clear(); // liberar ~150k items de RAM
       }
 
       // ── 13. Headquarters_coordinates ──────────────────────────────────
@@ -636,11 +720,28 @@ Future<void> _sbInsertActivities(
     }
   }
 
-  final batch = txn.batch();
-  for (final r in actRows)    { batch.insert('Activities',        r); }
-  for (final r in stepRows)   { batch.insert('Activities_steps',  r, conflictAlgorithm: ConflictAlgorithm.replace); }
-  for (final r in statusRows) { batch.insert('Activities_status', r, conflictAlgorithm: ConflictAlgorithm.ignore); }
-  await batch.commit(noResult: true);
+  // Activities: pocos registros → un solo batch
+  final actBatch = txn.batch();
+  for (final r in actRows) { actBatch.insert('Activities', r); }
+  await actBatch.commit(noResult: true);
+
+  // Steps: potencialmente miles → chunks de 500 para no saturar el platform channel
+  for (int i = 0; i < stepRows.length; i += 500) {
+    final chunk = stepRows.sublist(i, (i + 500).clamp(0, stepRows.length));
+    final b = txn.batch();
+    for (final r in chunk) { b.insert('Activities_steps', r, conflictAlgorithm: ConflictAlgorithm.replace); }
+    await b.commit(noResult: true);
+    await Future.delayed(Duration.zero);
+  }
+
+  // Status: potencialmente miles (árbol recursivo) → chunks de 500
+  for (int i = 0; i < statusRows.length; i += 500) {
+    final chunk = statusRows.sublist(i, (i + 500).clamp(0, statusRows.length));
+    final b = txn.batch();
+    for (final r in chunk) { b.insert('Activities_status', r, conflictAlgorithm: ConflictAlgorithm.ignore); }
+    await b.commit(noResult: true);
+    await Future.delayed(Duration.zero);
+  }
 
   final factorPositive = statusRows.where((r) => (_sbToInt(r['Factor']) ?? 0) > 0).length;
   debugPrint('   ✅ ${actRows.length} actividades | ${stepRows.length} pasos | ${statusRows.length} estados');
@@ -741,10 +842,19 @@ Future<void> _sbInsertHeadquarters(Transaction txn, List<dynamic> headquarters) 
     }
   }
 
-  final batch = txn.batch();
-  for (final r in hqRows)  { batch.insert('Headquarters',         r, conflictAlgorithm: ConflictAlgorithm.replace); }
-  for (final r in polRows) { batch.insert('Headquarters_polygons', r, conflictAlgorithm: ConflictAlgorithm.replace); }
-  await batch.commit(noResult: true);
+  // HQ rows: pocos registros → un solo batch
+  final hqBatch = txn.batch();
+  for (final r in hqRows) { hqBatch.insert('Headquarters', r, conflictAlgorithm: ConflictAlgorithm.replace); }
+  await hqBatch.commit(noResult: true);
+
+  // Polygon rows: pueden ser miles de puntos → chunks de 500
+  for (int i = 0; i < polRows.length; i += 500) {
+    final chunk = polRows.sublist(i, (i + 500).clamp(0, polRows.length));
+    final b = txn.batch();
+    for (final r in chunk) { b.insert('Headquarters_polygons', r, conflictAlgorithm: ConflictAlgorithm.replace); }
+    await b.commit(noResult: true);
+    await Future.delayed(Duration.zero);
+  }
 
   debugPrint('   ✅ ${hqRows.length} lotes + ${polRows.length} polígonos');
 }
@@ -795,12 +905,9 @@ Future<void> _sbInsertProducts(Transaction txn, List<dynamic> products) async {
   debugPrint('📝 [SyncBase] Insertando ${products.length} Products (todos los lotes)...');
 
   const int productFields = 16; // Id_product..Palm + Id_rfid + Sync_status
-  const int coordFields   = 4;
   const int productChunk  = 999 ~/ productFields; // 62
-  const int coordChunk    = 999 ~/ coordFields;   // 249
 
   final List<List<dynamic>> productRows = [];
-  final List<List<dynamic>> coordRows   = [];
   final String now = DateTime.now().toIso8601String();
 
   for (final p in products) {
@@ -822,14 +929,6 @@ Future<void> _sbInsertProducts(Transaction txn, List<dynamic> products) async {
       p['palm'],
       'synced',
     ]);
-
-    if (p['coordenates'] is List) {
-      for (final c in p['coordenates']) {
-        if (c['latitude'] != null && c['longitude'] != null) {
-          coordRows.add([c['id_product_coordenate'], p['id_product'], c['latitude'], c['longitude']]);
-        }
-      }
-    }
   }
 
   const String productCols = 'Id_product, Id_headquarter, Id_company, Id_type, '
@@ -841,67 +940,110 @@ Future<void> _sbInsertProducts(Transaction txn, List<dynamic> products) async {
     final chunk  = productRows.sublist(i, (i + productChunk).clamp(0, productRows.length));
     final params = chunk.expand((r) => r).toList();
     await txn.rawInsert(
-      'INSERT OR REPLACE INTO Products ($productCols) VALUES ${List.filled(chunk.length, productPH).join(',')}',
+      'INSERT INTO Products ($productCols) VALUES ${List.filled(chunk.length, productPH).join(',')}',
       params,
     );
+    await Future.delayed(Duration.zero); // ceder event loop → evita ANR
   }
 
-  if (coordRows.isNotEmpty) {
-    for (int i = 0; i < coordRows.length; i += coordChunk) {
-      final chunk  = coordRows.sublist(i, (i + coordChunk).clamp(0, coordRows.length));
-      final params = chunk.expand((r) => r).toList();
-      await txn.rawInsert(
-        'INSERT OR REPLACE INTO Products_coordinates (Id_product_coordenate, Id_product, Latitude, Longitude) VALUES ${List.filled(chunk.length, '(?,?,?,?)').join(',')}',
-        params,
-      );
+  debugPrint('   ✅ ${productRows.length} productos insertados');
+}
+
+Future<void> _sbInsertProductsCoordinates(Transaction txn, List<dynamic> coords) async {
+  debugPrint('📝 [SyncBase] Insertando ${coords.length} Products_coordinates...');
+
+  const int coordChunk = 999 ~/ 4; // 4 campos → 249 por chunk
+
+  final rows = <List<dynamic>>[];
+  for (final c in coords) {
+    if (c['latitude'] != null && c['longitude'] != null) {
+      rows.add([c['id_product_coordenate'], c['id_product'], c['latitude'], c['longitude']]);
     }
   }
 
-  debugPrint('   ✅ ${productRows.length} productos + ${coordRows.length} coordenadas');
+  for (int i = 0; i < rows.length; i += coordChunk) {
+    final chunk  = rows.sublist(i, (i + coordChunk).clamp(0, rows.length));
+    final params = chunk.expand((r) => r).toList();
+    await txn.rawInsert(
+      'INSERT INTO Products_coordinates (Id_product_coordenate, Id_product, Latitude, Longitude) VALUES '
+      '${List.filled(chunk.length, '(?,?,?,?)').join(',')}',
+      params,
+    );
+    await Future.delayed(Duration.zero);
+  }
+
+  debugPrint('   ✅ ${rows.length} coordenadas de productos insertadas');
 }
 
 Future<void> _sbInsertVirtualPoints(Transaction txn, List<dynamic> points) async {
   debugPrint('📝 [SyncBase] Insertando ${points.length} Virtual_points...');
-  final batch = txn.batch();
+
+  const int vpFields = 14;
+  const int vpChunk  = 999 ~/ vpFields; // = 71 registros por chunk
+
+  // Pre-construir filas para evitar accesos repetidos a Map dentro del loop SQL
+  final rows = <List<dynamic>>[];
+  final now  = DateTime.now().toIso8601String();
   for (final p in points) {
-    batch.insert('Virtual_points', {
-      'Id_virtual_point':           p['id_virtual_point'],
-      'Id_headquarter':             p['id_headquarter'],
-      'Id_type_point':              p['id_type_point'],
-      'Line_number':                p['line_number'],
-      'Point_number':               p['point_number'],
-      'Latitude':                   p['latitude'],
-      'Longitude':                  p['longitude'],
-      'Description_virtual_point':  p['description_virtual_point'],
-      'Generation_method':          p['generation_method'],
-      'Created_date':               p['created_date'] ?? DateTime.now().toIso8601String(),
-      'Is_active':                  (p['is_active'] == true || p['is_active'] == 1) ? 1 : 0,
-      'Headquarter_name':           p['headquarter_name'],
-      'Type_point_name':            p['type_point_name'],
-      'Point_display_name':         p['point_display_name'],
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+    rows.add([
+      p['id_virtual_point'],
+      p['id_headquarter'],
+      p['id_type_point'],
+      p['line_number'],
+      p['point_number'],
+      p['latitude'],
+      p['longitude'],
+      p['description_virtual_point'],
+      p['generation_method'],
+      p['created_date'] ?? now,
+      (p['is_active'] == true || p['is_active'] == 1) ? 1 : 0,
+      p['headquarter_name'],
+      p['type_point_name'],
+      p['point_display_name'],
+    ]);
   }
-  await batch.commit(noResult: true);
-  debugPrint('   ✅ ${points.length} puntos virtuales insertados');
+
+  const cols = 'Id_virtual_point,Id_headquarter,Id_type_point,Line_number,'
+      'Point_number,Latitude,Longitude,Description_virtual_point,'
+      'Generation_method,Created_date,Is_active,Headquarter_name,'
+      'Type_point_name,Point_display_name';
+
+  for (int i = 0; i < rows.length; i += vpChunk) {
+    final chunk  = rows.sublist(i, (i + vpChunk).clamp(0, rows.length));
+    final params = chunk.expand((r) => r).toList();
+    await txn.rawInsert(
+      'INSERT INTO Virtual_points ($cols) VALUES '
+      '${List.filled(chunk.length, "(?,?,?,?,?,?,?,?,?,?,?,?,?,?)").join(",")}',
+      params,
+    );
+    await Future.delayed(Duration.zero); // ceder event loop → evita ANR
+  }
+
+  debugPrint('   ✅ ${rows.length} puntos virtuales insertados');
 }
 
 Future<void> _sbInsertHeadquartersCoordinates(Transaction txn, List<dynamic> coords) async {
   debugPrint('📝 [SyncBase] Insertando ${coords.length} Headquarters_coordinates...');
-  final batch = txn.batch();
-  for (final c in coords) {
-    batch.insert('Headquarters_coordinates', {
-      'Id_polygon_coordinate':   c['id_polygon_coordinate'],
-      'Id_headquarter':          c['id_headquarter'],
-      'Name_polygon_coordinate': c['name_polygon_coordinate'],
-      'Coordinates_raw':         c['coordinates_raw'],
-      'Point_type':              c['point_type'],
-      'Id_type_point':           c['id_type_point'],
-      'Created_at':              c['created_at'] ?? DateTime.now().toIso8601String(),
-      'Modified_at':             c['modified_at'] ?? DateTime.now().toIso8601String(),
-      'Is_active':               (c['is_active'] == true || c['is_active'] == 1) ? 1 : 0,
-    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  final now = DateTime.now().toIso8601String();
+  for (int i = 0; i < coords.length; i += 500) {
+    final chunk = coords.sublist(i, (i + 500).clamp(0, coords.length));
+    final b = txn.batch();
+    for (final c in chunk) {
+      b.insert('Headquarters_coordinates', {
+        'Id_polygon_coordinate':   c['id_polygon_coordinate'],
+        'Id_headquarter':          c['id_headquarter'],
+        'Name_polygon_coordinate': c['name_polygon_coordinate'],
+        'Coordinates_raw':         c['coordinates_raw'],
+        'Point_type':              c['point_type'],
+        'Id_type_point':           c['id_type_point'],
+        'Created_at':              c['created_at'] ?? now,
+        'Modified_at':             c['modified_at'] ?? now,
+        'Is_active':               (c['is_active'] == true || c['is_active'] == 1) ? 1 : 0,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+    await b.commit(noResult: true);
+    await Future.delayed(Duration.zero);
   }
-  await batch.commit(noResult: true);
   debugPrint('   ✅ ${coords.length} coordenadas de exclusión insertadas');
 }
 

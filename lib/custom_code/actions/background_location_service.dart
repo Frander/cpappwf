@@ -13,9 +13,11 @@ import 'package:geodesy/geodesy.dart';
 import 'dart:io';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Importar las clases del archivo get_location_list.dart
 import 'get_location_list.dart';
+import 'background_location_service_lite.dart';
 
 /// Inicializa y configura el servicio de segundo plano
 Future<void> initializeBackgroundLocationService() async {
@@ -91,8 +93,24 @@ void onStart(ServiceInstance service) async {
     );
   }
 
-  // Ejecutar la lógica de geolocalización
-  await _startBackgroundLocationTracking(service);
+  // Leer el modo GPS elegido por el usuario (persistido en SharedPreferences
+  // por FFAppState). El isolate de background no tiene acceso directo a
+  // FFAppState, por eso lo leemos desde prefs que ya está sincronizado.
+  String gpsMode = 'LITE';
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    gpsMode = prefs.getString('ff_gpsMode') ?? 'LITE';
+  } catch (e) {
+    debugPrint('⚠️ No se pudo leer ff_gpsMode: $e — usando LITE por defecto');
+  }
+
+  debugPrint('🎯 Modo GPS activo: $gpsMode');
+
+  if (gpsMode == 'ADVANCED') {
+    await _startBackgroundLocationTracking(service);
+  } else {
+    await startLiteLocationTracking(service);
+  }
 }
 
 /// Callback para iOS cuando la app está en background
@@ -126,6 +144,7 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
   DateTime? lastSensorUpdate;
   DateTime? lastGPSUpdate;
   AccelerometerEvent? lastAccelEvent;
+  double? previousAltitude; // Fix 6A: consistencia de altitud GPS
 
   // Suscripciones a sensores
   StreamSubscription<AccelerometerEvent>? accelSub;
@@ -330,8 +349,8 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 
       // Estabilización con calidad: requiere TIEMPO + CALIDAD de lecturas
       // No basta con que pase el tiempo; necesitamos lecturas con buena precisión
-      // MEJORA: Si el margen de error es ≤7m, estabilizar INMEDIATAMENTE
-      final bool stabilizedByAccuracy = position.accuracy <= 7.0;
+      // MEJORA: Si el margen de error es ≤10m, estabilizar INMEDIATAMENTE
+      final bool stabilizedByAccuracy = position.accuracy <= 10.0;
       final bool stabilizedByConditions = elapsed >=
               LocationConfig.warmupSeconds +
                   LocationConfig.stabilizationSeconds &&
@@ -365,7 +384,19 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
       multipathDetector.isLikelyMultipath(position, movementDetector);
       final multipathPenalty = multipathDetector.getMultipathPenalty();
       final baseAccuracy = HDOPCorrector.adjustAccuracyByDOP(position);
-      final adjustedAccuracy = baseAccuracy * multipathPenalty;
+      var adjustedAccuracy = baseAccuracy * multipathPenalty;
+
+      // Fix 6A: señal de consistencia por altitud. Si estando estático la
+      // altitud salta >5m entre ticks, casi siempre es multipath vertical →
+      // penalizar el peso de este punto (no es estado del UKF, solo filtro).
+      if (movementDetector.isCurrentlyStatic() && previousAltitude != null) {
+        final deltaAlt = (position.altitude - previousAltitude!).abs();
+        if (deltaAlt > 5.0) {
+          adjustedAccuracy *= 2.0; // duplicar error → peso baja a 1/4
+        }
+      }
+      previousAltitude = position.altitude;
+
       final measNoise = pow(adjustedAccuracy, 2).toDouble();
 
       // Inicializar UKF
@@ -387,6 +418,19 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 
       // Predicción y actualización UKF
       ukf.predict(1.5, processNoise);
+
+      // Fix 1: detección de multipath por innovation residual.
+      // Después de predict(), ukf.state[0..1] contiene la predicción UTM.
+      // Si la medición cruda se aleja mucho más de lo que el error reportado
+      // justifica, probablemente es multipath (rebotes bajo canopy denso).
+      final predX = ukf.state[0];
+      final predY = ukf.state[1];
+      final residualMeters = sqrt(
+          (predX - measX) * (predX - measX) + (predY - measY) * (predY - measY));
+      final expectedError = max(position.accuracy.toDouble(), 1.0);
+      final multipathFactor =
+          (residualMeters / (expectedError * 3.0)).clamp(1.0, 5.0);
+
       ukf.update(measX, measY, measNoise, imuAccel);
 
       final ukfState = ukf.getPosition();
@@ -496,6 +540,18 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
             'speed': filteredSpeed,
             'battery': batteryLevel,
             'createdAt': DateTime.now().toIso8601String(),
+            // Datos enriquecidos para EnrichedGeoBuffer en el isolate principal
+            'heading': gpsHeading,
+            'acceleration': currentAccel,
+            'isStatic': movementDetector.isCurrentlyStatic(),
+            'isBrushChange': imuIntegrator.isBrushChange,
+            // Fix 1: inflar ukfPositionError por factor de multipath cuando el
+            // residual de la predicción UKF excede lo esperado → penaliza el
+            // peso de este punto en el centroide ponderado server-side.
+            'ukfPositionError': baseError * multipathFactor,
+            'vx': ukfState['vx'] ?? 0.0,
+            'vy': ukfState['vy'] ?? 0.0,
+            'method': 'UKF_IMU',
           });
 
           if (updateCount % 40 == 0) {
@@ -692,6 +748,38 @@ Future<void> startBackgroundLocationService() async {
   } else {
     debugPrint('ℹ️ Servicio GPS ya en ejecución, se omite startService() [${DateTime.now().toIso8601String()}]');
   }
+}
+
+/// Reinicia el servicio para aplicar un cambio de modo GPS (LITE ↔ ADVANCED).
+/// El nuevo modo debe haber sido escrito ya en FFAppState/SharedPreferences
+/// ANTES de llamar esta función.
+Future<void> restartBackgroundLocationService() async {
+  if (Platform.isWindows) return;
+  debugPrint('🔁 Reiniciando servicio GPS para aplicar nuevo modo...');
+
+  final service = FlutterBackgroundService();
+
+  // 1. Detener servicio actual
+  service.invoke('stopService');
+
+  // 2. Asegurar que SharedPreferences esté en disco antes de arrancar el
+  //    nuevo isolate — FFAppState escribe a prefs sin await, por lo que
+  //    el valor podría no estar en disco todavía.
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.reload(); // forzar lectura fresca del disco
+    debugPrint('🔁 Modo leído de prefs: ${prefs.getString("ff_gpsMode")}');
+  } catch (_) {}
+
+  // 3. Esperar a que el servicio se detenga completamente
+  for (int i = 0; i < 10; i++) {
+    if (!await service.isRunning()) break;
+    await Future.delayed(const Duration(milliseconds: 300));
+  }
+
+  // 4. Arrancar con el nuevo modo
+  await startBackgroundLocationService();
+  debugPrint('🔁 Servicio GPS reiniciado exitosamente');
 }
 
 /// Función pública para detener el servicio
