@@ -88,7 +88,17 @@
       "Read(//tmp/**)",
       "Bash(find \"e:/RepositoriosFix/ClickPalmAPP\" -name \"pubspec.yaml\" -type f -exec grep -l \"flutter_tts\" {} \\\\;)",
       "Bash(ls -d /e/RepositoriosFix/ClickPalmAPP/lib/configuration/*/)",
-      "Read(//e/RepositoriosFix/ClickPalmMaps/**)"
+      "Read(//e/RepositoriosFix/ClickPalmMaps/**)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --full-history --name-only -- \"*main.js\" \"*tileManager.js\" \"*virtualPointsApi.js\" \"*loggingConfig.js\")",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --full-history --name-only -- \"*.js\")",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --diff-filter=D --summary)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --name-status)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP branch -a)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --oneline)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --source --remotes --decorate --oneline)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --name-status --oneline)",
+      "Bash(git -C /e/RepositoriosFix/ClickPalmAPP show 2d1bce3:.)",
+      "Read(//e/RepositoriosFix//**)"
     ],
     "deny": [],
     "ask": [],

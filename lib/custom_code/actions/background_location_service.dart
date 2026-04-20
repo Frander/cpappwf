@@ -706,9 +706,15 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
   }
 }
 
+/// Bandera que indica si el usuario inició explícitamente el servicio GPS.
+/// Se usa en main.dart para relanzar el servicio si Android lo mató mientras
+/// la pantalla estaba bloqueada (AppLifecycleState.resumed).
+bool gpsServiceRequestedByUser = false;
+
 /// Función pública para iniciar el servicio
 Future<void> startBackgroundLocationService() async {
   if (Platform.isWindows) return; // No soportado en Windows
+  gpsServiceRequestedByUser = true;
   final service = FlutterBackgroundService();
 
   // IMPORTANTE: Verificar permisos ANTES de iniciar el servicio
@@ -785,6 +791,7 @@ Future<void> restartBackgroundLocationService() async {
 /// Función pública para detener el servicio
 Future<void> stopBackgroundLocationService() async {
   if (Platform.isWindows) return; // No soportado en Windows
+  gpsServiceRequestedByUser = false;
   final service = FlutterBackgroundService();
   service.invoke('stopService');
   debugPrint('🛑 Servicio de geolocalización en segundo plano DETENIDO');

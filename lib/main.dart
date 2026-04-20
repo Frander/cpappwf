@@ -27,7 +27,12 @@ import 'dart:async';
 import 'dart:io' show Platform;
 
 import '/components/animated_splash_screen_widget.dart';
-import '/custom_code/actions/background_location_service.dart';
+import '/custom_code/actions/background_location_service.dart'
+    show
+        initializeBackgroundLocationService,
+        startBackgroundLocationService,
+        stopBackgroundLocationService,
+        gpsServiceRequestedByUser;
 import '/custom_code/actions/enriched_geo_buffer.dart';
 import '/custom_code/actions/get_location_list.dart' show depurarGeolocalizaciones;
 import '/backend/schema/structs/index.dart';
@@ -82,7 +87,6 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Locale? _locale;
-  Timer? _pausedStopTimer;
 
   ThemeMode _themeMode = ThemeMode.system;
 
@@ -146,7 +150,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void dispose() {
     _gpsStabilizedSub?.cancel();
     _newLocationSub?.cancel();
-    _pausedStopTimer?.cancel();
     _sqlitePersistTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -343,30 +346,42 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      // App volvió al primer plano — cancelar cualquier timer de parada pendiente
-      _pausedStopTimer?.cancel();
-      _pausedStopTimer = null;
+      // App volvió al primer plano (desbloqueo de pantalla o vuelta desde otra app).
+      // Si el usuario había iniciado el servicio GPS y Android lo mató mientras
+      // la pantalla estaba bloqueada (batería agresiva en Samsung/Xiaomi/Huawei),
+      // lo relanzamos automáticamente.
       debugPrint('▶️ App en primer plano');
+      if (!Platform.isWindows && gpsServiceRequestedByUser) {
+        _checkAndRestartGpsIfDead();
+      }
     } else if (state == AppLifecycleState.paused) {
-      // App pasó a segundo plano. En Android, si el usuario cierra la app desde
-      // el task manager, "detached" a veces NO se dispara. Usamos un timer de
-      // 8 minutos como fallback: si en ese tiempo no vuelve a "resumed", se
-      // considera que el usuario cerró la app y se detiene el servicio.
-      // (El propio stopWithTask="true" en AndroidManifest ya maneja la mayoría
-      // de los casos al matar el proceso nativo, esto es un seguro extra en Dart.)
-      _pausedStopTimer?.cancel();
-      _pausedStopTimer = Timer(const Duration(minutes: 8), () {
-        debugPrint('⏱️ App en pausa >8 min — deteniendo servicio GPS como fallback');
-        stopBackgroundLocationService();
-        _pausedStopTimer = null;
-      });
-      debugPrint('⏸️ App en segundo plano — timer de seguridad iniciado (8 min)');
+      // La pantalla se bloqueó o el usuario cambió de app.
+      // NO detenemos el servicio — es un foreground service y debe sobrevivir.
+      // stopWithTask="true" en AndroidManifest se encarga de detenerlo cuando
+      // el usuario cierre la app desde el task manager (swipe).
+      debugPrint('⏸️ App en segundo plano — servicio GPS continúa activo');
     } else if (state == AppLifecycleState.detached) {
-      // Detached sí se disparó — cancelar timer y detener inmediatamente
-      _pausedStopTimer?.cancel();
-      _pausedStopTimer = null;
-      debugPrint('🛑 App cerrada (detached) - Deteniendo servicio de geolocalización...');
+      // La app fue cerrada completamente (proceso terminado).
+      debugPrint('🛑 App cerrada (detached) — deteniendo servicio GPS...');
       stopBackgroundLocationService();
+    }
+  }
+
+  /// Verifica si el servicio GPS está vivo. Si no lo está (Android lo mató
+  /// por batería mientras la pantalla estaba bloqueada), lo reinicia.
+  Future<void> _checkAndRestartGpsIfDead() async {
+    try {
+      final service = FlutterBackgroundService();
+      final isRunning = await service.isRunning();
+      if (!isRunning) {
+        debugPrint('🔄 Servicio GPS muerto tras bloqueo — relanzando...');
+        await startBackgroundLocationService();
+        debugPrint('✅ Servicio GPS relanzado automáticamente');
+      } else {
+        debugPrint('✅ Servicio GPS sigue vivo tras desbloqueo');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error verificando/relanzando servicio GPS: $e');
     }
   }
 

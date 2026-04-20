@@ -89,9 +89,13 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   Map<String, String> _mediaFilesToUpload = {};
   int _mediaFileCounter = 0;
 
+  // Token mutable: se renueva proactivamente antes de cada sync
+  String _activeAuthToken = '';
+
   @override
   void initState() {
     super.initState();
+    _activeAuthToken = _activeAuthToken;
     _setupAnimations();
     _loadInitialStats();
   }
@@ -1210,12 +1214,59 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   // LÓGICA DE SINCRONIZACIÓN
   // ============================================================================
 
-  void _startSync(SyncMode mode) {
+  /// Renueva el token ANTES de cada sync para evitar errores 401 mid-flight.
+  /// Usa el mismo cuerpo que POST /Users/Login: type_login, username, password.
+  /// Si la renovación falla, conserva el token actual como fallback.
+  Future<void> _renewTokenProactively() async {
+    try {
+      debugPrint('🔑 [Sync] Renovando token proactivamente antes de sincronizar...');
+      const String url = 'https://api.clickpalm.com/Users/RenewToken';
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'type_login': 'IMEI',
+          'username': widget.imei,
+          'password': widget.imei,
+        }),
+      ).timeout(const Duration(seconds: 20));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final newToken = data['token'] as String?;
+        if (newToken != null && newToken.isNotEmpty) {
+          _activeAuthToken = newToken;
+          // Persistir en AppState para que toda la app use el token fresco
+          final dynamic current = FFAppState().loginResponse;
+          if (current is Map) {
+            final updated = Map<String, dynamic>.from(current);
+            updated['token'] = newToken;
+            FFAppState().loginResponse = updated;
+          }
+          debugPrint('✅ [Sync] Token renovado proactivamente');
+          return;
+        }
+      }
+      debugPrint('⚠️ [Sync] Renovación proactiva falló (${response.statusCode}) — usando token actual');
+    } catch (e) {
+      debugPrint('⚠️ [Sync] Error en renovación proactiva: $e — usando token actual');
+    }
+  }
+
+  Future<void> _startSync(SyncMode mode) async {
     setState(() {
       _currentMode = mode;
       _isProcessing = true;
       _currentStep = SyncStep.checkingConnection;
       _progress = 0.0;
+      _currentMessage = 'Renovando token de acceso...';
+    });
+
+    // Renovar token ANTES de cualquier llamada al servidor
+    await _renewTokenProactively();
+
+    setState(() {
       _currentMessage = 'Iniciando sincronización...';
     });
 
@@ -1468,7 +1519,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           widget.idCompany,
           widget.idsHeadquarters,
           widget.imei,
-          widget.authToken,
+          _activeAuthToken,
         );
       }
 
@@ -1544,7 +1595,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       final success = await actions.syncBaseData(
         context,
         widget.imei,
-        widget.authToken,
+        _activeAuthToken,
         widget.idCompany,
         onProgress: (p, m) {
           if (mounted) {
@@ -1631,7 +1682,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             widget.idCompany,
             widget.idsHeadquarters,
             widget.imei,
-            widget.authToken,
+            _activeAuthToken,
           );
         }
         if (!visitsSuccess) {
@@ -1943,7 +1994,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
 
       // Crear request multipart
       final request = http.MultipartRequest('POST', Uri.parse(url));
-      request.headers['Authorization'] = 'Bearer ${widget.authToken}';
+      request.headers['Authorization'] = 'Bearer ${_activeAuthToken}';
 
       // Agregar JSON como campo de texto (nombre esperado por el backend)
       request.fields['SyncModelJson'] = jsonEncode(payload);
@@ -2623,7 +2674,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${widget.authToken}',
+          'Authorization': 'Bearer ${_activeAuthToken}',
         },
         body: jsonBody,
       );
@@ -2827,7 +2878,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
               Uri.parse(url),
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ${widget.authToken}',
+                'Authorization': 'Bearer ${_activeAuthToken}',
               },
               body: jsonBody,
             );
@@ -2841,7 +2892,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
               Uri.parse(url),
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ${widget.authToken}',
+                'Authorization': 'Bearer ${_activeAuthToken}',
               },
               body: jsonBody,
             );
@@ -2917,7 +2968,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           widget.idCompany,
           widget.idsHeadquarters,
           widget.imei,
-          widget.authToken,
+          _activeAuthToken,
         );
       }
 
@@ -2997,7 +3048,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           widget.idCompany,
           widget.idsHeadquarters,
           widget.imei,
-          widget.authToken,
+          _activeAuthToken,
         );
       }
 

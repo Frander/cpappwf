@@ -193,9 +193,9 @@ Future<String?> _renewAuthToken(String imei) async {
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
-        'Type_login': 'IMEI',
-        'Username': imei,
-        'Password': imei,
+        'type_login': 'IMEI',
+        'username': imei,
+        'password': imei,
       }),
     );
 

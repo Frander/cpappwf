@@ -27,6 +27,9 @@
   <uses-permission android:name="android.permission.WAKE_LOCK"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+  <!-- Permite solicitar al usuario que exima la app de optimización de batería,
+       evitando que Android mate el servicio GPS al bloquear la pantalla -->
+  <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
   <!-- Para geolocalización en segundo plano -->
   <uses-feature android:name="android.hardware.nfc" android:required="false"/>
   <uses-feature android:name="android.hardware.location.gnss" android:required="true"/>

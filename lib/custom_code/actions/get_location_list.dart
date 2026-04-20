@@ -1944,8 +1944,12 @@ Map<String, dynamic> _crearRegistroDepurado(
     'date_finish': dateFinish.toIso8601String(),
     'evaluated_radius': maxRadius,
     'point_count': count,
-    'Id_user': FFAppState().userSelected.idUser,
-    'Id_activity': FFAppState().activitySelected.idActivity,
+    'Id_user': FFAppState().userSelected.idUser != 0
+        ? FFAppState().userSelected.idUser
+        : null,
+    'Id_activity': FFAppState().activitySelected.idActivity != 0
+        ? FFAppState().activitySelected.idActivity
+        : null,
     'Method': groupMethod,
   };
 }

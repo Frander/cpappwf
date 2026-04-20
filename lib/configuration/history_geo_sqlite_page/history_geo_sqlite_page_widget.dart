@@ -887,13 +887,15 @@ class GpsMapBottomSheetState extends State<GpsMapBottomSheet> {
                           options: MapOptions(
                             initialCenter: center,
                             initialZoom: 16,
+                            minZoom: 3,
+                            maxZoom: 18,
                           ),
                           children: [
                             VectorTileLayer(
                               theme: _vectorTheme!,
                               tileProviders:
                                   TileProviders({'pmtiles': _tileProvider!}),
-                              maximumZoom: 22,
+                              maximumZoom: 14,
                             ),
                             // Ruta (polyline)
                             PolylineLayer(
@@ -951,7 +953,7 @@ class GpsPMTilesProvider extends VectorTileProvider {
   GpsPMTilesProvider(this.archive);
 
   @override
-  int get maximumZoom => 22;
+  int get maximumZoom => 14;
 
   @override
   int get minimumZoom => 0;
