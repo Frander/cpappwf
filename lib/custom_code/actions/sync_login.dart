@@ -1289,7 +1289,7 @@ void _updateAppState(Map<String, dynamic> loginData) {
         try {
           FFAppState().deviceDefault =
               DevicesStruct.fromMap(loginData['device']);
-          debugPrint('   ✅ Dispositivo: ${loginData['device']['device_name']}');
+          debugPrint('   ✅ Dispositivo: ${loginData['device']['device_name']} | IMEI: ${FFAppState().deviceDefault.imeI1}');
         } catch (e) {
           debugPrint('   ⚠️ Error al parsear deviceDefault: $e');
         }

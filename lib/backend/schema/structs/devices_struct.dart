@@ -98,10 +98,10 @@ class DevicesStruct extends BaseStruct {
         idDevice: castToType<int>(data['id_device']),
         idCompany: castToType<int>(data['id_company']),
         deviceName: data['device_name'] as String?,
-        cellPhone: data['cellPhone'] as String?,
+        cellPhone: (data['cellPhone'] ?? data['cell_phone']) as String?,
         serialId: data['serial_id'] as String?,
-        imeI1: data['imeI1'] as String?,
-        imeI2: data['imeI2'] as String?,
+        imeI1: (data['imeI1'] ?? data['imei1']) as String?,
+        imeI2: (data['imeI2'] ?? data['imei2']) as String?,
         model: data['model'] as String?,
         state: data['state'] as String?,
       );

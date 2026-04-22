@@ -95,7 +95,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   @override
   void initState() {
     super.initState();
-    _activeAuthToken = _activeAuthToken;
+    _activeAuthToken = widget.authToken;
     _setupAnimations();
     _loadInitialStats();
   }
@@ -1226,9 +1226,9 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'type_login': 'IMEI',
-          'username': widget.imei,
-          'password': widget.imei,
+          'Type_login': 'IMEI',
+          'Username': widget.imei,
+          'Password': widget.imei,
         }),
       ).timeout(const Duration(seconds: 20));
 

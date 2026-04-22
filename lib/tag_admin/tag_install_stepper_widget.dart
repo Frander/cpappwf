@@ -501,17 +501,30 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       // Obtener el id_company del AppState o de la zona
       final idCompany = _selectedZone!['Id_company'] ?? 1;
 
-      // Buscar el Id_type_point real en la tabla Types_points por nombre
-      final typeResults = await db.query(
-        'Types_points',
-        columns: ['Id_type_point'],
-        where: 'Name_type = ?',
-        whereArgs: [_selectedTagType!.displayName],
-        limit: 1,
+      // Buscar el Id_type_point real en Types_points (case-insensitive, tolerante a espacios)
+      final selectedName = _selectedTagType!.displayName.trim();
+      final typeResults = await db.rawQuery(
+        "SELECT Id_type_point, Name_type FROM Types_points "
+        "WHERE LOWER(TRIM(Name_type)) = LOWER(?) LIMIT 1;",
+        [selectedName],
       );
-      final idType = typeResults.isNotEmpty
-          ? (typeResults.first['Id_type_point'] as int)
-          : _selectedTagType!.index + 1; // fallback si no se encuentra
+
+      if (typeResults.isEmpty) {
+        final allTypes = await db.query(
+          'Types_points',
+          columns: ['Id_type_point', 'Name_type'],
+        );
+        debugPrint('❌ Tipo "$selectedName" no encontrado en Types_points.');
+        debugPrint('   Tipos disponibles (${allTypes.length}): '
+            '${allTypes.map((t) => '${t['Id_type_point']}=${t['Name_type']}').join(', ')}');
+        await db.close();
+        _showError('El tipo "$selectedName" no existe en el catálogo del servidor. '
+            'Sincroniza los datos base e inténtalo de nuevo.');
+        setState(() => _isSaving = false);
+        return;
+      }
+
+      final idType = typeResults.first['Id_type_point'] as int;
 
       if (_isUpdateMode && _existingProduct != null) {
         // Actualizar producto existente - marcar como 'updated' para sincronización
