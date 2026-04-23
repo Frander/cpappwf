@@ -24,6 +24,8 @@ import 'index.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+import 'dart:io';
+import 'dart:ui';
 import '/custom_code/platform_utils.dart';
 
 import '/components/animated_splash_screen_widget.dart';
@@ -48,32 +50,92 @@ StreamSubscription<Position>? locationSubscription;
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
+/// Log file para diagnóstico en release mode (donde debugPrint es no-op).
+File? _releaseLogFile;
+
+/// Escribe al log de release (archivo junto al .exe) y también a debugPrint.
+void _log(String message) {
+  final line = '${DateTime.now().toIso8601String()} $message';
+  debugPrint(line);
+  try {
+    _releaseLogFile?.writeAsStringSync('$line\n', mode: FileMode.append);
+  } catch (_) {}
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  GoRouter.optionURLReflectsImperativeAPIs = true;
-  usePathUrlStrategy();
 
-  await SQLiteManager.initialize();
+  // Crear log file junto al ejecutable para diagnóstico en release
+  try {
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    _releaseLogFile = File('$exeDir/clickpalm_crash.log');
+    _releaseLogFile!.writeAsStringSync(
+      '=== ClickPalm start ${DateTime.now().toIso8601String()} ===\n',
+    );
+  } catch (_) {}
 
-  // Inicializar el servicio de geolocalización en segundo plano (solo móvil)
-  if (Platforms.isMobile) {
-    await initializeBackgroundLocationService();
+  // Capturar TODOS los errores no manejados (incluyendo los de async/build)
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    _log('FlutterError: ${details.exceptionAsString()}\n${details.stack}');
+  };
+
+  PlatformDispatcher.instance.onError = (error, stack) {
+    _log('PlatformDispatcher error: $error\n$stack');
+    return true; // Marcarlo como manejado para evitar crash nativo
+  };
+
+  try {
+    _log('Step 1: GoRouter config');
+    GoRouter.optionURLReflectsImperativeAPIs = true;
+    usePathUrlStrategy();
+
+    _log('Step 2: SQLiteManager.initialize()');
+    await SQLiteManager.initialize();
+
+    // Inicializar el servicio de geolocalización en segundo plano (solo móvil)
+    if (Platforms.isMobile) {
+      _log('Step 3: initializeBackgroundLocationService()');
+      await initializeBackgroundLocationService();
+    }
+
+    _log('Step 4: FFAppState init');
+    final appState = FFAppState(); // Initialize FFAppState
+    await appState.initializePersistedState();
+
+    // En desktop no hay GPS ni brújula — simular sensores estabilizados
+    if (Platforms.isDesktop) {
+      appState.isStabilized = true;
+      appState.calibrateCompass = true;
+    }
+
+    if (Platforms.isMobile) {
+      WakelockPlus.enable();
+    }
+
+    _log('Step 5: runApp()');
+    runApp(ChangeNotifierProvider(
+      create: (context) => appState,
+      child: MyApp(),
+    ));
+    _log('Step 6: runApp() completed');
+  } catch (e, stack) {
+    _log('FATAL CRASH: $e\n$stack');
+    // Mostrar app mínima con el error para que no se cierre
+    runApp(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: SelectableText(
+              'Error al iniciar ClickPalm:\n\n$e\n\n$stack',
+              style: TextStyle(fontSize: 12, color: Colors.red),
+            ),
+          ),
+        ),
+      ),
+    ));
   }
-
-  final appState = FFAppState(); // Initialize FFAppState
-  await appState.initializePersistedState();
-
-  // En desktop no hay GPS ni brújula — simular sensores estabilizados
-  if (Platforms.isDesktop) {
-    appState.isStabilized = true;
-    appState.calibrateCompass = true;
-  }
-
-  WakelockPlus.enable();
-  runApp(ChangeNotifierProvider(
-    create: (context) => appState,
-    child: MyApp(),
-  ));
 }
 
 class MyApp extends StatefulWidget {
@@ -180,9 +242,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final lastPoint = EnrichedGeoBuffer().getAll();
       final speed = lastPoint.isNotEmpty ? lastPoint.last.speed : 0.0;
       int batteryLevel = 100;
-      try {
-        batteryLevel = await Battery().batteryLevel;
-      } catch (_) {}
+      if (Platforms.isMobile) {
+        try {
+          batteryLevel = await Battery().batteryLevel;
+        } catch (_) {}
+      }
 
       // Depurar geolocalizaciones (agrupar puntos < 2m en centroides)
       final depurados = depurarGeolocalizaciones(toSave, speed, batteryLevel);

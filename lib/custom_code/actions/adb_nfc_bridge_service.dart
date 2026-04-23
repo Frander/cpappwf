@@ -23,6 +23,57 @@ class AdbNfcBridgeService {
   WebSocket? _client;
   StreamSubscription<HttpRequest>? _serverSub;
 
+  /// Ruta resuelta de adb (se cachea tras la primera búsqueda).
+  String? _adbPath;
+
+  /// Busca adb.exe en PATH y en rutas conocidas del Android SDK.
+  /// Retorna la ruta completa o null si no se encuentra.
+  Future<String?> _findAdb() async {
+    if (_adbPath != null) return _adbPath;
+
+    // 1. Probar si adb está en PATH
+    try {
+      final result = await Process.run('adb', ['version']);
+      if (result.exitCode == 0) {
+        _adbPath = 'adb';
+        return _adbPath;
+      }
+    } catch (_) {}
+
+    // 2. Buscar en rutas conocidas del Android SDK
+    final home = Platform.environment['USERPROFILE'] ??
+        Platform.environment['HOME'] ?? '';
+    final localAppData = Platform.environment['LOCALAPPDATA'] ?? '';
+
+    final candidatePaths = <String>[
+      // Windows: Android Studio SDK default
+      '$localAppData/Android/Sdk/platform-tools/adb.exe',
+      '$home/AppData/Local/Android/Sdk/platform-tools/adb.exe',
+      // ANDROID_HOME / ANDROID_SDK_ROOT
+      if (Platform.environment['ANDROID_HOME'] != null)
+        '${Platform.environment['ANDROID_HOME']}/platform-tools/adb.exe',
+      if (Platform.environment['ANDROID_SDK_ROOT'] != null)
+        '${Platform.environment['ANDROID_SDK_ROOT']}/platform-tools/adb.exe',
+      // Linux
+      '$home/Android/Sdk/platform-tools/adb',
+      '/usr/bin/adb',
+      '/usr/local/bin/adb',
+      // macOS
+      '$home/Library/Android/sdk/platform-tools/adb',
+    ];
+
+    for (final path in candidatePaths) {
+      final normalized = path.replaceAll('/', Platform.pathSeparator);
+      if (await File(normalized).exists()) {
+        _adbPath = normalized;
+        debugPrint('AdbNfcBridgeService: adb encontrado en: $_adbPath');
+        return _adbPath;
+      }
+    }
+
+    return null;
+  }
+
   final StreamController<Map<String, dynamic>> _tagController =
       StreamController<Map<String, dynamic>>.broadcast();
   final StreamController<AdbBridgeStatus> _statusController =
@@ -71,24 +122,31 @@ class AdbNfcBridgeService {
     }
   }
 
+  /// Mensaje de error para la UI cuando adb no se encuentra.
+  String? adbError;
+
   Future<void> _setupAdbReverse() async {
+    final adb = await _findAdb();
+    if (adb == null) {
+      adbError = 'adb no encontrado. Instala Android Platform-Tools.';
+      debugPrint('⚠️ AdbNfcBridgeService: $adbError');
+      debugPrint('   Rutas buscadas: LOCALAPPDATA/Android/Sdk/platform-tools/, '
+          'ANDROID_HOME, ANDROID_SDK_ROOT, PATH');
+      return;
+    }
+    adbError = null;
+
     try {
-      final result = await Process.run('adb', ['reverse', 'tcp:8080', 'tcp:8080']);
+      final result = await Process.run(adb, ['reverse', 'tcp:8080', 'tcp:8080']);
       if (result.exitCode == 0) {
-        debugPrint('🔁 AdbNfcBridgeService: adb reverse tcp:8080 tcp:8080 OK');
+        debugPrint('AdbNfcBridgeService: adb reverse tcp:8080 tcp:8080 OK (usando: $adb)');
       } else {
-        debugPrint('⚠️ AdbNfcBridgeService: adb reverse failed: ${result.stderr}');
+        adbError = 'adb reverse fallo: ${result.stderr}';
+        debugPrint('⚠️ AdbNfcBridgeService: $adbError');
       }
     } catch (e) {
-      debugPrint('⚠️ AdbNfcBridgeService: adb not found or failed: $e');
-      if (Platform.isLinux) {
-        debugPrint('   💡 Instala adb: sudo apt install android-tools-adb  (Debian/Ubuntu)');
-        debugPrint('                   sudo pacman -S android-tools        (Arch)');
-      } else if (Platform.isMacOS) {
-        debugPrint('   💡 Instala adb: brew install --cask android-platform-tools');
-      } else if (Platform.isWindows) {
-        debugPrint('   💡 Instala Android Platform-Tools y añade la carpeta a PATH');
-      }
+      adbError = 'Error ejecutando adb: $e';
+      debugPrint('⚠️ AdbNfcBridgeService: $adbError');
     }
   }
 
