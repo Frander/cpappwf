@@ -11,6 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geodesy/geodesy.dart';
 import 'dart:io';
+import '/custom_code/platform_utils.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,7 +22,7 @@ import 'background_location_service_lite.dart';
 
 /// Inicializa y configura el servicio de segundo plano
 Future<void> initializeBackgroundLocationService() async {
-  if (Platform.isWindows) return; // No soportado en Windows
+  if (!Platforms.isMobile) return; // No soportado en desktop
   final service = FlutterBackgroundService();
 
   // Crear canal de notificaciones para Android
@@ -168,7 +169,7 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 
   try {
     // Configurar acelerómetro y giroscopio (solo en plataformas móviles)
-    if (!Platform.isWindows) {
+    if (Platforms.isMobile) {
       accelSub = accelerometerEventStream(
               samplingPeriod: const Duration(milliseconds: 200))
           .listen((event) {
@@ -713,7 +714,7 @@ bool gpsServiceRequestedByUser = false;
 
 /// Función pública para iniciar el servicio
 Future<void> startBackgroundLocationService() async {
-  if (Platform.isWindows) return; // No soportado en Windows
+  if (!Platforms.isMobile) return; // No soportado en desktop
   gpsServiceRequestedByUser = true;
   final service = FlutterBackgroundService();
 
@@ -760,7 +761,7 @@ Future<void> startBackgroundLocationService() async {
 /// El nuevo modo debe haber sido escrito ya en FFAppState/SharedPreferences
 /// ANTES de llamar esta función.
 Future<void> restartBackgroundLocationService() async {
-  if (Platform.isWindows) return;
+  if (!Platforms.isMobile) return;
   debugPrint('🔁 Reiniciando servicio GPS para aplicar nuevo modo...');
 
   final service = FlutterBackgroundService();
@@ -790,7 +791,7 @@ Future<void> restartBackgroundLocationService() async {
 
 /// Función pública para detener el servicio
 Future<void> stopBackgroundLocationService() async {
-  if (Platform.isWindows) return; // No soportado en Windows
+  if (!Platforms.isMobile) return; // No soportado en desktop
   gpsServiceRequestedByUser = false;
   final service = FlutterBackgroundService();
   service.invoke('stopService');

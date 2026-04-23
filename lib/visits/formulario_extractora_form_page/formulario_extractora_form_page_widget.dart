@@ -14,6 +14,7 @@ import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:async';
 import 'dart:ui';
 import 'dart:io';
+import '/custom_code/platform_utils.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import '/custom_code/actions/adb_nfc_bridge_service.dart';
 import '/custom_code/actions/adb_nfc_client_service.dart';
@@ -276,7 +277,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 .toLowerCase() ==
             'tag-transfer-adb-from');
 
-    if (hasServerField && Platform.isWindows) {
+    if (hasServerField && Platforms.isDesktop) {
       // Guardar flag y statusId del primer campo adb-server detectado
       _hasAdbServerField = true;
       final firstServer = allStatuses.firstWhere(
@@ -358,7 +359,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       });
     }
 
-    if (hasFromField && !Platform.isWindows) {
+    if (hasFromField && Platforms.isMobile) {
       _adbClientConnSub = AdbNfcClientService.instance.onConnectionChanged.listen((connected) {
         if (mounted) setState(() => _adbClientConnected = connected);
       });
@@ -606,7 +607,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     _adbTagSub?.cancel();
     _adbClientConnSub?.cancel();
     _adbServerCommandSub?.cancel();
-    if (Platform.isWindows) {
+    if (Platforms.isDesktop) {
       AdbNfcBridgeService.instance.stop();
     } else {
       AdbNfcClientService.instance.disconnect();
@@ -1435,7 +1436,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           );
 
     // Si hay campo adb-server en Windows → panel vertical izquierdo + formulario a la derecha
-    if (_hasAdbServerField && Platform.isWindows) {
+    if (_hasAdbServerField && Platforms.isDesktop) {
       return Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -2539,7 +2540,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
             // tag-transfer-adb-server: tap intenta habilitar el socket (solo desktop)
             if (isTagTransferAdbServerType) {
-              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+              if (Platforms.isDesktop && !AdbNfcBridgeService.instance.isServerRunning) {
                 await AdbNfcBridgeService.instance.start();
                 if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
               }
@@ -2548,7 +2549,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
             // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
             if (isTagTransferAdbFromType) {
-              if (!Platform.isWindows) {
+              if (Platforms.isMobile) {
                 if (!AdbNfcClientService.instance.isConnected) {
                   final connected = await AdbNfcClientService.instance.connect();
                   if (!mounted) return;
@@ -2920,7 +2921,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           },
           child: Container(
             margin: const EdgeInsets.only(bottom: 8),
-            padding: (isTagTransferAdbFromType && !Platform.isWindows)
+            padding: (isTagTransferAdbFromType && Platforms.isMobile)
                 ? const EdgeInsets.symmetric(horizontal: 12, vertical: 16)
                 : (isDateType || isTimeType)
                     ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
@@ -3960,7 +3961,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
             // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
             if (isTagTransferAdbServerType) {
-              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+              if (Platforms.isDesktop && !AdbNfcBridgeService.instance.isServerRunning) {
                 await AdbNfcBridgeService.instance.start();
                 if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
               }
@@ -3969,7 +3970,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
             // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
             if (isTagTransferAdbFromType) {
-              if (!Platform.isWindows) {
+              if (Platforms.isMobile) {
                 if (!AdbNfcClientService.instance.isConnected) {
                   final connected = await AdbNfcClientService.instance.connect();
                   if (!mounted) return;
@@ -4199,7 +4200,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               child: _buildAdbServerBadge(statusId: statusId),
                             ),
                           // Badge compacto adb-from solo en desktop (móvil usa card completa debajo)
-                          if (isTagTransferAdbFromType && Platform.isWindows)
+                          if (isTagTransferAdbFromType && Platforms.isDesktop)
                             Padding(
                               padding: const EdgeInsets.only(left: 8),
                               child: _buildAdbFromBadge(statusId: statusId),
@@ -4219,7 +4220,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           child: _buildTagReaderSummary(statusId: statusId),
                         ),
                       // Tarjeta grande adb-from (solo móvil)
-                      if (isTagTransferAdbFromType && !Platform.isWindows)
+                      if (isTagTransferAdbFromType && Platforms.isMobile)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildAdbFromCard(statusId: statusId, context: context, status: status),
@@ -4748,7 +4749,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
             // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
             if (isTagTransferAdbServerType) {
-              if (Platform.isWindows && !AdbNfcBridgeService.instance.isServerRunning) {
+              if (Platforms.isDesktop && !AdbNfcBridgeService.instance.isServerRunning) {
                 await AdbNfcBridgeService.instance.start();
                 if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
               }
@@ -4757,7 +4758,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
             // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
             if (isTagTransferAdbFromType) {
-              if (!Platform.isWindows) {
+              if (Platforms.isMobile) {
                 if (!AdbNfcClientService.instance.isConnected) {
                   final connected = await AdbNfcClientService.instance.connect();
                   if (!mounted) return;
@@ -5064,7 +5065,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     child: _buildAdbServerBadge(statusId: statusId),
                   ),
                 // Badge compacto adb-from solo en desktop
-                if (isTagTransferAdbFromType && Platform.isWindows)
+                if (isTagTransferAdbFromType && Platforms.isDesktop)
                   Padding(
                     padding: const EdgeInsets.only(left: 8),
                     child: _buildAdbFromBadge(statusId: statusId),
@@ -6772,7 +6773,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
       // 1. GPS: solicitar a Android vía ADB (Windows) o usar FFAppState (Android)
       Map<String, dynamic>? geoData;
-      if (Platform.isWindows) {
+      if (Platforms.isDesktop) {
         geoData = await AdbNfcBridgeService.instance.requestAndWaitGeoLocation();
       }
       if (geoData == null) {

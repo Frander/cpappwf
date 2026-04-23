@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'tts_queue_manager.dart';
 import 'voice_model_singleton.dart';
 import '/backend/sqlite/global_db_singleton.dart';
+import '/custom_code/platform_utils.dart';
 
 // ============================================================================
 // CLASES DE DATOS
@@ -566,7 +567,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
   }
 
   void _initSensors() {
-    if (Platform.isWindows) return; // Sensores no disponibles en Windows
+    if (!Platforms.isMobile) return; // Sensores no disponibles en desktop
     // Acelerómetro — guarda la última lectura de gravedad
     _accelerometerSub = accelerometerEventStream().listen((event) {
       _ax = event.x;

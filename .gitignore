@@ -56,3 +56,9 @@ app.*.map.json
 key.properties
 nul
 .claude/settings.local.json
+
+# Inno Setup output (instalador Windows)
+/Output/
+
+# Visual C++ Redistributable bundle (se descarga local, no al repo)
+/windows/redist/*.exe

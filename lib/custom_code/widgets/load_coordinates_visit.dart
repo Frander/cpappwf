@@ -20,6 +20,7 @@ import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/custom_code/actions/enriched_geo_buffer.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '/custom_code/platform_utils.dart';
 
 // ============================================================================
 // MODELO DE DATOS GPS
@@ -486,7 +487,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   Future<void> _getGPSFromGeolocator() async {
-    if (Platform.isWindows) return; // GPS no disponible en Windows
+    if (!Platforms.isMobile) return; // GPS no disponible en desktop
     try {
       bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {

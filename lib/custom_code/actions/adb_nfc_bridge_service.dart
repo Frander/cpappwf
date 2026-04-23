@@ -4,11 +4,16 @@
 // Only active when a tag-transfer-adb-server field is rendered in the form.
 //
 // Uses HttpServer + WebSocketTransformer — the official Dart approach.
+//
+// Funciona en cualquier desktop (Windows, Linux, macOS) siempre que `adb` esté
+// en PATH. En Linux: `sudo apt install android-tools-adb` (Debian/Ubuntu) o
+// `sudo pacman -S android-tools` (Arch).
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '/custom_code/platform_utils.dart';
 
 class AdbNfcBridgeService {
   AdbNfcBridgeService._();
@@ -38,7 +43,7 @@ class AdbNfcBridgeService {
   }
 
   Future<bool> start() async {
-    if (!Platform.isWindows) return false;
+    if (!Platforms.isDesktop) return false; // Solo desktop (Windows/Linux/macOS)
     if (_server != null) return true; // Already running
 
     try {
@@ -76,6 +81,14 @@ class AdbNfcBridgeService {
       }
     } catch (e) {
       debugPrint('⚠️ AdbNfcBridgeService: adb not found or failed: $e');
+      if (Platform.isLinux) {
+        debugPrint('   💡 Instala adb: sudo apt install android-tools-adb  (Debian/Ubuntu)');
+        debugPrint('                   sudo pacman -S android-tools        (Arch)');
+      } else if (Platform.isMacOS) {
+        debugPrint('   💡 Instala adb: brew install --cask android-platform-tools');
+      } else if (Platform.isWindows) {
+        debugPrint('   💡 Instala Android Platform-Tools y añade la carpeta a PATH');
+      }
     }
   }
 

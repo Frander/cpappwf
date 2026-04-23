@@ -11,8 +11,8 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:nfc_manager/nfc_manager.dart';
+import '/custom_code/platform_utils.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart'
     show IsoDepAndroid, NfcAAndroid, MifareClassicAndroid, NfcTagAndroid;
@@ -20,7 +20,7 @@ import 'package:nfc_manager/nfc_manager_android.dart'
 /// Detecta la capacidad del TAG NFC y retorna el tamaño en bytes
 /// Retorna 0 si no se pudo detectar o si hay un error
 Future<int> detectNfcCapacity(BuildContext context) async {
-  if (Platform.isWindows) return 0; // NFC no disponible en Windows
+  if (!Platforms.isMobile) return 0; // NFC no disponible en desktop
   // Verificar si NFC está disponible
   bool nfcReady = await checkNfcStatus(context, showAlert: true);
   if (!nfcReady) {

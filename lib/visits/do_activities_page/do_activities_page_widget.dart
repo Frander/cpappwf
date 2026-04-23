@@ -8,7 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import 'dart:io' show Platform;
+import '/custom_code/platform_utils.dart';
 import '../formulario_extractora_form_page/formulario_extractora_form_page_widget.dart';
 import 'do_activities_page_model.dart';
 export 'do_activities_page_model.dart';
@@ -334,7 +334,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               HapticFeedback.vibrate();
 
                               // Validaciones
-                              if (!Platform.isWindows && !FFAppState().isStabilized) {
+                              if (Platforms.isMobile && !FFAppState().isStabilized) {
                                 await showDialog(
                                   context: context,
                                   builder: (dialogContext) {
@@ -526,7 +526,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                               debugPrint('🔄 Long press detectado - Mostrando diálogo de sincronización nuevamente');
 
                               // Validaciones previas
-                              if (!Platform.isWindows && !FFAppState().isStabilized) {
+                              if (Platforms.isMobile && !FFAppState().isStabilized) {
                                 await showDialog(
                                   context: context,
                                   builder: (dialogContext) {
@@ -655,7 +655,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                 gradient: LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
-                                  colors: (Platform.isWindows || FFAppState().isStabilized)
+                                  colors: (!Platforms.isMobile || FFAppState().isStabilized)
                                       ? const [
                                           Color(0xFF003420),
                                           Color(0xFF00a86b),
@@ -669,7 +669,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                 boxShadow: [
                                   BoxShadow(
                                     blurRadius: 20,
-                                    color: ((Platform.isWindows || FFAppState().isStabilized)
+                                    color: ((!Platforms.isMobile || FFAppState().isStabilized)
                                             ? const Color(0xFF00a86b)
                                             : const Color(0xFFFF6B6B))
                                         .withValues(alpha: 0.4),
@@ -719,8 +719,8 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                         const SizedBox(height: 8),
 
                         // Indicador de estado GPS en tiempo real (tappable → abre monitor)
-                        // En Windows el GPS siempre está simulado — ocultar el indicador
-                        if (!Platform.isWindows)
+                        // En desktop el GPS siempre está simulado — ocultar el indicador
+                        if (Platforms.isMobile)
                         GestureDetector(
                           onTap: () => GPSStabilizationMonitor.show(context),
                           child: AnimatedBuilder(

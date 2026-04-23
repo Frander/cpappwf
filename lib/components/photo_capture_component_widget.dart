@@ -5,6 +5,7 @@ import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import 'dart:io';
 import '/custom_code/actions/index.dart' as actions;
+import '/custom_code/platform_utils.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -108,7 +109,7 @@ class _PhotoCaptureComponentWidgetState
   }
 
   Future<void> _capturePhoto(ImageSource source) async {
-    if (Platform.isWindows) return; // Captura de cámara no disponible en Windows
+    if (!Platforms.isMobile) return; // Captura de cámara no disponible en desktop
     try {
       HapticFeedback.mediumImpact();
 

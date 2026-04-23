@@ -12,10 +12,10 @@ import 'package:flutter/material.dart';
 
 import 'package:sensors_plus/sensors_plus.dart';
 import 'dart:async';
-import 'dart:io' show Platform;
+import '/custom_code/platform_utils.dart';
 
 Future<bool> calibrateCompass() async {
-  if (Platform.isWindows) return false; // Sensores no disponibles en Windows
+  if (!Platforms.isMobile) return false; // Sensores no disponibles en desktop
   try {
     final completer = Completer<bool>();
     StreamSubscription<MagnetometerEvent>? subscription;

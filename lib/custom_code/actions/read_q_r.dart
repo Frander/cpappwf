@@ -11,10 +11,10 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'dart:io' show Platform;
+import '/custom_code/platform_utils.dart';
 
 Future<String?> readQR(BuildContext context) async {
-  if (Platform.isWindows) return null; // Escáner QR no disponible en Windows
+  if (!Platforms.isMobile) return null; // Escáner QR no disponible en desktop
   try {
     final qrValue = await Navigator.of(context).push<String>(
       MaterialPageRoute(

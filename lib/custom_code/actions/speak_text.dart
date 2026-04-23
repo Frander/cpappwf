@@ -16,11 +16,11 @@ import '/flutter_flow/custom_functions.dart'
     as functions; // Imports custom functions
 
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'package:flutter_tts/flutter_tts.dart';
+import '/custom_code/platform_utils.dart';
 
 Future<void> speakText(String text) async {
-  if (Platform.isWindows) return; // TTS no disponible en Windows
+  if (!Platforms.isMobile) return; // TTS no disponible en desktop
   FlutterTts flutterTts = FlutterTts();
 
   await flutterTts

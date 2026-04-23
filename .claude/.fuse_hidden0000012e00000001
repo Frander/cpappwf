@@ -98,8 +98,7 @@
       "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --source --remotes --decorate --oneline)",
       "Bash(git -C /e/RepositoriosFix/ClickPalmAPP log --all --name-status --oneline)",
       "Bash(git -C /e/RepositoriosFix/ClickPalmAPP show 2d1bce3:.)",
-      "Read(//e/RepositoriosFix//**)",
-      "Bash(flutter build *)"
+      "Read(//e/RepositoriosFix//**)"
     ],
     "deny": [],
     "ask": [],

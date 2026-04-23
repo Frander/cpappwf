@@ -6,7 +6,7 @@ import '/components/modern_calibrate_compass_widget.dart';
 import '/custom_code/actions/index.dart';
 import '/backend/schema/structs/read_geo_struct.dart';
 import 'dart:async';
-import 'dart:io' show Platform;
+import '/custom_code/platform_utils.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -172,7 +172,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
       _userBadgeController.forward();
 
       // Iniciar servicio de geolocalización en segundo plano (solo en móvil)
-      if (!Platform.isWindows) {
+      if (Platforms.isMobile) {
       try {
         // Verificar si el servicio de ubicación está habilitado
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -201,7 +201,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
       } catch (e) {
         debugPrint('⚠️ Error al iniciar servicio de geolocalización: $e');
       }
-      } // end !Platform.isWindows
+      } // end Platforms.isMobile
 
     });
 

@@ -6,9 +6,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+// Empaqueta libsqlite3 nativa para desktop (Linux/Windows/macOS) para que
+// sqflite_common_ffi no dependa de que el sistema tenga libsqlite3 instalado.
+// ignore: unused_import
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 import 'package:path/path.dart' as path;
 import '/custom_code/actions/validate_db_sqlite.dart'
     show createClickPalmTables, upgradeClickPalmDatabase;
+import '/custom_code/platform_utils.dart';
 
 class GlobalDbSingleton {
   // Instancia singleton
@@ -21,7 +26,8 @@ class GlobalDbSingleton {
   String? _dbPath;
   bool _isInitializing = false;
 
-  /// Obtener la ruta de la base de datos según plataforma
+  /// Obtener la ruta de la base de datos según plataforma.
+  /// Path portable via path_provider + path.join (sin hardcoded separators).
   Future<String> _getBestDocumentsPath() async {
     late Directory baseDir;
 
@@ -32,11 +38,11 @@ class GlobalDbSingleton {
       }
       baseDir = externalDir;
     } else {
-      // Windows, Linux, macOS, iOS
+      // Desktop (Windows/Linux/macOS) e iOS: Documents es portable en todos.
       baseDir = await getApplicationDocumentsDirectory();
     }
 
-    final String pathStr = '${baseDir.path}/ClickPalmData';
+    final String pathStr = path.join(baseDir.path, 'ClickPalmData');
     final Directory targetDir = Directory(pathStr);
 
     if (!await targetDir.exists()) {
@@ -68,7 +74,7 @@ class GlobalDbSingleton {
     _isInitializing = true;
     try {
       // Inicializar FFI en plataformas desktop
-      if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      if (Platforms.isDesktop) {
         sqfliteFfiInit();
         databaseFactory = databaseFactoryFfi;
       }

@@ -3,8 +3,8 @@
 // NO modificar la lógica — es la misma que los mapas offline.
 
 import 'package:flutter/foundation.dart';
-import 'dart:io' show Platform;
 import 'package:flutter_tts/flutter_tts.dart';
+import '/custom_code/platform_utils.dart';
 
 enum SpeechPriority { low, normal, high, critical }
 
@@ -35,7 +35,7 @@ class TTSQueueManager {
   }
 
   Future<void> _initializeTTS() async {
-    if (Platform.isWindows) return; // TTS no disponible en Windows
+    if (!Platforms.isMobile) return; // TTS no disponible en desktop
     await _tts.setLanguage("es-CO");
     await _tts.setSpeechRate(0.5);
     await _tts.setVolume(1.0);

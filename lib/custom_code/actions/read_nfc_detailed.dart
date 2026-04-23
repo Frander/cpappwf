@@ -12,9 +12,9 @@ import 'package:flutter/material.dart';
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
 import 'package:nfc_manager/nfc_manager.dart';
+import '/custom_code/platform_utils.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager/nfc_manager_android.dart'
@@ -28,7 +28,7 @@ import 'package:nfc_manager/nfc_manager_android.dart'
 /// - currentSize: Tamaño actual del contenido en bytes
 /// - availableSize: Espacio disponible en bytes
 Future<Map<String, dynamic>> readNfcDetailed(BuildContext context) async {
-  if (Platform.isWindows) return {'success': false, 'content': ''}; // NFC no disponible en Windows
+  if (!Platforms.isMobile) return {'success': false, 'content': ''}; // NFC no disponible en desktop
   final result = <String, dynamic>{
     'success': false,
     'tagId': '',

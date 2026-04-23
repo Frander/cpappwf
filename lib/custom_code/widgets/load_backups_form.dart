@@ -28,6 +28,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'dart:typed_data';
 import 'package:flutter/services.dart'; // Para MethodChannel
 import 'package:share_plus/share_plus.dart'; // Para compartir archivos
+import '/custom_code/platform_utils.dart';
 
 // ============================================================================
 // MODELOS DE DATOS
@@ -309,7 +310,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
   // ==========================================================================
 
   Future<void> _checkBluetoothStatus() async {
-    if (Platform.isWindows) return; // Bluetooth no disponible en Windows
+    if (!Platforms.isMobile) return; // Bluetooth no disponible en desktop
     try {
       final adapterState = await FlutterBluePlus.adapterState.first;
       setState(() {

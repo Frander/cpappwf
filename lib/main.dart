@@ -24,7 +24,7 @@ import 'index.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'dart:io' show Platform;
+import '/custom_code/platform_utils.dart';
 
 import '/components/animated_splash_screen_widget.dart';
 import '/custom_code/actions/background_location_service.dart'
@@ -56,7 +56,7 @@ void main() async {
   await SQLiteManager.initialize();
 
   // Inicializar el servicio de geolocalización en segundo plano (solo móvil)
-  if (!Platform.isWindows) {
+  if (Platforms.isMobile) {
     await initializeBackgroundLocationService();
   }
 
@@ -64,7 +64,7 @@ void main() async {
   await appState.initializePersistedState();
 
   // En desktop no hay GPS ni brújula — simular sensores estabilizados
-  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+  if (Platforms.isDesktop) {
     appState.isStabilized = true;
     appState.calibrateCompass = true;
   }
@@ -140,7 +140,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _router = createRouter(_appStateNotifier);
 
     // Iniciar listeners GPS globales (solo móvil)
-    if (!Platform.isWindows) {
+    if (Platforms.isMobile) {
       _setupGlobalGpsListeners();
       _startSqlitePersistTimer();
     }
@@ -351,7 +351,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       // la pantalla estaba bloqueada (batería agresiva en Samsung/Xiaomi/Huawei),
       // lo relanzamos automáticamente.
       debugPrint('▶️ App en primer plano');
-      if (!Platform.isWindows && gpsServiceRequestedByUser) {
+      if (Platforms.isMobile && gpsServiceRequestedByUser) {
         _checkAndRestartGpsIfDead();
       }
     } else if (state == AppLifecycleState.paused) {

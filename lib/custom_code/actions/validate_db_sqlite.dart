@@ -16,9 +16,10 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
+import '/custom_code/platform_utils.dart';
 
 Future<String?> validateDbSqlite(BuildContext context) async {
-  if (!Platform.isAndroid && !Platform.isWindows && !Platform.isLinux && !Platform.isMacOS) {
+  if (!Platforms.isMobile && !Platforms.isDesktop) {
     debugPrint('validateDbSqlite: omitido en plataforma ${Platform.operatingSystem}');
     return null;
   }

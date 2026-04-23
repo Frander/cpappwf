@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
-import 'dart:io';
 
 import '/backend/sqlite/init.dart';
+import '/custom_code/platform_utils.dart';
 import 'queries/read.dart';
 import 'queries/update.dart';
 
 import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+// Empaqueta libsqlite3 nativa para desktop (Linux/Windows/macOS) para que
+// sqflite_common_ffi no dependa de que el sistema tenga libsqlite3 instalado.
+// ignore: unused_import
+import 'package:sqlite3_flutter_libs/sqlite3_flutter_libs.dart';
 export 'queries/read.dart';
 export 'queries/update.dart';
 
@@ -23,7 +27,7 @@ class SQLiteManager {
     if (kIsWeb) {
       return;
     }
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (Platforms.isDesktop) {
       sqfliteFfiInit();
       databaseFactory = databaseFactoryFfi;
     }

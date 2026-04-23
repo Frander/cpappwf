@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import '/custom_code/platform_utils.dart';
 
 class AdbNfcClientService {
   AdbNfcClientService._();
@@ -27,7 +28,7 @@ class AdbNfcClientService {
   bool get isConnected => _socket != null;
 
   Future<bool> connect() async {
-    if (Platform.isWindows) return false; // client is mobile-only
+    if (!Platforms.isMobile) return false; // client is mobile-only
     if (_socket != null) return true;
 
     try {

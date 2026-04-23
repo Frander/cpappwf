@@ -27,6 +27,7 @@ import 'dart:io';
 import 'package:battery_plus/battery_plus.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/custom_code/actions/enriched_geo_buffer.dart';
+import '/custom_code/platform_utils.dart';
 
 /// Vector 3D simple para cálculos IMU
 class Vector3 {
@@ -1332,7 +1333,7 @@ class DatabaseManager {
 
 /// Sistema principal mejorado
 Future<void> getLocationList(BuildContext context) async {
-  if (Platform.isWindows) return; // GPS/sensores no disponibles en Windows
+  if (!Platforms.isMobile) return; // GPS/sensores no disponibles en desktop
   debugPrint('=== Sistema de Geolocalización Mejorado Iniciado ===');
 
   // GPS debe mantenerse activo SIEMPRE en segundo plano
@@ -2034,7 +2035,7 @@ Future<void> _ensureLocationTrackingTableExists(Database database) async {
 
 /// Función de limpieza mejorada
 Future<void> stopLocationUpdates(BuildContext context) async {
-  if (Platform.isWindows) return; // GPS/sensores no disponibles en Windows
+  if (!Platforms.isMobile) return; // GPS/sensores no disponibles en desktop
   debugPrint('Deteniendo actualizaciones de ubicación...');
 
   await _locationSubscription?.cancel();

@@ -23,13 +23,14 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
+import '/custom_code/platform_utils.dart';
 
 Future<String> readNFC(
   BuildContext context, {
   bool autoClose = true,
   bool clearAfterRead = false,
 }) async {
-  if (Platform.isWindows) return ''; // NFC no disponible en Windows
+  if (!Platforms.isMobile) return ''; // NFC no disponible en desktop
   // Verificar si NFC está disponible y activado usando la nueva función
   bool nfcReady = await checkNfcStatus(context, showAlert: true);
   if (!nfcReady) {

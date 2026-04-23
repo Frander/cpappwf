@@ -17,6 +17,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import '/custom_code/platform_utils.dart';
 
 // ============================================================================
 // WIDGET - CONFIGURACIÓN DE IMPRESORAS BLUETOOTH
@@ -87,7 +88,7 @@ class _PrinterConfigurationPageState extends State<PrinterConfigurationPage>
   }
 
   Future<void> _initBluetooth() async {
-    if (Platform.isWindows) return; // Bluetooth no disponible en Windows
+    if (!Platforms.isMobile) return; // Bluetooth no disponible en desktop
     try {
       // Obtener estado actual de Bluetooth
       BluetoothAdapterState state = await FlutterBluePlus.adapterState.first;

@@ -18,6 +18,7 @@ import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
+import '/custom_code/platform_utils.dart';
 
 /// Muestra un previsualizador HTML con WebView y un botón para imprimir
 ///
@@ -217,7 +218,7 @@ class _HTMLPreviewScreenState extends State<HTMLPreviewScreen> {
   }
 
   Future<void> _printToThermalPrinter() async {
-    if (Platform.isWindows) return; // Bluetooth no disponible en Windows
+    if (!Platforms.isMobile) return; // Bluetooth no disponible en desktop
     setState(() {
       _isPrinting = true;
     });

@@ -9,8 +9,8 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:typed_data';
+import '/custom_code/platform_utils.dart';
 import 'nfc_view_raw_dialog_model.dart';
 export 'nfc_view_raw_dialog_model.dart';
 
@@ -43,7 +43,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
 
   /// Inicia la lectura del TAG NFC (versión personalizada que no cierra el diálogo)
   Future<void> _startNfcReading() async {
-    if (Platform.isWindows) return; // NFC no disponible en Windows
+    if (!Platforms.isMobile) return; // NFC no disponible en desktop
     // Verificar si NFC está disponible
     bool nfcAvailable = await NfcManager.instance.isAvailable();
     if (!nfcAvailable) {

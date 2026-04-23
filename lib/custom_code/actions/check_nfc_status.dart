@@ -14,6 +14,7 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:flutter/services.dart';
 import 'dart:io';
 import '/components/nfc_disabled_alert_widget.dart';
+import '/custom_code/platform_utils.dart';
 
 /// Canal para comunicación con Android nativo
 const MethodChannel _nfcChannel = MethodChannel('com.clickpalm.clickpalmapp/nfc');
@@ -28,7 +29,7 @@ enum NfcStatus {
 /// Verifica el estado del NFC y muestra alerta si está desactivado
 /// Retorna true si NFC está listo para usar, false si no
 Future<bool> checkNfcStatus(BuildContext context, {bool showAlert = true}) async {
-  if (Platform.isWindows) return false; // NFC no disponible en Windows
+  if (!Platforms.isMobile) return false; // NFC no disponible en desktop
   try {
     // Verificar si NFC está disponible
     bool isAvailable = await NfcManager.instance.isAvailable();

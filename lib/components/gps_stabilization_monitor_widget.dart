@@ -1,9 +1,9 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import '/app_state.dart';
+import '/custom_code/platform_utils.dart';
 import '/flutter_flow/nav/nav.dart';
 
 /// Monitor en tiempo real del proceso de estabilización GPS.
@@ -88,7 +88,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
   }
 
   void _setupListeners() {
-    if (Platform.isWindows) return; // Background service no disponible en Windows
+    if (!Platforms.isMobile) return; // Background service no disponible en desktop
     final service = FlutterBackgroundService();
 
     _progressSub = service.on('gpsProgress').listen((event) {

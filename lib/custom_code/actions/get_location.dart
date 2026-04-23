@@ -11,10 +11,10 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'package:geolocator/geolocator.dart';
-import 'dart:io' show Platform;
+import '/custom_code/platform_utils.dart';
 
 Future<String> getLocation() async {
-  if (Platform.isWindows) return 'LAT:0.0;LON:0.0;ALT:0.0'; // GPS no disponible en Windows
+  if (!Platforms.isMobile) return 'LAT:0.0;LON:0.0;ALT:0.0'; // GPS no disponible en desktop
   try {
     // Verificar permisos
     LocationPermission permission = await Geolocator.checkPermission();

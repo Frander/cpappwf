@@ -9,6 +9,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'dart:io' show Platform, File, Directory;
 import 'dart:math' as math;
+import '/custom_code/platform_utils.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
@@ -187,7 +188,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   /// Lee el TAG NFC y obtiene su ID
   Future<void> _readTag() async {
-    if (Platform.isWindows) return; // NFC no disponible en Windows
+    if (!Platforms.isMobile) return; // NFC no disponible en desktop
     setState(() {
       _isReading = true;
       _tagId = '';

@@ -12,8 +12,8 @@ import 'package:flutter/material.dart';
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
 import 'package:nfc_manager/nfc_manager.dart';
+import '/custom_code/platform_utils.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:nfc_manager/nfc_manager_android.dart' show IsoDepAndroid;
@@ -26,7 +26,7 @@ Future<bool> writeNFCTag(
   BuildContext context,
   String dataToWrite,
 ) async {
-  if (Platform.isWindows) return false; // NFC no disponible en Windows
+  if (!Platforms.isMobile) return false; // NFC no disponible en desktop
   // Verificar si NFC está disponible y activado
   bool nfcReady = await checkNfcStatus(context, showAlert: true);
   if (!nfcReady) {
