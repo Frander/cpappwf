@@ -118,7 +118,14 @@
       "Bash(echo \"Downloaded to $USERPROFILE/nuget.exe\")",
       "Bash(export PATH=\"$USERPROFILE:$PATH\")",
       "Bash(mkdir -p \"$LOCALAPPDATA/CrashDumps\")",
-      "Read(//c/Users/Juan_Diego_Duque/Documents/Repositorios/ClickPalmAPP/$LOCALAPPDATA/**)"
+      "Read(//c/Users/Juan_Diego_Duque/Documents/Repositorios/ClickPalmAPP/$LOCALAPPDATA/**)",
+      "Bash(Get-ChildItem -Path \"e:\\\\RepositoriosFix\\\\ClickPalmAPP\" -Recurse -Include \"*formulario_extractora*\")",
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem \"e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\visits\\\\formulario_extractora_form_page\" -Filter \"*.dart\")",
+      "Bash(Select-Object Name, FullName)",
+      "Bash(git -c safe.directory=E:/RepositoriosFix/ClickPalmAPP log --oneline -15 -- lib/visits/formulario_extractora_form_page/formulario_extractora_form_page_widget.dart)",
+      "Bash(git -c safe.directory=E:/RepositoriosFix/ClickPalmAPP status)",
+      "Bash(git -c safe.directory=E:/RepositoriosFix/ClickPalmAPP diff lib/visits/formulario_extractora_form_page/formulario_extractora_form_page_widget.dart)"
     ],
     "deny": [],
     "ask": [],

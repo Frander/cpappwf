@@ -227,6 +227,30 @@ class AdbNfcBridgeService {
     }
   }
 
+  /// Envía una solicitud de impresión al cliente Android conectado.
+  /// [htmlContent] HTML procesado con placeholders ya reemplazados.
+  /// Retorna false si no hay cliente conectado o el envío falla.
+  bool sendPrintRequest({required String htmlContent, required String title}) {
+    if (_client == null) {
+      debugPrint('⚠️ AdbNfcBridgeService: sendPrintRequest — no hay cliente conectado');
+      return false;
+    }
+    try {
+      _client!.add(jsonEncode({
+        'type': 'request_print',
+        'payload': {
+          'htmlContent': htmlContent,
+          'title': title,
+        },
+      }));
+      debugPrint('📤 AdbNfcBridgeService: request_print enviado al Android');
+      return true;
+    } catch (e) {
+      debugPrint('❌ AdbNfcBridgeService: sendPrintRequest falló: $e');
+      return false;
+    }
+  }
+
   /// Envía una solicitud de lectura NFC al cliente Android conectado.
   /// Retorna false si no hay cliente conectado o el envío falla.
   bool sendRequestRead() {

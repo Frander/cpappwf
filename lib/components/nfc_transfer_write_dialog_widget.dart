@@ -86,6 +86,9 @@ class _NfcTransferWriteDialogWidgetState
               List<dynamic>.from(srcJson['Visits'] as List? ?? []);
           destVisits.addAll(srcVisits);
           destJson['Visits'] = destVisits;
+          if (srcJson['status'] != null) {
+            destJson['status'] = srcJson['status'];
+          }
           contentToWrite = jsonEncode(destJson);
           debugPrint(
               '✅ TAG-TRANSFER: Fusionados ${srcVisits.length} Visits nuevos. Total destino: ${destVisits.length}');

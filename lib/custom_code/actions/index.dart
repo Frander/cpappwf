@@ -29,8 +29,10 @@ export 'remove_visit_detail_by_activity_status.dart'
     show removeVisitDetailByActivityStatus;
 export 'export_thermal_p_d_f.dart' show exportThermalPDF;
 export 'export_dynamic_p_d_f.dart' show exportDynamicPDF;
-export 'preview_and_print_html.dart' show previewAndPrintHTML;
+export 'preview_and_print_html.dart'
+    show previewAndPrintHTML, htmlToEscPosBytes, savePdfToFile;
 export 'update_or_add_visit_detail.dart' show updateOrAddVisitDetail;
+export 'update_visit_detail_in_sqlite.dart' show updateVisitDetailInSQLite;
 export 'check_internet_quality.dart' show checkInternetQuality;
 export 'test_action.dart' show testAction;
 export 'get_location_list.dart' show getLocationList;

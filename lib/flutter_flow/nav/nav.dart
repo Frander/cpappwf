@@ -93,6 +93,20 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
           ),
         ),
         FFRoute(
+          name: HistorialExtractoraPageWidget.routeName,
+          path: HistorialExtractoraPageWidget.routePath,
+          builder: (context, params) => HistorialExtractoraPageWidget(
+            idActivity: params.getParam('idActivity', ParamType.String),
+          ),
+        ),
+        FFRoute(
+          name: HistorialVisitDetailPageWidget.routeName,
+          path: HistorialVisitDetailPageWidget.routePath,
+          builder: (context, params) => HistorialVisitDetailPageWidget(
+            idVisit: params.getParam('idVisit', ParamType.String),
+          ),
+        ),
+        FFRoute(
           name: LoginPageWidget.routeName,
           path: LoginPageWidget.routePath,
           builder: (context, params) => LoginPageWidget(

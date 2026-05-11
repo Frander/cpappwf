@@ -1,4 +1,4 @@
-import '/backend/schema/structs/index.dart';
+﻿import '/backend/schema/structs/index.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
@@ -20,17 +20,15 @@ import '/custom_code/actions/adb_nfc_bridge_service.dart';
 import '/custom_code/actions/adb_nfc_client_service.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
 import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
 import 'formulario_extractora_form_page_model.dart';
 export 'formulario_extractora_form_page_model.dart';
 
@@ -118,6 +116,28 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   // Checkboxes para tags ADB acumulados (statusId → Set de índices marcados)
   final Map<int, Set<int>> _adbTagChecked = {};
 
+  // ── Persistencia incremental de Visits_details en SQLite ─────────────────
+  // _activeVisitId: Id_visit de la última visita creada por _autoSaveVisitFromAdbTag.
+  // Los UPDATEs incrementales (number, date, time, etc.) apuntan a esta visita.
+  // Null antes del primer tag ADB.
+  int? _activeVisitId;
+  // _formLocked: true mientras no haya tag ADB leído. Bloquea inputs vía IgnorePointer.
+  bool _formLocked = true;
+  // _processingTag: true desde que llega el JSON del tag hasta que
+  // _autoSaveVisitFromAdbTag termina (incluyendo cálculos). Hace que el overlay
+  // muestre un spinner en lugar del mensaje "Lea un tag para empezar".
+  bool _processingTag = false;
+  // _voiceEnabled: controla si se anuncia la visita por voz al guardar el tag.
+  // Por defecto OFF; se alterna con el botón del header.
+  bool _voiceEnabled = false;
+  // Map índice de tarjeta del panel ADB → Id_visit en SQLite.
+  // Se llena al recibir un tag (insert) y al cargar pendientes en initState.
+  // Permite que el toque en una tarjeta dispare la rehidratación de la visita.
+  final Map<int, int> _pendingTagIndexToVisitId = {};
+  // Índice de la tarjeta que está animando su salida (Status=0 → Status=1).
+  // Mientras es != null, esa tarjeta se renderiza con AnimatedSlide+AnimatedOpacity.
+  int? _animatingOutTagIndex;
+
   // ── ADB NFC Bridge (tag-transfer-adb-server / tag-transfer-adb-from) ──────
   AdbBridgeStatus _adbServerStatus = AdbBridgeStatus.serverDown;
   StreamSubscription<AdbBridgeStatus>? _adbStatusSub;
@@ -144,6 +164,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // Caché de nombres de usuarios desde SQLite (id_user -> name_user)
   final Map<int, String> _userNamesCache = {};
+
+  // Caché de identificación de usuarios desde SQLite (id_user -> Identificacion
+  // o, si está vacía, Oper_id). Se llena de forma asíncrona vía
+  // _loadUserIdentificacionFromSQLite.
+  final Map<int, String> _userIdentificacionCache = {};
+  final Set<int> _userIdentificacionLoading = {};
 
   // Map para rastrear valores numéricos de status por nombre (para numbers-operation)
   // statusName -> valor numérico
@@ -214,6 +240,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   // Set para rastrear qué status ya se loguearon (para evitar spam en logs)
   final Set<int> _loggedStatusIds = {};
 
+
   // ============================================================================
   // CACHÉ DE RENDIMIENTO - LOTE 1
   // ============================================================================
@@ -255,6 +282,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       _initializeDateTimeDefaults();
       _preloadUserNamesFromSQLite(); // Pre-cargar nombres de usuarios para el árbol de tags
       _initAdbBridge(); // Inicializar bridge ADB si corresponde
+      // Hidratar visitas pendientes (Status=0) del Id_activity actual: las
+      // muestra en el panel izquierdo y rehidrata el formulario con la más
+      // reciente. Se ejecuta DESPUÉS de _initAdbBridge para que
+      // _adbServerStatusId ya esté seteado.
+      await _loadPendingVisitsFromSQLite();
     });
   }
 
@@ -344,6 +376,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         // Auto-guardar visita en SQLite al recibir cada tag
         final tagContent = payload['tagContent'] as String? ?? '';
         if (tagContent.isNotEmpty) {
+          // Mostrar spinner inmediatamente — la guarda y los cálculos demoran
+          // unos segundos, durante los cuales el overlay sigue visible.
+          if (mounted) setState(() => _processingTag = true);
+
           final allServerStatuses = allStatuses.where((s) =>
               (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() ==
               'tag-transfer-adb-server');
@@ -727,6 +763,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         'calculatedDistances': _calculatedDistances,
         'distanceExtractorCalculated': _distanceExtractorCalculated,
         'headquarterWeights': _headquarterWeights,
+        'adbServerCardsRawJson': _adbServerCardsRawJson
+            .map((k, v) => MapEntry(k.toString(), v)),
         'timestamp': DateTime.now().toIso8601String(),
       };
 
@@ -905,6 +943,19 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         debugPrint('   ✓ Restaurados ${_headquarterWeights.length} weights');
       }
 
+      // Restaurar ADB server cards raw JSON
+      if (cacheData['adbServerCardsRawJson'] != null) {
+        _adbServerCardsRawJson.clear();
+        final rawMap = cacheData['adbServerCardsRawJson'] as Map;
+        rawMap.forEach((k, v) {
+          final id = int.tryParse(k.toString());
+          if (id != null && v is List) {
+            _adbServerCardsRawJson[id] = List<String>.from(v);
+          }
+        });
+        debugPrint('   ✓ Restaurados ${_adbServerCardsRawJson.length} ADB card entries');
+      }
+
       debugPrint('✅ Caché restaurado exitosamente');
       debugPrint('📥 ===== FIN RESTAURACIÓN DE CACHÉ =====');
       debugPrint('');
@@ -1024,6 +1075,45 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         } else {
           debugPrint('⏰ TIME ya tiene valor, saltando: $statusName');
         }
+      } else if (typeStatus.toLowerCase() == 'number' &&
+          defaultStatus.contains('=RANDOM:')) {
+        final regexRandom = RegExp(r'=RANDOM:MIN=(\d+)_MAX=(\d+)');
+        final matchRandom = regexRandom.firstMatch(defaultStatus);
+        if (matchRandom != null) {
+          final existingValue =
+              functions.statusResponseByActivityStatusAlternative(
+            statusId,
+            FFAppState().visitDetails.toList(),
+            parentStepId,
+          );
+          if (existingValue.isEmpty) {
+            final minVal = int.parse(matchRandom.group(1)!);
+            final maxVal = int.parse(matchRandom.group(2)!);
+            final randomValue =
+                minVal + math.Random().nextInt(maxVal - minVal + 1);
+            debugPrint(
+                '🎲 Inicializando NUMBER con =RANDOM: min=$minVal max=$maxVal → $randomValue');
+            FFAppState().addToVisitDetails(
+              VisitsDetailsStruct(
+                idVisitDetail: 0,
+                idVisit: 0,
+                idActivityStatus: statusId,
+                statusOption: statusName,
+                statusResponse: randomValue.toString(),
+                idStepParent: parentStepId,
+                rememberStatus: rememberStatus,
+                defaultStatus: defaultStatus,
+                typeStatus: typeStatus,
+                auxStep: parentStepId,
+              ),
+            );
+            initialized++;
+            debugPrint('   ✅ Guardado en visitDetails');
+          } else {
+            debugPrint(
+                '🎲 NUMBER =RANDOM ya tiene valor, saltando: $statusName');
+          }
+        }
       }
 
       // Buscar recursivamente en steps_childs
@@ -1032,7 +1122,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       for (var childStep in stepsChilds) {
         final childStepId = getJsonField(childStep, r'''$.id_activity_step''');
         final childStatusList =
-            getJsonField(childStep, r'''$.activity_status''')?.toList() ?? [];
+            getJsonField(childStep, r'''$.activities_status''')?.toList() ?? [];
         for (var childStatus in childStatusList) {
           processStatus(childStatus, childStepId);
         }
@@ -1063,7 +1153,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     for (var step in activitySteps) {
       final stepId = getJsonField(step, r'''$.id_activity_step''');
       final statusList =
-          getJsonField(step, r'''$.activity_status''')?.toList() ?? [];
+          getJsonField(step, r'''$.activities_status''')?.toList() ?? [];
       for (var status in statusList) {
         processStatus(status, stepId);
       }
@@ -1286,9 +1376,96 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 // Header de la página (título + botón atrás)
                 _buildPageHeader(),
 
-                // Contenido del formulario
+                // Contenido del formulario (bloqueado hasta el primer tag ADB)
                 Expanded(
-                  child: _buildFormContent(),
+                  child: Stack(
+                    children: [
+                      IgnorePointer(
+                        ignoring: _formLocked,
+                        child: _buildFormContent(),
+                      ),
+                      if (_formLocked)
+                        Positioned.fill(
+                          child: ColoredBox(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            child: Center(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 32),
+                                child: _processingTag
+                                    ? const Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          SizedBox(
+                                            width: 64,
+                                            height: 64,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 5,
+                                              valueColor:
+                                                  AlwaysStoppedAnimation<Color>(
+                                                      Color(0xFFB45309)),
+                                            ),
+                                          ),
+                                          SizedBox(height: 20),
+                                          Text(
+                                            'Leyendo tag...',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontFamily: 'Roboto',
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
+                                          ),
+                                          SizedBox(height: 8),
+                                          Text(
+                                            'Procesando la información, espere un momento...',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontFamily: 'Roboto',
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ],
+                                      )
+                                    : Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(Icons.nfc_rounded,
+                                              color: Color(0xFFB45309),
+                                              size: 64),
+                                          const SizedBox(height: 16),
+                                          const Text(
+                                            'Lea un tag para empezar',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontFamily: 'Roboto',
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 18,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 8),
+                                          const Text(
+                                            'El formulario se desbloqueará cuando se reciba la lectura del tag ADB.',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                              fontFamily: 'Roboto',
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 20),
+                                          _buildOverlaySolicitarButton(),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
 
                 // Botones de navegación
@@ -1296,6 +1473,76 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Botón SOLICITAR que se muestra dentro del overlay de bloqueo cuando el
+  /// formulario está esperando el primer tag ADB. Replica el comportamiento
+  /// del botón homónimo del panel ADB ([widget:9501]) — solo está activo si
+  /// hay un cliente Android conectado y dispara `sendRequestRead()`.
+  Widget _buildOverlaySolicitarButton() {
+    final isConnected = _adbServerStatus == AdbBridgeStatus.clientConnected;
+    return GestureDetector(
+      onTap: isConnected
+          ? () {
+              final sent = AdbNfcBridgeService.instance.sendRequestRead();
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(sent
+                        ? '📲 Solicitud enviada al Android'
+                        : '⚠️ No hay dispositivo Android conectado'),
+                    backgroundColor: sent
+                        ? const Color(0xFFB45309)
+                        : const Color(0xFFE53935),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              }
+            }
+          : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+        decoration: BoxDecoration(
+          color: isConnected
+              ? const Color(0xFF1565C0)
+              : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: isConnected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF1565C0).withValues(alpha: 0.5),
+                    blurRadius: 10,
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.nfc_rounded,
+              color: isConnected
+                  ? Colors.white
+                  : Colors.white.withValues(alpha: 0.25),
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'SOLICITAR',
+              style: TextStyle(
+                color: isConnected
+                    ? Colors.white
+                    : Colors.white.withValues(alpha: 0.25),
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'Roboto',
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1368,6 +1615,53 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 ),
                 overflow: TextOverflow.ellipsis,
                 maxLines: 1,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Toggle de voz: activa/desactiva announceVisitVoice() al guardar
+            // un tag. OFF por defecto.
+            GestureDetector(
+              onTap: () {
+                setState(() => _voiceEnabled = !_voiceEnabled);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(_voiceEnabled
+                          ? '🔊 Voz activada'
+                          : '🔇 Voz desactivada'),
+                      backgroundColor: _voiceEnabled
+                          ? const Color(0xFF00a86b)
+                          : const Color(0xFF616161),
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                }
+              },
+              child: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: _voiceEnabled
+                        ? const [Color(0xFF00a86b), Color(0xFF007552)]
+                        : const [Color(0xFF424242), Color(0xFF212121)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: (_voiceEnabled
+                            ? const Color(0xFF00a86b)
+                            : Colors.white)
+                        .withValues(alpha: 0.5),
+                    width: 1,
+                  ),
+                ),
+                child: Icon(
+                  _voiceEnabled
+                      ? Icons.volume_up_rounded
+                      : Icons.volume_off_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ],
@@ -1449,79 +1743,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     return formBody;
   }
 
-  /// Renderiza los steps como TabBar + TabBarView (diseño moderno)
-  Widget _buildTabLayout(List<dynamic> activitySteps, List<dynamic> activityStatus) {
-    return Column(
-      children: [
-        // ── TabBar moderna ───────────────────────────────────────
-        _ModernTabBar(
-          controller: _tabController!,
-          steps: activitySteps,
-          getCachedValue: _cachedSearchInVisitDetails,
-          getJsonField: getJsonField,
-        ),
-
-        // ── TabBarView ──────────────────────────────────────────
-        Expanded(
-          child: TabBarView(
-            controller: _tabController,
-            children: activitySteps.map<Widget>((step) {
-              final activitiesStatusRaw =
-                  getJsonField(step, r'''$.activities_status''');
-              final List<dynamic> tabStatuses = activitiesStatusRaw != null
-                  ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
-                  : [];
-
-              if (tabStatuses.isEmpty) {
-                return const Center(
-                  child: Text(
-                    'Sin campos configurados',
-                    style: TextStyle(color: Colors.white54),
-                  ),
-                );
-              }
-
-              return ListView.separated(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                itemCount: (tabStatuses.length / 2).ceil(),
-                separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (context, rowIndex) {
-                  final leftIndex = rowIndex * 2;
-                  final rightIndex = leftIndex + 1;
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: _buildStatusOption(step, tabStatuses[leftIndex], level: 0),
-                        ),
-                        const SizedBox(width: 10),
-                        if (rightIndex < tabStatuses.length)
-                          Expanded(
-                            child: _buildStatusOption(step, tabStatuses[rightIndex], level: 0),
-                          )
-                        else
-                          const Expanded(child: SizedBox()),
-                      ],
-                    ),
-                  );
-                },
-              );
-            }).toList(),
-          ),
-        ),
-
-        // ── Status raíz adicionales (si los hay) ────────────────
-        if (activityStatus.isNotEmpty)
-          ...activityStatus.map((s) => _buildRootStatusCard(
-                s,
-                allActivityStatus: activityStatus,
-                level: 0,
-              )),
-      ],
-    );
-  }
-
   // ============================================================
   // LAYOUT SIMULTÁNEO DE PANELES (reemplaza TabBarView)
   // ============================================================
@@ -1570,9 +1791,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final adbStatuses = statuses.where((s) =>
         (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() ==
         'tag-transfer-adb-server').toList();
+    final randomNumStatuses = statuses.where(_isRandomNumberStatus).toList();
     final normalStatuses = statuses.where((s) {
       final t = (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase();
-      return t != 'date' && t != 'time' && t != 'tag-transfer-adb-server';
+      if (t == 'date' || t == 'time' || t == 'tag-transfer-adb-server') return false;
+      if (_isRandomNumberStatus(s)) return false;
+      return true;
     }).toList();
 
     return Container(
@@ -1605,7 +1829,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           // Contenido scrollable que llena el espacio restante
           Expanded(
             child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(10, 0, 10, 10),
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1617,6 +1841,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     ),
                   // Time — fila individual (full-width)
                   for (final s in timeStatuses)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _buildStatusOption(step, s, level: 0),
+                    ),
+                  // RANDOM number — fila individual (full-width)
+                  for (final s in randomNumStatuses)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 10),
                       child: _buildStatusOption(step, s, level: 0),
@@ -1701,6 +1931,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       return numA.compareTo(numB);
     });
 
+    final randomNumStatuses = allStatuses.where(_isRandomNumberStatus).toList();
+    final gridStatuses = allStatuses.where((s) => !_isRandomNumberStatus(s)).toList();
+
     // Nombre del panel = nombres de los steps fusionados
     final panelName = steps.map((s) =>
         getJsonField(s, r'''$.unity''')?.toString() ??
@@ -1737,38 +1970,49 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Column(
-                children: List.generate(
-                  (allStatuses.length / 2).ceil(),
-                  (rowIndex) {
-                    final leftIndex = rowIndex * 2;
-                    final rightIndex = leftIndex + 1;
-                    final leftStep = _findStepForStatus(steps, allStatuses[leftIndex]);
-                    return Padding(
+                children: [
+                  // RANDOM number — fila individual (full-width)
+                  for (final s in randomNumStatuses)
+                    Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: IntrinsicHeight(
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Expanded(
-                              child: _buildStatusOption(
-                                  leftStep, allStatuses[leftIndex], level: 0),
-                            ),
-                            const SizedBox(width: 10),
-                            if (rightIndex < allStatuses.length)
+                      child: _buildStatusOption(
+                          _findStepForStatus(steps, s), s, level: 0),
+                    ),
+                  // Resto en grid 2 columnas
+                  ...List.generate(
+                    (gridStatuses.length / 2).ceil(),
+                    (rowIndex) {
+                      final leftIndex = rowIndex * 2;
+                      final rightIndex = leftIndex + 1;
+                      final leftStep =
+                          _findStepForStatus(steps, gridStatuses[leftIndex]);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
                               Expanded(
                                 child: _buildStatusOption(
-                                    _findStepForStatus(steps, allStatuses[rightIndex]),
-                                    allStatuses[rightIndex],
-                                    level: 0),
-                              )
-                            else
-                              const Expanded(child: SizedBox()),
+                                    leftStep, gridStatuses[leftIndex], level: 0),
+                              ),
+                              const SizedBox(width: 10),
+                              if (rightIndex < gridStatuses.length)
+                                Expanded(
+                                  child: _buildStatusOption(
+                                      _findStepForStatus(steps, gridStatuses[rightIndex]),
+                                      gridStatuses[rightIndex],
+                                      level: 0),
+                                )
+                              else
+                                const Expanded(child: SizedBox()),
                           ],
                         ),
                       ),
                     );
                   },
                 ),
+                ],
               ),
             ),
           ),
@@ -2129,6 +2373,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         typeStatus.toLowerCase() == 'distance-extractor';
     final isDynamicPrintingType =
         typeStatus.toLowerCase() == 'dynamic-printing';
+    final isDynamicPrintingAdbType =
+        typeStatus.toLowerCase() == 'dynamic-printing-adb';
     final isPhotoType = typeStatus.toLowerCase() == 'photo';
     final isVideoType = typeStatus.toLowerCase() == 'video';
     final isDateType = typeStatus.toLowerCase() == 'date';
@@ -2538,14 +2784,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
-            // tag-transfer-adb-server: tap intenta habilitar el socket (solo desktop)
-            if (isTagTransferAdbServerType) {
-              if (Platforms.isDesktop && !AdbNfcBridgeService.instance.isServerRunning) {
-                await AdbNfcBridgeService.instance.start();
-                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
-              }
-              return;
-            }
+            // tag-transfer-adb-server: tap deshabilitado (ya cortocircuitado
+            // por el early return de arriba; bloque conservado en otros
+            // builders sólo para los demás tipos que sí siguen activos).
 
             // tag-transfer-adb-from: tap conecta y lee NFC (solo móvil)
             if (isTagTransferAdbFromType) {
@@ -2610,32 +2851,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
-            // Si es tipo headquarter-weight, cargar weights desde SQLite y calcular
+            // Si es tipo headquarter-weight, NO hacer nada en el tap del usuario.
+            // El cálculo se dispara desde el tag-reader / webhook ADB
+            // (_autoCalculateRelatedHeadquarterWeights), no desde aquí.
             if (isHeadquarterWeightType) {
-              final List<int> headquarterIds = [];
-              int? tagReaderStatusId;
-
-              for (var entry in _tagReaderData.entries) {
-                tagReaderStatusId = entry.key;
-                final tagData = entry.value;
-                for (var record in tagData) {
-                  final hqId = record['headquarterId'] as int? ?? 0;
-                  if (hqId > 0 && !headquarterIds.contains(hqId)) {
-                    headquarterIds.add(hqId);
-                  }
-                }
-              }
-
-              if (headquarterIds.isNotEmpty) {
-                await _loadHeadquarterWeights(headquarterIds);
-                if (tagReaderStatusId != null) {
-                  _calculateHeadquarterWeightResults(
-                      tagReaderStatusId, 'tag-reader');
-                }
-              }
-
-              // No llamar _onStatusSelected — no debe marcarse visualmente como seleccionado
-              setState(() {});
               return;
             }
 
@@ -2654,8 +2873,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
-            // Si es tipo dynamic-printing, seleccionar automáticamente (se maneja con botón inline)
-            if (isDynamicPrintingType) {
+            // Si es tipo dynamic-printing / dynamic-printing-adb, seleccionar automáticamente (se maneja con botón inline)
+            if (isDynamicPrintingType || isDynamicPrintingAdbType) {
               await _onStatusSelected(parentStep, status);
               setState(() {});
               return;
@@ -2727,6 +2946,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               } catch (e) {
                 debugPrint('❌ ERROR al abrir dialog: $e');
               }
+              // Persistir incremento en SQLite con el valor recién seleccionado.
+              if (_activeVisitId != null && statusId is int) {
+                final detail = FFAppState()
+                    .visitDetails
+                    .where((d) => d.idActivityStatus == statusId)
+                    .firstOrNull;
+                if (detail != null) {
+                  unawaited(actions.updateVisitDetailInSQLite(
+                    _activeVisitId!,
+                    statusId,
+                    statusName,
+                    detail.statusResponse,
+                  ));
+                }
+              }
               setState(() {});
               return;
             }
@@ -2748,6 +2982,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   );
                 },
               );
+              // Persistir incremento en SQLite con la hora recién seleccionada.
+              if (_activeVisitId != null && statusId is int) {
+                final detail = FFAppState()
+                    .visitDetails
+                    .where((d) => d.idActivityStatus == statusId)
+                    .firstOrNull;
+                if (detail != null) {
+                  unawaited(actions.updateVisitDetailInSQLite(
+                    _activeVisitId!,
+                    statusId,
+                    statusName,
+                    detail.statusResponse,
+                  ));
+                }
+              }
               setState(() {});
               return;
             }
@@ -2972,7 +3221,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   isTagTransferAdbServerType ||
                   typeStatus.toLowerCase() == 'tag-transfer-adb-from' ||
                   isDistanceExtractorType ||
-                  isLabelInfoType;
+                  isLabelInfoType ||
+                  isDynamicPrintingAdbType;
               final Color iconColor = (active || alwaysWhiteIcon) ? Colors.white : const Color(0xFFB45309);
               IconData iconData;
               if (isDateType) {
@@ -3034,6 +3284,20 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               final bool isAnyTagTransfer = isTagTransferType ||
                   isTagTransferAdbServerType ||
                   typeStatus.toLowerCase() == 'tag-transfer-adb-from';
+
+              // Para campos RANDOM: chip full-width con nombre, número y botón copiar
+              if (isNumberType) {
+                final ds = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+                if (ds.toUpperCase().contains('=RANDOM:')) {
+                  final numId = getJsonField(status, r'''$.id_activity_status''') as int? ?? 0;
+                  return _buildRandomNumberChip(
+                    statusId: numId,
+                    statusName: statusName,
+                    defaultStatus: ds,
+                    fullWidth: true,
+                  );
+                }
+              }
 
               // Bloque de contenido del status (sin el icono de tipo para tag-transfer)
               Widget bodyContent = Row(
@@ -3113,7 +3377,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                         fontFamily: 'Roboto',
                                         fontSize: (typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time') ? 13 : 19,
                                         fontWeight: FontWeight.w800,
-                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isDistanceExtractorType || isLabelInfoType)
+                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isDistanceExtractorType || isLabelInfoType || isDynamicPrintingAdbType)
                                                 ? Colors.white
                                                 : ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                                                             !isTagWriterType &&
@@ -3260,16 +3524,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 statusId: statusId,
                               ),
                             ),
-                          // TextField INLINE para headquarter-weight (muestra fórmula evaluada)
-                          if (isHeadquarterWeightType &&
-                              _calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()))
-                            Padding(
-                              padding: const EdgeInsets.only(top: 8),
-                              child: _buildHeadquarterWeightInlineDisplay(
-                                statusId: statusId is int ? statusId : (statusId as num).toInt(),
-                                status: status,
-                              ),
-                            ),
                           // Resumen de weights of headquarters - DEBAJO
                           if (isHeadquarterWeightType &&
                               (_calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()) ||
@@ -3294,6 +3548,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 parentStep: parentStep,
                                 status: status,
                               ),
+                            ),
+                          // Botón PREVISUALIZAR para dynamic-printing-adb (dentro del card)
+                          if (isDynamicPrintingAdbType)
+                            _buildDynamicPrintingAdbButton(
+                              context: context,
+                              statusName: statusName,
+                              status: status,
+                              statusId: statusId,
                             ),
                         ],
                       ),
@@ -3324,7 +3586,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               width: 2,
                             ),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.search_rounded,
                             size: 22,
                             color: Colors.white,
@@ -3506,6 +3768,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         typeStatus.toLowerCase() == 'distance-extractor';
     final isDynamicPrintingType =
         typeStatus.toLowerCase() == 'dynamic-printing';
+    final isDynamicPrintingAdbType =
+        typeStatus.toLowerCase() == 'dynamic-printing-adb';
     final isTagTransferAdbServerType =
         typeStatus.toLowerCase() == 'tag-transfer-adb-server';
     final isTagTransferAdbFromType =
@@ -3952,19 +4216,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
-            // Si es tipo dynamic-printing, el botón maneja su propia lógica
-            if (isDynamicPrintingType) {
+            // Si es tipo dynamic-printing / dynamic-printing-adb, el botón maneja su propia lógica
+            if (isDynamicPrintingType || isDynamicPrintingAdbType) {
               debugPrint(
                   '🖨️ DYNAMIC-PRINTING: Tipo detectado, ignorando tap del contenedor');
               return;
             }
 
-            // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
+            // tag-transfer-adb-server: tap deshabilitado.
+            // El socket arranca automáticamente desde _initAdbBridge() en
+            // initState para desktop; no se debe levantar desde el tap.
             if (isTagTransferAdbServerType) {
-              if (Platforms.isDesktop && !AdbNfcBridgeService.instance.isServerRunning) {
-                await AdbNfcBridgeService.instance.start();
-                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
-              }
               return;
             }
 
@@ -4132,7 +4394,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           if (isNumberType)
                             Padding(
                               padding: const EdgeInsets.only(left: 8),
-                              child: _buildCompactInlineNumberControl(status: status),
+                              child: defaultStatus.toUpperCase().contains('=RANDOM:')
+                                  ? _buildRandomNumberChip(
+                                      statusId: statusId is int ? statusId : (statusId as num).toInt(),
+                                      statusName: statusName,
+                                      defaultStatus: defaultStatus,
+                                      fullWidth: false,
+                                    )
+                                  : _buildCompactInlineNumberControl(status: status),
                             ),
                           // Botón de limpieza inline para tag-writer
                           if (isTagWriterType && _tagWriterData.containsKey(statusId))
@@ -4265,16 +4534,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildDistanceExtractorDisplay(statusId: statusId),
                         ),
-                      // TextField INLINE para headquarter-weight (muestra fórmula evaluada)
-                      if (isHeadquarterWeightType &&
-                          _calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()))
-                        Padding(
-                          padding: const EdgeInsets.only(top: 8),
-                          child: _buildHeadquarterWeightInlineDisplay(
-                            statusId: statusId is int ? statusId : (statusId as num).toInt(),
-                            status: status,
-                          ),
-                        ),
                       // Resumen de weights de headquarters
                       if (isHeadquarterWeightType &&
                           (_calculatedHeadquarterWeights.containsKey(statusId is int ? statusId : (statusId as num).toInt()) || _headquartersWithoutWeight.isNotEmpty))
@@ -4291,7 +4550,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           child: _buildDistributionDisplay(statusId),
                         ),
                       // Cajones numéricos del 1 al 5
-                      if (isNumberType)
+                      if (isNumberType &&
+                          !defaultStatus.toUpperCase().contains('=RANDOM:'))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildNumberBoxes(status: status),
@@ -4309,6 +4569,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               color: Colors.white70,
                             ),
                           ),
+                        ),
+                      // Botón PREVISUALIZAR para dynamic-printing-adb (dentro del card)
+                      if (isDynamicPrintingAdbType)
+                        _buildDynamicPrintingAdbButton(
+                          context: context,
+                          statusName: statusName,
+                          status: status,
+                          statusId: statusId,
                         ),
                     ],
                   ),
@@ -4747,12 +5015,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               return;
             }
 
-            // tag-transfer-adb-server: tap intenta levantar el socket (solo desktop)
+            // tag-transfer-adb-server: tap deshabilitado.
+            // El socket arranca automáticamente desde _initAdbBridge() en
+            // initState para desktop; no se debe levantar desde el tap.
             if (isTagTransferAdbServerType) {
-              if (Platforms.isDesktop && !AdbNfcBridgeService.instance.isServerRunning) {
-                await AdbNfcBridgeService.instance.start();
-                if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
-              }
               return;
             }
 
@@ -5524,30 +5790,33 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     setState(() {});
   }
 
+  // ──────────────────────────────────────────────────────────────────────────
+  // BOTONERA INFERIOR (Cancelar / Historial / Guardar).
+  // GUARDAR ya no crea visita — la visita se crea al recibir un tag ADB.
+  // GUARDAR solo cambia Status=1 (terminado) de _activeVisitId, anima la
+  // salida de la tarjeta del panel izquierdo y auto-selecciona la siguiente
+  // pendiente más reciente (o vuelve a bloquear el form si no quedan).
+  // ──────────────────────────────────────────────────────────────────────────
   Widget _buildNavigationButtons() {
-
-    // ── Modo normal (o último tab): mostrar Cancelar/Guardar ─────────────────
-    // Usar activitySelected (ActivitiesStruct tipado desde SQLite) — fuente de verdad fiable
-    final isSync = FFAppState().activitySelected.isSync;
+    final canSave = _activeVisitId != null;
 
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
+          // ── CANCELAR ───────────────────────────────────────────────────
           Expanded(
             child: GestureDetector(
-              onTap: () async {
-                context.pushNamed(
-                  DoActivitiesPageWidget.routeName,
-                  extra: <String, dynamic>{
-                    kTransitionInfoKey: const TransitionInfo(
-                      hasTransition: true,
-                      transitionType: PageTransitionType.fade,
-                      duration: Duration(milliseconds: 500),
-                    ),
-                  },
-                );
-              },
+              onTap: () => context.pushNamed(
+                DoActivitiesPageWidget.routeName,
+                extra: <String, dynamic>{
+                  kTransitionInfoKey: const TransitionInfo(
+                    hasTransition: true,
+                    transitionType: PageTransitionType.fade,
+                    duration: Duration(milliseconds: 500),
+                  ),
+                },
+              ),
               child: Container(
                 height: 50,
                 decoration: BoxDecoration(
@@ -5561,9 +5830,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   boxShadow: [
                     BoxShadow(
                       blurRadius: 12,
-                      color: FlutterFlowTheme.of(context)
-                          .error
-                          .withValues(alpha: 0.4),
+                      color: FlutterFlowTheme.of(context).error.withValues(alpha: 0.4),
                       offset: const Offset(0, 6),
                     ),
                   ],
@@ -5572,16 +5839,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.chevron_left_rounded,
-                        color: Colors.white, size: 24),
-                    SizedBox(width: 8),
+                        color: Colors.white, size: 22),
+                    SizedBox(width: 6),
                     Text(
                       'Cancelar',
                       style: TextStyle(
                         fontFamily: 'Roboto',
-                        fontSize: 16,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                        letterSpacing: 0.5,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],
@@ -5589,661 +5856,160 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
             ),
           ),
-          // Solo mostrar el separador y el botón Guardar si is_sync es true
-          if (isSync) ...[
-            const SizedBox(width: 12),
-            Expanded(
-              child: GestureDetector(
-                onTap: () async {
-                  // Obtener la actividad actual
-                  final currentActivity = FFAppState().currentActivity;
-
-                  // Verificar si la actividad tiene steps (estructura jerárquica)
-                  final hasSteps = getJsonField(currentActivity, r'''$.activity_steps''')?.toList().isNotEmpty ?? false;
-
-                  if (hasSteps) {
-                    // VALIDACIÓN 1: Si hay steps, validar que los steps requeridos estén completos
-                    final validationResult = _validateRequiredStepsRecursive();
-
-                    if (validationResult != null) {
-                      // Hay un step requerido sin completar
-                      final message = validationResult['message'] as String;
-                      final path = (validationResult['path'] as List<dynamic>).cast<int>();
-
-                      // Expandir el árbol hasta el step faltante
-                      _expandTreeToStep(path);
-
-                      // Mostrar mensaje de error específico
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.error_outline_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Campo Requerido',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                message,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(milliseconds: 4000),
-                          backgroundColor: FlutterFlowTheme.of(context).error,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                      return;
-                    }
-                  } else {
-                    // VALIDACIÓN 2: Si NO hay steps (solo estados directos), verificar que haya al menos un estado seleccionado
-                    if (FFAppState().visitDetails.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
-                            children: [
-                              Icon(
-                                Icons.warning_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Debe seleccionar al menos un estado antes de guardar la visita',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 4),
-                          backgroundColor: FlutterFlowTheme.of(context).warning,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                      return;
-                    }
-                  }
-
-                  // Verificar si la actividad requiere lectura de TAG NFC, QR o GPS antes de guardar
-                  final readDefault = getJsonField(currentActivity, r'''$.read_default''')?.toString().toUpperCase() ?? '';
-
-                  if (readDefault == 'NFC') {
-                    // === MODO NFC: Leer TAG y guardar visita directamente ===
-                    final nfcTagId = await _showNfcTagIdReaderDialog();
-
-                    // Si el usuario canceló la lectura NFC, no continuar
-                    if (nfcTagId == null || nfcTagId.isEmpty) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Row(
-                              children: [
-                                Icon(Icons.nfc_rounded, color: Colors.white),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Lectura de TAG cancelada. No se guardó la visita.',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            duration: const Duration(seconds: 3),
-                            backgroundColor: Colors.orange.shade700,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // Crear visita directamente con NFC y las últimas geolocalizaciones
-                    final success = await _createVisitWithNfc(nfcTagId);
-
-                    if (success && mounted) {
-                      // Mostrar mensaje de éxito
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '¡Visita Registrada!',
-                                      style: TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      'TAG: $nfcTagId',
-                                      style: const TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 3),
-                          backgroundColor: const Color(0xFFB45309),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-
-                      // Limpiar los datos de tags que NO deben ser recordados
-                      _cleanupTagDatasByRememberFlag();
-                    }
-                  } else if (readDefault == 'QR') {
-                    // === MODO QR: Escanear código QR y guardar visita directamente ===
-                    final qrCode = await _showQrScannerDialog();
-
-                    // Si el usuario canceló el escaneo QR, no continuar
-                    if (qrCode == null || qrCode.isEmpty) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Row(
-                              children: [
-                                Icon(Icons.qr_code_rounded, color: Colors.white),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Escaneo de QR cancelado. No se guardó la visita.',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            duration: const Duration(seconds: 3),
-                            backgroundColor: Colors.orange.shade700,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // Crear visita directamente con QR y las últimas geolocalizaciones
-                    final success = await _createVisitWithQr(qrCode);
-
-                    if (success && mounted) {
-                      // Mostrar mensaje de éxito
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '¡Visita Registrada!',
-                                      style: TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      'QR: ${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}',
-                                      style: const TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 3),
-                          backgroundColor: const Color(0xFFB45309),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-
-                      // Limpiar los datos de tags que NO deben ser recordados
-                      _cleanupTagDatasByRememberFlag();
-                    }
-                  } else {
-                    // === MODO GPS (default): Usar LoadCoordinatesVisit con timer ===
-                    await showDialog<bool>(
-                      context: context,
-                      barrierDismissible: false,
-                      barrierColor: Colors.black.withValues(alpha: 0.85),
-                      builder: (dialogContext) {
-                        return Dialog(
-                          backgroundColor: Colors.transparent,
-                          elevation: 0,
-                          insetPadding: EdgeInsets.zero,
-                          child: SizedBox(
-                            height: MediaQuery.sizeOf(context).height * 0.75,
-                            width: MediaQuery.sizeOf(context).width * 0.95,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(32),
-                              child: custom_widgets.LoadCoordinatesVisit(
-                                width: MediaQuery.sizeOf(context).width * 0.95,
-                                height: MediaQuery.sizeOf(context).height * 0.75,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    );
-
-                    // Limpiar los datos de tags que NO deben ser recordados después de crear la visita
-                    _cleanupTagDatasByRememberFlag();
-                  }
-
-                  // El widget LoadCoordinatesVisit se cierra automáticamente
-                  // El formulario permanece abierto para permitir crear más visitas
-                  // visitDetails ya fue limpiado automáticamente (solo quedaron los con remember_status = true)
-                },
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        FlutterFlowTheme.of(context).primary,
-                        FlutterFlowTheme.of(context)
-                            .primary
-                            .withValues(alpha: 0.8),
-                      ],
+          const SizedBox(width: 10),
+          // ── HISTORIAL ──────────────────────────────────────────────────
+          Expanded(
+            child: GestureDetector(
+              onTap: () {
+                final idActivity = getJsonField(
+                    FFAppState().currentActivity, r'$.id_activity') as int?;
+                if (idActivity == null) return;
+                context.pushNamed(
+                  'HistorialExtractoraPage',
+                  queryParameters: {'idActivity': idActivity.toString()},
+                );
+              },
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 12,
+                      color: const Color(0xFF1565C0).withValues(alpha: 0.4),
+                      offset: const Offset(0, 6),
                     ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 12,
-                        color: FlutterFlowTheme.of(context)
-                            .primary
-                            .withValues(alpha: 0.4),
-                        offset: const Offset(0, 6),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.history_rounded, color: Colors.white, size: 22),
+                    SizedBox(width: 6),
+                    Text(
+                      'Historial',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
                       ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle_rounded,
-                          color: Colors.white, size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        'Guardar',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
+          const SizedBox(width: 10),
+          // ── GUARDAR ────────────────────────────────────────────────────
+          Expanded(
+            child: GestureDetector(
+              onTap: canSave ? _onSavePendingVisit : null,
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: canSave
+                        ? const [Color(0xFF00a86b), Color(0xFF007552)]
+                        : const [Color(0xFF616161), Color(0xFF424242)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: canSave
+                      ? [
+                          BoxShadow(
+                            blurRadius: 12,
+                            color: const Color(0xFF00a86b).withValues(alpha: 0.45),
+                            offset: const Offset(0, 6),
+                          ),
+                        ]
+                      : [],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.check_rounded, color: Colors.white, size: 22),
+                    SizedBox(width: 6),
+                    Text(
+                      'Guardar',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
+  /// Marca la visita activa como terminada (Status=1), anima la salida de
+  /// la tarjeta correspondiente del panel izquierdo, reindexa el map de
+  /// pendientes y auto-selecciona la siguiente más reciente (o bloquea el
+  /// formulario si no quedan más).
+  Future<void> _onSavePendingVisit() async {
+    if (_activeVisitId == null) return;
+    final closedVisitId = _activeVisitId!;
 
-  /// Muestra un diálogo para leer el TAG ID (RFID) del NFC antes de guardar
-  /// Retorna el TAG ID leído o null si el usuario cancela
-  Future<String?> _showNfcTagIdReaderDialog() async {
-    String? tagId;
-    bool isReading = false;
-    bool isCancelled = false;
-    String? errorMessage;
+    try {
+      final db = await GlobalDbSingleton().database;
+      await db.update(
+        'Visits',
+        {'Status': 1},
+        where: 'Id_visit = ?',
+        whereArgs: [closedVisitId],
+      );
+    } catch (e) {
+      debugPrint('❌ _onSavePendingVisit UPDATE error: $e');
+      return;
+    }
 
-    return await showDialog<String?>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.85),
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (builderContext, setDialogState) {
-            // Función para iniciar la lectura NFC
-            Future<void> startNfcReading() async {
-              if (isReading || isCancelled) return;
+    // Localizar índice de la tarjeta correspondiente (puede ser -1 si por
+    // alguna razón no estaba mapeada — en ese caso skip animation).
+    int closedIdx = -1;
+    _pendingTagIndexToVisitId.forEach((k, v) {
+      if (v == closedVisitId) closedIdx = k;
+    });
 
-              setDialogState(() {
-                isReading = true;
-                errorMessage = null;
-              });
+    if (closedIdx >= 0) {
+      setState(() => _animatingOutTagIndex = closedIdx);
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      setState(() {
+        _removeTagCardAt(closedIdx);
+        _pendingTagIndexToVisitId.remove(closedIdx);
+        _reindexPendingTagMap(closedIdx);
+        _animatingOutTagIndex = null;
+      });
+    }
 
-              try {
-                await NfcManager.instance.startSession(
-                  pollingOptions: {
-                    NfcPollingOption.iso14443,
-                    NfcPollingOption.iso15693,
-                    NfcPollingOption.iso18092,
-                  },
-                  onDiscovered: (NfcTag tag) async {
-                    try {
-                      // Obtener el ID del TAG
-                      final androidTag = NfcTagAndroid.from(tag);
-                      if (androidTag != null && androidTag.id.isNotEmpty) {
-                        tagId = androidTag.id
-                            .map((byte) => byte.toRadixString(16).toUpperCase().padLeft(2, '0'))
-                            .join('');
-                      }
-
-                      await NfcManager.instance.stopSession();
-
-                      if (!isCancelled && tagId != null && tagId!.isNotEmpty) {
-                        HapticFeedback.mediumImpact();
-
-                        // La visita solo necesita el RFID, retornar inmediatamente
-                        debugPrint('✅ TAG RFID leído exitosamente: $tagId');
-
-                        // Cerrar el diálogo retornando el tagId
-                        if (builderContext.mounted && Navigator.of(builderContext).canPop()) {
-                          Navigator.of(builderContext).pop(tagId);
-                        }
-                      } else if (!isCancelled) {
-                        // TAG alejado muy rápido o no se pudo leer
-                        debugPrint('⚠️ No se pudo leer el TAG correctamente');
-                        setDialogState(() {
-                          isReading = false;
-                          errorMessage = 'No se pudo leer el TAG.\nAcerque el TAG y manténgalo cerca hasta que se complete la lectura.';
-                        });
-                      }
-                    } catch (e) {
-                      debugPrint('❌ Error leyendo TAG ID: $e');
-                      await NfcManager.instance.stopSession();
-                      setDialogState(() {
-                        isReading = false;
-                        errorMessage = 'Error al leer el TAG.\nIntente nuevamente.';
-                      });
-                    }
-                  },
-                );
-              } catch (e) {
-                debugPrint('❌ Error iniciando sesión NFC: $e');
-                setDialogState(() {
-                  isReading = false;
-                  errorMessage = 'Error al iniciar lector NFC.\nVerifique que NFC esté activado.';
-                });
-              }
-            }
-
-            // Iniciar lectura automáticamente
-            if (!isReading && !isCancelled) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                startNfcReading();
-              });
-            }
-
-            return Dialog(
-              backgroundColor: Colors.transparent,
-              elevation: 0,
-              child: Container(
-                width: MediaQuery.sizeOf(builderContext).width * 0.9,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1A1A2E),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(
-                    color: const Color(0xFFB45309).withValues(alpha: 0.3),
-                    width: 2,
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Icono NFC animado
-                    Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: const Color(0xFFB45309).withValues(alpha: 0.1),
-                        border: Border.all(
-                          color: const Color(0xFFB45309),
-                          width: 3,
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.nfc_rounded,
-                        size: 50,
-                        color: Color(0xFFB45309),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    // Título
-                    const Text(
-                      'Lectura de TAG Requerida',
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    // Instrucciones o mensaje de error
-                    if (errorMessage != null)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange, width: 1),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.warning_amber, color: Colors.orange, size: 24),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                errorMessage!,
-                                style: const TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 13,
-                                  color: Colors.white,
-                                ),
-                                textAlign: TextAlign.left,
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      Text(
-                        isReading
-                            ? 'Acerque el TAG NFC al dispositivo...'
-                            : 'Preparando lector NFC...',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          color: Colors.white.withValues(alpha: 0.7),
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    const SizedBox(height: 20),
-                    // Indicador de carga
-                    if (isReading)
-                      const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFB45309)),
-                        ),
-                      ),
-                    const SizedBox(height: 24),
-                    // Botones
-                    if (errorMessage != null)
-                      // Mostrar botón de reintentar cuando hay error
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                isCancelled = true;
-                                try {
-                                  await NfcManager.instance.stopSession();
-                                } catch (_) {}
-                                if (builderContext.mounted && Navigator.of(dialogContext).canPop()) {
-                                  Navigator.of(dialogContext).pop(null);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey.shade700,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text(
-                                'Cancelar',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                await startNfcReading();
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFB45309),
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text(
-                                'Reintentar',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    else
-                      // Mostrar solo botón cancelar cuando está leyendo
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            isCancelled = true;
-                            try {
-                              await NfcManager.instance.stopSession();
-                            } catch (_) {}
-                            if (builderContext.mounted && Navigator.of(dialogContext).canPop()) {
-                              Navigator.of(dialogContext).pop(null);
-                            }
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade700,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text(
-                            'Cancelar',
-                            style: TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
+    // Auto-seleccionar la siguiente pendiente (la primera del map).
+    if (_pendingTagIndexToVisitId.isNotEmpty) {
+      final nextIdx = _pendingTagIndexToVisitId.keys.reduce(
+          (a, b) => a < b ? a : b);
+      final nextVisitId = _pendingTagIndexToVisitId[nextIdx]!;
+      setState(() => _selectedAdbTagIndex = nextIdx);
+      _clearFormState();
+      await _hydrateVisitInForm(nextVisitId);
+    } else {
+      _clearFormState();
+      if (mounted) {
+        setState(() {
+          _activeVisitId = null;
+          _formLocked = true;
+        });
+      }
+    }
   }
 
   /// Crea una visita directamente usando el TAG NFC leído y las últimas 3 geolocalizaciones del AppState
@@ -6278,16 +6044,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               debugPrint('✅ Tipo de producto requerido: $requiredProductType');
 
               // Buscar el producto en SQLite por RFID
-              final dbPath = FFAppState().pathDatabase;
-              final database = await openDatabase(dbPath);
-
-              final productResults = await database.rawQuery('''
-                SELECT Type_product FROM Products WHERE Rfid = ? LIMIT 1
-              ''', [nfcTagId]);
+              // Usa GlobalDbSingleton.executeOperation: conexión compartida +
+              // retry automático en locked/busy/database_closed (3 intentos).
+              final productResults = await globalDb.executeOperation(
+                (db) => db.rawQuery(
+                  'SELECT Type_product FROM Products WHERE Rfid = ? LIMIT 1',
+                  [nfcTagId],
+                ),
+              );
 
               if (productResults.isEmpty) {
-                // RFID no encontrado
-                await database.close();
                 debugPrint('❌ RFID no encontrado en Products: $nfcTagId');
 
                 if (mounted) {
@@ -6323,7 +6089,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               }
 
               final productType = productResults.first['Type_product'] as String?;
-              await database.close();
 
               if (productType != requiredProductType) {
                 // Tipo de producto no coincide
@@ -6430,81 +6195,80 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       final visitDetails = FFAppState().visitDetails;
       final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
 
-      // Abrir base de datos
-      final dbPath = FFAppState().pathDatabase;
-      final database = await openDatabase(dbPath);
-
+      // Insertar Visita + detalles + geolocalizaciones en una transacción.
+      // Usa GlobalDbSingleton.executeOperation: conexión compartida +
+      // retry automático en locked/busy/database_closed (3 intentos).
       int visitId = 0;
-      await database.transaction((txn) async {
-        // Insertar la visita con el RFID
-        visitId = await txn.rawInsert('''
-          INSERT INTO Visits (
-            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
-            Id_user, Id_device, Id_status, Created_at, Battery,
-            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', [
-          userSelected.idCompany,
-          idActivity,
-          idHeadquarter,
-          0, // Id_product
-          0, // Id_bulk
-          userSelected.idUser,
-          deviceDefault.idDevice,
-          0, // Id_status
-          DateTime.now().toIso8601String(),
-          100, // Battery (valor por defecto)
-          mainLocation.latitude,
-          mainLocation.longitude,
-          mainLocation.altitude,
-          mainLocation.errorHorizontal,
-          null, // Id_virtual_point
-          0, // Status
-          nfcTagId, // RFID del TAG
-        ]);
-
-        debugPrint('✅ Visita NFC creada con ID: $visitId');
-
-        // Insertar detalles de la visita
-        int insertedCount = 0;
-        for (var detail in detailsToInsert) {
-          final idActivityStatus = detail.idActivityStatus;
-
-          final statusCheck = await txn.rawQuery('''
-            SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
-          ''', [idActivityStatus]);
-
-          if (statusCheck.isEmpty) continue;
-
-          await txn.rawInsert('''
-            INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
-            VALUES (?, ?, ?, ?)
-          ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
-
-          insertedCount++;
-        }
-
-        debugPrint('✅ $insertedCount detalles de visita insertados');
-
-        // Insertar las geolocalizaciones
-        for (var geoPoint in locationsToSave) {
-          await txn.rawInsert('''
-            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
-            VALUES (?, ?, ?, ?, ?, ?)
+      await globalDb.executeOperation((db) async {
+        await db.transaction((txn) async {
+          // Insertar la visita con el RFID
+          visitId = await txn.rawInsert('''
+            INSERT INTO Visits (
+              Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+              Id_user, Id_device, Id_status, Created_at, Battery,
+              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ''', [
-            visitId,
-            geoPoint.latitude,
-            geoPoint.longitude,
-            geoPoint.altitude,
-            geoPoint.errorHorizontal,
-            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
+            userSelected.idCompany,
+            idActivity,
+            idHeadquarter,
+            0, // Id_product
+            0, // Id_bulk
+            userSelected.idUser,
+            deviceDefault.idDevice,
+            0, // Id_status
+            DateTime.now().toIso8601String(),
+            100, // Battery (valor por defecto)
+            mainLocation.latitude,
+            mainLocation.longitude,
+            mainLocation.altitude,
+            mainLocation.errorHorizontal,
+            null, // Id_virtual_point
+            0, // Status
+            nfcTagId, // RFID del TAG
           ]);
-        }
 
-        debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
+          debugPrint('✅ Visita NFC creada con ID: $visitId');
+
+          // Insertar detalles de la visita
+          int insertedCount = 0;
+          for (var detail in detailsToInsert) {
+            final idActivityStatus = detail.idActivityStatus;
+
+            final statusCheck = await txn.rawQuery('''
+              SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
+            ''', [idActivityStatus]);
+
+            if (statusCheck.isEmpty) continue;
+
+            await txn.rawInsert('''
+              INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
+              VALUES (?, ?, ?, ?)
+            ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
+
+            insertedCount++;
+          }
+
+          debugPrint('✅ $insertedCount detalles de visita insertados');
+
+          // Insertar las geolocalizaciones
+          for (var geoPoint in locationsToSave) {
+            await txn.rawInsert('''
+              INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
+              VALUES (?, ?, ?, ?, ?, ?)
+            ''', [
+              visitId,
+              geoPoint.latitude,
+              geoPoint.longitude,
+              geoPoint.altitude,
+              geoPoint.errorHorizontal,
+              geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
+            ]);
+          }
+
+          debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
+        });
       });
-
-      await database.close();
 
       // Actualizar el contador de visitas y limpiar visitDetails completamente
       FFAppState().update(() {
@@ -6641,81 +6405,80 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       final visitDetails = FFAppState().visitDetails;
       final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
 
-      // Abrir base de datos
-      final dbPath = FFAppState().pathDatabase;
-      final database = await openDatabase(dbPath);
-
+      // Insertar Visita + detalles + geolocalizaciones en una transacción.
+      // Usa GlobalDbSingleton.executeOperation: conexión compartida +
+      // retry automático en locked/busy/database_closed (3 intentos).
       int visitId = 0;
-      await database.transaction((txn) async {
-        // Insertar la visita con el código QR en el campo Rfid
-        visitId = await txn.rawInsert('''
-          INSERT INTO Visits (
-            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
-            Id_user, Id_device, Id_status, Created_at, Battery,
-            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', [
-          userSelected.idCompany,
-          idActivity,
-          idHeadquarter,
-          0, // Id_product
-          0, // Id_bulk
-          userSelected.idUser,
-          deviceDefault.idDevice,
-          0, // Id_status
-          DateTime.now().toIso8601String(),
-          100, // Battery (valor por defecto)
-          mainLocation.latitude,
-          mainLocation.longitude,
-          mainLocation.altitude,
-          mainLocation.errorHorizontal,
-          null, // Id_virtual_point
-          0, // Status
-          qrCode, // Código QR en el campo Rfid
-        ]);
-
-        debugPrint('✅ Visita QR creada con ID: $visitId');
-
-        // Insertar detalles de la visita
-        int insertedCount = 0;
-        for (var detail in detailsToInsert) {
-          final idActivityStatus = detail.idActivityStatus;
-
-          final statusCheck = await txn.rawQuery('''
-            SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
-          ''', [idActivityStatus]);
-
-          if (statusCheck.isEmpty) continue;
-
-          await txn.rawInsert('''
-            INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
-            VALUES (?, ?, ?, ?)
-          ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
-
-          insertedCount++;
-        }
-
-        debugPrint('✅ $insertedCount detalles de visita insertados');
-
-        // Insertar las geolocalizaciones
-        for (var geoPoint in locationsToSave) {
-          await txn.rawInsert('''
-            INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
-            VALUES (?, ?, ?, ?, ?, ?)
+      await globalDb.executeOperation((db) async {
+        await db.transaction((txn) async {
+          // Insertar la visita con el código QR en el campo Rfid
+          visitId = await txn.rawInsert('''
+            INSERT INTO Visits (
+              Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+              Id_user, Id_device, Id_status, Created_at, Battery,
+              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ''', [
-            visitId,
-            geoPoint.latitude,
-            geoPoint.longitude,
-            geoPoint.altitude,
-            geoPoint.errorHorizontal,
-            geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
+            userSelected.idCompany,
+            idActivity,
+            idHeadquarter,
+            0, // Id_product
+            0, // Id_bulk
+            userSelected.idUser,
+            deviceDefault.idDevice,
+            0, // Id_status
+            DateTime.now().toIso8601String(),
+            100, // Battery (valor por defecto)
+            mainLocation.latitude,
+            mainLocation.longitude,
+            mainLocation.altitude,
+            mainLocation.errorHorizontal,
+            null, // Id_virtual_point
+            0, // Status
+            qrCode, // Código QR en el campo Rfid
           ]);
-        }
 
-        debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
+          debugPrint('✅ Visita QR creada con ID: $visitId');
+
+          // Insertar detalles de la visita
+          int insertedCount = 0;
+          for (var detail in detailsToInsert) {
+            final idActivityStatus = detail.idActivityStatus;
+
+            final statusCheck = await txn.rawQuery('''
+              SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
+            ''', [idActivityStatus]);
+
+            if (statusCheck.isEmpty) continue;
+
+            await txn.rawInsert('''
+              INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
+              VALUES (?, ?, ?, ?)
+            ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
+
+            insertedCount++;
+          }
+
+          debugPrint('✅ $insertedCount detalles de visita insertados');
+
+          // Insertar las geolocalizaciones
+          for (var geoPoint in locationsToSave) {
+            await txn.rawInsert('''
+              INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
+              VALUES (?, ?, ?, ?, ?, ?)
+            ''', [
+              visitId,
+              geoPoint.latitude,
+              geoPoint.longitude,
+              geoPoint.altitude,
+              geoPoint.errorHorizontal,
+              geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
+            ]);
+          }
+
+          debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
+        });
       });
-
-      await database.close();
 
       // Actualizar el contador de visitas y limpiar visitDetails completamente
       FFAppState().update(() {
@@ -6803,46 +6566,48 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       } catch (_) {}
       debugPrint('🏷️  Tag destino RFID: "$tagFromRfid"');
 
-      final dbPath = FFAppState().pathDatabase;
-      final database = await openDatabase(dbPath);
-
-      // 3. Id_product desde Products WHERE Rfid = tag_from
+      // 3-5. Lookups (Id_product, coordenadas, virtual_point) en una sola
+      // executeOperation: conexión compartida del singleton + retry automático
+      // en locked/busy/database_closed.
       int idProduct = 0;
-      if (tagFromRfid.isNotEmpty) {
-        final rows = await database.rawQuery(
-            'SELECT Id_product FROM Products WHERE Rfid = ? LIMIT 1', [tagFromRfid]);
-        if (rows.isNotEmpty) idProduct = (rows.first['Id_product'] as int?) ?? 0;
-      }
-      debugPrint('📦 Id_product: $idProduct');
-
-      // 4. Coordenadas de referencia para VP: usar Products_coordinates del producto destino
       double refLat = lat, refLon = lon;
-      if (idProduct > 0) {
-        final coordRows = await database.rawQuery(
-            'SELECT Latitude, Longitude FROM Products_coordinates WHERE Id_product = ? LIMIT 1',
-            [idProduct]);
-        if (coordRows.isNotEmpty) {
-          refLat = (coordRows.first['Latitude'] as num?)?.toDouble() ?? lat;
-          refLon = (coordRows.first['Longitude'] as num?)?.toDouble() ?? lon;
-        }
-      }
-
-      // 5. Id_virtual_point: punto virtual más cercano a las coordenadas de referencia
       int idVirtualPoint = 0;
-      final vpRows = await database.rawQuery(
-          'SELECT Id_virtual_point, Latitude, Longitude FROM Virtual_points '
-          'WHERE Latitude IS NOT NULL AND Longitude IS NOT NULL');
       double minVpDist = double.infinity;
-      for (final vp in vpRows) {
-        final vpLat = (vp['Latitude'] as num?)?.toDouble() ?? 0.0;
-        final vpLon = (vp['Longitude'] as num?)?.toDouble() ?? 0.0;
-        if (vpLat == 0.0 && vpLon == 0.0) continue;
-        final d = _calcHaversineAdb(refLat, refLon, vpLat, vpLon);
-        if (d < minVpDist) {
-          minVpDist = d;
-          idVirtualPoint = (vp['Id_virtual_point'] as int?) ?? 0;
+      await globalDb.executeOperation((db) async {
+        // 3. Id_product desde Products WHERE Rfid = tag_from
+        if (tagFromRfid.isNotEmpty) {
+          final rows = await db.rawQuery(
+              'SELECT Id_product FROM Products WHERE Rfid = ? LIMIT 1', [tagFromRfid]);
+          if (rows.isNotEmpty) idProduct = (rows.first['Id_product'] as int?) ?? 0;
         }
-      }
+
+        // 4. Coordenadas de referencia para VP
+        if (idProduct > 0) {
+          final coordRows = await db.rawQuery(
+              'SELECT Latitude, Longitude FROM Products_coordinates WHERE Id_product = ? LIMIT 1',
+              [idProduct]);
+          if (coordRows.isNotEmpty) {
+            refLat = (coordRows.first['Latitude'] as num?)?.toDouble() ?? lat;
+            refLon = (coordRows.first['Longitude'] as num?)?.toDouble() ?? lon;
+          }
+        }
+
+        // 5. Id_virtual_point: punto virtual más cercano a las coordenadas de referencia
+        final vpRows = await db.rawQuery(
+            'SELECT Id_virtual_point, Latitude, Longitude FROM Virtual_points '
+            'WHERE Latitude IS NOT NULL AND Longitude IS NOT NULL');
+        for (final vp in vpRows) {
+          final vpLat = (vp['Latitude'] as num?)?.toDouble() ?? 0.0;
+          final vpLon = (vp['Longitude'] as num?)?.toDouble() ?? 0.0;
+          if (vpLat == 0.0 && vpLon == 0.0) continue;
+          final d = _calcHaversineAdb(refLat, refLon, vpLat, vpLon);
+          if (d < minVpDist) {
+            minVpDist = d;
+            idVirtualPoint = (vp['Id_virtual_point'] as int?) ?? 0;
+          }
+        }
+      });
+      debugPrint('📦 Id_product: $idProduct');
       debugPrint('📌 Id_virtual_point: $idVirtualPoint (dist: ${minVpDist.toStringAsFixed(0)} m)');
 
       // 6. Id_headquarter por verificación de polígono
@@ -6864,59 +6629,85 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       // 7. Construir lista de Visits_details desde el estado actual del formulario
       final detailsToInsert = _buildAllVisitDetails(adbStatusId, rawTagJson);
 
-      // 8. Insertar Visits + Visits_details en una transacción
+      // 8. Insertar Visits + Visits_details en una transacción.
+      // Usa GlobalDbSingleton.executeOperation: conexión compartida +
+      // retry automático en locked/busy/database_closed.
       int visitId = 0;
-      await database.transaction((txn) async {
-        visitId = await txn.rawInsert('''
-          INSERT INTO Visits (
-            Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
-            Id_user, Id_device, Id_status, Created_at, Battery,
-            Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
-          ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ''', [
-          userSelected.idCompany,
-          idActivity,
-          idHeadquarter,
-          idProduct,
-          0,
-          userSelected.idUser,
-          deviceDefault.idDevice,
-          0,
-          DateTime.now().toIso8601String(),
-          100,
-          lat,
-          lon,
-          alt,
-          errH,
-          idVirtualPoint > 0 ? idVirtualPoint : null,
-          0,
-          tagFromRfid.isNotEmpty ? tagFromRfid : null,
-        ]);
+      await globalDb.executeOperation((db) async {
+        await db.transaction((txn) async {
+          visitId = await txn.rawInsert('''
+            INSERT INTO Visits (
+              Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
+              Id_user, Id_device, Id_status, Created_at, Battery,
+              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          ''', [
+            userSelected.idCompany,
+            idActivity,
+            idHeadquarter,
+            idProduct,
+            0,
+            userSelected.idUser,
+            deviceDefault.idDevice,
+            0,
+            DateTime.now().toIso8601String(),
+            100,
+            lat,
+            lon,
+            alt,
+            errH,
+            idVirtualPoint > 0 ? idVirtualPoint : null,
+            0,
+            tagFromRfid.isNotEmpty ? tagFromRfid : null,
+          ]);
 
-        debugPrint('✅ Visita ADB creada con ID: $visitId');
+          debugPrint('✅ Visita ADB creada con ID: $visitId');
 
-        int insertedDetails = 0;
-        for (final d in detailsToInsert) {
-          final statusCheck = await txn.rawQuery(
-              'SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?',
-              [d['id_activity_status']]);
-          if (statusCheck.isEmpty) continue;
-          await txn.rawInsert(
-              'INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response) '
-              'VALUES (?,?,?,?)',
-              [visitId, d['id_activity_status'], d['status_option'], d['status_response']]);
-          insertedDetails++;
-        }
-        debugPrint('✅ $insertedDetails detalles de visita insertados');
+          int insertedDetails = 0;
+          for (final d in detailsToInsert) {
+            final statusCheck = await txn.rawQuery(
+                'SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?',
+                [d['id_activity_status']]);
+            if (statusCheck.isEmpty) continue;
+            await txn.rawInsert(
+                'INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response) '
+                'VALUES (?,?,?,?)',
+                [visitId, d['id_activity_status'], d['status_option'], d['status_response']]);
+            insertedDetails++;
+          }
+          debugPrint('✅ $insertedDetails detalles de visita insertados');
+        });
       });
 
-      await database.close();
-
       FFAppState().update(() => FFAppState().visitCount = FFAppState().visitCount + 1);
+
+      // Marcar esta visita como activa para los UPDATEs incrementales que
+      // dispare el usuario al editar campos del formulario, y desbloquear
+      // los inputs (que estaban inactivos hasta el primer tag).
+      if (mounted && visitId > 0) {
+        setState(() {
+          _activeVisitId = visitId;
+          _formLocked = false;
+          _processingTag = false;
+          // Asociar la tarjeta recién insertada (última en _adbTagTimestamps)
+          // con el Id_visit en SQLite, para que el botón GUARDAR sepa cuál
+          // visita marcar como Status=1 al cerrarla.
+          final lastTagIndex = _adbTagTimestamps.length - 1;
+          if (lastTagIndex >= 0) {
+            _pendingTagIndexToVisitId[lastTagIndex] = visitId;
+          }
+        });
+      } else if (mounted) {
+        setState(() => _processingTag = false);
+      }
+
       debugPrint('✅ Auto-visita ADB guardada exitosamente. ID: $visitId');
-      unawaited(actions.announceVisitVoice());
+      if (_voiceEnabled) {
+        unawaited(actions.announceVisitVoice());
+      }
     } catch (e) {
       debugPrint('❌ _autoSaveVisitFromAdbTag error: $e');
+      if (mounted) setState(() => _processingTag = false);
     }
   }
 
@@ -6952,12 +6743,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         now: now,
       );
 
-      if (statusResponse == null) continue;
-
+      // INSERT incondicional: incluir TODOS los statuses con un valor por defecto
+      // (cadena vacía si _buildStatusResponse retorna null) para que los UPDATEs
+      // incrementales posteriores tengan siempre una fila que actualizar.
       results.add({
         'id_activity_status': statusId,
         'status_option': statusName,
-        'status_response': statusResponse,
+        'status_response': statusResponse ?? '',
       });
     }
     return results;
@@ -7017,8 +6809,22 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         });
 
       case 'headquarter-weight':
-        final hwData = _calculatedHeadquarterWeights[statusId];
-        return hwData != null ? jsonEncode(hwData) : null;
+        // Preferir el JSON ya serializado en visitDetails (lo guarda
+        // _saveHqWeightToVisitDetails con claves String). _calculatedHeadquarterWeights
+        // contiene Map<int, ...> que jsonEncode no soporta.
+        final detail = FFAppState()
+            .visitDetails
+            .where((d) => d.idActivityStatus == statusId)
+            .firstOrNull;
+        if (detail != null && detail.statusResponse.isNotEmpty) {
+          return detail.statusResponse;
+        }
+        return null;
+
+      case 'dynamic-printing-adb':
+        // Default inicial: "NO" (no impreso). El UPDATE pasará a "SI"
+        // cuando el usuario oprima IMPRIMIR en el dialog de previsualización.
+        return 'NO';
 
       default:
         // Para tipos no listados buscar en visitDetails
@@ -7030,6 +6836,297 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           return detail.statusResponse;
         }
         return null;
+    }
+  }
+
+  // ============================================================================
+  // HIDRATACIÓN: cargar visitas pendientes (Status=0) al entrar a la página
+  // y rehidratar el formulario cuando se selecciona una tarjeta.
+  // ============================================================================
+
+  /// Carga del SQLite todas las visitas pendientes (Status=0) del Id_activity
+  /// actual, las inserta como tarjetas en el panel ADB izquierdo y auto-
+  /// selecciona la más reciente, hidratando el formulario.
+  Future<void> _loadPendingVisitsFromSQLite() async {
+    try {
+      final currentActivity = FFAppState().currentActivity;
+      final idActivity = getJsonField(currentActivity, r'$.id_activity') as int?;
+      if (idActivity == null) return;
+
+      final db = await GlobalDbSingleton().database;
+
+      // 1. Visitas pendientes ordenadas por más reciente primero.
+      final visitRows = await db.rawQuery('''
+        SELECT v.Id_visit, v.Created_at, v.Id_product, p.Name_product
+        FROM Visits v
+        LEFT JOIN Products p ON v.Id_product = p.Id_product
+        WHERE v.Status = 0 AND v.Id_activity = ?
+        ORDER BY v.Created_at DESC
+      ''', [idActivity]);
+
+      if (visitRows.isEmpty) return;
+
+      final serverStatusId = _adbServerStatusId;
+      // Para cada visita pendiente: tomar el Status_response del detalle de
+      // tipo tag-transfer-adb-server y rellenar las estructuras del panel.
+      for (final v in visitRows) {
+        final visitId = v['Id_visit'] as int;
+        final createdAtStr = v['Created_at'] as String?;
+        final productName = (v['Name_product'] as String?) ?? '';
+        DateTime? createdAt;
+        if (createdAtStr != null) {
+          createdAt = DateTime.tryParse(createdAtStr);
+        }
+
+        // Obtener el rawTagJson asociado a esta visita.
+        String rawTagJson = '';
+        if (serverStatusId != null) {
+          final detailRows = await db.rawQuery('''
+            SELECT vd.Status_response
+            FROM Visits_details vd
+            INNER JOIN Activities_status a
+              ON a.Id_activity_status = vd.Id_activity_status
+            WHERE vd.Id_visit = ?
+              AND LOWER(a.Type_status) = 'tag-transfer-adb-server'
+            LIMIT 1
+          ''', [visitId]);
+          if (detailRows.isNotEmpty) {
+            rawTagJson = (detailRows.first['Status_response'] as String?) ?? '';
+          }
+        }
+
+        if (!mounted) return;
+        setState(() {
+          _adbTagTimestamps.add(createdAt ?? DateTime.now());
+          final idx = _adbTagTimestamps.length - 1;
+          _pendingTagIndexToVisitId[idx] = visitId;
+
+          if (serverStatusId != null) {
+            _adbServerCardsRawJson[serverStatusId] ??= [];
+            _adbServerCardsProductName[serverStatusId] ??= [];
+            _adbServerCardsData[serverStatusId] ??= [];
+            _adbServerCardsRawJson[serverStatusId]!.add(rawTagJson);
+            _adbServerCardsProductName[serverStatusId]!.add(productName);
+            if (rawTagJson.isNotEmpty) {
+              try {
+                _adbServerCardsData[serverStatusId]!
+                    .add(_parseNfcTagContent(rawTagJson));
+              } catch (_) {
+                _adbServerCardsData[serverStatusId]!.add([]);
+              }
+            } else {
+              _adbServerCardsData[serverStatusId]!.add([]);
+            }
+          }
+        });
+      }
+
+      // 2. Auto-seleccionar la más reciente (índice 0 fue la primera insertada
+      // arriba, ordenadas DESC). Rehidratar el formulario con sus detalles.
+      if (_pendingTagIndexToVisitId.isNotEmpty) {
+        final firstIdx = _pendingTagIndexToVisitId.keys.first;
+        final firstVisitId = _pendingTagIndexToVisitId[firstIdx]!;
+        if (mounted) {
+          setState(() {
+            _selectedAdbTagIndex = firstIdx;
+            // Reflejar en el árbol inline el contenido del primer tag.
+            if (serverStatusId != null) {
+              final cards = _adbServerCardsData[serverStatusId];
+              if (cards != null && firstIdx < cards.length) {
+                _tagReaderData[serverStatusId] = cards[firstIdx];
+                _tagReaderProductName[serverStatusId] =
+                    _adbServerCardsProductName[serverStatusId]?[firstIdx] ?? '';
+              }
+            }
+          });
+        }
+        await _hydrateVisitInForm(firstVisitId);
+      }
+    } catch (e) {
+      debugPrint('❌ _loadPendingVisitsFromSQLite error: $e');
+    }
+  }
+
+  /// Rellena los controllers/maps del formulario con los Visits_details de
+  /// la visita indicada. Hace UN solo SELECT con JOIN a Activities_status para
+  /// obtener Type_status. Luego despacha por tipo.
+  Future<void> _hydrateVisitInForm(int visitId) async {
+    try {
+      final db = await GlobalDbSingleton().database;
+
+      final rows = await db.rawQuery('''
+        SELECT vd.Id_activity_status, vd.Status_option, vd.Status_response,
+               a.Type_status, a.Status_name, a.Default_status,
+               a.Remember_status, a.Id_activity_step_parent
+        FROM Visits_details vd
+        LEFT JOIN Activities_status a
+          ON a.Id_activity_status = vd.Id_activity_status
+        WHERE vd.Id_visit = ?
+        ORDER BY vd.Id_visit_detail
+      ''', [visitId]);
+
+      final newDetails = <VisitsDetailsStruct>[];
+
+      for (final r in rows) {
+        final idStatus = (r['Id_activity_status'] as int?) ?? 0;
+        if (idStatus == 0) continue;
+        final statusOption = (r['Status_option'] as String?) ?? '';
+        final statusResponse = (r['Status_response'] as String?) ?? '';
+        final typeStatus =
+            ((r['Type_status'] as String?) ?? '').toLowerCase();
+        final statusName = (r['Status_name'] as String?) ?? statusOption;
+        final defaultStatus = (r['Default_status'] as String?) ?? '';
+        final rememberStatus = (r['Remember_status'] as int?) == 1;
+        final idStepParent = (r['Id_activity_step_parent'] as int?) ?? 0;
+
+        // Rellenar la estructura visual según el tipo
+        switch (typeStatus) {
+          case 'number':
+            if (statusResponse.isNotEmpty) {
+              _textControllers[idStatus] ??= TextEditingController();
+              _textControllers[idStatus]!.text = statusResponse;
+              final parsed = double.tryParse(statusResponse);
+              if (parsed != null) _statusValuesByName[statusName] = parsed;
+            }
+            break;
+          case 'numbers-operation':
+            final parsed = double.tryParse(statusResponse);
+            if (parsed != null) {
+              _calculatedValues[idStatus] = parsed;
+              _numbersOperationCalculated[idStatus] = true;
+            }
+            break;
+          case 'distance-extractor':
+            if (statusResponse.isNotEmpty) {
+              try {
+                final m = jsonDecode(statusResponse) as Map<String, dynamic>;
+                final dist = (m['distanceFromTag'] as num?)?.toDouble();
+                if (dist != null) _calculatedDistances[idStatus] = dist;
+                final list = m['distancesFromProducts'];
+                if (list is List) {
+                  _calculatedDistancesFromProduct[idStatus] =
+                      list.cast<Map<String, dynamic>>();
+                }
+                _distanceExtractorCalculated[idStatus] = true;
+              } catch (_) {}
+            }
+            break;
+          case 'headquarter-weight':
+            if (statusResponse.isNotEmpty) {
+              try {
+                final m = jsonDecode(statusResponse) as Map<String, dynamic>;
+                _calculatedHeadquarterWeights[idStatus] = m;
+              } catch (_) {}
+            }
+            break;
+          case 'tag-transfer-adb-server':
+          case 'label-info':
+            // tag-transfer-adb-server ya se cargó en _loadPendingVisitsFromSQLite.
+            // label-info es estático (default_status); no necesita rehidratar.
+            break;
+          default:
+            break;
+        }
+
+        newDetails.add(VisitsDetailsStruct(
+          idVisitDetail: 0,
+          idVisit: 0,
+          idActivityStatus: idStatus,
+          statusOption: statusOption,
+          statusResponse: statusResponse,
+          idStepParent: idStepParent,
+          rememberStatus: rememberStatus,
+          defaultStatus: defaultStatus,
+          typeStatus: typeStatus,
+          auxStep: idStepParent,
+        ));
+      }
+
+      if (!mounted) return;
+      setState(() {
+        FFAppState().visitDetails = newDetails;
+        _activeVisitId = visitId;
+        _formLocked = false;
+      });
+
+      // Recalcular fórmulas TAG_READER (mismo patrón que el listener del tag
+      // ADB en línea ~372): los campos `headquarter-weight` y
+      // `distance-extractor` cuyo default_status apunta a TAG_READER:<name>
+      // dependen de `_tagReaderData`, que ya quedó poblado por
+      // _loadPendingVisitsFromSQLite o por el onTap de _buildAdbTagCard ANTES
+      // de invocar _hydrateVisitInForm. Sin estas dos llamadas los campos
+      // quedan inertes al rehidratar.
+      final List<dynamic> allStatuses = [..._cachedActivityStatus];
+      for (final step in _cachedActivitySteps) {
+        final stepStatuses = getJsonField(step, r'$.activities_status');
+        if (stepStatuses is List) allStatuses.addAll(stepStatuses);
+      }
+      for (final s in allStatuses) {
+        final type = (getJsonField(s, r'$.type_status')?.toString() ?? '')
+            .toLowerCase();
+        if (type != 'tag-transfer-adb-server') continue;
+        final id = getJsonField(s, r'$.id_activity_status') as int?;
+        final name = getJsonField(s, r'$.status_name')?.toString() ?? '';
+        if (id == null) continue;
+        // Fire-and-forget — si fallan tienen su propio try/catch.
+        _autoCalculateRelatedDistances(id, name);
+        _autoCalculateRelatedHeadquarterWeights(id, name);
+      }
+    } catch (e) {
+      debugPrint('❌ _hydrateVisitInForm error: $e');
+    }
+  }
+
+  /// Limpia los controllers/maps que renderizan los valores del formulario,
+  /// para evitar mezcla al pasar de una visita a otra.
+  void _clearFormState() {
+    setState(() {
+      for (final c in _textControllers.values) {
+        c.clear();
+      }
+      _statusValuesByName.clear();
+      _calculatedValues.clear();
+      _numbersOperationCalculated.clear();
+      _calculatedDistances.clear();
+      _calculatedDistancesFromProduct.clear();
+      _distanceExtractorCalculated.clear();
+      _calculatedHeadquarterWeights.clear();
+      FFAppState().visitDetails = [];
+    });
+  }
+
+  /// Elimina la tarjeta del panel ADB en el índice indicado, ajustando todas
+  /// las estructuras que dependen del orden de inserción.
+  void _removeTagCardAt(int idx) {
+    if (idx < 0 || idx >= _adbTagTimestamps.length) return;
+    _adbTagTimestamps.removeAt(idx);
+    final sid = _adbServerStatusId;
+    if (sid != null) {
+      if (_adbServerCardsRawJson[sid] != null &&
+          idx < _adbServerCardsRawJson[sid]!.length) {
+        _adbServerCardsRawJson[sid]!.removeAt(idx);
+      }
+      if (_adbServerCardsProductName[sid] != null &&
+          idx < _adbServerCardsProductName[sid]!.length) {
+        _adbServerCardsProductName[sid]!.removeAt(idx);
+      }
+      if (_adbServerCardsData[sid] != null &&
+          idx < _adbServerCardsData[sid]!.length) {
+        _adbServerCardsData[sid]!.removeAt(idx);
+      }
+    }
+  }
+
+  /// Reindexa _pendingTagIndexToVisitId después de eliminar una tarjeta:
+  /// las claves > closedIdx se decrementan en 1 para alinearse con las listas
+  /// que ya hicieron removeAt.
+  void _reindexPendingTagMap(int closedIdx) {
+    final entries = _pendingTagIndexToVisitId.entries
+        .where((e) => e.key > closedIdx)
+        .toList();
+    for (final e in entries) {
+      _pendingTagIndexToVisitId.remove(e.key);
+      _pendingTagIndexToVisitId[e.key - 1] = e.value;
     }
   }
 
@@ -7153,6 +7250,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           auxStep: parentStepId,
         ),
       );
+    }
+
+    // Persistir incrementalmente en SQLite sobre la visita activa (último tag ADB).
+    if (_activeVisitId != null && statusId is int) {
+      unawaited(actions.updateVisitDetailInSQLite(
+        _activeVisitId!,
+        statusId,
+        statusName,
+        newValue.toString(),
+      ));
     }
 
     debugPrint('🔄 Llamando _recalculateOperations()...');
@@ -7710,6 +7817,104 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     debugPrint('');
   }
 
+  // ===== RANDOM NUMBER CHIP =====
+
+  bool _isRandomNumberStatus(dynamic status) {
+    final t = (getJsonField(status, r'''$.type_status''')?.toString() ?? '').toLowerCase();
+    if (t != 'number') return false;
+    final ds = (getJsonField(status, r'''$.default_status''')?.toString() ?? '').toUpperCase();
+    return ds.contains('=RANDOM:');
+  }
+
+  Widget _buildRandomNumberChip({
+    required int statusId,
+    required String statusName,
+    required String defaultStatus,
+    bool fullWidth = false,
+  }) {
+    final value = _getCurrentNumberValue(statusId, defaultStatus);
+    final formatted = _formatColombianNumber(value);
+    final rawString = value.toString();
+
+    final copyBtn = _CopyValueButton(
+      value: rawString,
+      semanticLabel: 'Copiar número aleatorio',
+    );
+
+    if (fullWidth) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+              colors: [Color(0xFF0D2B1A), Color(0xFF1B4332)]),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.tag_rounded,
+                size: 13, color: Colors.white.withValues(alpha: 0.45)),
+            const SizedBox(width: 6),
+            Expanded(
+              child: Text(
+                statusName,
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                  color: Colors.white.withValues(alpha: 0.55),
+                  letterSpacing: 0.3,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                formatted,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+              ),
+            ),
+            const SizedBox(width: 8),
+            copyBtn,
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+            colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)]),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            formatted,
+            style: const TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(width: 7),
+          copyBtn,
+        ],
+      ),
+    );
+  }
+
   // ===== CAJONES NUMÉRICOS DEL 1 AL 4 =====
 
   // Control numérico compacto para root status
@@ -7717,6 +7922,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) {
+      final sName = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+      return _buildRandomNumberChip(
+        statusId: statusId is int ? statusId : (statusId as num).toInt(),
+        statusName: sName,
+        defaultStatus: defaultStatus,
+        fullWidth: false,
+      );
+    }
+
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -7821,6 +8037,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: _CopyValueButton(
+              value: currentValue.toString(),
+              semanticLabel: 'Copiar valor numérico',
+            ),
+          ),
         ],
       ),
     );
@@ -7831,6 +8054,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) return const SizedBox.shrink();
+
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -7948,14 +8174,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   size: 22,
                 ),
                 SizedBox(width: 10),
-                Text(
-                  'INGRESAR OTRO NÚMERO',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'INGRESAR OTRO NÚMERO',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -7975,6 +8204,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) return const SizedBox.shrink();
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -8080,6 +8310,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
             ),
           ),
+          if (showValue)
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _CopyValueButton(
+                value: currentValue.toString(),
+                semanticLabel: 'Copiar valor numérico',
+              ),
+            ),
         ],
       ),
     );
@@ -8093,6 +8331,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) return const SizedBox.shrink();
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -8210,14 +8449,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   size: 22,
                 ),
                 SizedBox(width: 10),
-                Text(
-                  'INGRESAR OTRO NÚMERO',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'INGRESAR OTRO NÚMERO',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -8327,17 +8569,50 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           // Procesar placeholders con acceso completo al estado del formulario
           debugPrint('');
           debugPrint('🔄 ===== INICIANDO PROCESAMIENTO DE PLACEHOLDERS =====');
-          final processedHTML = _processHTMLPlaceholders(htmlTemplate);
+          final processedHTML = await _processHTMLPlaceholders(htmlTemplate);
           debugPrint('✅ ===== FIN PROCESAMIENTO DE PLACEHOLDERS =====');
           debugPrint('');
           debugPrint(
               '📄 HTML procesado (primeros 500 chars): ${processedHTML.substring(0, processedHTML.length > 500 ? 500 : processedHTML.length)}...');
 
-          // Abrir el previsualizador HTML con opción de imprimir
+          // Construir nombre del PDF: {NumeroRegistro}_{Fecha}_{Hora}_{Producto}
+          final pdfRegistro = () {
+            final d = FFAppState().visitDetails.firstWhere(
+              (x) => x.defaultStatus.toUpperCase().contains('=RANDOM:'),
+              orElse: () => VisitsDetailsStruct(),
+            );
+            return d.statusResponse.isNotEmpty
+                ? d.statusResponse
+                : DateTime.now().millisecondsSinceEpoch.toString();
+          }();
+          final pdfNow = DateTime.now();
+          final pdfFecha =
+              '${pdfNow.day.toString().padLeft(2, '0')}${pdfNow.month.toString().padLeft(2, '0')}${pdfNow.year}';
+          final pdfHora =
+              '${pdfNow.hour.toString().padLeft(2, '0')}${pdfNow.minute.toString().padLeft(2, '0')}';
+          String pdfProducto = '';
+          for (final cards in _adbServerCardsRawJson.values) {
+            if (cards.isNotEmpty) {
+              final j = actions.parseNfcJson(cards.last);
+              if (j != null) {
+                pdfProducto =
+                    ((j['Read_info'] as Map?)?['Name_product'] as String? ?? '')
+                        .trim();
+                if (pdfProducto.isNotEmpty) break;
+              }
+            }
+          }
+          if (pdfProducto.isEmpty) pdfProducto = statusName;
+          final pdfFilename =
+              '${pdfRegistro}_${pdfFecha}_${pdfHora}_$pdfProducto';
+
+          // Abrir el previsualizador HTML con opción de imprimir y guardar PDF
+          if (!mounted) return;
           await actions.previewAndPrintHTML(
-            context,
+            this.context,
             processedHTML,
             statusName,
+            pdfFilename: pdfFilename,
           );
 
           debugPrint('✅ Vista previa cerrada');
@@ -8392,6 +8667,119 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDynamicPrintingAdbButton({
+    required BuildContext context,
+    required String statusName,
+    required dynamic status,
+    required int statusId,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () async {
+          HapticFeedback.mediumImpact();
+          try {
+            var htmlTemplate =
+                getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+            if (htmlTemplate.isEmpty) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('⚠️ No hay plantilla HTML configurada'),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+              return;
+            }
+
+            htmlTemplate = _decodeHtmlEntities(htmlTemplate);
+            final processedHTML = await _processHTMLPlaceholders(htmlTemplate);
+            if (!mounted) return;
+
+            // Construir pdfFilename igual que en dynamic-printing normal
+            final adbPdfRegistro = () {
+              final d = FFAppState().visitDetails.firstWhere(
+                (x) => x.defaultStatus.toUpperCase().contains('=RANDOM:'),
+                orElse: () => VisitsDetailsStruct(),
+              );
+              return d.statusResponse.isNotEmpty
+                  ? d.statusResponse
+                  : DateTime.now().millisecondsSinceEpoch.toString();
+            }();
+            final adbPdfNow = DateTime.now();
+            final adbPdfFilename = '${adbPdfRegistro}_'
+                '${adbPdfNow.day.toString().padLeft(2, '0')}${adbPdfNow.month.toString().padLeft(2, '0')}${adbPdfNow.year}_'
+                '${adbPdfNow.hour.toString().padLeft(2, '0')}${adbPdfNow.minute.toString().padLeft(2, '0')}_'
+                '$statusName';
+
+            if (!mounted) return;
+            showDialog(
+              context: this.context,
+              barrierDismissible: true,
+              builder: (dialogContext) => _AdbPrintPreviewDialog(
+                html: processedHTML,
+                title: statusName,
+                pdfFilename: adbPdfFilename,
+                onPrinted: () {
+                  // Persistir en SQLite: el usuario confirmó IMPRIMIR.
+                  if (_activeVisitId != null) {
+                    unawaited(actions.updateVisitDetailInSQLite(
+                      _activeVisitId!,
+                      statusId,
+                      statusName,
+                      'SI',
+                    ));
+                  }
+                },
+              ),
+            );
+          } catch (e) {
+            debugPrint('❌ Error en dynamic-printing-adb preview: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(this.context).showSnackBar(
+                SnackBar(
+                  content: Text('❌ Error: $e'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
+        },
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+            ),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.visibility_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 8),
+              Text(
+                'PREVISUALIZAR',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -8821,23 +9209,45 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
 
     // Lookup conductor (US id_user → Users, usa caché existente)
-    // Mostrar: "Nombre (operID)" si se resuelve el nombre, o solo el operID
+    // Conductor: solo el nombre. La identificación se muestra en su propia
+    // fila (IDENTIFICACION = columna Users.Identificacion, fallback Oper_id).
     String driverName = '—';
+    String driverIdentificacion = '';
     if (idUser != null) {
       final resolvedName = _getUserName(idUser.toString());
-      final isResolved = resolvedName.isNotEmpty && resolvedName != idUser.toString();
-      driverName = isResolved ? '$resolvedName ($idUser)' : '$idUser';
+      final isResolved =
+          resolvedName.isNotEmpty && resolvedName != idUser.toString();
+      driverName = isResolved ? resolvedName : '$idUser';
+      driverIdentificacion = _getUserIdentificacion(idUser);
+      if (driverIdentificacion.isEmpty) {
+        driverIdentificacion = '$idUser';
+      }
     }
 
     // Parsear visitas para el árbol
     final visitData = _parseNfcTagContent(rawJson);
+
+    // Parsear visits_details inyectado por WRITER_STATUS (status.visits_details)
+    List<Map<String, dynamic>> formStatusDetails = const [];
+    try {
+      final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
+      final statusBlock = decoded['status'] as Map<String, dynamic>?;
+      final details = statusBlock?['visits_details'] as List<dynamic>?;
+      if (details != null) {
+        formStatusDetails =
+            details.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
 
     return _buildAdbServerTagCard(
       statusId: statusId,
       originName: originName,
       destName: destName.isNotEmpty ? destName : (tagFrom.isNotEmpty ? tagFrom : '—'),
       driverName: driverName.isNotEmpty ? driverName : '—',
+      driverIdentificacion:
+          driverIdentificacion.isNotEmpty ? driverIdentificacion : '—',
       visitData: visitData,
+      formStatusDetails: formStatusDetails,
     );
   }
 
@@ -8846,7 +9256,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     required String originName,
     required String destName,
     required String driverName,
+    required String driverIdentificacion,
     required List<Map<String, dynamic>> visitData,
+    List<Map<String, dynamic>> formStatusDetails = const [],
   }) {
     // Agrupar visitas por lote (mismo que árbol existente)
     final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
@@ -8855,7 +9267,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       groupedByHeadquarter.putIfAbsent(heId, () => []).add(record);
     }
 
-    Widget infoRow(IconData icon, String label, String value, Color iconColor) {
+    Widget infoRow(
+      IconData icon,
+      String label,
+      String value,
+      Color iconColor, {
+      String? copyValue,
+      String? copySemanticLabel,
+    }) {
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 5),
         child: Row(
@@ -8893,6 +9312,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (copyValue != null && copyValue.isNotEmpty && copyValue != '—') ...[
+              const SizedBox(width: 8),
+              _CopyValueButton(
+                value: copyValue,
+                semanticLabel: copySemanticLabel,
+                iconSize: 12,
+              ),
+            ],
           ],
         ),
       );
@@ -8921,9 +9348,53 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                infoRow(Icons.inventory_2_outlined, 'ORIGEN', originName, const Color(0xFFB45309)),
-                infoRow(Icons.move_to_inbox_outlined, 'DESTINO', destName, const Color(0xFFB45309)),
-                infoRow(Icons.person_outline_rounded, 'CONDUCTOR', driverName, const Color(0xFF42A5F5)),
+                infoRow(
+                  Icons.inventory_2_outlined,
+                  'ORIGEN',
+                  originName,
+                  const Color(0xFFB45309),
+                  copyValue: originName,
+                  copySemanticLabel: 'Copiar origen',
+                ),
+                infoRow(
+                  Icons.move_to_inbox_outlined,
+                  'DESTINO',
+                  destName,
+                  const Color(0xFFB45309),
+                  copyValue: destName,
+                  copySemanticLabel: 'Copiar destino',
+                ),
+                infoRow(
+                  Icons.person_outline_rounded,
+                  'CONDUCTOR',
+                  driverName,
+                  const Color(0xFF42A5F5),
+                  copyValue: driverName,
+                  copySemanticLabel: 'Copiar conductor',
+                ),
+                infoRow(
+                  Icons.badge_outlined,
+                  'IDENTIFICACIÓN',
+                  driverIdentificacion,
+                  const Color(0xFF42A5F5),
+                  copyValue: driverIdentificacion,
+                  copySemanticLabel: 'Copiar identificación',
+                ),
+                // ── Detalles del formulario inyectados (status.visits_details) ──
+                ...formStatusDetails.map((d) {
+                  final option = (d['status_option'] ?? '').toString();
+                  final response = (d['status_response'] ?? '').toString();
+                  return infoRow(
+                    Icons.checklist_rounded,
+                    option,
+                    response.isNotEmpty ? response : '—',
+                    const Color(0xFF66BB6A),
+                    copyValue: response,
+                    copySemanticLabel: option.isNotEmpty
+                        ? 'Copiar $option'
+                        : 'Copiar valor',
+                  );
+                }),
               ],
             ),
           ),
@@ -9166,21 +9637,42 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
     }
 
-    return GestureDetector(
-      onTap: () => setState(() {
-        _selectedAdbTagIndex = index;
-        // Actualizar árbol inline con los datos de la tarjeta seleccionada
-        final sid = _adbServerStatusId;
-        if (sid != null) {
-          final cards = _adbServerCardsData[sid];
-          if (cards != null && index < cards.length) {
-            _tagReaderData[sid] = cards[index];
-            _tagReaderProductName[sid] = _adbServerCardsProductName[sid]?[index] ?? '';
-            _tagReaderRawJsons.remove(sid);
-          }
-        }
-      }),
-      child: AnimatedContainer(
+    final isAnimatingOut = _animatingOutTagIndex == index;
+
+    return AnimatedSlide(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeInBack,
+      offset: isAnimatingOut ? const Offset(-1.4, 0) : Offset.zero,
+      child: AnimatedOpacity(
+        duration: const Duration(milliseconds: 320),
+        opacity: isAnimatingOut ? 0 : 1,
+        child: GestureDetector(
+          onTap: () async {
+            setState(() {
+              _selectedAdbTagIndex = index;
+              // Actualizar árbol inline con los datos de la tarjeta seleccionada
+              final sid = _adbServerStatusId;
+              if (sid != null) {
+                final cards = _adbServerCardsData[sid];
+                if (cards != null && index < cards.length) {
+                  _tagReaderData[sid] = cards[index];
+                  _tagReaderProductName[sid] =
+                      _adbServerCardsProductName[sid]?[index] ?? '';
+                  _tagReaderRawJsons.remove(sid);
+                }
+              }
+            });
+
+            // Rehidratar el formulario con la visita asociada a esta tarjeta
+            // (si proviene de una pendiente cargada de SQLite o de un tag ya
+            // insertado en esta sesión).
+            final visitId = _pendingTagIndexToVisitId[index];
+            if (visitId != null && visitId != _activeVisitId) {
+              _clearFormState();
+              await _hydrateVisitInForm(visitId);
+            }
+          },
+          child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -9226,6 +9718,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
             ),
           ],
+        ),
+      ),
         ),
       ),
     );
@@ -9462,10 +9956,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     if (!ok) return;
                   }
                   if (!mounted) return;
-                  final ctx = context;
                   await showDialog(
                     barrierDismissible: false,
-                    context: ctx,
+                    context: this.context,
                     builder: (_) => const Dialog(
                       elevation: 0,
                       insetPadding: EdgeInsets.zero,
@@ -10005,6 +10498,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       );
       debugPrint('   ✅ Agregado a visitDetails');
     }
+
+    // Persistir incrementalmente en SQLite sobre la visita activa.
+    if (_activeVisitId != null && statusId is int) {
+      unawaited(actions.updateVisitDetailInSQLite(
+        _activeVisitId!,
+        statusId,
+        statusName,
+        result.toString(),
+      ));
+    }
   }
 
   // ===== PERSISTENCIA DE RESULTADOS DE headquarter-weight =====
@@ -10086,6 +10589,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         );
         debugPrint('   ✅ HQ-Weight añadido a visitDetails');
       }
+
+      // Persistir incrementalmente en SQLite sobre la visita activa.
+      if (_activeVisitId != null) {
+        unawaited(actions.updateVisitDetailInSQLite(
+          _activeVisitId!,
+          statusId,
+          statusName,
+          jsonString,
+        ));
+      }
     } catch (e) {
       debugPrint('⚠️ Error persistiendo HQ-Weight en visitDetails: $e');
     }
@@ -10097,7 +10610,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   /// También identifica los lotes que NO tienen peso promedio configurado
   /// Usa la base de datos principal (pathDatabase) con conexión directa
   Future<void> _loadHeadquarterWeights(List<int> headquarterIds) async {
-    Database? db;
     try {
       final now = DateTime.now();
 
@@ -10118,16 +10630,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       // Limpiar lista de lotes sin peso antes de cargar
       _headquartersWithoutWeight.clear();
 
-      // Obtener la ruta de la base de datos desde FFAppState
-      final dbPath = FFAppState().pathDatabase;
-      if (dbPath.isEmpty) {
-        debugPrint('❌ Error: pathDatabase está vacío');
-        return;
-      }
-
-      // Abrir conexión a la base de datos (readonly para evitar bloqueos)
-      db = await openDatabase(dbPath, readOnly: true);
-      debugPrint('📂 Base de datos abierta: $dbPath');
+      // Usar la conexión compartida del singleton (NO se cierra después,
+      // el singleton es dueño del ciclo de vida y otras consultas concurrentes
+      // podrían fallar con database_closed si cerramos aquí).
+      final db = await GlobalDbSingleton().database;
 
       for (var headquarterId in headquarterIds) {
         // Buscar nombre del lote en AppState
@@ -10185,12 +10691,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
     } catch (e) {
       debugPrint('❌ Error cargando weights: $e');
-    } finally {
-      // Cerrar la conexión para evitar bloqueos
-      if (db != null && db.isOpen) {
-        await db.close();
-        debugPrint('✅ Base de datos cerrada correctamente');
-      }
     }
   }
 
@@ -10346,6 +10846,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
     debugPrint('⚖️ ===== FIN CÁLCULO DE PESO =====');
     debugPrint('');
+    if (mounted) setState(() {});
   }
 
   // ===== DISTRIBUCIÓN PROPORCIONAL DE PESO (=CALCULATION_DISTRIBUTION) =====
@@ -10991,7 +11492,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
 
     debugPrint('   Fórmula para cálculo: "$processedFormula"');
-    final result = _evaluateMathExpressionWithParentheses(processedFormula);
+    final result = _evaluateMathExpressionWithParentheses(
+      processedFormula,
+      variables: formVariables,
+    );
     debugPrint('✅ Resultado: $result kg');
 
     _calculatedHeadquarterWeights[statusId] = {
@@ -11078,7 +11582,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
 
       debugPrint('   🏢 $loteName: racimos=$racimos, fórmula=$calcF');
-      final result = _evaluateMathExpressionWithParentheses(calcF);
+      final result = _evaluateMathExpressionWithParentheses(
+        calcF,
+        variables: formVariables,
+      );
       debugPrint('   ✅ $result kg');
 
       lotesResult.add({
@@ -11125,33 +11632,30 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   Map<String, double> _collectFormVariables() {
     final Map<String, double> vars = {};
 
-    var tareDetail = FFAppState().visitDetails.firstWhere(
-          (d) => d.statusOption.toUpperCase() == 'TARE',
-          orElse: () => VisitsDetailsStruct(),
-        );
-    if (tareDetail.statusResponse.isEmpty) {
-      tareDetail = FFAppState().visitDetails.firstWhere(
-            (d) => d.statusOption.toUpperCase().contains('TARE') &&
-                   !d.statusOption.toUpperCase().contains('DESTARE'),
-            orElse: () => VisitsDetailsStruct(),
-          );
-    }
-    if (tareDetail.statusResponse.isNotEmpty) {
-      vars['TARE'] = double.tryParse(tareDetail.statusResponse) ?? 0.0;
+    // Recopilar todos los campos del formulario con respuesta numérica
+    for (final d in FFAppState().visitDetails) {
+      if (d.statusResponse.isNotEmpty && d.statusOption.isNotEmpty) {
+        final val = double.tryParse(d.statusResponse);
+        if (val != null) {
+          vars[d.statusOption.toUpperCase()] = val;
+        }
+      }
     }
 
-    var destareDetail = FFAppState().visitDetails.firstWhere(
-          (d) => d.statusOption.toUpperCase() == 'DESTARE',
-          orElse: () => VisitsDetailsStruct(),
-        );
-    if (destareDetail.statusResponse.isEmpty) {
-      destareDetail = FFAppState().visitDetails.firstWhere(
-            (d) => d.statusOption.toUpperCase().contains('DESTARE'),
-            orElse: () => VisitsDetailsStruct(),
-          );
-    }
-    if (destareDetail.statusResponse.isNotEmpty) {
-      vars['DESTARE'] = double.tryParse(destareDetail.statusResponse) ?? 0.0;
+    // Alias TARE para campos cuyo nombre contenga "TARE" (pero no "DESTARE"),
+    // por compatibilidad con formularios que no llamen al campo exactamente "TARE"
+    if (!vars.containsKey('TARE')) {
+      for (final d in FFAppState().visitDetails) {
+        if (d.statusOption.toUpperCase().contains('TARE') &&
+            !d.statusOption.toUpperCase().contains('DESTARE') &&
+            d.statusResponse.isNotEmpty) {
+          final val = double.tryParse(d.statusResponse);
+          if (val != null) {
+            vars['TARE'] = val;
+            break;
+          }
+        }
+      }
     }
 
     return vars;
@@ -11160,12 +11664,26 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   /// Obtiene el total de RESULTS de todos los registros del TAG_READER
   /// Evalúa una expresión matemática simple con paréntesis
   /// Soporta: +, -, *, /, ()
-  double _evaluateMathExpressionWithParentheses(String expression) {
+  /// Si [variables] se provee, los tokens no-numéricos se resuelven contra el
+  /// mapa usando claves normalizadas (uppercase + sin espacios/guiones bajos),
+  /// para que p.ej. el token "PESOBRUTO" (resultado de quitar espacios a la
+  /// fórmula original "PESO BRUTO") matchee con la variable "Peso bruto".
+  double _evaluateMathExpressionWithParentheses(
+    String expression, {
+    Map<String, double>? variables,
+  }) {
     try {
       debugPrint('   🔢 Evaluando: "$expression"');
 
       // Remover espacios
       expression = expression.replaceAll(' ', '');
+
+      final Map<String, double>? normalizedVars = variables == null
+          ? null
+          : {
+              for (final e in variables.entries)
+                e.key.toUpperCase().replaceAll(RegExp(r'[\s_]'), ''): e.value,
+            };
 
       // Evaluar paréntesis recursivamente
       int iterations = 0;
@@ -11184,7 +11702,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
         final subExpr = expression.substring(openIndex + 1, closeIndex);
         debugPrint('   📐 Evaluando sub-expresión: "$subExpr"');
-        final subResult = _evaluateSimpleMathExpression(subExpr);
+        final subResult = _evaluateSimpleMathExpression(subExpr, variables: normalizedVars);
         debugPrint('   📐 Resultado: $subResult');
 
         expression = expression.substring(0, openIndex) +
@@ -11196,7 +11714,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
       // Evaluar expresión sin paréntesis
       debugPrint('   📊 Evaluando expresión final: "$expression"');
-      final result = _evaluateSimpleMathExpression(expression);
+      final result = _evaluateSimpleMathExpression(expression, variables: normalizedVars);
       debugPrint('   ✅ Resultado final: $result');
       return result;
     } catch (e) {
@@ -11345,7 +11863,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   /// Evalúa una expresión matemática simple sin paréntesis
   /// Respeta precedencia de operadores: *, / antes que +, -
-  double _evaluateSimpleMathExpression(String expression) {
+  /// [variables] se asume YA normalizado: claves uppercase + sin espacios ni
+  /// guiones bajos. Llamado desde [_evaluateMathExpressionWithParentheses]
+  /// que se encarga de la normalización.
+  double _evaluateSimpleMathExpression(
+    String expression, {
+    Map<String, double>? variables,
+  }) {
     try {
       // Remover espacios
       expression = expression.replaceAll(' ', '');
@@ -11385,19 +11909,34 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         return 0.0;
       }
 
-      // Convertir números
+      // Convertir números (con fallback a variables si no es numérico)
       final List<dynamic> processed = [];
       for (var token in tokens) {
         if ('+-*/'.contains(token)) {
           processed.add(token);
-        } else {
-          final num = double.tryParse(token);
-          if (num == null) {
-            debugPrint('      ⚠️ No se pudo parsear: "$token"');
-            return 0.0;
-          }
-          processed.add(num);
+          continue;
         }
+        final num = double.tryParse(token);
+        if (num != null) {
+          processed.add(num);
+          continue;
+        }
+        // Fallback: token no numérico → buscar en variables con clave
+        // normalizada (uppercase + sin espacios/guiones bajos). Esto permite
+        // que fórmulas con espacios ("PESO BRUTO") sigan funcionando aunque
+        // la limpieza previa de espacios haya pegado las palabras
+        // ("PESOBRUTO"), o que variantes como "peso_bruto" matcheen también.
+        if (variables != null) {
+          final key = token.toUpperCase().replaceAll(RegExp(r'[\s_]'), '');
+          final v = variables[key];
+          if (v != null) {
+            debugPrint('      🔁 Variable resuelta: "$token" → $v');
+            processed.add(v);
+            continue;
+          }
+        }
+        debugPrint('      ⚠️ No se pudo parsear: "$token"');
+        return 0.0;
       }
 
       debugPrint('      Procesados: $processed');
@@ -11680,6 +12219,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       double? originLat;
       double? originLng;
 
+      // ID del tag-reader/ADB asociado (cuando aplica). Se usa también en la
+      // OPCIÓN 2 para localizar el JSON del tag (matriz de Visitas) y derivar
+      // la lista de lotes con la misma fuente que renderiza el árbol del card.
+      int? targetTagReaderId;
+
       // OPCIÓN 1: Buscar coordenadas del TAG_READER especificado
       if (defaultStatus.startsWith('=TAG_READER:')) {
         final tagReaderName =
@@ -11703,7 +12247,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         final activityStatus = activityStatusRaw?.toList() ?? [];
 
         // Buscar el statusId del tag-reader (o tag-transfer-adb-server/from) por nombre
-        int? targetTagReaderId;
         // Tipos de status que actúan como origen de tag
         const tagOriginTypes = {
           'tag-reader',
@@ -11831,26 +12374,27 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       debugPrint(
           '📦 ===== CALCULANDO OPCIÓN 2 (desde Producto por cada lote) =====');
 
-      // Obtener lotes: primero desde headquartersSelectedList, y si está vacío,
-      // extraer IDs únicos de HE de los datos de los tags ADB recibidos.
-      final selectedHeadquarters = FFAppState().headquartersSelectedList;
-      debugPrint(
-          '📋 Lotes en headquartersSelectedList: ${selectedHeadquarters.length}');
-
-      // Construir lista de (id, nombre) para los lotes a procesar
-      // Formato: List<({int id, String name})>
+      // Fuente PRIMARIA: HE únicos del JSON del tag (matriz de Visitas) que está
+      // asociado al TAG_READER/ADB que disparó este cálculo. Es la misma fuente
+      // que renderiza el árbol _buildAdbServerTagCard → _buildHeadquarterGroup.
       final List<({int id, String name})> lotesToProcess = [];
+      final Set<int> uniqueHeIds = {};
 
-      if (selectedHeadquarters.isNotEmpty) {
-        for (final hq in selectedHeadquarters) {
-          lotesToProcess.add((id: hq.idHeadquarter, name: hq.nameHeadquarter.isNotEmpty ? hq.nameHeadquarter : 'Lote #${hq.idHeadquarter}'));
-          debugPrint('   - Lote ${hq.idHeadquarter}: ${hq.nameHeadquarter}');
+      // 1) Records ya parseados del tag-reader/ADB target (poblados al recibir el tag)
+      if (targetTagReaderId != null && _tagReaderData[targetTagReaderId] != null) {
+        for (final record in _tagReaderData[targetTagReaderId]!) {
+          final heId = record['headquarterId'] as int? ?? 0;
+          if (heId > 0) uniqueHeIds.add(heId);
         }
-      } else {
-        // Extraer HE únicos de todos los tags ADB recibidos
-        debugPrint('⚠️ headquartersSelectedList vacío — extrayendo HE de tags ADB...');
-        final Set<int> uniqueHeIds = {};
-        for (final rawList in _adbServerCardsRawJson.values) {
+        debugPrint(
+            '📋 Lotes desde JSON tag (matriz de visitas) tag-reader $targetTagReaderId: ${uniqueHeIds.length}');
+      }
+
+      // 2) Si por alguna razón no hay records parseados, leer rawJsons del mismo
+      //    statusId y parsear Visits[].HE manualmente (fallback robusto).
+      if (uniqueHeIds.isEmpty && targetTagReaderId != null) {
+        final rawList = _adbServerCardsRawJson[targetTagReaderId];
+        if (rawList != null) {
           for (final rawJson in rawList) {
             try {
               final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
@@ -11860,17 +12404,34 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   final he = visit['HE'];
                   if (he != null) {
                     final heId = he is int ? he : (he as num).toInt();
-                    uniqueHeIds.add(heId);
+                    if (heId > 0) uniqueHeIds.add(heId);
                   }
                 }
               }
             } catch (_) {}
           }
+          debugPrint(
+              '📋 Lotes desde rawJson de tag-reader $targetTagReaderId: ${uniqueHeIds.length}');
         }
-        debugPrint('   HE únicos extraídos de tags: $uniqueHeIds');
-        // Los nombres se obtendrán de SQLite (tabla Headquarters)
-        for (final heId in uniqueHeIds) {
-          lotesToProcess.add((id: heId, name: '')); // nombre se rellena abajo
+      }
+
+      for (final heId in uniqueHeIds) {
+        lotesToProcess.add((id: heId, name: '')); // nombre se resuelve más abajo via SQLite
+      }
+
+      // 3) Último recurso: si no hay tag JSON disponible, usar headquartersSelectedList
+      //    (caso típico: cálculo manual previo a leer un tag).
+      if (lotesToProcess.isEmpty) {
+        final selectedHeadquarters = FFAppState().headquartersSelectedList;
+        debugPrint(
+            '⚠️ Sin JSON tag para tag-reader $targetTagReaderId — fallback a headquartersSelectedList: ${selectedHeadquarters.length}');
+        for (final hq in selectedHeadquarters) {
+          lotesToProcess.add((
+            id: hq.idHeadquarter,
+            name: hq.nameHeadquarter.isNotEmpty
+                ? hq.nameHeadquarter
+                : 'Lote #${hq.idHeadquarter}',
+          ));
         }
       }
 
@@ -11880,22 +12441,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       if (lotesToProcess.isEmpty) {
         debugPrint('⚠️ No hay lotes para calcular — Opción 2 omitida');
       } else {
-        // Leer productos desde SQLite
+        // Leer productos desde SQLite (usando el singleton para evitar
+        // cerrar la conexión compartida y romper consultas concurrentes)
         try {
-          late Directory baseDir;
-          if (Platform.isAndroid) {
-            final Directory? externalDir = await getExternalStorageDirectory();
-            if (externalDir == null) throw Exception('No se pudo acceder al almacenamiento externo');
-            baseDir = externalDir;
-          } else {
-            baseDir = await getApplicationDocumentsDirectory();
-          }
-          final String basePath = '${baseDir.path}/ClickPalmData';
-          final String dbPath = path.join(basePath, 'clickpalm_database.db');
-
-          debugPrint('📂 Ruta de SQLite: $dbPath');
-
-          final db = await openDatabase(dbPath);
+          final db = await GlobalDbSingleton().database;
 
           // Calcular distancia para CADA lote
           for (final loteEntry in lotesToProcess) {
@@ -12002,9 +12551,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             }
           } // fin del for de lotes
 
-          // Cerrar la base de datos
-          await db.close();
-          debugPrint('✅ Base de datos cerrada');
+          // NO cerrar: la conexión es propiedad de GlobalDbSingleton.
+          // Otras consultas concurrentes (p.ej. _loadHeadquarterWeights)
+          // fallarían con DatabaseException(database_closed) si cerramos aquí.
         } catch (e) {
           debugPrint('❌ Error consultando SQLite: $e');
         }
@@ -12019,6 +12568,22 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         }
         _distanceExtractorCalculated[statusId] = true;
       });
+
+      // Persistir incrementalmente en SQLite sobre la visita activa.
+      if (_activeVisitId != null) {
+        final statusName =
+            getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+        final responseJson = jsonEncode({
+          'distanceFromTag': distanceFromTag,
+          'distancesFromProducts': distancesFromProducts,
+        });
+        unawaited(actions.updateVisitDetailInSQLite(
+          _activeVisitId!,
+          statusId,
+          statusName,
+          responseJson,
+        ));
+      }
 
       debugPrint(
           '✅ Distancia desde TAG (OPCIÓN 1): ${distanceFromTag.toStringAsFixed(2)} metros');
@@ -12340,9 +12905,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               width: 1,
                             ),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.edit_location_alt_outlined,
                                   color: Color(0xFF94A3B8), size: 14),
                               SizedBox(width: 6),
@@ -12718,6 +13283,49 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
   }
 
+  /// Devuelve la identificación visible del conductor (columna `Identificacion`
+  /// de la tabla SQLite `Users`). Si está vacía, devuelve el `Oper_id`.
+  /// Mientras la consulta a SQLite carga, intenta resolver de inmediato con
+  /// `operID` desde `FFAppState().usersList`.
+  String _getUserIdentificacion(int idUser) {
+    if (_userIdentificacionCache.containsKey(idUser)) {
+      return _userIdentificacionCache[idUser]!;
+    }
+    _loadUserIdentificacionFromSQLite(idUser);
+    final user = FFAppState().usersList.firstWhere(
+          (u) => u.idUser == idUser,
+          orElse: () => UsersStruct(),
+        );
+    return user.operID;
+  }
+
+  Future<void> _loadUserIdentificacionFromSQLite(int idUser) async {
+    if (_userIdentificacionLoading.contains(idUser)) return;
+    _userIdentificacionLoading.add(idUser);
+    try {
+      final db = await GlobalDbSingleton().database;
+      final result = await db.query(
+        'Users',
+        columns: ['Identificacion', 'Oper_id'],
+        where: 'Id_user = ?',
+        whereArgs: [idUser],
+        limit: 1,
+      );
+      String value = '';
+      if (result.isNotEmpty) {
+        final ident = (result.first['Identificacion'] as String?) ?? '';
+        final operId = (result.first['Oper_id'] as String?) ?? '';
+        value = ident.isNotEmpty ? ident : operId;
+      }
+      _userIdentificacionCache[idUser] = value;
+      if (mounted) setState(() {});
+    } catch (e) {
+      debugPrint('❌ _loadUserIdentificacionFromSQLite: Error: $e');
+    } finally {
+      _userIdentificacionLoading.remove(idUser);
+    }
+  }
+
   /// Carga el nombre del producto desde SQLite por Id_product
   Future<void> _loadProductById(int productId) async {
     if (_productByIdCache.containsKey(productId)) return;
@@ -12876,12 +13484,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // ===== PROCESAR PLACEHOLDERS HTML PARA DYNAMIC-PRINTING =====
 
-  String _processHTMLPlaceholders(String htmlTemplate) {
+  Future<String> _processHTMLPlaceholders(String htmlTemplate) async {
     String result = htmlTemplate;
 
-    // Buscar todos los placeholders en formato {NombreCampo}
-    // Solo capturar nombres válidos: letras, números, espacios, guiones y guiones bajos
-    final placeholderPattern = RegExp(r'\{([a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ_-]+)\}');
+    // Buscar todos los placeholders en formato {NombreCampo} o {Campo.subpath}
+    // Permite letras, números, espacios, guiones, guiones bajos y puntos
+    final placeholderPattern = RegExp(r'\{([a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ_.-]+)\}');
     final matches = placeholderPattern.allMatches(htmlTemplate).toList();
 
     debugPrint('📋 Encontrados ${matches.length} placeholders en HTML:');
@@ -12899,7 +13507,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           '🔍 [${replacedCount + 1}/${matches.length}] Procesando placeholder: "$placeholder" (campo: "$fieldName")');
 
       // Buscar el campo en currentStepStatuses
-      String replacementValue = _getPlaceholderValue(fieldName);
+      String replacementValue = await _getPlaceholderValue(fieldName);
 
       // Reemplazar el placeholder
       result = result.replaceAll(placeholder, replacementValue);
@@ -12917,83 +13525,83 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     return result;
   }
 
-  String _getPlaceholderValue(String fieldName) {
+  Future<String> _getPlaceholderValue(String fieldName) async {
     debugPrint('🔍 Buscando placeholder: "$fieldName"');
 
-    // Buscar el status por nombre en activity_steps y root status
+    // Notación de punto: {NombreCampo.subpath} → extrae sub-campo del JSON NFC
+    if (fieldName.contains('.')) {
+      final dotIdx = fieldName.indexOf('.');
+      final baseField = fieldName.substring(0, dotIdx).trim();
+      final subPath = fieldName.substring(dotIdx + 1).trim();
+      return _getNfcJsonSubfieldValue(baseField, subPath);
+    }
+
+    // Búsqueda recursiva: cubre steps_childs y status_childs en cualquier nivel
     dynamic targetStatus;
     int? targetStatusId;
     String? targetStatusType;
 
-    // Buscar en activity_steps
-    final activityStepsRaw =
-        getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
-    debugPrint(
-        '   Activity steps raw: ${activityStepsRaw != null ? "existe" : "null"}');
-
-    if (activityStepsRaw != null) {
-      final activitySteps =
-          (activityStepsRaw is List) ? activityStepsRaw : [activityStepsRaw];
-      debugPrint('   Buscando en ${activitySteps.length} steps');
-
-      for (var step in activitySteps) {
-        final statusListRaw = getJsonField(step, r'''$.activity_status''');
-        if (statusListRaw != null) {
-          final statusList =
-              (statusListRaw is List) ? statusListRaw : [statusListRaw];
-          debugPrint('     Revisando ${statusList.length} status en step');
-
-          for (var status in statusList) {
-            final statusNameField =
-                getJsonField(status, r'''$.name_status''')?.toString() ?? '';
-            debugPrint('       - Status: "$statusNameField"');
-
-            if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
-              targetStatus = status;
-              targetStatusId =
-                  getJsonField(status, r'''$.id_activity_status''')?.toInt();
-              targetStatusType = getJsonField(status, r'''$.type_status''')
-                  ?.toString()
-                  .toLowerCase();
-              debugPrint(
-                  '       ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
-              break;
-            }
-          }
-          if (targetStatus != null) break;
+    void searchInStatus(dynamic status) {
+      if (targetStatus != null) return;
+      // JSON usa "status_name" (no "name_status")
+      final name = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+      if (name.toLowerCase() == fieldName.toLowerCase()) {
+        targetStatus = status;
+        targetStatusId = getJsonField(status, r'''$.id_activity_status''')?.toInt();
+        targetStatusType = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase();
+        debugPrint('       ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
+        return;
+      }
+      // Recursivo: status hijos (activities_status_childs)
+      final statusChilds = getJsonField(status, r'''$.activities_status_childs''')?.toList() ?? [];
+      for (var cs in statusChilds) {
+        if (targetStatus != null) return;
+        searchInStatus(cs);
+      }
+      // Recursivo: steps hijos → cada step tiene activities_status
+      final stepsChilds = getJsonField(status, r'''$.activities_steps_childs''')?.toList() ?? [];
+      for (var childStep in stepsChilds) {
+        if (targetStatus != null) return;
+        final childList = getJsonField(childStep, r'''$.activities_status''')?.toList() ?? [];
+        for (var cs in childList) {
+          searchInStatus(cs);
         }
       }
     }
 
-    // Si no se encuentra en steps, buscar en root status (activity_status)
+    // Buscar en activity_steps → statuses via $.activities_status
+    final activityStepsRaw =
+        getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+
+    if (activityStepsRaw != null) {
+      final activitySteps =
+          (activityStepsRaw is List) ? activityStepsRaw : [activityStepsRaw];
+
+      for (var step in activitySteps) {
+        if (targetStatus != null) break;
+        final statusListRaw = getJsonField(step, r'''$.activities_status''');
+        if (statusListRaw != null) {
+          final statusList =
+              (statusListRaw is List) ? statusListRaw : [statusListRaw];
+          for (var status in statusList) {
+            searchInStatus(status);
+            if (targetStatus != null) break;
+          }
+        }
+      }
+    }
+
+    // Buscar en root activity_status (singular — es la clave correcta en raíz)
     if (targetStatus == null) {
       final rootStatusListRaw =
           getJsonField(FFAppState().currentActivity, r'''$.activity_status''');
-      debugPrint(
-          '   Buscando en activity_status: ${rootStatusListRaw != null ? "existe" : "null"}');
-
       if (rootStatusListRaw != null) {
         final rootStatusList = (rootStatusListRaw is List)
             ? rootStatusListRaw
             : [rootStatusListRaw];
-        debugPrint('   Buscando en ${rootStatusList.length} root status');
-
         for (var status in rootStatusList) {
-          final statusNameField =
-              getJsonField(status, r'''$.name_status''')?.toString() ?? '';
-          debugPrint('     - Root status: "$statusNameField"');
-
-          if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
-            targetStatus = status;
-            targetStatusId =
-                getJsonField(status, r'''$.id_activity_status''')?.toInt();
-            targetStatusType = getJsonField(status, r'''$.type_status''')
-                ?.toString()
-                .toLowerCase();
-            debugPrint(
-                '     ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
-            break;
-          }
+          if (targetStatus != null) break;
+          searchInStatus(status);
         }
       }
     }
@@ -13009,63 +13617,308 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         '📌 Campo encontrado: $fieldName (id: $targetStatusId, tipo: $targetStatusType)');
 
     // Según el tipo de status, obtener el valor apropiado
+    // Nota: se usa targetStatusId! porque ya se verificó != null arriba.
+    // Dart pierde el type promotion cuando la variable es capturada por un closure.
+    final sid = targetStatusId!;
+
     switch (targetStatusType) {
       case 'date':
-        return _getDateValue(targetStatusId);
+        return _getDateValue(sid);
 
       case 'time':
-        return _getTimeValue(targetStatusId);
+        return _getTimeValue(sid);
 
       case 'tag-reader':
-        return _getTagReaderPlainText(targetStatusId);
+        return _getTagReaderPlainText(sid);
+
+      case 'tag-transfer-adb-server':
+        return _getAdbServerDestinationValue(sid);
 
       case 'distance-extractor':
-        return _getDistanceExtractorValue(targetStatusId);
+        return _getDistanceExtractorValue(sid);
 
       case 'number':
-        return _getNumberValue(targetStatusId);
+        return _getNumberValue(sid);
 
       case 'numbers-operation':
-        return _getNumbersOperationValue(targetStatusId);
+        return _getNumbersOperationValue(sid);
 
       case 'label-info':
-        // Para label-info, retornar el contenido de default_status
         final defaultStatus =
-            getJsonField(targetStatus, r'''$.default_status''')?.toString() ??
-                '';
+            getJsonField(targetStatus, r'''$.default_status''')?.toString() ?? '';
         return defaultStatus.isNotEmpty ? defaultStatus : '[Sin información]';
 
       case 'text':
-        // Para text, obtener de visitDetails
-        final detail = FFAppState().visitDetails.firstWhere(
-              (d) => d.idActivityStatus == targetStatusId,
+        final detailText = FFAppState().visitDetails.firstWhere(
+              (d) => d.idActivityStatus == sid,
               orElse: () => VisitsDetailsStruct(),
             );
-        return detail.statusResponse.isNotEmpty
-            ? detail.statusResponse
+        return detailText.statusResponse.isNotEmpty
+            ? detailText.statusResponse
             : '[$fieldName]';
 
       case 'unique-list':
       case 'reference-list':
-        // Para listas, obtener la opción seleccionada desde statusResponse
-        final detail = FFAppState().visitDetails.firstWhere(
-              (d) => d.idActivityStatus == targetStatusId,
+        final detailList = FFAppState().visitDetails.firstWhere(
+              (d) => d.idActivityStatus == sid,
               orElse: () => VisitsDetailsStruct(),
             );
-        // Para reference-list (type_status), statusResponse contiene el nombre seleccionado (e.g., "WISTON HERNAN QUIÑONES ORTIZ")
-        return detail.statusResponse.isNotEmpty
-            ? detail.statusResponse
+        return detailList.statusResponse.isNotEmpty
+            ? detailList.statusResponse
             : '[$fieldName]';
 
       default:
-        // Para otros tipos, obtener de visitDetails
-        final detail = FFAppState().visitDetails.firstWhere(
-              (d) => d.statusOption.toLowerCase() == fieldName.toLowerCase(),
+        // Para cualquier otro tipo buscar por idActivityStatus
+        final detailDefault = FFAppState().visitDetails.firstWhere(
+              (d) => d.idActivityStatus == sid,
               orElse: () => VisitsDetailsStruct(),
             );
-        return detail.statusResponse.isNotEmpty
-            ? detail.statusResponse
+        return detailDefault.statusResponse.isNotEmpty
+            ? detailDefault.statusResponse
             : '[$fieldName]';
+    }
+  }
+
+  /// Extrae un sub-campo del JSON NFC de un status tag-reader/tag-writer/tag-transfer.
+  /// Uso: {NombreCampo.subPath} en el HTML template.
+  Future<String> _getNfcJsonSubfieldValue(String baseField, String subPath) async {
+    debugPrint('🔎 NFC subfield: "$baseField.$subPath"');
+
+    // Búsqueda recursiva por name_status == baseField
+    int? targetStatusId;
+    String? targetStatusType;
+
+    void searchNfcStatus(dynamic status) {
+      if (targetStatusId != null) return;
+      // JSON usa "status_name" (no "name_status")
+      final name = getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+      if (name.toLowerCase() == baseField.toLowerCase()) {
+        targetStatusId = getJsonField(status, r'''$.id_activity_status''')?.toInt();
+        targetStatusType = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase();
+        return;
+      }
+      // Recursivo: status hijos
+      final statusChilds = getJsonField(status, r'''$.activities_status_childs''')?.toList() ?? [];
+      for (var cs in statusChilds) {
+        if (targetStatusId != null) return;
+        searchNfcStatus(cs);
+      }
+      // Recursivo: steps hijos
+      final stepsChilds = getJsonField(status, r'''$.activities_steps_childs''')?.toList() ?? [];
+      for (var childStep in stepsChilds) {
+        if (targetStatusId != null) return;
+        final childList = getJsonField(childStep, r'''$.activities_status''')?.toList() ?? [];
+        for (var cs in childList) { searchNfcStatus(cs); }
+      }
+    }
+
+    final stepsRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+    if (stepsRaw != null) {
+      final steps = stepsRaw is List ? stepsRaw : [stepsRaw];
+      for (var step in steps) {
+        if (targetStatusId != null) break;
+        final sl = getJsonField(step, r'''$.activities_status''');
+        if (sl != null) {
+          for (var s in (sl is List ? sl : [sl])) {
+            searchNfcStatus(s);
+          }
+        }
+      }
+    }
+    if (targetStatusId == null) {
+      final rootRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_status''');
+      if (rootRaw != null) {
+        for (var s in (rootRaw is List ? rootRaw : [rootRaw])) {
+          searchNfcStatus(s);
+        }
+      }
+    }
+
+    if (targetStatusId == null || targetStatusType == null) {
+      debugPrint('⚠️ NFC subfield: campo "$baseField" no encontrado');
+      return '[$baseField.$subPath]';
+    }
+
+    const nfcTypes = {
+      'tag-reader', 'tag-writer', 'tag-transfer',
+      'tag-transfer-adb-server', 'tag-transfer-adb-from',
+    };
+    if (!nfcTypes.contains(targetStatusType)) {
+      debugPrint('⚠️ NFC subfield: tipo "$targetStatusType" no soportado');
+      return '[$baseField.$subPath]';
+    }
+
+    // Obtener raw JSON: primero visitDetails, luego fallback a _adbServerCardsRawJson
+    // (tag-transfer-adb-server guarda el JSON en estado local, no en visitDetails)
+    String rawJson = FFAppState().visitDetails
+        .where((d) => d.idActivityStatus == targetStatusId)
+        .firstOrNull
+        ?.statusResponse ?? '';
+
+    debugPrint('🔎 NFC subfield: statusId=$targetStatusId type=$targetStatusType rawJson.len=${rawJson.length}');
+
+    if (rawJson.isEmpty) {
+      final sid = targetStatusId!;
+      final cards = _adbServerCardsRawJson[sid];
+      debugPrint('🔎 NFC fallback ADB: adbServerCards[$sid]=${cards?.length ?? "null"} entries');
+      if (cards != null && cards.isNotEmpty) {
+        final idx = _selectedAdbTagIndex.clamp(0, cards.length - 1);
+        rawJson = cards[idx];
+        debugPrint('🔎 NFC fallback ADB: usando card[$idx], len=${rawJson.length}');
+      }
+    }
+
+    if (rawJson.isEmpty) {
+      debugPrint('⚠️ NFC subfield: statusResponse vacío para "$baseField" (statusId=$targetStatusId)');
+      return '[$baseField.$subPath]';
+    }
+
+    final nfcJson = actions.parseNfcJson(rawJson);
+    if (nfcJson == null) {
+      debugPrint('⚠️ NFC subfield: JSON inválido para "$baseField"');
+      return '[$baseField.$subPath]';
+    }
+
+    final readInfo = nfcJson['Read_info'] as Map<String, dynamic>?;
+
+    switch (subPath.toLowerCase()) {
+      case 'us':
+        final usId = readInfo?['US'];
+        if (usId == null) return '[Sin operador]';
+        try {
+          final usRows = await globalDb.executeOperation((db) async {
+            return await db.query(
+              'Users',
+              columns: ['Name_user'],
+              where: 'Id_user = ?',
+              whereArgs: [usId],
+              limit: 1,
+            );
+          });
+          if (usRows.isNotEmpty) {
+            final name = usRows.first['Name_user'] as String?;
+            if (name != null && name.isNotEmpty) return name;
+          }
+        } catch (_) {}
+        return 'ID $usId';
+
+      case 'tag_from':
+        return (readInfo?['tag_from'] as String? ?? '').isNotEmpty
+            ? (readInfo!['tag_from'] as String)
+            : '[Sin tag origen]';
+
+      case 'tag_to':
+        final rawTagTo = (readInfo?['tag_to'] as String? ?? '').trim();
+        if (rawTagTo.isEmpty) return '[Sin tag destino]';
+        final cachedName = _productByRfidCache[rawTagTo];
+        if (cachedName == null) {
+          unawaited(_loadProductByRfid(rawTagTo));
+          return rawTagTo;
+        }
+        return cachedName.isNotEmpty ? '$cachedName ($rawTagTo)' : rawTagTo;
+
+      case 'date_created':
+        final raw = readInfo?['Date_created'] as String?;
+        if (raw == null || raw.isEmpty) return '[Sin fecha]';
+        try {
+          final dt = DateTime.parse(raw);
+          return '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year} '
+              '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+        } catch (_) {
+          return raw;
+        }
+
+      case 'name_product':
+        return readInfo?['Name_product'] as String? ?? '[Sin producto]';
+
+      case 'rfid':
+        return readInfo?['RFID'] as String? ?? '[Sin RFID]';
+
+      case 'visits':
+        final visitsList = nfcJson['Visits'] as List?;
+        if (visitsList == null || visitsList.isEmpty) {
+          return '<div>[Sin visitas]</div>';
+        }
+
+        // Pre-cargar nombres de cargueros desde SQLite (un query por ID único)
+        final uniqueOpIds = visitsList
+            .whereType<Map<String, dynamic>>()
+            .map((v) => v['OP'])
+            .where((id) => id != null)
+            .map((id) => (id as num).toInt())
+            .toSet();
+        final opNames = <int, String>{};
+        for (final opId in uniqueOpIds) {
+          try {
+            final rows = await globalDb.executeOperation((db) async {
+              return await db.query(
+                'Users',
+                columns: ['Name_user'],
+                where: 'Id_user = ?',
+                whereArgs: [opId],
+                limit: 1,
+              );
+            });
+            if (rows.isNotEmpty) {
+              final name = rows.first['Name_user'] as String?;
+              if (name != null && name.isNotEmpty) opNames[opId] = name;
+            }
+          } catch (_) {}
+        }
+
+        final buffer = StringBuffer();
+        for (final v in visitsList) {
+          if (v is! Map<String, dynamic>) continue;
+
+          String dhFormatted = '';
+          try {
+            final dh = DateTime.parse(v['DH'] as String? ?? '');
+            dhFormatted = '${dh.day.toString().padLeft(2,'0')}/${dh.month.toString().padLeft(2,'0')}/${dh.year} '
+                '${dh.hour.toString().padLeft(2,'0')}:${dh.minute.toString().padLeft(2,'0')}';
+          } catch (_) {
+            dhFormatted = v['DH']?.toString() ?? '';
+          }
+
+          final opId = v['OP'] != null ? (v['OP'] as num).toInt() : null;
+          final opName = opId != null ? (opNames[opId] ?? 'ID $opId') : '';
+
+          final heId = v['HE'] != null ? (v['HE'] as num).toInt() : 0;
+          String loteName = 'Lote #$heId';
+          if (heId > 0) {
+            try {
+              final hqRows = await globalDb.executeOperation((db) async {
+                return await db.query(
+                  'Headquarters',
+                  columns: ['Name_headquarter'],
+                  where: 'Id_headquarter = ?',
+                  whereArgs: [heId],
+                  limit: 1,
+                );
+              });
+              if (hqRows.isNotEmpty) {
+                final name = hqRows.first['Name_headquarter'] as String?;
+                if (name != null && name.isNotEmpty) loteName = name;
+              }
+            } catch (_) {}
+          }
+
+          final visits = v['VISITS'] ?? 0;
+          final results = v['RESULTS'] ?? 0;
+
+          buffer.write(
+            '<div style="border-bottom:1px dashed #ccc;padding:3px 0;">'
+            '<div>Fecha: $dhFormatted</div>'
+            '<div>Carguero: $opName</div>'
+            '<div>Visitas: $visits&nbsp;&nbsp;Racimos: $results</div>'
+            '<div>Lote: $loteName</div>'
+            '</div>',
+          );
+        }
+        return buffer.toString();
+
+      default:
+        debugPrint('⚠️ NFC subfield: subPath "$subPath" no reconocido');
+        return '[$baseField.$subPath]';
     }
   }
 
@@ -13099,6 +13952,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         detail.statusResponse.startsWith('=')) {
       return '[Sin hora]';
     }
+
+    // Parsear formato Flutter TimeOfDay(HH:MM) → "HH:MM"
+    final todMatch =
+        RegExp(r'TimeOfDay\((\d{1,2}:\d{2})\)').firstMatch(detail.statusResponse);
+    if (todMatch != null) return todMatch.group(1)!;
 
     return detail.statusResponse;
   }
@@ -13191,38 +14049,87 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     return text.toString().trim();
   }
 
-  String _getDistanceExtractorValue(int statusId) {
-    if (!_distanceExtractorCalculated.containsKey(statusId)) {
-      return '[Sin calcular]';
+  /// Renderiza el placeholder {NombreCampo} de un status tag-transfer-adb-server:
+  /// RFID destino (con fallback a RFID origen) + lista HTML de visits_details inyectados.
+  String _getAdbServerDestinationValue(int statusId) {
+    final cards = _adbServerCardsRawJson[statusId];
+    if (cards == null || cards.isEmpty) {
+      return '[Sin tag de destino]';
     }
 
+    final selectedIndex = _selectedAdbTagIndex.clamp(0, cards.length - 1);
+    final rawJson = cards[selectedIndex];
+
+    String destRfid = '';
+    List<Map<String, dynamic>> formStatusDetails = const [];
+    try {
+      final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
+      final readInfo = decoded['Read_info'] as Map<String, dynamic>?;
+      final tagTo = (readInfo?['tag_to'] as String? ?? '').trim();
+      final rfid = (readInfo?['RFID'] as String? ?? '').trim();
+      destRfid = tagTo.isNotEmpty ? tagTo : rfid;
+
+      final statusBlock = decoded['status'] as Map<String, dynamic>?;
+      final details = statusBlock?['visits_details'] as List<dynamic>?;
+      if (details != null) {
+        formStatusDetails =
+            details.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      }
+    } catch (_) {}
+
+    final buffer = StringBuffer();
+    buffer.write(destRfid.isNotEmpty ? destRfid : '[Sin tag de destino]');
+
+    for (final d in formStatusDetails) {
+      final option = (d['status_option'] ?? '').toString();
+      final response = (d['status_response'] ?? '').toString();
+      if (option.isEmpty && response.isEmpty) continue;
+      buffer.write('<div>$option: $response</div>');
+    }
+
+    return buffer.toString();
+  }
+
+  String _getDistanceExtractorValue(int statusId) {
+    // Fuente principal: valor numérico en memoria (metros).
+    final meters = _calculatedDistances[statusId];
+    if (meters != null && meters > 0) {
+      return '${(meters / 1000.0).toStringAsFixed(2)} km';
+    }
+
+    // Fallback: extraer distanceFromTag del JSON serializado en visitDetails
+    // (el auto-save guarda {distanceFromTag, distancesFromProducts} como JSON).
     final detail = FFAppState().visitDetails.firstWhere(
           (d) => d.idActivityStatus == statusId,
           orElse: () => VisitsDetailsStruct(),
         );
-
-    if (detail.statusResponse.isEmpty) {
-      return '[Sin distancia]';
+    if (detail.statusResponse.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(detail.statusResponse);
+        if (decoded is Map && decoded['distanceFromTag'] != null) {
+          final m = (decoded['distanceFromTag'] as num).toDouble();
+          if (m > 0) return '${(m / 1000.0).toStringAsFixed(2)} km';
+        }
+      } catch (_) {}
     }
 
-    // Extraer solo el número de km
-    try {
-      final distanceKm = double.parse(detail.statusResponse);
-      return '${distanceKm.toStringAsFixed(2)} km';
-    } catch (e) {
-      return detail.statusResponse;
-    }
+    return '[Sin calcular]';
   }
 
   String _getNumberValue(int statusId) {
-    // Buscar el nombre del status para obtener el valor
     final detail = FFAppState().visitDetails.firstWhere(
           (d) => d.idActivityStatus == statusId,
           orElse: () => VisitsDetailsStruct(),
         );
 
-    if (detail.statusOption.isEmpty) {
-      return '0';
+    if (detail.statusOption.isEmpty) return '0';
+
+    // Campos RANDOM: valor guardado en statusResponse (no pasa por text controller)
+    if (detail.defaultStatus.toUpperCase().contains('=RANDOM:') &&
+        detail.statusResponse.isNotEmpty) {
+      final parsed = double.tryParse(detail.statusResponse);
+      if (parsed != null) return _formatColombianNumber(parsed);
+      return detail.statusResponse;
     }
 
     final currentValue = _statusValuesByName[detail.statusOption] ?? 0.0;
@@ -13280,6 +14187,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final rawJsons = _tagReaderRawJsons[statusId];
     final isMulti = rawJsons != null && rawJsons.length > 1;
 
+    List<Map<String, dynamic>> parseVisitsDetails(String raw) {
+      try {
+        final decoded = jsonDecode(raw) as Map<String, dynamic>;
+        final status = decoded['status'] as Map<String, dynamic>?;
+        final details = status?['visits_details'] as List<dynamic>?;
+        if (details != null) {
+          return details.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      } catch (_) {}
+      return [];
+    }
+
     if (isMulti) {
       // Modo NO_REMOVE: una sección por cada tag leído
       return Column(
@@ -13294,6 +14213,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             tagIndex: index + 1,
             statusId: statusId,
             isAdbServer: isAdbServer,
+            visitsDetails: parseVisitsDetails(raw),
           );
         }).toList(),
       );
@@ -13302,12 +14222,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     // Modo normal (un solo tag): comportamiento original
     final tagData = _tagReaderData[statusId] ?? [];
     if (tagData.isEmpty) return const SizedBox.shrink();
+    final singleRaw = rawJsons?.isNotEmpty == true ? rawJsons!.first : '';
     return _buildTagReaderSummarySection(
       sectionData: tagData,
       productName: _tagReaderProductName[statusId] ?? '',
       tagIndex: 0,
       statusId: statusId,
       isAdbServer: isAdbServer,
+      visitsDetails: singleRaw.isNotEmpty ? parseVisitsDetails(singleRaw) : [],
     );
   }
 
@@ -13317,6 +14239,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     required int tagIndex,
     required int statusId,
     bool isAdbServer = false,
+    List<Map<String, dynamic>> visitsDetails = const [],
   }) {
     if (sectionData.isEmpty) return const SizedBox.shrink();
 
@@ -13372,6 +14295,53 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         ),
         const SizedBox(height: 12),
         ...groupedByHeadquarter.entries.map((entry) => _buildHeadquarterGroup(entry.key, entry.value)),
+        if (visitsDetails.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          Divider(height: 1, thickness: 1, color: Colors.white.withValues(alpha: 0.15)),
+          const SizedBox(height: 8),
+          ...visitsDetails.map((detail) {
+            final option = detail['status_option']?.toString() ?? '';
+            final response = detail['status_response']?.toString() ?? '';
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF42A5F5).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(Icons.label_outline_rounded, size: 13, color: Color(0xFF42A5F5)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    '$option: ',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white.withValues(alpha: 0.55),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      response,
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ],
     );
 
@@ -13543,29 +14513,41 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              const TextSpan(
-                                text: 'Lote: ',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFFFBBF24),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Lote: ',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFFBBF24),
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: loteName,
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              TextSpan(
-                                text: loteName,
-                                style: const TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 6),
+                            _CopyValueButton(
+                              value: loteName,
+                              semanticLabel: 'Copiar nombre del lote',
+                            ),
+                          ],
                         ),
                         const SizedBox(height: 6),
                         Row(
@@ -13643,6 +14625,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                         color: Colors.white,
                                       ),
                                     ),
+                                    const SizedBox(width: 4),
+                                    _CopyValueButton(
+                                      value: '$totalResults',
+                                      semanticLabel:
+                                          'Copiar racimos del lote',
+                                      iconSize: 11,
+                                    ),
                                   ],
                                 ),
                               ),
@@ -13717,30 +14706,42 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Nombre del operador principal (OP) con prefijo Recolector
-                        RichText(
-                          text: TextSpan(
-                            children: [
-                              const TextSpan(
-                                text: 'Recolector: ',
-                                style: TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFFFBBF24),
+                        // Nombre del operador principal (OP) con prefijo Carguero
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Carguero: ',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Color(0xFFFBBF24),
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: operatorName.toUpperCase(),
+                                      style: const TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              TextSpan(
-                                text: operatorName.toUpperCase(),
-                                style: const TextStyle(
-                                  fontFamily: 'Roboto',
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(width: 6),
+                            _CopyValueButton(
+                              value: operatorName.toUpperCase(),
+                              semanticLabel: 'Copiar carguero',
+                            ),
+                          ],
                         ),
                         // Cortero eliminado del resumen
                         const SizedBox(height: 6),
@@ -13811,6 +14812,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                       fontWeight: FontWeight.bold,
                                       color: Colors.white.withValues(alpha: 0.9),
                                     ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  _CopyValueButton(
+                                    value: '$totalResults',
+                                    semanticLabel:
+                                        'Copiar racimos del carguero',
+                                    iconSize: 12,
                                   ),
                                 ],
                               ),
@@ -14182,12 +15190,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Nombre del operador principal (OP) con prefijo Recolector
+                        // Nombre del operador principal (OP) con prefijo Carguero
                         RichText(
                           text: TextSpan(
                             children: [
                               const TextSpan(
-                                text: 'Recolector: ',
+                                text: 'Carguero: ',
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
                                   fontSize: 14,
@@ -14291,6 +15299,60 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         ],
       ),
     );
+  }
+
+  List<String> _getUnresolvedStatuses({required int skipStatusId}) {
+    const skipTypes = {
+      'step',
+      'tag-transfer',
+      'tag-transfer-adb-server',
+      'tag-transfer-adb-from',
+      'dynamic-printing',
+      'dynamic-printing-adb',
+    };
+    final unresolved = <String>[];
+
+    void checkStatus(dynamic status) {
+      final type = getJsonField(status, r'''$.type_status''')
+              ?.toString()
+              .toLowerCase() ??
+          '';
+      final id =
+          getJsonField(status, r'''$.id_activity_status''') as int? ?? 0;
+      final name =
+          getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+      if (!skipTypes.contains(type) && id != skipStatusId && id != 0) {
+        final hasValue = FFAppState()
+            .visitDetails
+            .any((d) => d.idActivityStatus == id && d.statusResponse.isNotEmpty);
+        if (!hasValue) unresolved.add(name.isNotEmpty ? name : 'ID $id');
+      }
+      for (var step
+          in (getJsonField(status, r'''$.steps_childs''')?.toList() ?? [])) {
+        for (var s
+            in (getJsonField(step, r'''$.activity_status''')?.toList() ?? [])) {
+          checkStatus(s);
+        }
+      }
+      for (var s
+          in (getJsonField(status, r'''$.status_childs''')?.toList() ?? [])) {
+        checkStatus(s);
+      }
+    }
+
+    final activity = FFAppState().currentActivity;
+    for (var s
+        in (getJsonField(activity, r'''$.activity_status''')?.toList() ?? [])) {
+      checkStatus(s);
+    }
+    for (var step
+        in (getJsonField(activity, r'''$.activity_steps''')?.toList() ?? [])) {
+      for (var s
+          in (getJsonField(step, r'''$.activity_status''')?.toList() ?? [])) {
+        checkStatus(s);
+      }
+    }
+    return unresolved;
   }
 
   // ===== RESUMEN DEL TAG TRANSFER AGRUPADO POR LOTE =====
@@ -14466,8 +15528,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   return;
                 }
 
-                // Extraer TYPE_PRODUCT_FINISH para título dinámico del diálogo de destino
+                // Extraer TYPE_PRODUCT_FINISH y WRITER_STATUS para título dinámico y validación
                 String? destinationTitle;
+                bool writerStatus = false;
                 for (var detail in FFAppState().visitDetails) {
                   if (detail.idActivityStatus == statusId) {
                     final defaultStatus = detail.defaultStatus;
@@ -14479,7 +15542,54 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       destinationTitle = 'Escribir $typeProductFinish de destino';
                       debugPrint('📦 TAG-TRANSFER: Título dinámico destino: $destinationTitle');
                     }
+                    if (RegExp(r'WRITER_STATUS\s*=\s*TRUE')
+                        .hasMatch(defaultStatus.toUpperCase())) {
+                      writerStatus = true;
+                      debugPrint('📋 TAG-TRANSFER: WRITER_STATUS=true detectado');
+                    }
                     break;
+                  }
+                }
+
+                // Si WRITER_STATUS=true, validar que todos los campos del formulario estén resueltos
+                if (writerStatus) {
+                  final unresolved =
+                      _getUnresolvedStatuses(skipStatusId: statusId);
+                  if (unresolved.isNotEmpty) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                          'Completa estos campos antes de transferir:\n• ${unresolved.join('\n• ')}',
+                          style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.w600),
+                        ),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 5),
+                      ));
+                    }
+                    return;
+                  }
+                }
+
+                // Si WRITER_STATUS=true, inyectar los status del formulario en el JSON del tag
+                String contentToTransfer = sourceTagContent;
+                if (writerStatus) {
+                  final srcJson = actions.parseNfcJson(sourceTagContent);
+                  if (srcJson != null) {
+                    final visitDetailsForForm = FFAppState()
+                        .visitDetails
+                        .where((d) => d.idActivityStatus != statusId)
+                        .map((d) => {
+                              'id_activity_status': d.idActivityStatus,
+                              'status_option': d.statusOption,
+                              'status_response': d.statusResponse,
+                            })
+                        .toList();
+                    srcJson['status'] = {'visits_details': visitDetailsForForm};
+                    contentToTransfer = jsonEncode(srcJson);
+                    debugPrint(
+                        '📋 WRITER_STATUS: ${visitDetailsForForm.length} status inyectados en JSON');
                   }
                 }
 
@@ -14493,7 +15603,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       insetPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
                       child: NfcTransferWriteDialogWidget(
-                        sourceTagContent: sourceTagContent,
+                        sourceTagContent: contentToTransfer,
                         destinationTitle: destinationTitle,
                       ),
                     );
@@ -14886,12 +15996,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Nombre del operador principal (OP) con prefijo Recolector
+                        // Nombre del operador principal (OP) con prefijo Carguero
                         RichText(
                           text: TextSpan(
                             children: [
                               const TextSpan(
-                                text: 'Recolector: ',
+                                text: 'Carguero: ',
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
                                   fontSize: 14,
@@ -15094,16 +16204,29 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Valor calculado con sufijo (siempre visible)
-                  Center(
-                    child: Text(
-                      displayValue,
-                      style: TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                        color: valueColor,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          displayValue,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                            color: valueColor,
+                          ),
+                        ),
                       ),
-                    ),
+                      const SizedBox(width: 10),
+                      _CopyValueButton(
+                        value: _formatColombianNumber(calculatedValue),
+                        semanticLabel: 'Copiar resultado calculado',
+                        iconSize: 14,
+                      ),
+                    ],
                   ),
                   // Fórmula (solo visible si se hace long press)
                   if (_showFormulaForOperation[statusId] == true) ...[
@@ -15184,6 +16307,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
             ),
           ),
+          if (defaultStatus.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            _CopyValueButton(
+              value: defaultStatus,
+              semanticLabel: 'Copiar información',
+              iconSize: 14,
+            ),
+          ],
         ],
       ),
     );
@@ -16197,13 +17328,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           children: [
             Icon(Icons.social_distance_rounded, size: 16, color: Colors.white.withValues(alpha: 0.4)),
             const SizedBox(width: 8),
-            Text(
-              'Esperando lectura de TAG para calcular distancia...',
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.45),
-                fontStyle: FontStyle.italic,
+            Expanded(
+              child: Text(
+                'Esperando lectura de TAG para calcular distancia...',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  color: Colors.white.withValues(alpha: 0.45),
+                  fontStyle: FontStyle.italic,
+                ),
               ),
             ),
           ],
@@ -16244,7 +17377,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             ],
           ),
           const SizedBox(height: 10),
-          // OPCIÓN 1: Desde TAG
+          // NIVEL 1: Desde TAG
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
@@ -16252,15 +17385,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Desde TAG',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 11,
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w600,
+                Expanded(
+                  child: Text(
+                    'Desde TAG',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 Text(
@@ -16272,25 +17406,40 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     color: Colors.white,
                   ),
                 ),
+                const SizedBox(width: 8),
+                _CopyValueButton(
+                  value: distanceFromTagKm.toStringAsFixed(2),
+                  semanticLabel: 'Copiar distancia desde TAG',
+                ),
               ],
             ),
           ),
-          // OPCIÓN 2: Desde Productos (una fila por cada lote)
-          if (distancesFromProducts != null &&
-              distancesFromProducts.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            // Título de la sección
-            Text(
-              'Desde Productos:',
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 11,
-                color: Colors.white.withValues(alpha: 0.7),
-                fontWeight: FontWeight.w600,
-              ),
+          // NIVEL 2: Desde Productos (siempre visible — árbol expandido por defecto)
+          const SizedBox(height: 8),
+          Text(
+            'Desde Productos:',
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 11,
+              color: Colors.white.withValues(alpha: 0.7),
+              fontWeight: FontWeight.w600,
             ),
-            const SizedBox(height: 4),
-            // Lista de distancias por lote
+          ),
+          const SizedBox(height: 4),
+          if (distancesFromProducts == null || distancesFromProducts.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 12, top: 2, bottom: 2),
+              child: Text(
+                'Sin distancias calculadas por producto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 10,
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            )
+          else
             ...distancesFromProducts.map((item) {
               final loteName = item['headquarterName'] as String;
               final distance = item['distance'] as double;
@@ -16299,7 +17448,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               final distanceKm = distance / 1000;
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.only(left: 12, bottom: 4),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -16308,7 +17457,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
                         child: Column(
@@ -16347,12 +17495,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           color: Colors.white,
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      _CopyValueButton(
+                        value: distanceKm.toStringAsFixed(2),
+                        semanticLabel: 'Copiar distancia a $loteName',
+                        iconSize: 12,
+                      ),
                     ],
                   ),
                 ),
               );
             }),
-          ],
         ],
       ),
     );
@@ -16651,6 +17804,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      _CopyValueButton(
+                        value: _formatDecimal(grandTotal),
+                        semanticLabel: 'Copiar peso calculado',
+                        iconSize: 13,
+                      ),
                     ],
                   ),
                 ],
@@ -16785,6 +17944,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 ),
                               ),
                             ),
+                            const SizedBox(width: 8),
+                            _CopyValueButton(
+                              value: _formatDecimal(calculatedWeight),
+                              semanticLabel: 'Copiar peso calculado del lote',
+                              iconSize: 12,
+                            ),
                           ],
                         ),
                       ],
@@ -16819,13 +17984,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         letterSpacing: 0.8,
                       ),
                     ),
-                    Text(
-                      '${_formatDecimal(grandTotal)} kg',
-                      style: const TextStyle(
-                        fontFamily: 'Roboto',
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                    const SizedBox(width: 4),
+                    Flexible(
+                      child: Text(
+                        '${_formatDecimal(grandTotal)} kg',
+                        textAlign: TextAlign.right,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   ],
@@ -16995,14 +18165,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   ],
                 ),
                 const SizedBox(height: 8),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
                   children: [
                     _buildDistBadge(
                       label: 'Peso neto',
                       value: '${_formatDecimal(pesoNeto)} kg',
                       color: const Color(0xFFD97706),
                     ),
-                    const SizedBox(width: 8),
                     _buildDistBadge(
                       label: 'Factor',
                       value: factor.toStringAsFixed(4),
@@ -17047,6 +18218,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         Expanded(
                           child: Text(
                             hqName,
+                            overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                               fontFamily: 'Roboto',
                               fontSize: 14,
@@ -17055,18 +18227,27 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                             ),
                           ),
                         ),
-                        _buildDistBadge(
-                          label: '',
-                          value: '$totalResults rac.',
-                          color: const Color(0xFF2196F3).withValues(alpha: 0.7),
-                          compact: true,
-                        ),
                         const SizedBox(width: 6),
-                        _buildDistBadge(
-                          label: '',
-                          value: '${_formatDecimal(pesoAsignado)} kg',
-                          color: const Color(0xFFD97706).withValues(alpha: 0.7),
-                          compact: true,
+                        Flexible(
+                          child: Wrap(
+                            alignment: WrapAlignment.end,
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              _buildDistBadge(
+                                label: '',
+                                value: '$totalResults rac.',
+                                color: const Color(0xFF2196F3).withValues(alpha: 0.7),
+                                compact: true,
+                              ),
+                              _buildDistBadge(
+                                label: '',
+                                value: '${_formatDecimal(pesoAsignado)} kg',
+                                color: const Color(0xFFD97706).withValues(alpha: 0.7),
+                                compact: true,
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -17095,6 +18276,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 children: [
                                   Text(
                                     displayName,
+                                    overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(
                                       fontFamily: 'Roboto',
                                       fontSize: 13,
@@ -17105,6 +18287,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                   if (op2Name.isNotEmpty)
                                     Text(
                                       'Cortero: $op2Name',
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(
                                         fontFamily: 'Roboto',
                                         fontSize: 11,
@@ -17114,18 +18297,27 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 ],
                               ),
                             ),
-                            _buildDistBadge(
-                              label: '',
-                              value: '$opResults rac.',
-                              color: const Color(0xFF2196F3).withValues(alpha: 0.5),
-                              compact: true,
-                            ),
                             const SizedBox(width: 6),
-                            _buildDistBadge(
-                              label: '',
-                              value: '${_formatDecimal(pesoOp)} kg',
-                              color: const Color(0xFFD97706).withValues(alpha: 0.5),
-                              compact: true,
+                            Flexible(
+                              child: Wrap(
+                                alignment: WrapAlignment.end,
+                                spacing: 6,
+                                runSpacing: 4,
+                                children: [
+                                  _buildDistBadge(
+                                    label: '',
+                                    value: '$opResults rac.',
+                                    color: const Color(0xFF2196F3).withValues(alpha: 0.5),
+                                    compact: true,
+                                  ),
+                                  _buildDistBadge(
+                                    label: '',
+                                    value: '${_formatDecimal(pesoOp)} kg',
+                                    color: const Color(0xFFD97706).withValues(alpha: 0.5),
+                                    compact: true,
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -17148,8 +18340,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 bottomRight: Radius.circular(10),
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            child: Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 6,
               children: [
                 const Text(
                   'TOTAL DISTRIBUIDO:',
@@ -17161,7 +18356,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                     letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(width: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
@@ -17239,160 +18433,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     );
   }
 
-  /// Muestra la fórmula evaluada INLINE para headquarter-weight
-  Widget _buildHeadquarterWeightInlineDisplay({
-    required int statusId,
-    required dynamic status,
-  }) {
-    final data = _calculatedHeadquarterWeights[statusId];
-    if (data == null) return const SizedBox.shrink();
-
-    final evaluatedFormula = data['evaluatedFormula'] as String? ?? '';
-    if (evaluatedFormula.isEmpty) return const SizedBox.shrink();
-
-    final lotes = data['lotes'] as List<dynamic>?;
-    final grandTotal = data['grandTotal'] as double? ?? 0.0;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B4332),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: const Color(0xFF451A03).withValues(alpha: 0.3),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Encabezado
-          Row(
-            children: [
-              const Icon(Icons.calculate_outlined, color: Color(0xFFD97706), size: 16),
-              const SizedBox(width: 6),
-              const Text(
-                'Peso por lote',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFFD97706),
-                ),
-              ),
-              const Spacer(),
-              // Total general
-              Text(
-                '${_formatDecimal(grandTotal)} kg total',
-                style: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          // Filas por lote
-          if (lotes != null && lotes.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ...lotes.map((lote) {
-              final m = lote as Map<String, dynamic>;
-              final loteName = m['headquarterName'] as String? ?? '';
-              final racimos = m['totalRacimos'] as int? ?? 0;
-              final weight = m['weight'] as double? ?? 0.0;
-              final evalF = m['evaluatedFormula'] as String? ?? '';
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFFD97706).withValues(alpha: 0.25),
-                      width: 1,
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Lote + racimos
-                      Row(
-                        children: [
-                          Text(
-                            loteName,
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF2196F3).withValues(alpha: 0.3),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              '$racimos racimos',
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${_formatDecimal(weight)} kg',
-                            style: const TextStyle(
-                              fontFamily: 'Roboto',
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFFD97706),
-                            ),
-                          ),
-                        ],
-                      ),
-                      // Fórmula evaluada pequeña
-                      if (evalF.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          evalF,
-                          style: TextStyle(
-                            fontFamily: 'Roboto Mono',
-                            fontSize: 10,
-                            color: Colors.white.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              );
-            }),
-          ] else ...[
-            // Fallback: una sola línea con la fórmula
-            const SizedBox(height: 6),
-            Text(
-              evaluatedFormula,
-              style: const TextStyle(
-                fontFamily: 'Roboto Mono',
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Colors.white,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   // ===== VISUALIZACIÓN DE FECHA Y HORA EN STATUS =====
 
   /// Muestra el valor de fecha seleccionado al lado del nombre del status
@@ -17442,17 +18482,30 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               width: 1,
             ),
           ),
-          child: Text(
-            formattedDate,
-            overflow: TextOverflow.ellipsis,
-            maxLines: 1,
-            style: const TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 0.2,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  formattedDate,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: const TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              _CopyValueButton(
+                value: formattedDate,
+                semanticLabel: 'Copiar fecha',
+                iconSize: 10,
+              ),
+            ],
           ),
         ),
       );
@@ -17524,15 +18577,26 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               width: 1,
             ),
           ),
-          child: Text(
-            formattedTime,
-            style: const TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 0.2,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                formattedTime,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const SizedBox(width: 6),
+              _CopyValueButton(
+                value: formattedTime,
+                semanticLabel: 'Copiar hora',
+                iconSize: 10,
+              ),
+            ],
           ),
         ),
       );
@@ -18709,6 +19773,361 @@ class _ModernTabBarState extends State<_ModernTabBar>
           }),
         ),
       ),
+    );
+  }
+}
+
+class _AdbPrintPreviewDialog extends StatefulWidget {
+  final String html;
+  final String title;
+  final String pdfFilename;
+  // Callback que el padre conecta al UPDATE de Visits_details
+  // (Status_response = "SI") cuando el usuario confirma la impresión.
+  final VoidCallback? onPrinted;
+
+  const _AdbPrintPreviewDialog({
+    required this.html,
+    required this.title,
+    this.pdfFilename = 'ticket',
+    this.onPrinted,
+  });
+
+  @override
+  State<_AdbPrintPreviewDialog> createState() => _AdbPrintPreviewDialogState();
+}
+
+class _AdbPrintPreviewDialogState extends State<_AdbPrintPreviewDialog> {
+  bool _savingPdf = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final isConnected = AdbNfcBridgeService.instance.isClientConnected;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        width: 320,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: const Color(0xFF1B5E20),
+              child: Row(
+                children: [
+                  const Icon(Icons.receipt_long_rounded,
+                      color: Colors.white, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'Roboto',
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.close_rounded,
+                        color: Colors.white, size: 24),
+                  ),
+                ],
+              ),
+            ),
+            // Contenido HTML scrollable
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: HtmlWidget(
+                  widget.html,
+                  textStyle: const TextStyle(
+                    fontFamily: 'Courier New',
+                    fontSize: 13,
+                    color: Colors.black87,
+                    height: 1.5,
+                  ),
+                  onTapUrl: (_) => true,
+                ),
+              ),
+            ),
+            // Botones GUARDAR PDF + IMPRIMIR
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _savingPdf
+                  ? const Center(
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        child: CircularProgressIndicator(),
+                      ),
+                    )
+                  : Row(
+                      children: [
+                        // GUARDAR PDF
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () async {
+                              HapticFeedback.mediumImpact();
+                              setState(() => _savingPdf = true);
+                              try {
+                                await actions.savePdfToFile(
+                                  context,
+                                  widget.html,
+                                  widget.pdfFilename,
+                                );
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(this.context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('❌ Error al guardar PDF: $e'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
+                              } finally {
+                                if (mounted) setState(() => _savingPdf = false);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF1565C0), Color(0xFF0D47A1)],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.picture_as_pdf,
+                                      color: Colors.white, size: 20),
+                                  SizedBox(width: 6),
+                                  Text(
+                                    'GUARDAR PDF',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // IMPRIMIR
+                        Expanded(
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              HapticFeedback.mediumImpact();
+                              final sent =
+                                  AdbNfcBridgeService.instance.sendPrintRequest(
+                                htmlContent: widget.html,
+                                title: widget.title,
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(sent
+                                      ? '📲 Solicitud de impresión enviada al Android'
+                                      : '⚠️ No hay dispositivo Android conectado'),
+                                  backgroundColor: sent
+                                      ? const Color(0xFF00a86b)
+                                      : const Color(0xFFE53935),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                              if (sent) {
+                                widget.onPrinted?.call();
+                                Navigator.of(context).pop();
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 13),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: isConnected
+                                      ? const [
+                                          Color(0xFF00a86b),
+                                          Color(0xFF007552)
+                                        ]
+                                      : const [
+                                          Color(0xFF616161),
+                                          Color(0xFF424242)
+                                        ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.print_rounded,
+                                      color: Colors.white, size: 20),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    isConnected
+                                        ? 'IMPRIMIR'
+                                        : 'IMPRIMIR',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Botón inline de "copiar al portapapeles" usado en el árbol del control
+// tag-transfer-adb-server (niveles Lote / Racimos lote / Carguero / Racimos
+// carguero). Muestra feedback elegante en el propio botón: el icono cambia a
+// un check verde y aparece una pequeña burbuja flotante "¡Copiado!" durante
+// ~1.2s. Detiene la propagación del tap para no disparar el InkWell padre.
+// ─────────────────────────────────────────────────────────────────────────────
+class _CopyValueButton extends StatefulWidget {
+  final String value;
+  final String? semanticLabel;
+  final double iconSize;
+
+  const _CopyValueButton({
+    required this.value,
+    this.semanticLabel,
+    this.iconSize = 13,
+  });
+
+  @override
+  State<_CopyValueButton> createState() => _CopyValueButtonState();
+}
+
+class _CopyValueButtonState extends State<_CopyValueButton> {
+  bool _copied = false;
+  Timer? _resetTimer;
+
+  @override
+  void dispose() {
+    _resetTimer?.cancel();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    Clipboard.setData(ClipboardData(text: widget.value));
+    _resetTimer?.cancel();
+    setState(() => _copied = true);
+    _resetTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() => _copied = false);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final padding = widget.iconSize <= 11 ? 4.0 : 5.0;
+    final pillColor = _copied
+        ? const Color(0xFF4ADE80).withValues(alpha: 0.18)
+        : Colors.white.withValues(alpha: 0.12);
+
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        Semantics(
+          label: widget.semanticLabel ?? 'Copiar valor',
+          button: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _handleTap,
+            child: Container(
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: pillColor,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 150),
+                transitionBuilder: (child, anim) =>
+                    ScaleTransition(scale: anim, child: child),
+                child: _copied
+                    ? Icon(
+                        Icons.check_rounded,
+                        key: const ValueKey('copied'),
+                        size: widget.iconSize + 1,
+                        color: const Color(0xFF4ADE80),
+                      )
+                    : Icon(
+                        Icons.copy_rounded,
+                        key: const ValueKey('copy'),
+                        size: widget.iconSize,
+                        color: Colors.white.withValues(alpha: 0.75),
+                      ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: widget.iconSize + padding * 2 + 4,
+          child: IgnorePointer(
+            child: AnimatedSlide(
+              duration: const Duration(milliseconds: 180),
+              offset: _copied ? Offset.zero : const Offset(0, 0.35),
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _copied ? 1.0 : 0.0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1B4332),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: const Color(0xFF4ADE80).withValues(alpha: 0.45),
+                      width: 1,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    '¡Copiado!',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

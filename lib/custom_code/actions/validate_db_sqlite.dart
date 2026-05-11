@@ -47,7 +47,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          27, // v27: columna Method en Location_tracking y Visits_locations
+          28, // v28: columna Identificacion en Users
       onCreate: (Database db, int version) async {
         await createClickPalmTables(db);
       },
@@ -153,6 +153,7 @@ Future<void> createClickPalmTables(Database db) async {
         Phone_country_code TEXT,
         Phone_number TEXT,
         User_name_login TEXT,
+        Identificacion TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
     );
   ''');
@@ -1588,6 +1589,7 @@ Future<void> upgradeClickPalmDatabase(
             Phone_country_code TEXT,
             Phone_number TEXT,
             User_name_login TEXT,
+            Identificacion TEXT,
             FOREIGN KEY (Id_company) REFERENCES Companies(Id_company)
         );
       ''');
@@ -2298,6 +2300,22 @@ Future<void> upgradeClickPalmDatabase(
         debugPrint('✅ Migración a versión 27 completada');
       } catch (e) {
         debugPrint('❌ Error en migración a versión 27: $e');
+      }
+    }
+
+    // Migración v27 a v28: columna Identificacion en Users
+    if (oldVersion < 28) {
+      debugPrint('📦 Aplicando migración a versión 28...');
+      try {
+        final usrCols = (await db.rawQuery('PRAGMA table_info(Users);'))
+            .map((c) => c['name'] as String).toSet();
+        if (!usrCols.contains('Identificacion')) {
+          await db.execute('ALTER TABLE Users ADD COLUMN Identificacion TEXT;');
+          debugPrint('   ✅ Columna Identificacion agregada a Users');
+        }
+        debugPrint('✅ Migración a versión 28 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 28: $e');
       }
     }
   } catch (e) {

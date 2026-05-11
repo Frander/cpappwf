@@ -784,6 +784,7 @@ Future<void> _insertUsers(
       'Phone_country_code': user['phone_country_code'],
       'Phone_number':       user['phone_number'],
       'User_name_login':    user['user_name_login'],
+      'Identificacion':     user['identificacion'],
     });
   }
   await batch.commit(noResult: true);

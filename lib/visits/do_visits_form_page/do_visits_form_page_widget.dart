@@ -31,6 +31,11 @@ import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'do_visits_form_page_model.dart';
 export 'do_visits_form_page_model.dart';
 
@@ -97,6 +102,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   final Map<int, String> _tagWriterProductName = {};
   final Map<int, String> _tagTransferSourceProductName = {};
   final Map<int, String> _tagTransferDestProductName = {};
+  final Map<int, String> _tagTransferSourceContent = {}; // raw NFC JSON por statusId
 
   // Map para almacenar datos de tags NFC escritos por status_id
   // La estructura es: statusId -> (headquarterId -> {totalVisits, totalResults, records})
@@ -213,6 +219,14 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   List<dynamic> _cachedActivitySteps = [];
   List<dynamic> _cachedActivityStatus = [];
   bool _isDataCacheInitialized = false;
+
+  // Caché de hijos de reference-list cargados desde activitiesJSON por default_status
+  // statusId → List<dynamic> de statuses de la actividad referenciada
+  final Map<int, List<dynamic>> _referenceListChilds = {};
+
+  // Caché del status padre reference-list (para poder guardar su fila en
+  // visitDetails cuando se selecciona un hijo). statusId → status JSON.
+  final Map<int, dynamic> _referenceListParents = {};
 
   // Caché de búsquedas en visitDetails (evita O(n) en cada rebuild)
   final Map<String, bool> _visitDetailsSearchCache = {};
@@ -387,6 +401,143 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     if (type == 'request_nfc_read') {
       debugPrint('📨 ADB-FROM: request_nfc_read recibido desde Windows — simulando tap');
       _triggerAdbFromNfcRead();
+    } else if (type == 'request_print') {
+      final payload = msg['payload'] as Map<String, dynamic>? ?? {};
+      final htmlContent = payload['htmlContent'] as String? ?? '';
+      final title = payload['title'] as String? ?? 'Impresión';
+      if (htmlContent.isNotEmpty) {
+        debugPrint('🖨️ ADB-FROM: request_print recibido — imprimiendo directo');
+        _printDirectFromAdb(htmlContent, title);
+      }
+    }
+  }
+
+  Future<void> _printDirectFromAdb(String htmlContent, String title) async {
+    if (!mounted) return;
+    debugPrint('🖨️ Iniciando impresión directa via ADB...');
+
+    // Mostrar indicador
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(children: const [
+          SizedBox(width: 20, height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+          SizedBox(width: 12),
+          Text('Imprimiendo...'),
+        ]),
+        backgroundColor: const Color(0xFF1565C0),
+        duration: const Duration(seconds: 30),
+      ),
+    );
+
+    BluetoothDevice? connectedDevice;
+    try {
+      // Obtener MAC de la impresora
+      String? printerMac = FFAppState().printerMacAddress;
+      if (printerMac.isEmpty) {
+        final prefs = await SharedPreferences.getInstance();
+        printerMac = prefs.getString('printer_address');
+      }
+
+      if (!mounted) return;
+      if (printerMac == null || printerMac.isEmpty) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ No hay impresora configurada'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      // Permisos Bluetooth (Android 12+)
+      if (Platform.isAndroid) {
+        final info = await DeviceInfoPlugin().androidInfo;
+        if (info.version.sdkInt >= 31) {
+          final result = await [
+            Permission.bluetoothScan,
+            Permission.bluetoothConnect,
+          ].request();
+          if (result[Permission.bluetoothScan]?.isGranted != true ||
+              result[Permission.bluetoothConnect]?.isGranted != true) {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('⚠️ Permisos Bluetooth denegados'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+            return;
+          }
+        }
+      }
+
+      // Verificar Bluetooth encendido
+      final adapterState = await FlutterBluePlus.adapterState.first;
+      if (adapterState != BluetoothAdapterState.on) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Bluetooth desactivado'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return;
+      }
+
+      connectedDevice = BluetoothDevice.fromId(printerMac);
+      await connectedDevice.connect(timeout: const Duration(seconds: 15));
+      debugPrint('✅ Conectado a impresora: $printerMac');
+
+      final services = await connectedDevice.discoverServices();
+      BluetoothCharacteristic? writeChar;
+      for (final svc in services) {
+        for (final ch in svc.characteristics) {
+          if (ch.properties.write || ch.properties.writeWithoutResponse) {
+            writeChar = ch;
+            break;
+          }
+        }
+        if (writeChar != null) break;
+      }
+
+      if (writeChar == null) throw Exception('Sin característica de escritura');
+
+      final bytes = actions.htmlToEscPosBytes(htmlContent);
+
+      final data = Uint8List.fromList(bytes);
+      for (int i = 0; i < data.length; i += 20) {
+        final end = (i + 20 < data.length) ? i + 20 : data.length;
+        await writeChar.write(data.sublist(i, end), withoutResponse: true);
+        await Future.delayed(const Duration(milliseconds: 20));
+      }
+
+      debugPrint('✅ Impresión completada');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Impreso correctamente'),
+          backgroundColor: Color(0xFF00a86b),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ _printDirectFromAdb: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Error al imprimir: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } finally {
+      try { await connectedDevice?.disconnect(); } catch (_) {}
     }
   }
 
@@ -515,6 +666,42 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       });
     }
 
+    // Cargar hijos de reference-list (type_status) desde activitiesJSON
+    // Los hijos viven en otra actividad referenciada por el campo default_status del status raíz
+    _referenceListChilds.clear();
+    _referenceListParents.clear();
+    final activitiesJson = FFAppState().activitiesJSON;
+    if (activitiesJson is List) {
+      final Map<int, dynamic> activityById = {};
+      for (var act in activitiesJson) {
+        final actId = getJsonField(act, r'''$.id_activity''');
+        if (actId is int) activityById[actId] = act;
+      }
+      for (var status in _cachedActivityStatus) {
+        final typeStatus = getJsonField(status, r'''$.type_status''')?.toString() ?? '';
+        if (typeStatus != 'reference-list') continue;
+        final statusId = getJsonField(status, r'''$.id_activity_status''');
+        if (statusId == null) continue;
+        final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+        final refActivityId = int.tryParse(defaultStatus);
+        if (refActivityId == null) continue;
+        final refActivity = activityById[refActivityId];
+        if (refActivity == null) {
+          debugPrint('⚠️ reference-list status $statusId: actividad referenciada $refActivityId no encontrada');
+          continue;
+        }
+        final refStatuses = getJsonField(refActivity, r'''$.activity_status''');
+        if (refStatuses is List && refStatuses.isNotEmpty) {
+          _referenceListChilds[statusId as int] = refStatuses;
+          _referenceListParents[statusId] = status;
+          _rootStatusExpansionState[statusId] = true; // auto-expandir
+          debugPrint('✅ reference-list status $statusId: ${refStatuses.length} hijos desde actividad $refActivityId');
+        } else {
+          debugPrint('⚠️ reference-list status $statusId: actividad $refActivityId sin statuses raíz');
+        }
+      }
+    }
+
     _isDataCacheInitialized = true;
   }
 
@@ -600,11 +787,40 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   bool _cachedSearchInVisitDetails(int id, String type) {
     final cacheKey = '${type}_$id';
     if (!_visitDetailsSearchCache.containsKey(cacheKey)) {
-      _visitDetailsSearchCache[cacheKey] = functions.searchInVisitsDetails(
+      bool result = functions.searchInVisitsDetails(
         FFAppState().visitDetails.toList(),
         id,
         type,
       );
+
+      // Fallback reference-list: los hijos de un status `reference-list` NO
+      // tienen fila propia en visitDetails (solo la tiene el padre con el
+      // nombre del hijo en statusResponse). Para que el render verde funcione,
+      // consideramos al hijo "seleccionado" si la fila del padre lleva su
+      // status_name en statusResponse.
+      if (!result && type.toUpperCase() == 'STATUS') {
+        final refInfo = _findReferenceListParent(id);
+        if (refInfo != null) {
+          String? childName;
+          for (final c in refInfo.siblings) {
+            if (getJsonField(c, r'''$.id_activity_status''') == id) {
+              childName = getJsonField(c, r'''$.status_name''')?.toString();
+              break;
+            }
+          }
+          if (childName != null && childName.isNotEmpty) {
+            for (final d in FFAppState().visitDetails) {
+              if (d.idActivityStatus == refInfo.parentId &&
+                  d.statusResponse == childName) {
+                result = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      _visitDetailsSearchCache[cacheKey] = result;
     }
     return _visitDetailsSearchCache[cacheKey]!;
   }
@@ -684,14 +900,23 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         final statusIdStr = key.substring(prefix.length);
         final statusId = int.tryParse(statusIdStr);
         if (statusId == null) continue;
-        if (_tagTransferData.containsKey(statusId)) continue;
-
         final nfcContent = prefs.getString(key) ?? '';
         if (nfcContent.isEmpty) continue;
 
+        if (_tagTransferData.containsKey(statusId)) {
+          // _tagTransferData ya cargado (por form cache), pero asegurar que el contenido raw esté disponible
+          if (!_tagTransferSourceContent.containsKey(statusId)) {
+            setState(() => _tagTransferSourceContent[statusId] = nfcContent);
+          }
+          continue;
+        }
+
         final parsedData = _parseNfcTagContentByHeadquarter(nfcContent);
         if (parsedData.isNotEmpty) {
-          setState(() { _tagTransferData[statusId] = parsedData; });
+          setState(() {
+            _tagTransferData[statusId] = parsedData;
+            _tagTransferSourceContent[statusId] = nfcContent;
+          });
           restored++;
           debugPrint('♻️ [TAG-TRANSFER] Restaurado desde SharedPreferences: statusId=$statusId');
         }
@@ -1039,6 +1264,44 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         } else {
           debugPrint('⏰ TIME ya tiene valor, saltando: $statusName');
         }
+      } else if (typeStatus.toLowerCase() == 'number' &&
+          defaultStatus.contains('=RANDOM:')) {
+        final regexRandom = RegExp(r'=RANDOM:MIN=(\d+)_MAX=(\d+)');
+        final matchRandom = regexRandom.firstMatch(defaultStatus);
+        if (matchRandom != null) {
+          final existingValue =
+              functions.statusResponseByActivityStatusAlternative(
+            statusId,
+            FFAppState().visitDetails.toList(),
+            parentStepId,
+          );
+          if (existingValue.isEmpty) {
+            final minVal = int.parse(matchRandom.group(1)!);
+            final maxVal = int.parse(matchRandom.group(2)!);
+            final randomValue =
+                minVal + math.Random().nextInt(maxVal - minVal + 1);
+            debugPrint(
+                '🎲 Inicializando NUMBER con =RANDOM: min=$minVal max=$maxVal → $randomValue');
+            FFAppState().addToVisitDetails(
+              VisitsDetailsStruct(
+                idVisitDetail: 0,
+                idVisit: 0,
+                idActivityStatus: statusId,
+                statusOption: statusName,
+                statusResponse: randomValue.toString(),
+                idStepParent: parentStepId,
+                rememberStatus: rememberStatus,
+                defaultStatus: defaultStatus,
+                typeStatus: typeStatus,
+                auxStep: parentStepId,
+              ),
+            );
+            initialized++;
+            debugPrint('   ✅ Guardado en visitDetails');
+          } else {
+            debugPrint('🎲 NUMBER =RANDOM ya tiene valor, saltando: $statusName');
+          }
+        }
       }
 
       // Buscar recursivamente en steps_childs
@@ -1097,6 +1360,65 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // ==========================================================================
   // VALIDACIÓN DE CAMPOS OBLIGATORIOS
   // ==========================================================================
+
+  /// Retorna nombres de status sin respuesta en visitDetails.
+  /// Excluye el statusId del tag-transfer actual y tipos contenedor/infraestructura.
+  List<String> _getUnresolvedStatuses({required int skipStatusId}) {
+    const skipTypes = {
+      'step',
+      'tag-transfer',
+      'tag-transfer-adb-server',
+      'tag-transfer-adb-from',
+      'dynamic-printing',
+    };
+    final unresolved = <String>[];
+
+    void checkStatus(dynamic status) {
+      final type = getJsonField(status, r'''$.type_status''')
+              ?.toString()
+              .toLowerCase() ??
+          '';
+      final id =
+          getJsonField(status, r'''$.id_activity_status''') as int? ?? 0;
+      final name =
+          getJsonField(status, r'''$.status_name''')?.toString() ?? '';
+      if (!skipTypes.contains(type) && id != skipStatusId && id != 0) {
+        // Coincide con la lógica del UI (`searchInVisitsDetails`): basta con que
+        // exista una fila para este id_activity_status. El statusResponse puede
+        // estar vacío para opciones tipo radio cuando defaultStatus es vacío,
+        // pero la fila ya indica que el usuario seleccionó la opción.
+        final hasValue = FFAppState()
+            .visitDetails
+            .any((d) => d.idActivityStatus == id);
+        if (!hasValue) unresolved.add(name.isNotEmpty ? name : 'ID $id');
+      }
+      for (var step
+          in (getJsonField(status, r'''$.steps_childs''')?.toList() ?? [])) {
+        for (var s
+            in (getJsonField(step, r'''$.activity_status''')?.toList() ?? [])) {
+          checkStatus(s);
+        }
+      }
+      for (var s
+          in (getJsonField(status, r'''$.status_childs''')?.toList() ?? [])) {
+        checkStatus(s);
+      }
+    }
+
+    final activity = FFAppState().currentActivity;
+    for (var s
+        in (getJsonField(activity, r'''$.activity_status''')?.toList() ?? [])) {
+      checkStatus(s);
+    }
+    for (var step
+        in (getJsonField(activity, r'''$.activity_steps''')?.toList() ?? [])) {
+      for (var s
+          in (getJsonField(step, r'''$.activity_status''')?.toList() ?? [])) {
+        checkStatus(s);
+      }
+    }
+    return unresolved;
+  }
 
   /// Verifica si existe algún status de tipo tag-writer, tag-reader o tag-transfer
   /// en la actividad actual (busca recursivamente en todos los niveles)
@@ -2084,6 +2406,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                   _tagTransferSourceProductName[statusId] = sourceProductName;
+                  _tagTransferSourceContent[statusId] = nfcContent;
                 });
                 _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
@@ -2986,11 +3309,18 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final stepsChilds = stepsChildsRaw != null
         ? (stepsChildsRaw is List ? stepsChildsRaw : [])
         : [];
+    // Para reference-list: buscar hijos en _referenceListChilds (cargados desde activitiesJSON)
+    final refListChilds = (typeStatus.toLowerCase() == 'reference-list' && statusId is int)
+        ? (_referenceListChilds[statusId] ?? <dynamic>[])
+        : <dynamic>[];
     final statusChildsRaw =
-        getJsonField(status, r'''$.activities_status_childs''');
-    final statusChilds = statusChildsRaw != null
-        ? (statusChildsRaw is List ? statusChildsRaw : [])
-        : [];
+        getJsonField(status, r'''$.activities_status_childs''') ??
+        getJsonField(status, r'''$.status_childs''');
+    final statusChilds = refListChilds.isNotEmpty
+        ? refListChilds
+        : (statusChildsRaw != null
+            ? (statusChildsRaw is List ? statusChildsRaw : [statusChildsRaw])
+            : <dynamic>[]);
 
     // Extraer color del status para unique-option y unique_choice
     final statusColor = getJsonField(status, r'''$.color''')?.toString() ?? '#00ff9f';
@@ -3007,21 +3337,20 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     final statusColorParsed = parseColor(statusColor);
 
-    // Log de renderizado (solo la primera vez para cada status)
-    if (!_loggedStatusIds.contains(statusId)) {
-      _loggedStatusIds.add(statusId);
-      debugPrint(
-          '🎯 RENDERIZANDO ROOT STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level default_status="$defaultStatus"');
-    }
+    // Log de renderizado
+    debugPrint(
+        '🎯 RENDERIZANDO ROOT STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level stepsChilds=${stepsChilds.length} statusChilds=${statusChilds.length}');
 
     final isExpanded = _rootStatusExpansionState[statusId] ?? false;
     // LOTE 1: Usar búsqueda cacheada
     final hasValue = _cachedSearchInVisitDetails(statusId, 'STATUS');
 
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
+    debugPrint('   hasChildren=$hasChildren isExpanded=$isExpanded typeStatus="$typeStatus"');
 
     // Para status de tipo "number", "tag-writer", "tag-reader", "tag-transfer", "numbers-operation", "headquarter-weight", "label-info", "distance-extractor" y "dynamic-printing", NO abrir diálogo, mostrar control inline
     final isNumberType = typeStatus.toLowerCase() == 'number';
+    final isReferenceListType = typeStatus.toLowerCase() == 'reference-list';
     final isTagWriterType = typeStatus.toLowerCase() == 'tag-writer';
     final isTagReaderType = typeStatus.toLowerCase() == 'tag-reader';
     final isTagTransferType = typeStatus.toLowerCase() == 'tag-transfer';
@@ -3038,6 +3367,158 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         typeStatus.toLowerCase() == 'tag-transfer-adb-server';
     final isTagTransferAdbFromType =
         typeStatus.toLowerCase() == 'tag-transfer-adb-from';
+
+    // ══ Card especial para reference-list ══
+    if (isReferenceListType) {
+      String? selectedOptionName;
+      for (var child in refListChilds) {
+        final childId = getJsonField(child, r'''$.id_activity_status''');
+        if (_cachedSearchInVisitDetails(childId, 'STATUS')) {
+          selectedOptionName = getJsonField(child, r'''$.status_name''')?.toString();
+          break;
+        }
+      }
+      final isSearchOpen = _searchBoxExpansionState[statusId] ?? false;
+      final isSelected = selectedOptionName != null;
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: EdgeInsets.only(left: level * 8.0),
+            decoration: BoxDecoration(
+              color: isSelected ? const Color(0xFF00a86b) : const Color(0xFFF1F8F4),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected ? const Color(0xFF00a86b) : const Color(0xFFE8F5E9),
+                width: 2,
+              ),
+            ),
+            child: Row(
+              children: [
+                // Chevron — toca para expandir/colapsar
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() {
+                      _rootStatusExpansionState[statusId] = !isExpanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Icon(
+                      isExpanded ? Icons.expand_more_rounded : Icons.chevron_right_rounded,
+                      color: isSelected ? Colors.white : const Color(0xFF00a86b),
+                      size: 32,
+                    ),
+                  ),
+                ),
+                // Nombre + opción seleccionada — toca para expandir/colapsar
+                Expanded(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      setState(() {
+                        _rootStatusExpansionState[statusId] = !isExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            statusName,
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: isSelected ? Colors.white : const Color(0xFF00a86b),
+                            ),
+                          ),
+                          if (selectedOptionName != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              selectedOptionName,
+                              style: const TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // Botón búsqueda — tap independiente (no colapsa la lista)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    setState(() {
+                      _searchBoxExpansionState[statusId] = !isSearchOpen;
+                      if (!isSearchOpen) {
+                        _rootStatusExpansionState[statusId] = true;
+                      }
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    child: Icon(
+                      isSearchOpen ? Icons.search_off : Icons.search_rounded,
+                      color: isSelected ? Colors.white : const Color(0xFF00a86b),
+                      size: 24,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Caja de búsqueda
+          if (isSearchOpen) _buildExpandedSearchBox(statusId),
+          // Lista de opciones
+          if (isExpanded && refListChilds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 8, top: 8),
+              child: Builder(
+                builder: (ctx) {
+                  final displayList = _filterStatusList(statusId, refListChilds.cast<dynamic>());
+                  if (displayList.isEmpty) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        'Sin resultados',
+                        style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 12,
+                          color: Colors.grey.withValues(alpha: 0.7),
+                        ),
+                      ),
+                    );
+                  }
+                  return Column(
+                    children: displayList.map<Widget>((childStatus) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: _buildRootStatusChildOption(
+                          status,
+                          childStatus,
+                          level: level + 1,
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+            ),
+        ],
+      );
+    }
 
     // Calcular progreso de steps hijos requeridos
     int totalRequired = 0;
@@ -3534,6 +4015,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               return;
             }
 
+            debugPrint('👆 TAP ROOT STATUS ID=$statusId hasChildren=$hasChildren isExpanded=$isExpanded isReferenceListType=$isReferenceListType');
             if (hasChildren) {
               setState(() {
                 // COLAPSAR todos los status hermanos antes de alternar este
@@ -3548,9 +4030,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                 // Alternar el estado de expansión de este status
                 _rootStatusExpansionState[statusId] = !isExpanded;
+                debugPrint('   ➡️ Nuevo isExpanded=${!isExpanded}');
               });
             } else {
-              // Si no tiene hijos, es un status simple que se puede seleccionar
+              debugPrint('   ⚠️ Sin hijos → _onRootStatusSelected');
               await _onRootStatusSelected(status, allRootStatus: allActivityStatus);
             }
           },
@@ -3655,7 +4138,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           if (isNumberType)
                             Padding(
                               padding: const EdgeInsets.only(left: 8),
-                              child: _buildCompactInlineNumberControl(status: status),
+                              child: defaultStatus.toUpperCase().contains('=RANDOM:')
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 14, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
+                                        ),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        _formatColombianNumber(
+                                            _getCurrentNumberValue(statusId, defaultStatus)),
+                                        style: const TextStyle(
+                                          fontFamily: 'Roboto',
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          letterSpacing: -0.5,
+                                        ),
+                                      ),
+                                    )
+                                  : _buildCompactInlineNumberControl(status: status),
                             ),
                           // Botón de limpieza inline para tag-writer
                           if (isTagWriterType && _tagWriterData.containsKey(statusId))
@@ -3815,7 +4320,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                           child: _buildDistributionDisplay(statusId),
                         ),
                       // Cajones numéricos del 1 al 5
-                      if (isNumberType)
+                      if (isNumberType &&
+                          !defaultStatus.toUpperCase().contains('=RANDOM:'))
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: _buildNumberBoxes(status: status),
@@ -3863,15 +4369,60 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ),
         ),
 
-        // Hijos expandidos (steps o status childs)
-        if (isExpanded && hasChildren)
+        // ══ Sección especial para reference-list (sin AnimatedContainer) ══
+        if (isReferenceListType && isExpanded && statusChilds.isNotEmpty)
+          Builder(
+            builder: (ctx) {
+              debugPrint('📋 RENDERIZANDO LISTA reference-list ID=$statusId con ${statusChilds.length} hijos');
+              final displayList = _filterStatusList(statusId, statusChilds.cast<dynamic>());
+              debugPrint('   📋 displayList.length=${displayList.length}');
+              return Padding(
+                padding: const EdgeInsets.only(left: 8, top: 8),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8, bottom: 8),
+                      child: _buildCompactSearchButton(statusId, hasValue: hasValue),
+                    ),
+                    if ((_searchBoxExpansionState[statusId] ?? false))
+                      _buildExpandedSearchBox(statusId),
+                    if (displayList.isEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          'Sin resultados',
+                          style: TextStyle(
+                            fontFamily: 'Roboto',
+                            fontSize: 12,
+                            color: Colors.grey.withValues(alpha: 0.7),
+                          ),
+                        ),
+                      )
+                    else
+                      ...displayList.map<Widget>((childStatus) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _buildRootStatusChildOption(
+                            status,
+                            childStatus,
+                            level: level + 1,
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              );
+            },
+          ),
+
+        // ══ Sección genérica para otros tipos con hijos ══
+        if (isExpanded && hasChildren && !isReferenceListType)
           AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
             margin: EdgeInsets.only(left: level * 8.0 + 8, top: 8),
             child: Column(
               children: [
-                // Mostrar status childs primero
                 ...statusChilds.map<Widget>((childStatus) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -3879,8 +4430,6 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         level: level + 1),
                   );
                 }),
-
-                // Mostrar steps childs (level: 0 para alinear visualmente con los status childs)
                 ...stepsChilds.map<Widget>((childStep) {
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 8),
@@ -3913,9 +4462,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ? (stepsChildsRaw is List ? stepsChildsRaw : [])
         : [];
     final statusChildsRaw =
-        getJsonField(childStatus, r'''$.activities_status_childs''');
+        getJsonField(childStatus, r'''$.activities_status_childs''') ??
+        getJsonField(childStatus, r'''$.status_childs''');
     final statusChilds = statusChildsRaw != null
-        ? (statusChildsRaw is List ? statusChildsRaw : [])
+        ? (statusChildsRaw is List ? statusChildsRaw : [statusChildsRaw])
         : [];
 
     // Log de renderizado (solo la primera vez para cada status)
@@ -4343,6 +4893,15 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     '   ✅ Limpiado registro de unique-option para padre=$parentStatusId');
               }
 
+              // Si era hijo de un reference-list y ya no queda ningún hermano
+              // seleccionado, eliminar la fila del padre reference-list para
+              // que la validación lo considere de nuevo pendiente.
+              final refInfo = _findReferenceListParent(statusId);
+              if (refInfo != null) {
+                _clearReferenceListParentIfEmpty(
+                    refInfo.parentId, refInfo.siblings);
+              }
+
               debugPrint('✅ Root Status Child deseleccionado correctamente');
 
               // Solo hacer setState si DESELECCIONAMOS
@@ -4413,6 +4972,11 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 allRootStatus: parentStatusChildsList,
                 parentStatusId: parentStatusId,
               );
+              // Auto-colapsar si el padre es reference-list
+              final parentType = getJsonField(parentStatus, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+              if (parentType == 'reference-list') {
+                setState(() => _rootStatusExpansionState[parentStatusId] = false);
+              }
             }
           },
           child: Container(
@@ -4664,6 +5228,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       return;
     }
 
+    // CASO REFERENCE-LIST: si este status es hijo de un status `reference-list`
+    // (sus opciones se cargan desde otra actividad), guardar SOLO la fila del
+    // padre con statusResponse=childName. NO guardamos fila para el hijo: el
+    // render verde se resuelve por fallback en `_cachedSearchInVisitDetails`.
+    final refListInfo = _findReferenceListParent(statusId);
+    if (refListInfo != null && refListInfo.parent != null) {
+      debugPrint(
+          '🎯 REFERENCE-LIST HIJO (root): statusId=$statusId, parentId=${refListInfo.parentId}');
+      _applyReferenceListSelection(
+        parentId: refListInfo.parentId,
+        parent: refListInfo.parent,
+        siblings: refListInfo.siblings,
+        childStatusId: statusId,
+        childStatusName: statusName,
+      );
+      setState(() {});
+      return;
+    }
+
     // CASO 1: UNIQUE-OPTION HIJO dentro de un MULTIPLE-OPTION PADRE
     // Deseleccionar solo hermanos del MISMO padre
     if (typeStatus.toLowerCase() == 'unique-option' &&
@@ -4760,6 +5343,144 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return int.tryParse(defaultStatus) ?? 0;
   }
 
+  // Devuelve (parentId, parentStatusJson, siblings) si [childStatusId] es hijo
+  // de un status de tipo `reference-list` cargado en `_referenceListChilds`,
+  // o null si no lo es.
+  ({int parentId, dynamic parent, List<dynamic> siblings})?
+      _findReferenceListParent(int childStatusId) {
+    for (final entry in _referenceListChilds.entries) {
+      final hit = entry.value.any((c) =>
+          getJsonField(c, r'''$.id_activity_status''') == childStatusId);
+      if (hit) {
+        return (
+          parentId: entry.key,
+          parent: _referenceListParents[entry.key],
+          siblings: entry.value,
+        );
+      }
+    }
+    return null;
+  }
+
+  // Cuando se selecciona un hijo de un status `reference-list`:
+  //  1) Quita de visitDetails las filas de los hermanos previamente
+  //     seleccionados (exclusividad: solo uno permitido por padre).
+  //  2) Inserta/actualiza la fila del PADRE reference-list con
+  //     idActivityStatus=parentId, statusResponse=childName, para que tanto
+  //     la validación (`_getUnresolvedStatuses`) como el render del
+  //     breadcrumb encuentren el dato bajo el id del padre.
+  // No toca la fila del hijo (la maneja el caller con su lógica habitual).
+  void _applyReferenceListSelection({
+    required int parentId,
+    required dynamic parent,
+    required List<dynamic> siblings,
+    required int childStatusId,
+    required String childStatusName,
+  }) {
+    // 1) Quitar hermanos previamente seleccionados
+    final siblingIds = <int>{};
+    for (final s in siblings) {
+      final sid = getJsonField(s, r'''$.id_activity_status''');
+      if (sid is int && sid != childStatusId) siblingIds.add(sid);
+    }
+    if (siblingIds.isNotEmpty) {
+      final List<int> toRemove = [];
+      for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+        if (siblingIds
+            .contains(FFAppState().visitDetails[i].idActivityStatus)) {
+          toRemove.add(i);
+          debugPrint(
+              '   ❌ Reference-list: deseleccionando hermano id=${FFAppState().visitDetails[i].idActivityStatus}');
+        }
+      }
+      for (int i = toRemove.length - 1; i >= 0; i--) {
+        FFAppState().removeAtIndexFromVisitDetails(toRemove[i]);
+      }
+    }
+
+    // 2) Insertar/actualizar fila del padre reference-list
+    final parentName =
+        getJsonField(parent, r'''$.status_name''')?.toString() ?? '';
+    final parentDefault =
+        getJsonField(parent, r'''$.default_status''')?.toString() ?? '';
+    final parentRemember =
+        getJsonField(parent, r'''$.remember_status''') == true;
+
+    int existingParentIndex = -1;
+    for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+      if (FFAppState().visitDetails[i].idActivityStatus == parentId) {
+        existingParentIndex = i;
+        break;
+      }
+    }
+
+    if (existingParentIndex >= 0) {
+      FFAppState().updateVisitDetailsAtIndex(
+        existingParentIndex,
+        (detail) => VisitsDetailsStruct(
+          idVisitDetail: detail.idVisitDetail,
+          idVisit: detail.idVisit,
+          idActivityStatus: parentId,
+          statusOption: parentName,
+          statusResponse: childStatusName,
+          idStepParent: 0,
+          rememberStatus: parentRemember,
+          defaultStatus: parentDefault,
+          typeStatus: 'reference-list',
+          auxStep: 0,
+        ),
+      );
+    } else {
+      FFAppState().addToVisitDetails(
+        VisitsDetailsStruct(
+          idVisitDetail: 0,
+          idVisit: 0,
+          idActivityStatus: parentId,
+          statusOption: parentName,
+          statusResponse: childStatusName,
+          idStepParent: 0,
+          rememberStatus: parentRemember,
+          defaultStatus: parentDefault,
+          typeStatus: 'reference-list',
+          auxStep: 0,
+        ),
+      );
+    }
+    debugPrint(
+        '   ✅ Reference-list padre id=$parentId actualizado: statusResponse="$childStatusName"');
+
+    _visitDetailsSearchCache.clear();
+  }
+
+  // Quita la fila del padre reference-list cuando ya no queda ningún hijo
+  // seleccionado (deselección manual del único hijo).
+  void _clearReferenceListParentIfEmpty(int parentId, List<dynamic> siblings) {
+    final remaining = <int>{};
+    for (final s in siblings) {
+      final sid = getJsonField(s, r'''$.id_activity_status''');
+      if (sid is int) remaining.add(sid);
+    }
+    final stillHasChild = FFAppState()
+        .visitDetails
+        .any((d) => remaining.contains(d.idActivityStatus));
+    if (stillHasChild) return;
+
+    final List<int> toRemove = [];
+    for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+      if (FFAppState().visitDetails[i].idActivityStatus == parentId) {
+        toRemove.add(i);
+      }
+    }
+    for (int i = toRemove.length - 1; i >= 0; i--) {
+      FFAppState().removeAtIndexFromVisitDetails(toRemove[i]);
+    }
+    if (toRemove.isNotEmpty) {
+      _visitDetailsSearchCache.clear();
+      debugPrint(
+          '   🧹 Reference-list padre id=$parentId eliminado (sin hijo seleccionado)');
+    }
+  }
+
   void _saveRootStatusValue({
     required int statusId,
     required String statusName,
@@ -4842,6 +5563,25 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('📋 Tipo de step: $typeStep - Permite MÚLTIPLES selecciones');
     } else {
       debugPrint('📋 Tipo de step: $typeStep - Solo se permite UNA selección');
+    }
+
+    // EXCLUSIVIDAD + propagación al PADRE reference-list: si este status es
+    // hijo de un status de tipo 'reference-list', guardar SOLO la fila del
+    // padre con statusResponse=childName. NO guardamos fila para el hijo: el
+    // render verde se resuelve por fallback en `_cachedSearchInVisitDetails`.
+    final refListInfo = _findReferenceListParent(statusId);
+    if (refListInfo != null && refListInfo.parent != null) {
+      debugPrint(
+          '🎯 REFERENCE-LIST HIJO: statusId=$statusId, parentId=${refListInfo.parentId}');
+      _applyReferenceListSelection(
+        parentId: refListInfo.parentId,
+        parent: refListInfo.parent,
+        siblings: refListInfo.siblings,
+        childStatusId: statusId,
+        childStatusName: statusName,
+      );
+      setState(() {});
+      return;
     }
 
     // 1. Para unique-list y reference-list: Eliminar TODOS los status previos con el mismo id_step_parent
@@ -7175,6 +7915,29 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          _formatColombianNumber(_getCurrentNumberValue(statusId, defaultStatus)),
+          style: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+      );
+    }
+
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -7289,6 +8052,9 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) return const SizedBox.shrink();
+
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -7406,14 +8172,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   size: 22,
                 ),
                 SizedBox(width: 10),
-                Text(
-                  'INGRESAR OTRO NÚMERO',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'INGRESAR OTRO NÚMERO',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -7432,6 +8201,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) return const SizedBox.shrink();
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -7549,6 +8319,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final defaultStatus =
         getJsonField(status, r'''$.default_status''').toString();
+    if (defaultStatus.toUpperCase().contains('=RANDOM:')) {
+      return Row(
+        children: [
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)]),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  _formatColombianNumber(_getCurrentNumberValue(statusId, defaultStatus)),
+                  style: const TextStyle(fontFamily: 'Roboto', fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     int currentValue = _getCurrentNumberValue(statusId, defaultStatus);
     bool usedUpDown = _numberUsedUpDown[statusId] ?? false;
 
@@ -7666,14 +8457,17 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   size: 22,
                 ),
                 SizedBox(width: 10),
-                Text(
-                  'INGRESAR OTRO NÚMERO',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 0.8,
+                Flexible(
+                  child: Text(
+                    'INGRESAR OTRO NÚMERO',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -7783,7 +8577,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           // Procesar placeholders con acceso completo al estado del formulario
           debugPrint('');
           debugPrint('🔄 ===== INICIANDO PROCESAMIENTO DE PLACEHOLDERS =====');
-          final processedHTML = _processHTMLPlaceholders(htmlTemplate);
+          final processedHTML = await _processHTMLPlaceholders(htmlTemplate);
           debugPrint('✅ ===== FIN PROCESAMIENTO DE PLACEHOLDERS =====');
           debugPrint('');
           debugPrint(
@@ -11778,12 +12572,12 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
   // ===== PROCESAR PLACEHOLDERS HTML PARA DYNAMIC-PRINTING =====
 
-  String _processHTMLPlaceholders(String htmlTemplate) {
+  Future<String> _processHTMLPlaceholders(String htmlTemplate) async {
     String result = htmlTemplate;
 
-    // Buscar todos los placeholders en formato {NombreCampo}
-    // Solo capturar nombres válidos: letras, números, espacios, guiones y guiones bajos
-    final placeholderPattern = RegExp(r'\{([a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ_-]+)\}');
+    // Buscar todos los placeholders en formato {NombreCampo} o {Campo.subpath}
+    // Permite letras, números, espacios, guiones, guiones bajos y puntos
+    final placeholderPattern = RegExp(r'\{([a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ_.-]+)\}');
     final matches = placeholderPattern.allMatches(htmlTemplate).toList();
 
     debugPrint('📋 Encontrados ${matches.length} placeholders en HTML:');
@@ -11801,7 +12595,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           '🔍 [${replacedCount + 1}/${matches.length}] Procesando placeholder: "$placeholder" (campo: "$fieldName")');
 
       // Buscar el campo en currentStepStatuses
-      String replacementValue = _getPlaceholderValue(fieldName);
+      String replacementValue = await _getPlaceholderValue(fieldName);
 
       // Reemplazar el placeholder
       result = result.replaceAll(placeholder, replacementValue);
@@ -11819,84 +12613,71 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return result;
   }
 
-  String _getPlaceholderValue(String fieldName) {
+  Future<String> _getPlaceholderValue(String fieldName) async {
     debugPrint('🔍 Buscando placeholder: "$fieldName"');
+
+    // Notación de punto: {NombreCampo.subpath} → extrae sub-campo del JSON NFC
+    if (fieldName.contains('.')) {
+      final dotIdx = fieldName.indexOf('.');
+      final baseField = fieldName.substring(0, dotIdx).trim();
+      final subPath = fieldName.substring(dotIdx + 1).trim();
+      return _getNfcJsonSubfieldValue(baseField, subPath);
+    }
 
     // Buscar el status por nombre en activity_steps y root status
     dynamic targetStatus;
     int? targetStatusId;
     String? targetStatusType;
 
-    // Buscar en activity_steps
-    final activityStepsRaw =
-        getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
-    debugPrint(
-        '   Activity steps raw: ${activityStepsRaw != null ? "existe" : "null"}');
-
-    if (activityStepsRaw != null) {
-      final activitySteps =
-          (activityStepsRaw is List) ? activityStepsRaw : [activityStepsRaw];
-      debugPrint('   Buscando en ${activitySteps.length} steps');
-
-      for (var step in activitySteps) {
-        final statusListRaw = getJsonField(step, r'''$.activity_status''');
-        if (statusListRaw != null) {
-          final statusList =
-              (statusListRaw is List) ? statusListRaw : [statusListRaw];
-          debugPrint('     Revisando ${statusList.length} status en step');
-
-          for (var status in statusList) {
-            final statusNameField =
-                getJsonField(status, r'''$.name_status''')?.toString() ?? '';
-            debugPrint('       - Status: "$statusNameField"');
-
-            if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
-              targetStatus = status;
-              targetStatusId =
-                  getJsonField(status, r'''$.id_activity_status''')?.toInt();
-              targetStatusType = getJsonField(status, r'''$.type_status''')
-                  ?.toString()
-                  .toLowerCase();
-              debugPrint(
-                  '       ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
-              break;
-            }
-          }
-          if (targetStatus != null) break;
+    // Búsqueda recursiva: status_childs y steps_childs a cualquier profundidad
+    void searchInStatus(dynamic status) {
+      if (targetStatus != null) return;
+      final statusNameField =
+          getJsonField(status, r'''$.name_status''')?.toString() ?? '';
+      if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
+        targetStatus = status;
+        targetStatusId =
+            getJsonField(status, r'''$.id_activity_status''')?.toInt();
+        targetStatusType =
+            getJsonField(status, r'''$.type_status''')?.toString().toLowerCase();
+        debugPrint('       ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
+        return;
+      }
+      for (var s in (getJsonField(status, r'''$.status_childs''')?.toList() ?? [])) {
+        searchInStatus(s);
+        if (targetStatus != null) return;
+      }
+      for (var step in (getJsonField(status, r'''$.steps_childs''')?.toList() ?? [])) {
+        for (var s in (getJsonField(step, r'''$.activity_status''')?.toList() ?? [])) {
+          searchInStatus(s);
+          if (targetStatus != null) return;
         }
       }
     }
 
-    // Si no se encuentra en steps, buscar en root status (activity_status)
+    void searchInStep(dynamic step) {
+      if (targetStatus != null) return;
+      for (var s in (getJsonField(step, r'''$.activity_status''')?.toList() ?? [])) {
+        searchInStatus(s);
+        if (targetStatus != null) return;
+      }
+      for (var subStep in (getJsonField(step, r'''$.steps_childs''')?.toList() ?? [])) {
+        searchInStep(subStep);
+        if (targetStatus != null) return;
+      }
+    }
+
+    final activity = FFAppState().currentActivity;
+    // Buscar en root activity_status
+    for (var s in (getJsonField(activity, r'''$.activity_status''')?.toList() ?? [])) {
+      searchInStatus(s);
+      if (targetStatus != null) break;
+    }
+    // Buscar en activity_steps (recursivo)
     if (targetStatus == null) {
-      final rootStatusListRaw =
-          getJsonField(FFAppState().currentActivity, r'''$.activity_status''');
-      debugPrint(
-          '   Buscando en activity_status: ${rootStatusListRaw != null ? "existe" : "null"}');
-
-      if (rootStatusListRaw != null) {
-        final rootStatusList = (rootStatusListRaw is List)
-            ? rootStatusListRaw
-            : [rootStatusListRaw];
-        debugPrint('   Buscando en ${rootStatusList.length} root status');
-
-        for (var status in rootStatusList) {
-          final statusNameField =
-              getJsonField(status, r'''$.name_status''')?.toString() ?? '';
-          debugPrint('     - Root status: "$statusNameField"');
-
-          if (statusNameField.toLowerCase() == fieldName.toLowerCase()) {
-            targetStatus = status;
-            targetStatusId =
-                getJsonField(status, r'''$.id_activity_status''')?.toInt();
-            targetStatusType = getJsonField(status, r'''$.type_status''')
-                ?.toString()
-                .toLowerCase();
-            debugPrint(
-                '     ✅ MATCH! id: $targetStatusId, tipo: $targetStatusType');
-            break;
-          }
-        }
+      for (var step in (getJsonField(activity, r'''$.activity_steps''')?.toList() ?? [])) {
+        searchInStep(step);
+        if (targetStatus != null) break;
       }
     }
 
@@ -11910,25 +12691,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     debugPrint(
         '📌 Campo encontrado: $fieldName (id: $targetStatusId, tipo: $targetStatusType)');
 
+    final resolvedId = targetStatusId!;
+
     // Según el tipo de status, obtener el valor apropiado
     switch (targetStatusType) {
       case 'date':
-        return _getDateValue(targetStatusId);
+        return _getDateValue(resolvedId);
 
       case 'time':
-        return _getTimeValue(targetStatusId);
+        return _getTimeValue(resolvedId);
 
       case 'tag-reader':
-        return _getTagReaderPlainText(targetStatusId);
+        return _getTagReaderPlainText(resolvedId);
 
       case 'distance-extractor':
-        return _getDistanceExtractorValue(targetStatusId);
+        return _getDistanceExtractorValue(resolvedId);
 
       case 'number':
-        return _getNumberValue(targetStatusId);
+        return _getNumberValue(resolvedId);
 
       case 'numbers-operation':
-        return _getNumbersOperationValue(targetStatusId);
+        return _getNumbersOperationValue(resolvedId);
 
       case 'label-info':
         // Para label-info, retornar el contenido de default_status
@@ -11940,7 +12723,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       case 'text':
         // Para text, obtener de visitDetails
         final detail = FFAppState().visitDetails.firstWhere(
-              (d) => d.idActivityStatus == targetStatusId,
+              (d) => d.idActivityStatus == resolvedId,
               orElse: () => VisitsDetailsStruct(),
             );
         return detail.statusResponse.isNotEmpty
@@ -11951,7 +12734,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       case 'reference-list':
         // Para listas, obtener la opción seleccionada desde statusResponse
         final detail = FFAppState().visitDetails.firstWhere(
-              (d) => d.idActivityStatus == targetStatusId,
+              (d) => d.idActivityStatus == resolvedId,
               orElse: () => VisitsDetailsStruct(),
             );
         // Para reference-list (type_status), statusResponse contiene el nombre seleccionado (e.g., "WISTON HERNAN QUIÑONES ORTIZ")
@@ -11968,6 +12751,203 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         return detail.statusResponse.isNotEmpty
             ? detail.statusResponse
             : '[$fieldName]';
+    }
+  }
+
+  /// Extrae un sub-campo del JSON NFC de un status tag-reader/tag-writer/tag-transfer.
+  /// Uso: {NombreCampo.subPath} en el HTML template.
+  Future<String> _getNfcJsonSubfieldValue(String baseField, String subPath) async {
+    debugPrint('🔎 NFC subfield: "$baseField.$subPath"');
+
+    int? targetStatusId;
+    String? targetStatusType;
+
+    void searchInList(List list) {
+      for (var status in list) {
+        final name = getJsonField(status, r'''$.name_status''')?.toString() ?? '';
+        if (name.toLowerCase() == baseField.toLowerCase()) {
+          targetStatusId = getJsonField(status, r'''$.id_activity_status''')?.toInt();
+          targetStatusType = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase();
+        }
+      }
+    }
+
+    final stepsRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_steps''');
+    if (stepsRaw != null) {
+      final steps = stepsRaw is List ? stepsRaw : [stepsRaw];
+      for (var step in steps) {
+        final sl = getJsonField(step, r'''$.activity_status''');
+        if (sl != null) searchInList(sl is List ? sl : [sl]);
+        if (targetStatusId != null) break;
+      }
+    }
+    if (targetStatusId == null) {
+      final rootRaw = getJsonField(FFAppState().currentActivity, r'''$.activity_status''');
+      if (rootRaw != null) searchInList(rootRaw is List ? rootRaw : [rootRaw]);
+    }
+
+    if (targetStatusId == null || targetStatusType == null) {
+      debugPrint('⚠️ NFC subfield: campo "$baseField" no encontrado');
+      return '[$baseField.$subPath]';
+    }
+
+    const nfcTypes = {'tag-reader', 'tag-writer', 'tag-transfer'};
+    if (!nfcTypes.contains(targetStatusType)) {
+      debugPrint('⚠️ NFC subfield: tipo "$targetStatusType" no soportado');
+      return '[$baseField.$subPath]';
+    }
+
+    final detail = FFAppState().visitDetails.firstWhere(
+      (d) => d.idActivityStatus == targetStatusId,
+      orElse: () => VisitsDetailsStruct(),
+    );
+
+    if (detail.statusResponse.isEmpty) {
+      debugPrint('⚠️ NFC subfield: statusResponse vacío para "$baseField"');
+      return '[$baseField.$subPath]';
+    }
+
+    final nfcJson = actions.parseNfcJson(detail.statusResponse);
+    if (nfcJson == null) {
+      debugPrint('⚠️ NFC subfield: JSON inválido para "$baseField"');
+      return '[$baseField.$subPath]';
+    }
+
+    final readInfo = nfcJson['Read_info'] as Map<String, dynamic>?;
+
+    switch (subPath.toLowerCase()) {
+      case 'us':
+        final usId = readInfo?['US'];
+        if (usId == null) return '[Sin operador]';
+        try {
+          final usRows = await globalDb.executeOperation((db) async {
+            return await db.query(
+              'Users',
+              columns: ['Name_user'],
+              where: 'Id_user = ?',
+              whereArgs: [usId],
+              limit: 1,
+            );
+          });
+          if (usRows.isNotEmpty) {
+            final name = usRows.first['Name_user'] as String?;
+            if (name != null && name.isNotEmpty) return name;
+          }
+        } catch (_) {}
+        return 'ID $usId';
+
+      case 'tag_from':
+        return (readInfo?['tag_from'] as String? ?? '').isNotEmpty
+            ? (readInfo!['tag_from'] as String)
+            : '[Sin tag origen]';
+
+      case 'tag_to':
+        return (readInfo?['tag_to'] as String? ?? '').isNotEmpty
+            ? (readInfo!['tag_to'] as String)
+            : '[Sin tag destino]';
+
+      case 'date_created':
+        final raw = readInfo?['Date_created'] as String?;
+        if (raw == null || raw.isEmpty) return '[Sin fecha]';
+        try {
+          final dt = DateTime.parse(raw);
+          return '${dt.day.toString().padLeft(2,'0')}/${dt.month.toString().padLeft(2,'0')}/${dt.year} '
+              '${dt.hour.toString().padLeft(2,'0')}:${dt.minute.toString().padLeft(2,'0')}';
+        } catch (_) {
+          return raw;
+        }
+
+      case 'name_product':
+        return readInfo?['Name_product'] as String? ?? '[Sin producto]';
+
+      case 'rfid':
+        return readInfo?['RFID'] as String? ?? '[Sin RFID]';
+
+      case 'visits':
+        final visitsList = nfcJson['Visits'] as List?;
+        if (visitsList == null || visitsList.isEmpty) {
+          return '<div>[Sin visitas]</div>';
+        }
+
+        // Pre-cargar nombres de cargueros desde SQLite (un query por ID único)
+        final uniqueOpIds = visitsList
+            .whereType<Map<String, dynamic>>()
+            .map((v) => v['OP'])
+            .where((id) => id != null)
+            .map((id) => (id as num).toInt())
+            .toSet();
+        final opNames = <int, String>{};
+        for (final opId in uniqueOpIds) {
+          try {
+            final rows = await globalDb.executeOperation((db) async {
+              return await db.query(
+                'Users',
+                columns: ['Name_user'],
+                where: 'Id_user = ?',
+                whereArgs: [opId],
+                limit: 1,
+              );
+            });
+            if (rows.isNotEmpty) {
+              final name = rows.first['Name_user'] as String?;
+              if (name != null && name.isNotEmpty) opNames[opId] = name;
+            }
+          } catch (_) {}
+        }
+
+        final buffer = StringBuffer();
+        for (final v in visitsList) {
+          if (v is! Map<String, dynamic>) continue;
+
+          String dhFormatted = '';
+          try {
+            final dh = DateTime.parse(v['DH'] as String? ?? '');
+            dhFormatted = '${dh.day.toString().padLeft(2,'0')}/${dh.month.toString().padLeft(2,'0')}/${dh.year} '
+                '${dh.hour.toString().padLeft(2,'0')}:${dh.minute.toString().padLeft(2,'0')}';
+          } catch (_) {
+            dhFormatted = v['DH']?.toString() ?? '';
+          }
+
+          final opId = v['OP'] != null ? (v['OP'] as num).toInt() : null;
+          final opName = opId != null ? (opNames[opId] ?? 'ID $opId') : '';
+
+          final heId = v['HE'] != null ? (v['HE'] as num).toInt() : 0;
+          String loteName = 'Lote #$heId';
+          if (heId > 0) {
+            try {
+              final hqRows = await globalDb.executeOperation((db) async {
+                return await db.query(
+                  'Headquarters',
+                  columns: ['Name_headquarter'],
+                  where: 'Id_headquarter = ?',
+                  whereArgs: [heId],
+                  limit: 1,
+                );
+              });
+              if (hqRows.isNotEmpty) {
+                final name = hqRows.first['Name_headquarter'] as String?;
+                if (name != null && name.isNotEmpty) loteName = name;
+              }
+            } catch (_) {}
+          }
+
+          final visits = v['VISITS'] ?? 0;
+          final results = v['RESULTS'] ?? 0;
+
+          buffer.write(
+            '<div style="border-bottom:1px dashed #ccc;padding:3px 0;">'
+            '<div>Fecha: $dhFormatted</div>'
+            '<div>Carguero: $opName</div>'
+            '<div>Visitas: $visits&nbsp;&nbsp;Racimos: $results</div>'
+            '<div>Lote: $loteName</div>'
+            '</div>',
+          );
+        }
+        return buffer.toString();
+
+      default:
+        debugPrint('⚠️ NFC subfield: subPath "$subPath" no reconocido');
+        return '[$baseField.$subPath]';
     }
   }
 
@@ -13238,8 +14218,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             // TRANSFERIR AHORA - Clickeable
             InkWell(
               onTap: () async {
-                // Obtener el contenido del tag de origen desde FFAppState
-                final sourceTagContent = FFAppState().nfcRead;
+                // Obtener el contenido del tag de origen (nfcRead o caché local)
+                final sourceTagContent = FFAppState().nfcRead.isNotEmpty
+                    ? FFAppState().nfcRead
+                    : (_tagTransferSourceContent[statusId] ?? '');
                 if (sourceTagContent.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -13256,20 +14238,173 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   return;
                 }
 
-                // Extraer TYPE_PRODUCT_FINISH para título dinámico del diálogo de destino
+                // Extraer default_status del status tag-transfer desde la
+                // definición de la actividad (currentActivity). NOTA: NO se
+                // puede leer desde visitDetails porque el registro del
+                // tag-transfer todavía no existe en este momento — solo se
+                // crea después de que la escritura al destino sea exitosa.
                 String? destinationTitle;
-                for (var detail in FFAppState().visitDetails) {
-                  if (detail.idActivityStatus == statusId) {
-                    final defaultStatus = detail.defaultStatus;
-                    // Captura todo hasta ; o } (permitiendo espacios en el nombre)
-                    final regexTypeFinish = RegExp(r'TYPE_PRODUCT_FINISH:([^;}]+)');
-                    final matchFinish = regexTypeFinish.firstMatch(defaultStatus);
-                    if (matchFinish != null) {
-                      final typeProductFinish = matchFinish.group(1)!.trim();
-                      destinationTitle = 'Escribir $typeProductFinish de destino';
-                      debugPrint('📦 TAG-TRANSFER: Título dinámico destino: $destinationTitle');
+                bool writerStatus = false;
+                String? tagTransferDefaultStatus;
+
+                void searchStatusForDefault(dynamic status) {
+                  if (tagTransferDefaultStatus != null) return;
+                  final id =
+                      getJsonField(status, r'''$.id_activity_status''') as int? ?? 0;
+                  if (id == statusId) {
+                    tagTransferDefaultStatus =
+                        getJsonField(status, r'''$.default_status''')?.toString() ??
+                            '';
+                    return;
+                  }
+                  final stepsChilds =
+                      getJsonField(status, r'''$.activities_steps_childs''') ??
+                          getJsonField(status, r'''$.steps_childs''');
+                  if (stepsChilds is List) {
+                    for (final s in stepsChilds) {
+                      final sl = getJsonField(s, r'''$.activity_status''');
+                      if (sl is List) {
+                        for (final c in sl) {
+                          searchStatusForDefault(c);
+                          if (tagTransferDefaultStatus != null) return;
+                        }
+                      }
                     }
-                    break;
+                  }
+                  final statusChilds =
+                      getJsonField(status, r'''$.activities_status_childs''') ??
+                          getJsonField(status, r'''$.status_childs''');
+                  if (statusChilds is List) {
+                    for (final c in statusChilds) {
+                      searchStatusForDefault(c);
+                      if (tagTransferDefaultStatus != null) return;
+                    }
+                  }
+                }
+
+                final activity = FFAppState().currentActivity;
+                final rootStatuses = getJsonField(activity, r'''$.activity_status''');
+                if (rootStatuses is List) {
+                  for (final s in rootStatuses) {
+                    searchStatusForDefault(s);
+                    if (tagTransferDefaultStatus != null) break;
+                  }
+                }
+                if (tagTransferDefaultStatus == null) {
+                  final activitySteps =
+                      getJsonField(activity, r'''$.activity_steps''');
+                  if (activitySteps is List) {
+                    for (final step in activitySteps) {
+                      final sl = getJsonField(step, r'''$.activity_status''');
+                      if (sl is List) {
+                        for (final s in sl) {
+                          searchStatusForDefault(s);
+                          if (tagTransferDefaultStatus != null) break;
+                        }
+                      }
+                      if (tagTransferDefaultStatus != null) break;
+                    }
+                  }
+                }
+
+                debugPrint(
+                    '🔎 TAG-TRANSFER: default_status del status $statusId = "${tagTransferDefaultStatus ?? "(no encontrado)"}"');
+
+                if (tagTransferDefaultStatus != null) {
+                  final defaultStatus = tagTransferDefaultStatus!;
+                  // Captura todo hasta ; o } (permitiendo espacios en el nombre)
+                  final regexTypeFinish = RegExp(r'TYPE_PRODUCT_FINISH:([^;}]+)');
+                  final matchFinish = regexTypeFinish.firstMatch(defaultStatus);
+                  if (matchFinish != null) {
+                    final typeProductFinish = matchFinish.group(1)!.trim();
+                    destinationTitle = 'Escribir $typeProductFinish de destino';
+                    debugPrint('📦 TAG-TRANSFER: Título dinámico destino: $destinationTitle');
+                  }
+                  if (RegExp(r'WRITER_STATUS\s*=\s*TRUE')
+                      .hasMatch(defaultStatus.toUpperCase())) {
+                    writerStatus = true;
+                    debugPrint('📋 TAG-TRANSFER: WRITER_STATUS=true detectado');
+                  } else {
+                    debugPrint(
+                        '📋 TAG-TRANSFER: WRITER_STATUS no presente en default_status — no se inyectará visits_details');
+                  }
+                }
+
+                // Si WRITER_STATUS=true, validar que todos los campos del formulario estén resueltos
+                if (writerStatus) {
+                  final unresolved =
+                      _getUnresolvedStatuses(skipStatusId: statusId);
+                  if (unresolved.isNotEmpty) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                        content: Text(
+                          'Completa estos campos antes de transferir:\n• ${unresolved.join('\n• ')}',
+                          style: const TextStyle(
+                              fontFamily: 'Roboto',
+                              fontWeight: FontWeight.w600),
+                        ),
+                        backgroundColor: Colors.red,
+                        duration: const Duration(seconds: 5),
+                      ));
+                    }
+                    return;
+                  }
+                }
+
+                // Si WRITER_STATUS=true, inyectar los status del formulario en el JSON del tag
+                String contentToTransfer = sourceTagContent;
+                if (writerStatus) {
+                  // ═══════════════════════════════════════════════════════════
+                  // DEBUG: Imprimir el contenido completo de visitDetails en
+                  // memoria antes de filtrar/inyectar al JSON del tag de destino
+                  // ═══════════════════════════════════════════════════════════
+                  debugPrint('');
+                  debugPrint('═══════════════════════════════════════════════════════════');
+                  debugPrint('📦 TAG-TRANSFER WRITE: Contenido de visitDetails EN MEMORIA');
+                  debugPrint('   tag-transfer statusId actual (será excluido): $statusId');
+                  debugPrint('   total entradas: ${FFAppState().visitDetails.length}');
+                  debugPrint('───────────────────────────────────────────────────────────');
+                  for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                    final d = FFAppState().visitDetails[i];
+                    final excluded = d.idActivityStatus == statusId;
+                    debugPrint(
+                        '   [$i] ${excluded ? "⏭️ EXCLUIDO" : "✅ INYECTAR "} '
+                        'idActivityStatus=${d.idActivityStatus} '
+                        'idStepParent=${d.idStepParent} '
+                        'typeStatus="${d.typeStatus}" '
+                        'statusOption="${d.statusOption}" '
+                        'statusResponse="${d.statusResponse.length > 80 ? "${d.statusResponse.substring(0, 80)}…(${d.statusResponse.length} chars)" : d.statusResponse}"');
+                  }
+                  debugPrint('═══════════════════════════════════════════════════════════');
+                  debugPrint('');
+
+                  final srcJson = actions.parseNfcJson(sourceTagContent);
+                  if (srcJson != null) {
+                    final visitDetailsForForm = FFAppState()
+                        .visitDetails
+                        .where((d) => d.idActivityStatus != statusId)
+                        .map((d) => {
+                              'id_activity_status': d.idActivityStatus,
+                              'status_option': d.statusOption,
+                              'status_response': d.statusResponse,
+                            })
+                        .toList();
+                    srcJson['status'] = {'visits_details': visitDetailsForForm};
+                    contentToTransfer = jsonEncode(srcJson);
+                    debugPrint(
+                        '📋 WRITER_STATUS: ${visitDetailsForForm.length} status inyectados en JSON');
+                    // Imprimir el bloque exacto inyectado al tag (status.visits_details)
+                    debugPrint('───────────────────────────────────────────────────────────');
+                    debugPrint('📤 BLOQUE INYECTADO en tag.status.visits_details:');
+                    debugPrint(const JsonEncoder.withIndent('  ')
+                        .convert(srcJson['status']));
+                    debugPrint('───────────────────────────────────────────────────────────');
+                    debugPrint('📤 JSON FINAL a escribir en tag de destino (${contentToTransfer.length} chars):');
+                    debugPrint(contentToTransfer);
+                    debugPrint('═══════════════════════════════════════════════════════════');
+                  } else {
+                    debugPrint(
+                        '⚠️ TAG-TRANSFER: parseNfcJson devolvió null — no se pudo inyectar visits_details. Se escribirá el contenido origen sin modificar.');
                   }
                 }
 
@@ -13283,7 +14418,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       insetPadding: EdgeInsets.zero,
                       backgroundColor: Colors.transparent,
                       child: NfcTransferWriteDialogWidget(
-                        sourceTagContent: sourceTagContent,
+                        sourceTagContent: contentToTransfer,
                         destinationTitle: destinationTitle,
                       ),
                     );
