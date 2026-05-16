@@ -25,7 +25,7 @@ import 'package:path_provider/path_provider.dart';
 import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
-import '/index.dart';
+import '/visits/do_activities_page/do_activities_page_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -51,10 +51,10 @@ class DoVisitsFormPageWidget extends StatefulWidget {
   static String routePath = '/doVisitsFormPage';
 
   @override
-  State<DoVisitsFormPageWidget> createState() => _DoVisitsFormPageWidgetState();
+  State<DoVisitsFormPageWidget> createState() => DoVisitsFormPageWidgetState();
 }
 
-class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
+class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     with AutomaticKeepAliveClientMixin {
   late DoVisitsFormPageModel _model;
 
@@ -656,7 +656,8 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (currentActivityId != null) {
         _cachedActivityStatus = _cachedActivityStatus.where((s) {
           final sActivityId = getJsonField(s, r'''$.id_activity''');
-          return sActivityId == currentActivityId;
+          final sStatus = getJsonField(s, r'''$.status''')?.toString().toUpperCase() ?? 'A';
+          return sActivityId == currentActivityId && sStatus == 'A';
         }).toList();
       }
       _cachedActivityStatus.sort((a, b) {
@@ -1478,6 +1479,174 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     return false;
   }
 
+  /// Corre las mismas validaciones del botón GPS antes de guardar una visita.
+  /// Retorna true si todas las validaciones pasan.
+  Future<bool> _runPreSaveValidations() async {
+    if (!mounted) return false;
+    final currentActivity = FFAppState().currentActivity;
+    final hasSteps = getJsonField(currentActivity, r'''$.activity_steps''')?.toList().isNotEmpty ?? false;
+
+    if (hasSteps) {
+      final validationResult = _validateRequiredStepsRecursive();
+      if (validationResult != null) {
+        final message = validationResult['message'] as String;
+        final path = (validationResult['path'] as List<dynamic>).cast<int>();
+        _expandTreeToStep(path);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(Icons.error_outline_rounded, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Campo Requerido',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500, fontSize: 13)),
+              ],
+            ),
+            duration: const Duration(milliseconds: 4000),
+            backgroundColor: FlutterFlowTheme.of(context).error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        return false;
+      }
+    } else {
+      if (FFAppState().visitDetails.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.warning_rounded, color: Colors.white, size: 20),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Debe seleccionar al menos un estado antes de guardar la visita',
+                    style: TextStyle(fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 4),
+            backgroundColor: FlutterFlowTheme.of(context).warning,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /// Ejecuta el flujo de guardado con GPS (modo default), igual al tap del botón GPS.
+  Future<void> _triggerGpsSaveFlow() async {
+    if (!mounted) return;
+    await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
+      builder: (dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          insetPadding: EdgeInsets.zero,
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.75,
+            width: MediaQuery.sizeOf(context).width * 0.95,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(32),
+              child: custom_widgets.LoadCoordinatesVisit(
+                width: MediaQuery.sizeOf(context).width * 0.95,
+                height: MediaQuery.sizeOf(context).height * 0.75,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    _cleanupTagDatasByRememberFlag();
+  }
+
+  /// Escanea un QR y guarda la visita directamente (usado desde OTRAS OPCIONES).
+  Future<void> triggerQrSaveFlow() async {
+    if (!mounted) return;
+    if (!await _runPreSaveValidations()) return;
+    final qrCode = await _showQrScannerDialog();
+    if (qrCode == null || qrCode.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Row(
+              children: [
+                Icon(Icons.qr_code_rounded, color: Colors.white),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Escaneo de QR cancelado. No se guardó la visita.',
+                    style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 3),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            margin: const EdgeInsets.all(16),
+          ),
+        );
+      }
+      return;
+    }
+    final success = await _createVisitWithQr(qrCode);
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '¡Visita Registrada!',
+                      style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    Text(
+                      'QR: ${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}',
+                      style: const TextStyle(fontFamily: 'Roboto', fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 3),
+          backgroundColor: const Color(0xFF00a86b),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      _cleanupTagDatasByRememberFlag();
+    }
+  }
+
   /// Valida recursivamente todos los steps requeridos en la jerarquía
   /// Retorna un mapa con los steps faltantes y su ruta para expansión
   Map<String, dynamic>? _validateRequiredStepsRecursive() {
@@ -2199,6 +2368,32 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     );
                   }
                   debugPrint('💾 TAG-WRITER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('🔎 TAG-WRITER: defaultStatus = "$defaultStatus"');
+                  debugPrint('🔎 TAG-WRITER: Buscando "AUTO_SAVE:true" en defaultStatus...');
+                  
+                  // AUTO_SAVE: si el comando está presente, guardar visita con GPS automáticamente
+                  if (defaultStatus.contains('AUTO_SAVE:true')) {
+                    debugPrint('🚀 AUTO_SAVE: Comando detectado en tag-writer, ejecutando guardado automático con GPS...');
+                    
+                    // Pequeño delay para asegurar que el diálogo anterior se haya cerrado completamente
+                    await Future.delayed(const Duration(milliseconds: 500));
+                    
+                    if (!mounted) {
+                      debugPrint('❌ AUTO_SAVE: Widget desmontado, cancelando auto-guardado');
+                      return;
+                    }
+                    
+                    debugPrint('🔍 AUTO_SAVE: Ejecutando validaciones pre-guardado...');
+                    if (await _runPreSaveValidations()) {
+                      debugPrint('✅ AUTO_SAVE: Validaciones pasadas, disparando flujo GPS...');
+                      await _triggerGpsSaveFlow();
+                      debugPrint('✅ AUTO_SAVE: Flujo GPS completado');
+                    } else {
+                      debugPrint('❌ AUTO_SAVE: Validaciones fallaron');
+                    }
+                  } else {
+                    debugPrint('⚠️ AUTO_SAVE: Comando NO detectado. defaultStatus no contiene "AUTO_SAVE:true"');
+                  }
                 }
               }
               return;
@@ -3623,6 +3818,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     );
                   }
                   debugPrint('💾 TAG-WRITER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('🔎 TAG-WRITER: defaultStatus = "$defaultStatus"');
+                  debugPrint('🔎 TAG-WRITER: Buscando "AUTO_SAVE:true" en defaultStatus...');
+
+                  if (defaultStatus.contains('AUTO_SAVE:true')) {
+                    debugPrint('🚀 AUTO_SAVE: Comando detectado en tag-writer, ejecutando guardado automático con GPS...');
+                    await Future.delayed(const Duration(milliseconds: 500));
+                    if (!mounted) {
+                      debugPrint('❌ AUTO_SAVE: Widget desmontado, cancelando auto-guardado');
+                      return;
+                    }
+                    debugPrint('🔍 AUTO_SAVE: Ejecutando validaciones pre-guardado...');
+                    if (await _runPreSaveValidations()) {
+                      debugPrint('✅ AUTO_SAVE: Validaciones pasadas, disparando flujo GPS...');
+                      await _triggerGpsSaveFlow();
+                      debugPrint('✅ AUTO_SAVE: Flujo GPS completado');
+                    } else {
+                      debugPrint('❌ AUTO_SAVE: Validaciones fallaron');
+                    }
+                  } else {
+                    debugPrint('⚠️ AUTO_SAVE: Comando NO detectado. defaultStatus no contiene "AUTO_SAVE:true"');
+                  }
                 }
               }
               return;
@@ -4176,6 +4392,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                                 context: context,
                                 statusName: statusName,
                                 statusId: statusId,
+                                status: status,
                               ),
                             ),
                           // Botón de limpieza inline para tag-reader
@@ -4593,6 +4810,27 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     );
                   }
                   debugPrint('💾 TAG-WRITER: Contenido guardado en status_response (en memoria)');
+                  debugPrint('🔎 TAG-WRITER: defaultStatus = "$defaultStatus"');
+                  debugPrint('🔎 TAG-WRITER: Buscando "AUTO_SAVE:true" en defaultStatus...');
+
+                  if (defaultStatus.contains('AUTO_SAVE:true')) {
+                    debugPrint('🚀 AUTO_SAVE: Comando detectado en tag-writer, ejecutando guardado automático con GPS...');
+                    await Future.delayed(const Duration(milliseconds: 500));
+                    if (!mounted) {
+                      debugPrint('❌ AUTO_SAVE: Widget desmontado, cancelando auto-guardado');
+                      return;
+                    }
+                    debugPrint('🔍 AUTO_SAVE: Ejecutando validaciones pre-guardado...');
+                    if (await _runPreSaveValidations()) {
+                      debugPrint('✅ AUTO_SAVE: Validaciones pasadas, disparando flujo GPS...');
+                      await _triggerGpsSaveFlow();
+                      debugPrint('✅ AUTO_SAVE: Flujo GPS completado');
+                    } else {
+                      debugPrint('❌ AUTO_SAVE: Validaciones fallaron');
+                    }
+                  } else {
+                    debugPrint('⚠️ AUTO_SAVE: Comando NO detectado. defaultStatus no contiene "AUTO_SAVE:true"');
+                  }
                 }
               }
               return;
@@ -5751,43 +5989,121 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }
 
   Widget _buildNavigationButtons() {
-    // Usar activitySelected (ActivitiesStruct tipado desde SQLite) — fuente de verdad fiable
-    final isSync = FFAppState().activitySelected.isSync;
-
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
+          // ═══════════════════════════════════════════════════════════════════
+          // BOTÓN NFC (Izquierda) - Leer TAG NFC y crear visita
+          // ═══════════════════════════════════════════════════════════════════
           Expanded(
             child: InkWell(
               onTap: () async {
-                context.pushNamed(
-                  DoActivitiesPageWidget.routeName,
-                  extra: <String, dynamic>{
-                    kTransitionInfoKey: const TransitionInfo(
-                      hasTransition: true,
-                      transitionType: PageTransitionType.fade,
-                      duration: Duration(milliseconds: 500),
+                // Ejecutar validaciones pre-guardado
+                if (!await _runPreSaveValidations()) {
+                  return;
+                }
+
+                // Abrir diálogo NFC para leer el RFID del TAG
+                final nfcTagId = await _showNfcTagIdReaderDialog();
+
+                // Si el usuario canceló la lectura NFC, no continuar
+                if (nfcTagId == null || nfcTagId.isEmpty) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: const Row(
+                          children: [
+                            Icon(Icons.nfc_rounded, color: Colors.white),
+                            SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                'Lectura de TAG cancelada. No se guardó la visita.',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        duration: const Duration(seconds: 3),
+                        backgroundColor: Colors.orange.shade700,
+                        behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        margin: const EdgeInsets.all(16),
+                      ),
+                    );
+                  }
+                  return;
+                }
+
+                // Crear visita directamente con NFC
+                final success = await _createVisitWithNfc(nfcTagId);
+
+                if (success && mounted) {
+                  // Mostrar mensaje de éxito
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '¡Visita Registrada!',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                Text(
+                                  'TAG: $nfcTagId',
+                                  style: const TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      duration: const Duration(seconds: 3),
+                      backgroundColor: const Color(0xFF00a86b),
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      margin: const EdgeInsets.all(16),
                     ),
-                  },
-                );
+                  );
+
+                  // Limpiar los datos de tags que NO deben ser recordados
+                  _cleanupTagDatasByRememberFlag();
+                }
               },
               child: Container(
                 height: 50,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      FlutterFlowTheme.of(context).error,
-                      FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
+                      const Color(0xFF00a86b),
+                      const Color(0xFF00a86b).withValues(alpha: 0.8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(14),
                   boxShadow: [
                     BoxShadow(
                       blurRadius: 12,
-                      color: FlutterFlowTheme.of(context)
-                          .error
-                          .withValues(alpha: 0.4),
+                      color: const Color(0xFF00a86b).withValues(alpha: 0.4),
                       offset: const Offset(0, 6),
                     ),
                   ],
@@ -5795,11 +6111,10 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.chevron_left_rounded,
-                        color: Colors.white, size: 24),
+                    Icon(Icons.nfc_rounded, color: Colors.white, size: 24),
                     SizedBox(width: 8),
                     Text(
-                      'Cancelar',
+                      'NFC',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 16,
@@ -5813,369 +6128,86 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               ),
             ),
           ),
-          // Solo mostrar el separador y el botón Guardar si is_sync es true
-          if (isSync) ...[
-            const SizedBox(width: 12),
-            Expanded(
-              child: InkWell(
-                onTap: () async {
-                  // Obtener la actividad actual
-                  final currentActivity = FFAppState().currentActivity;
 
-                  // Verificar si la actividad tiene steps (estructura jerárquica)
-                  final hasSteps = getJsonField(currentActivity, r'''$.activity_steps''')?.toList().isNotEmpty ?? false;
+          const SizedBox(width: 12),
 
-                  if (hasSteps) {
-                    // VALIDACIÓN 1: Si hay steps, validar que los steps requeridos estén completos
-                    final validationResult = _validateRequiredStepsRecursive();
+          // ═══════════════════════════════════════════════════════════════════
+          // BOTÓN GPS (Derecha) - Geolocalización con contador 5 segundos
+          // ═══════════════════════════════════════════════════════════════════
+          Expanded(
+            child: InkWell(
+              onTap: () async {
+                // Ejecutar validaciones pre-guardado
+                if (!await _runPreSaveValidations()) {
+                  return;
+                }
 
-                    if (validationResult != null) {
-                      // Hay un step requerido sin completar
-                      final message = validationResult['message'] as String;
-                      final path = (validationResult['path'] as List<dynamic>).cast<int>();
-
-                      // Expandir el árbol hasta el step faltante
-                      _expandTreeToStep(path);
-
-                      // Mostrar mensaje de error específico
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Row(
-                                children: [
-                                  Icon(
-                                    Icons.error_outline_rounded,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                  SizedBox(width: 8),
-                                  Text(
-                                    'Campo Requerido',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                message,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w500,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(milliseconds: 4000),
-                          backgroundColor: FlutterFlowTheme.of(context).error,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                      return;
-                    }
-                  } else {
-                    // VALIDACIÓN 2: Si NO hay steps (solo estados directos), verificar que haya al menos un estado seleccionado
-                    if (FFAppState().visitDetails.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
-                            children: [
-                              Icon(
-                                Icons.warning_rounded,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Debe seleccionar al menos un estado antes de guardar la visita',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 4),
-                          backgroundColor: FlutterFlowTheme.of(context).warning,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                      return;
-                    }
-                  }
-
-                  // Verificar si la actividad requiere lectura de TAG NFC, QR o GPS antes de guardar
-                  final readDefault = getJsonField(currentActivity, r'''$.read_default''')?.toString().toUpperCase() ?? '';
-
-                  if (readDefault == 'NFC') {
-                    // === MODO NFC: Leer TAG y guardar visita directamente ===
-                    final nfcTagId = await _showNfcTagIdReaderDialog();
-
-                    // Si el usuario canceló la lectura NFC, no continuar
-                    if (nfcTagId == null || nfcTagId.isEmpty) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Row(
-                              children: [
-                                Icon(Icons.nfc_rounded, color: Colors.white),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Lectura de TAG cancelada. No se guardó la visita.',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            duration: const Duration(seconds: 3),
-                            backgroundColor: Colors.orange.shade700,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // Crear visita directamente con NFC y las últimas geolocalizaciones
-                    final success = await _createVisitWithNfc(nfcTagId);
-
-                    if (success && mounted) {
-                      // Mostrar mensaje de éxito
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '¡Visita Registrada!',
-                                      style: TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      'TAG: $nfcTagId',
-                                      style: const TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 3),
-                          backgroundColor: const Color(0xFF00a86b),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-
-                      // Limpiar los datos de tags que NO deben ser recordados
-                      _cleanupTagDatasByRememberFlag();
-                    }
-                  } else if (readDefault == 'QR') {
-                    // === MODO QR: Escanear código QR y guardar visita directamente ===
-                    final qrCode = await _showQrScannerDialog();
-
-                    // Si el usuario canceló el escaneo QR, no continuar
-                    if (qrCode == null || qrCode.isEmpty) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: const Row(
-                              children: [
-                                Icon(Icons.qr_code_rounded, color: Colors.white),
-                                SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    'Escaneo de QR cancelado. No se guardó la visita.',
-                                    style: TextStyle(
-                                      fontFamily: 'Roboto',
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                            duration: const Duration(seconds: 3),
-                            backgroundColor: Colors.orange.shade700,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            margin: const EdgeInsets.all(16),
-                          ),
-                        );
-                      }
-                      return;
-                    }
-
-                    // Crear visita directamente con QR y las últimas geolocalizaciones
-                    final success = await _createVisitWithQr(qrCode);
-
-                    if (success && mounted) {
-                      // Mostrar mensaje de éxito
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 24),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      '¡Visita Registrada!',
-                                      style: TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      'QR: ${qrCode.length > 30 ? '${qrCode.substring(0, 30)}...' : qrCode}',
-                                      style: const TextStyle(
-                                        fontFamily: 'Roboto',
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 3),
-                          backgroundColor: const Color(0xFF00a86b),
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-
-                      // Limpiar los datos de tags que NO deben ser recordados
-                      _cleanupTagDatasByRememberFlag();
-                    }
-                  } else {
-                    // === MODO GPS (default): Usar LoadCoordinatesVisit con timer ===
-                    await showDialog<bool>(
-                      context: context,
-                      barrierDismissible: false,
-                      barrierColor: Colors.black.withValues(alpha: 0.85),
-                      builder: (dialogContext) {
-                        return Dialog(
-                          backgroundColor: Colors.transparent,
-                          elevation: 0,
-                          insetPadding: EdgeInsets.zero,
-                          child: SizedBox(
-                            height: MediaQuery.sizeOf(context).height * 0.75,
+                // Abrir diálogo LoadCoordinatesVisit con contador de 5 segundos
+                await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: false,
+                  barrierColor: Colors.black.withValues(alpha: 0.85),
+                  builder: (dialogContext) {
+                    return Dialog(
+                      backgroundColor: Colors.transparent,
+                      elevation: 0,
+                      insetPadding: EdgeInsets.zero,
+                      child: SizedBox(
+                        height: MediaQuery.sizeOf(context).height * 0.75,
+                        width: MediaQuery.sizeOf(context).width * 0.95,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(32),
+                          child: custom_widgets.LoadCoordinatesVisit(
                             width: MediaQuery.sizeOf(context).width * 0.95,
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(32),
-                              child: custom_widgets.LoadCoordinatesVisit(
-                                width: MediaQuery.sizeOf(context).width * 0.95,
-                                height: MediaQuery.sizeOf(context).height * 0.75,
-                              ),
-                            ),
+                            height: MediaQuery.sizeOf(context).height * 0.75,
                           ),
-                        );
-                      },
-                    );
-
-                    // Limpiar los datos de tags que NO deben ser recordados después de crear la visita
-                    _cleanupTagDatasByRememberFlag();
-                  }
-
-                  // El widget LoadCoordinatesVisit se cierra automáticamente
-                  // El formulario permanece abierto para permitir crear más visitas
-                  // visitDetails ya fue limpiado automáticamente (solo quedaron los con remember_status = true)
-                },
-                child: Container(
-                  height: 50,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        FlutterFlowTheme.of(context).primary,
-                        FlutterFlowTheme.of(context)
-                            .primary
-                            .withValues(alpha: 0.8),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        blurRadius: 12,
-                        color: FlutterFlowTheme.of(context)
-                            .primary
-                            .withValues(alpha: 0.4),
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle_rounded,
-                          color: Colors.white, size: 24),
-                      SizedBox(width: 8),
-                      Text(
-                        'Guardar',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
                         ),
                       ),
+                    );
+                  },
+                );
+
+                // Limpiar los datos de tags que NO deben ser recordados después de crear la visita
+                _cleanupTagDatasByRememberFlag();
+              },
+              child: Container(
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF0EA5E9),
+                      const Color(0xFF0EA5E9).withValues(alpha: 0.8),
                     ],
                   ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      blurRadius: 12,
+                      color: const Color(0xFF0EA5E9).withValues(alpha: 0.4),
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.location_on_rounded, color: Colors.white, size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      'GPS',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
@@ -8484,6 +8516,7 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     required BuildContext context,
     required String statusName,
     required int statusId,
+    dynamic status,
   }) {
     return InkWell(
       onTap: () async {
@@ -8510,6 +8543,58 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               _tagWriterData[statusId] = parsedData;
               _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
             });
+
+            // Actualizar visitDetails con el contenido escrito
+            if (status != null) {
+              final rememberStatus = getJsonField(status, r'''$.remember_status''') == true;
+              final defaultStatus = getJsonField(status, r'''$.default_status''')?.toString() ?? '';
+              final typeStatus = getJsonField(status, r'''$.type_status''').toString();
+              int existingIndex = -1;
+              for (int i = 0; i < FFAppState().visitDetails.length; i++) {
+                if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
+                  existingIndex = i;
+                  break;
+                }
+              }
+              if (existingIndex >= 0) {
+                FFAppState().updateVisitDetailsAtIndex(
+                  existingIndex,
+                  (detail) => VisitsDetailsStruct(
+                    idVisitDetail: detail.idVisitDetail,
+                    idVisit: detail.idVisit,
+                    idActivityStatus: statusId,
+                    statusOption: statusName,
+                    statusResponse: nfcContent,
+                    idStepParent: 0,
+                    rememberStatus: rememberStatus,
+                    defaultStatus: defaultStatus,
+                    typeStatus: typeStatus,
+                    auxStep: 0,
+                  ),
+                );
+              } else {
+                FFAppState().addToVisitDetails(
+                  VisitsDetailsStruct(
+                    idVisitDetail: 0,
+                    idVisit: 0,
+                    idActivityStatus: statusId,
+                    statusOption: statusName,
+                    statusResponse: nfcContent,
+                    idStepParent: 0,
+                    rememberStatus: rememberStatus,
+                    defaultStatus: defaultStatus,
+                    typeStatus: typeStatus,
+                    auxStep: 0,
+                  ),
+                );
+              }
+              // AUTO_SAVE: si el comando está presente, guardar visita con GPS automáticamente
+              if (defaultStatus.contains('AUTO_SAVE:true')) {
+                if (await _runPreSaveValidations()) {
+                  await _triggerGpsSaveFlow();
+                }
+              }
+            }
           }
         }
       },
@@ -14502,6 +14587,13 @@ class _DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       duration: Duration(seconds: 3),
                     ),
                   );
+                  // AUTO_SAVE: si el comando está presente, guardar visita con GPS automáticamente
+                  if (tagTransferDefaultStatus != null &&
+                      tagTransferDefaultStatus!.contains('AUTO_SAVE:true')) {
+                    if (mounted && await _runPreSaveValidations()) {
+                      await _triggerGpsSaveFlow();
+                    }
+                  }
                 }
               },
               child: Container(

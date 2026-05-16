@@ -140,6 +140,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // ── ADB NFC Bridge (tag-transfer-adb-server / tag-transfer-adb-from) ──────
   AdbBridgeStatus _adbServerStatus = AdbBridgeStatus.serverDown;
+  bool _isRestartingAdb = false;
   StreamSubscription<AdbBridgeStatus>? _adbStatusSub;
   StreamSubscription<Map<String, dynamic>>? _adbTagSub;
   final Map<int, Map<String, dynamic>> _adbReceivedTagData = {};
@@ -9450,35 +9451,62 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             padding: const EdgeInsets.fromLTRB(10, 12, 10, 6),
             child: GestureDetector(
               onTap: () async {
-                if (!AdbNfcBridgeService.instance.isServerRunning) {
-                  await AdbNfcBridgeService.instance.start();
-                  if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
-                }
+                if (_isRestartingAdb) return;
+                if (mounted) { setState(() => _isRestartingAdb = true); }
+                await AdbNfcBridgeService.instance.restart();
+                if (mounted) setState(() {
+                  _adbServerStatus = AdbNfcBridgeService.instance.currentStatus;
+                  _isRestartingAdb = false;
+                });
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                 decoration: BoxDecoration(
-                  color: badgeColor,
+                  color: _isRestartingAdb ? const Color(0xFF1565C0) : badgeColor,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [BoxShadow(color: badgeColor.withValues(alpha: 0.5), blurRadius: 10)],
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(badgeIcon, color: Colors.white, size: 16),
-                    const SizedBox(width: 6),
-                    Text(
-                      isConnected ? 'USB CONECTADO' : 'ADB ESPERANDO',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        fontFamily: 'Roboto',
+                child: _isRestartingAdb
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SizedBox(
+                            width: 12,
+                            height: 12,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'RECONECTANDO...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(badgeIcon, color: Colors.white, size: 16),
+                          const SizedBox(width: 6),
+                          Text(
+                            isConnected ? 'USB CONECTADO' : 'ADB ESPERANDO',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              fontFamily: 'Roboto',
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
-                ),
               ),
             ),
           ),

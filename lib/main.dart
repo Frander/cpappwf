@@ -24,7 +24,6 @@ import 'index.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
-import 'dart:io';
 import 'dart:ui';
 import '/custom_code/platform_utils.dart';
 
@@ -40,6 +39,7 @@ import '/custom_code/actions/get_location_list.dart' show depurarGeolocalizacion
 import '/backend/schema/structs/index.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/components/gps_quality_indicator_widget.dart';
+import '/release_log.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:battery_plus/battery_plus.dart';
 
@@ -50,56 +50,55 @@ StreamSubscription<Position>? locationSubscription;
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
-/// Log file para diagnóstico en release mode (donde debugPrint es no-op).
-File? _releaseLogFile;
-
-/// Escribe al log de release (archivo junto al .exe) y también a debugPrint.
-void _log(String message) {
-  final line = '${DateTime.now().toIso8601String()} $message';
-  debugPrint(line);
-  try {
-    _releaseLogFile?.writeAsStringSync('$line\n', mode: FileMode.append);
-  } catch (_) {}
-}
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Crear log file junto al ejecutable para diagnóstico en release
-  try {
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-    _releaseLogFile = File('$exeDir/clickpalm_crash.log');
-    _releaseLogFile!.writeAsStringSync(
-      '=== ClickPalm start ${DateTime.now().toIso8601String()} ===\n',
+  await initReleaseLog();
+
+  // ErrorWidget global: convierte excepciones de build en un widget rojo
+  // legible en lugar de un rectángulo vacío (que se ve como pantalla blanca).
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    releaseLog('ErrorWidget.builder', details.exception, details.stack);
+    return Container(
+      padding: const EdgeInsets.all(8),
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF441111),
+        border: Border.all(color: Colors.red, width: 1),
+      ),
+      child: SelectableText(
+        '⚠ ${details.exceptionAsString()}',
+        style: const TextStyle(color: Colors.white, fontSize: 11),
+      ),
     );
-  } catch (_) {}
+  };
 
   // Capturar TODOS los errores no manejados (incluyendo los de async/build)
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    _log('FlutterError: ${details.exceptionAsString()}\n${details.stack}');
+    releaseLog('FlutterError', details.exception, details.stack);
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
-    _log('PlatformDispatcher error: $error\n$stack');
+    releaseLog('PlatformDispatcher', error, stack);
     return true; // Marcarlo como manejado para evitar crash nativo
   };
 
   try {
-    _log('Step 1: GoRouter config');
+    releaseLog('Step 1: GoRouter config');
     GoRouter.optionURLReflectsImperativeAPIs = true;
     usePathUrlStrategy();
 
-    _log('Step 2: SQLiteManager.initialize()');
+    releaseLog('Step 2: SQLiteManager.initialize()');
     await SQLiteManager.initialize();
 
     // Inicializar el servicio de geolocalización en segundo plano (solo móvil)
     if (Platforms.isMobile) {
-      _log('Step 3: initializeBackgroundLocationService()');
+      releaseLog('Step 3: initializeBackgroundLocationService()');
       await initializeBackgroundLocationService();
     }
 
-    _log('Step 4: FFAppState init');
+    releaseLog('Step 4: FFAppState init');
     final appState = FFAppState(); // Initialize FFAppState
     await appState.initializePersistedState();
 
@@ -113,14 +112,14 @@ void main() async {
       WakelockPlus.enable();
     }
 
-    _log('Step 5: runApp()');
+    releaseLog('Step 5: runApp()');
     runApp(ChangeNotifierProvider(
       create: (context) => appState,
       child: MyApp(),
     ));
-    _log('Step 6: runApp() completed');
+    releaseLog('Step 6: runApp() completed');
   } catch (e, stack) {
-    _log('FATAL CRASH: $e\n$stack');
+    releaseLog('FATAL CRASH', e, stack);
     // Mostrar app mínima con el error para que no se cierre
     runApp(MaterialApp(
       home: Scaffold(

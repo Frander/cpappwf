@@ -1,14 +1,19 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
+import '/custom_code/actions/device_transfer_service.dart';
+import '/adb_install_page/adb_install_page_widget.dart';
 import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 import 'package:provider/provider.dart';
 import '/home_page/home_page_widget.dart';
 import '/custom_code/actions/index.dart' as actions;
 import '/backend/sqlite/global_db_singleton.dart';
+import '/release_log.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_page_model.dart';
 export 'login_page_model.dart';
 
@@ -37,6 +42,13 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
   List<UsersStruct> _filteredUsers = [];
   bool _isLoading = false;
   bool _isLoadingUsers = true;
+
+  // ── Primer inicio: detección de conectividad ────────────────────────────
+  bool _showUsbTransferOption = false;
+  bool _showNoConnectionError = false;
+  bool _isDownloadingDb = false;
+  double _downloadProgress = 0.0;
+  String? _detectedGatewayUrl;
 
   @override
   void initState() {
@@ -71,6 +83,10 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
           _filteredUsers = users;
           _isLoadingUsers = false;
         });
+        // Sin usuarios y no es modo cambio de operador → verificar primer inicio
+        if (users.isEmpty && !widget.forceSelection) {
+          _checkFirstRunConnectivity();
+        }
       }
     } catch (e) {
       debugPrint('Error cargando usuarios desde SQLite: $e');
@@ -79,6 +95,76 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
           _isLoadingUsers = false;
         });
       }
+    }
+  }
+
+  /// Detecta el tipo de conectividad disponible en el primer inicio.
+  /// Prioridad: internet → si no hay, mostrar opciones TCP / ADB.
+  Future<void> _checkFirstRunConnectivity() async {
+    final isNew = await actions.isNewDevice();
+    if (!isNew || !mounted) return;
+
+    // 1. Internet primero — si hay, flujo normal sin intervención
+    final hasInternet = await InternetConnection().hasInternetAccess;
+    if (hasInternet) return;
+
+    // 2. Sin internet → mostrar card con opciones de instalación
+    if (mounted) setState(() => _showNoConnectionError = true);
+  }
+
+  /// Sondea las IPs USB tethering; si hay servidor TCP activo, muestra la card de transferencia.
+  Future<void> _tryTcpInstall() async {
+    setState(() => _showNoConnectionError = false);
+    for (final ip in DeviceTransferService.kUsbGatewayIps) {
+      final url = 'http://$ip:${DeviceTransferService.port}/db';
+      if (await DeviceTransferService.instance.probeServer(url)) {
+        if (mounted) {
+          setState(() {
+            _showUsbTransferOption = true;
+            _detectedGatewayUrl = url;
+          });
+        }
+        return;
+      }
+    }
+    if (mounted) {
+      setState(() => _showNoConnectionError = true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'No se detectó el dispositivo. Activa "Conexión compartida por USB" en el celular origen.'),
+          backgroundColor: Color(0xFFE65100),
+        ),
+      );
+    }
+  }
+
+  Future<void> _startUsbTransfer() async {
+    setState(() {
+      _isDownloadingDb = true;
+      _downloadProgress = 0;
+    });
+    final success = await DeviceTransferService.instance.downloadDatabase(
+      _detectedGatewayUrl!,
+      onProgress: (progress) {
+        if (mounted) setState(() => _downloadProgress = progress);
+      },
+    );
+    if (!mounted) return;
+    if (success) {
+      setState(() {
+        _showUsbTransferOption = false;
+        _isDownloadingDb = false;
+      });
+      await _loadUsersFromSqlite(); // Recargar con la BD recibida
+    } else {
+      setState(() => _isDownloadingDb = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se pudo transferir la base de datos. Verifica la conexión USB.'),
+          backgroundColor: Color(0xFFE53935),
+        ),
+      );
     }
   }
 
@@ -151,21 +237,76 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
       FFAppState().update(() {});
       debugPrint('✅ Usuario seleccionado: ${user.nameUser}');
 
-      if (Navigator.of(context).canPop()) context.pop();
-      context.pushNamed(
-        HomePageWidget.routeName,
-        extra: <String, dynamic>{
-          kTransitionInfoKey: const TransitionInfo(
-            hasTransition: true,
-            transitionType: PageTransitionType.fade,
-            duration: Duration(milliseconds: 300),
-          ),
-        },
-      );
+      if (!mounted) return;
+      if (widget.forceSelection) {
+        // Cambio de operador desde dentro de la app: volver a quien llamó
+        context.pop();
+      } else {
+        // Flujo de login inicial: siempre ir a HomePage limpiando el stack
+        if (Navigator.of(context).canPop()) context.pop();
+        context.pushNamed(
+          HomePageWidget.routeName,
+          extra: <String, dynamic>{
+            kTransitionInfoKey: const TransitionInfo(
+              hasTransition: true,
+              transitionType: PageTransitionType.fade,
+              duration: Duration(milliseconds: 300),
+            ),
+          },
+        );
+      }
     } catch (e) {
       debugPrint('Error en selección de usuario: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  /// Escape hatch para usuarios con SharedPreferences corrupto: borra TODO
+  /// el estado local persistido (incluye structs de FlutterFlow) y reinicia
+  /// FFAppState en memoria. La app vuelve al estado de primera instalación.
+  Future<void> _resetLocalData() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Restablecer datos locales'),
+        content: const Text(
+          'Esto borrará el usuario, actividad y lote seleccionados, así como '
+          'cualquier otro dato guardado en este dispositivo. Tendrás que volver '
+          'a sincronizar la base.\n\n¿Continuar?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Restablecer',
+                style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      FFAppState.reset();
+      await FFAppState().initializePersistedState();
+      releaseLog('LoginPage._resetLocalData OK');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Datos locales restablecidos')),
+      );
+      setState(() {});
+    } catch (e, st) {
+      releaseLog('LoginPage._resetLocalData failed', e, st);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo restablecer: $e')),
+      );
     }
   }
 
@@ -374,6 +515,15 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                         }
 
                         if (_filteredUsers.isEmpty) {
+                          // Primer inicio: USB detectado
+                          if (_showUsbTransferOption) {
+                            return _buildUsbDetectedCard();
+                          }
+                          // Primer inicio: sin ninguna conexión
+                          if (_showNoConnectionError) {
+                            return _buildNoConnectionCard();
+                          }
+                          // Estado vacío normal (búsqueda sin resultados)
                           return Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -454,11 +604,13 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                       ),
                                     ],
                                   ),
+                                  // BackdropFilter eliminado: con sigma=2 el efecto glass
+                                  // es prácticamente imperceptible, pero cada item disparaba
+                                  // un render-pass adicional con sample del fondo en GPU
+                                  // (caro en gama media, saturaba BLASTBufferQueue).
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(14),
-                                    child: BackdropFilter(
-                                      filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
-                                      child: Padding(
+                                    child: Padding(
                                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                                         child: Row(
                                           children: [
@@ -567,17 +719,289 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
                                     ),
                                   ),
                                 ),
-                              ),
-                            );
+                              );
                           },
                         );
                       },
                     ),
                   ),
                 ),
+                // Escape hatch: si HomePage queda en blanco al entrar, este
+                // botón borra el state local corrupto y permite re-sincronizar.
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  child: TextButton(
+                    onPressed: _resetLocalData,
+                    child: Text(
+                      '¿Pantalla en blanco al entrar? Restablecer datos locales',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                        fontSize: 11,
+                        decoration: TextDecoration.underline,
+                        decorationColor: Colors.white.withValues(alpha: 0.4),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  // ── UI: USB detectado ────────────────────────────────────────────────────
+
+  Widget _buildUsbDetectedCard() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0D47A1), Color(0xFF1565C0)],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.usb_rounded, size: 40, color: Colors.white),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Celular anterior detectado',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Se encontró un dispositivo con datos conectado por cable USB. ¿Deseas recuperar la base de datos?',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isDownloadingDb ? null : _startUsbTransfer,
+                icon: _isDownloadingDb
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.download_rounded),
+                label: Text(
+                  _isDownloadingDb
+                      ? 'Transfiriendo... ${(_downloadProgress * 100).toStringAsFixed(0)}%'
+                      : 'Transferir datos',
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF1565C0),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            if (_isDownloadingDb) ...[
+              const SizedBox(height: 8),
+              LinearProgressIndicator(
+                value: _downloadProgress,
+                backgroundColor: Colors.white24,
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(Color(0xFF42A5F5)),
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ],
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => setState(() => _showUsbTransferOption = false),
+              child: Text(
+                'Ignorar y continuar',
+                style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5), fontSize: 13),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── UI: Sin conexión en primer inicio — elegir método ───────────────────
+
+  Widget _buildNoConnectionCard() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFB71C1C), Color(0xFFE53935)],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.wifi_off_rounded,
+                  size: 36, color: Colors.white),
+            ),
+            const SizedBox(height: 18),
+            const Text(
+              'Sin conexión a internet',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Para configurar este dispositivo, elige una opción de instalación:',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 13,
+                color: Colors.white.withValues(alpha: 0.7),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            // Opción TCP
+            _buildInstallOptionButton(
+              icon: Icons.usb_rounded,
+              title: 'Instalar por TCP',
+              subtitle: 'Conecta otro Android con la app\nvía USB tethering',
+              color: const Color(0xFF0D47A1),
+              borderColor: const Color(0xFF1565C0),
+              onTap: _tryTcpInstall,
+            ),
+            const SizedBox(height: 12),
+            // Opción ADB
+            _buildInstallOptionButton(
+              icon: Icons.computer_rounded,
+              title: 'Instalar por ADB',
+              subtitle: 'Conecta un PC Windows con la\nBD actualizada vía cable USB',
+              color: const Color(0xFF1A237E),
+              borderColor: const Color(0xFF3949AB),
+              onTap: () async {
+                final ctx = context;
+                await Navigator.push(
+                  ctx,
+                  MaterialPageRoute(
+                      builder: (_) => const AdbInstallPageWidget()),
+                );
+                if (mounted) _loadUsersFromSqlite();
+              },
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() => _showNoConnectionError = false);
+                  _checkFirstRunConnectivity();
+                },
+                icon: const Icon(Icons.refresh_rounded, color: Colors.white),
+                label: const Text('Reintentar internet',
+                    style: TextStyle(color: Colors.white)),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Colors.white24),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInstallOptionButton({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required Color borderColor,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor.withValues(alpha: 0.6)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: borderColor.withValues(alpha: 0.3),
+              ),
+              child: Icon(icon, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 12,
+                      color: Colors.white.withValues(alpha: 0.6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded,
+                size: 14, color: Colors.white.withValues(alpha: 0.4)),
+          ],
         ),
       ),
     );

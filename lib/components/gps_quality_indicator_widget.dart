@@ -72,8 +72,13 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     if (!Platforms.isMobile) return;
     final service = FlutterBackgroundService();
     _gpsProgressSubscription = service.on('gpsProgress').listen((event) {
-      if (event != null && mounted) {
+      // Optimización: no hacer setState si el banner no está visible —
+      // nadie va a leer _currentAccuracy y el setState fuerza un frame
+      // innecesario que en gama media-alta satura BLASTBufferQueue.
+      if (event != null && mounted && _isVisible) {
         final accuracy = (event['accuracy'] as num?)?.toDouble() ?? 0.0;
+        // Throttle adicional: solo rebuild si el valor cambió ≥ 0.5 m.
+        if ((accuracy - _currentAccuracy).abs() < 0.5) return;
         setState(() {
           _currentAccuracy = accuracy;
         });
@@ -165,9 +170,13 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     // En Windows no hay GPS real — siempre simulado como estabilizado
     if (!Platforms.isMobile) return const SizedBox.shrink();
 
-    return Consumer<FFAppState>(
-      builder: (context, appState, _) {
-        final currentStabilized = appState.isStabilized;
+    // Selector en vez de Consumer: solo rebuild cuando `isStabilized` cambia
+    // (booleano), no en cada `notifyListeners()` del FFAppState — que se
+    // dispara cada vez que llega una lectura GPS (~ cada 1.5 s) además de
+    // por setters de structs no relacionados.
+    return Selector<FFAppState, bool>(
+      selector: (_, appState) => appState.isStabilized,
+      builder: (context, currentStabilized, _) {
 
         // Detectar cambios de estado
         bool shouldShow = false;

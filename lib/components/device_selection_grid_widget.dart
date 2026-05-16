@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:sqflite/sqflite.dart';
 import '/custom_code/actions/index.dart' as actions;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'device_selection_grid_model.dart';
 export 'device_selection_grid_model.dart';
 
@@ -30,6 +31,7 @@ class DeviceSelectionGridWidget extends StatefulWidget {
 class _DeviceSelectionGridWidgetState
     extends State<DeviceSelectionGridWidget> {
   late DeviceSelectionGridModel _model;
+  bool _hideAddDevice = false;
 
   @override
   void setState(VoidCallback callback) {
@@ -45,8 +47,20 @@ class _DeviceSelectionGridWidgetState
     _model.textController ??= TextEditingController();
     _model.textFieldFocusNode ??= FocusNode();
 
-    // Cargar dispositivos al iniciar
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDevices());
+    _checkAdbInstall();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Evitar que el teclado aparezca automáticamente al abrir el diálogo.
+      // Flutter a veces enfoca el primer TextField visible al mostrarse un Dialog.
+      if (mounted) FocusScope.of(context).unfocus();
+      _loadDevices();
+    });
+  }
+
+  Future<void> _checkAdbInstall() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isAdb = prefs.getBool('clickpalm_adb_install') ?? false;
+    if (isAdb && mounted) setState(() => _hideAddDevice = true);
   }
 
   @override
@@ -455,7 +469,8 @@ class _DeviceSelectionGridWidgetState
                       : _buildDeviceGrid(),
             ),
 
-            // Botón agregar nuevo dispositivo
+            // Botón agregar nuevo dispositivo (oculto si instalación fue por ADB)
+            if (!_hideAddDevice)
             Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(20.0, 8.0, 20.0, 12.0),
               child: InkWell(

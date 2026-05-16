@@ -7,7 +7,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import '/custom_code/platform_utils.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 
 class AdbNfcClientService {
   AdbNfcClientService._();
@@ -18,12 +21,28 @@ class AdbNfcClientService {
       StreamController<bool>.broadcast();
   final StreamController<Map<String, dynamic>> _serverCommandController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<double> _dbProgressController =
+      StreamController<double>.broadcast();
+  final StreamController<DbTransferCompleteEvent> _dbCompleteController =
+      StreamController<DbTransferCompleteEvent>.broadcast();
+
+  // Estado interno de ensamblado de BD
+  List<int> _dbBuffer = [];
+  int _dbTotalBytes = 0;
+  DateTime? _dbTransferStart;
 
   Stream<bool> get onConnectionChanged => _connectedController.stream;
 
   /// Emite comandos recibidos desde el servidor Windows (p.ej. 'request_nfc_read').
   Stream<Map<String, dynamic>> get onServerCommand =>
       _serverCommandController.stream;
+
+  /// Progreso de recepción de BD (0.0 – 1.0).
+  Stream<double> get onDbTransferProgress => _dbProgressController.stream;
+
+  /// Emite el resultado cuando la transferencia de BD está completa.
+  Stream<DbTransferCompleteEvent> get onDbTransferComplete =>
+      _dbCompleteController.stream;
 
   bool get isConnected => _socket != null;
 
@@ -38,14 +57,11 @@ class AdbNfcClientService {
       _connectedController.add(true);
 
       _socket!.listen(
-        (data) {
-          // Procesar comandos enviados desde el servidor Windows → Android
-          try {
-            final Map<String, dynamic> msg = jsonDecode(data as String);
-            debugPrint('📨 AdbNfcClientService: Comando del servidor: $msg');
-            _serverCommandController.add(msg);
-          } catch (e) {
-            debugPrint('❌ AdbNfcClientService: Mensaje inválido del servidor: $e');
+        (dynamic data) {
+          if (data is List<int>) {
+            _handleBinaryChunk(data);
+          } else if (data is String) {
+            _handleJsonMessage(data);
           }
         },
         onDone: () {
@@ -65,6 +81,82 @@ class AdbNfcClientService {
       debugPrint('❌ AdbNfcClientService: Could not connect: $e');
       _socket = null;
       _connectedController.add(false);
+      return false;
+    }
+  }
+
+  void _handleJsonMessage(String data) {
+    try {
+      final Map<String, dynamic> msg = jsonDecode(data);
+      debugPrint('📨 AdbNfcClientService: Mensaje del servidor: ${msg['type']}');
+      switch (msg['type'] as String?) {
+        case 'db_transfer_start':
+          _dbTotalBytes = (msg['payload']['total_bytes'] as num).toInt();
+          _dbTransferStart ??= DateTime.now();
+          _dbBuffer = [];
+          debugPrint('📦 AdbNfcClientService: Transferencia BD iniciada ($_dbTotalBytes bytes)');
+          break;
+        case 'db_transfer_complete':
+          _saveTransferredDb();
+          break;
+        default:
+          _serverCommandController.add(msg);
+      }
+    } catch (e) {
+      debugPrint('❌ AdbNfcClientService: Mensaje inválido del servidor: $e');
+    }
+  }
+
+  void _handleBinaryChunk(List<int> bytes) {
+    _dbBuffer.addAll(bytes);
+    if (_dbTotalBytes > 0) {
+      _dbProgressController.add(_dbBuffer.length / _dbTotalBytes);
+    }
+  }
+
+  Future<void> _saveTransferredDb() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      final tempPath = p.join(tempDir.path, 'adb_transfer.db');
+      await File(tempPath).writeAsBytes(_dbBuffer);
+      if (await File(tempPath).length() == 0) throw Exception('Archivo vacío');
+
+      final dbPath = await globalDb.dbPath;
+      await globalDb.close();
+      await File(tempPath).copy(dbPath);
+      await globalDb.database; // reabrir
+
+      final duration =
+          DateTime.now().difference(_dbTransferStart ?? DateTime.now());
+      _dbCompleteController.add(DbTransferCompleteEvent(
+        dbPath: dbPath,
+        totalBytes: _dbBuffer.length,
+        duration: duration,
+      ));
+      debugPrint('✅ AdbNfcClientService: BD guardada en $dbPath (${_dbBuffer.length} bytes)');
+      _dbBuffer = [];
+      _dbTotalBytes = 0;
+      _dbTransferStart = null;
+    } catch (e) {
+      debugPrint('❌ AdbNfcClientService: Error guardando BD: $e');
+      try {
+        await globalDb.database;
+      } catch (_) {}
+    }
+  }
+
+  /// Solicita la transferencia de BD al servidor PC.
+  Future<bool> requestDbTransfer() async {
+    if (_socket == null || !isConnected) return false;
+    _dbBuffer = [];
+    _dbTotalBytes = 0;
+    _dbTransferStart = DateTime.now();
+    try {
+      _socket!.add(jsonEncode({'type': 'request_db_transfer'}));
+      debugPrint('📤 AdbNfcClientService: request_db_transfer enviado');
+      return true;
+    } catch (e) {
+      debugPrint('❌ AdbNfcClientService: requestDbTransfer falló: $e');
       return false;
     }
   }
@@ -125,4 +217,22 @@ class AdbNfcClientService {
     _socket = null;
     _connectedController.add(false);
   }
+
+  /// Desconecta (sin importar estado actual) y vuelve a conectar.
+  Future<bool> forceReconnect() async {
+    await disconnect();
+    return connect();
+  }
+}
+
+class DbTransferCompleteEvent {
+  final String dbPath;
+  final int totalBytes;
+  final Duration duration;
+
+  const DbTransferCompleteEvent({
+    required this.dbPath,
+    required this.totalBytes,
+    required this.duration,
+  });
 }

@@ -14,6 +14,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '/custom_code/platform_utils.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 
 class AdbNfcBridgeService {
   AdbNfcBridgeService._();
@@ -80,9 +81,12 @@ class AdbNfcBridgeService {
       StreamController<AdbBridgeStatus>.broadcast();
   final StreamController<Map<String, dynamic>> _geoLocationController =
       StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<DbTransferState> _dbTransferController =
+      StreamController<DbTransferState>.broadcast();
 
   Stream<Map<String, dynamic>> get onTagReceived => _tagController.stream;
   Stream<AdbBridgeStatus> get onStatusChanged => _statusController.stream;
+  Stream<DbTransferState> get onDbTransfer => _dbTransferController.stream;
 
   bool get isServerRunning => _server != null;
   bool get isClientConnected => _client != null;
@@ -199,9 +203,54 @@ class AdbNfcBridgeService {
         final payload = msg['payload'] as Map<String, dynamic>;
         debugPrint('📍 AdbNfcBridgeService: GPS response received: $payload');
         _geoLocationController.add(payload);
+      } else if (msg['type'] == 'request_db_transfer') {
+        debugPrint('📦 AdbNfcBridgeService: Solicitud de transferencia BD recibida');
+        _handleDbTransferRequest();
       }
     } catch (e) {
       debugPrint('❌ AdbNfcBridgeService: Invalid message: $e');
+    }
+  }
+
+  Future<void> _handleDbTransferRequest() async {
+    if (_client == null) return;
+    try {
+      await globalDb.executeOperation(
+          (db) async => db.execute('PRAGMA wal_checkpoint(FULL)'));
+      final dbPath = await globalDb.dbPath;
+      final bytes = await File(dbPath).readAsBytes();
+      final total = bytes.length;
+
+      _client!.add(jsonEncode({
+        'type': 'db_transfer_start',
+        'payload': {'total_bytes': total},
+      }));
+      _dbTransferController
+          .add(DbTransferState(progress: 0, totalBytes: total, sentBytes: 0));
+
+      const chunkSize = 64 * 1024; // 64 KB
+      int sent = 0;
+      while (sent < total) {
+        final end = (sent + chunkSize).clamp(0, total);
+        _client!.add(bytes.sublist(sent, end));
+        sent = end;
+        _dbTransferController.add(DbTransferState(
+            progress: sent / total, totalBytes: total, sentBytes: sent));
+        await Future.delayed(Duration.zero);
+      }
+
+      _client!.add(jsonEncode({
+        'type': 'db_transfer_complete',
+        'payload': {'total_bytes': total},
+      }));
+      _dbTransferController.add(DbTransferState(
+          progress: 1.0,
+          totalBytes: total,
+          sentBytes: total,
+          isComplete: true));
+      debugPrint('✅ AdbNfcBridgeService: BD enviada ($total bytes)');
+    } catch (e) {
+      debugPrint('❌ AdbNfcBridgeService: Error enviando BD: $e');
     }
   }
 
@@ -278,10 +327,31 @@ class AdbNfcBridgeService {
     _statusController.add(AdbBridgeStatus.serverDown);
     debugPrint('🔴 AdbNfcBridgeService: Server stopped');
   }
+
+  /// Para el servidor, espera 500 ms y lo vuelve a iniciar con adb reverse.
+  Future<bool> restart() async {
+    await stop();
+    await Future.delayed(const Duration(milliseconds: 500));
+    return start();
+  }
 }
 
 enum AdbBridgeStatus {
   serverDown,       // Server not running — red badge
   waitingForClient, // Server up, no mobile connected — yellow/orange badge
   clientConnected,  // Server up + mobile connected — green badge
+}
+
+class DbTransferState {
+  final double progress;
+  final int totalBytes;
+  final int sentBytes;
+  final bool isComplete;
+
+  const DbTransferState({
+    required this.progress,
+    required this.totalBytes,
+    required this.sentBytes,
+    this.isComplete = false,
+  });
 }

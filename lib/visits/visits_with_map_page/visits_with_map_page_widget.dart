@@ -2,6 +2,8 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/index.dart';
+import '/visits/do_visits_form_page/do_visits_form_page_widget.dart';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -24,43 +26,24 @@ class VisitsWithMapPageWidget extends StatefulWidget {
       _VisitsWithMapPageWidgetState();
 }
 
-class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
-    with TickerProviderStateMixin {
+class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget> {
   late VisitsWithMapPageModel _model;
-  late TabController _tabController;
 
   final scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // Tipo de lectura actual (GPS, NFC, QR) - se obtiene del read_default de la actividad
-  String _currentReadType = 'GPS';
+  // Key para invocar métodos públicos del formulario (p.ej. el flujo QR).
+  final GlobalKey<DoVisitsFormPageWidgetState> _formKey =
+      GlobalKey<DoVisitsFormPageWidgetState>();
 
   @override
   void initState() {
     super.initState();
     _model = createModel(context, () => VisitsWithMapPageModel());
-    _tabController = TabController(
-      vsync: this,
-      length: 3,
-      initialIndex: 0,
-    );
-    // Inicializar el tipo de lectura desde la actividad actual
-    _initReadType();
-  }
-
-  void _initReadType() {
-    final currentActivity = FFAppState().currentActivity;
-    final readDefault = getJsonField(currentActivity, r'''$.read_default''')?.toString().toUpperCase() ?? '';
-    if (readDefault == 'NFC' || readDefault == 'QR' || readDefault == 'GPS') {
-      _currentReadType = readDefault;
-    } else {
-      _currentReadType = 'GPS';
-    }
   }
 
   @override
   void dispose() {
     _model.dispose();
-    _tabController.dispose();
     super.dispose();
   }
 
@@ -68,12 +51,18 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
 
-    return GestureDetector(
-      onTap: () {
-        FocusScope.of(context).unfocus();
-        FocusManager.instance.primaryFocus?.unfocus();
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _showExitConfirmationDialog(onConfirm: () { if (mounted) context.pop(); });
       },
-      child: Scaffold(
+      child: GestureDetector(
+        onTap: () {
+          FocusScope.of(context).unfocus();
+          FocusManager.instance.primaryFocus?.unfocus();
+        },
+        child: Scaffold(
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: SafeArea(
@@ -98,59 +87,15 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                 // Header compacto con tabs integrados
                 _buildModernHeader(),
 
-                // Contenido del tab seleccionado
+                // Formulario (pantalla completa; Brújula y Mapa en overlay vía "Otras Opciones")
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    physics: widget.isMapEnabled
-                        ? null
-                        : const NeverScrollableScrollPhysics(),
-                    children: [
-                      // Tab 1: Formulario
-                      const DoVisitsFormPageWidget(),
-                      
-                      // Tab 2: Brújula
-                      Container(
-                        color: FlutterFlowTheme.of(context).primaryBackground,
-                        child: custom_widgets.CompassClickpalm(
-                          width: MediaQuery.sizeOf(context).width,
-                          height: MediaQuery.sizeOf(context).height,
-                          idHeadquarter: FFAppState()
-                              .headquartersSelectedList
-                              .isNotEmpty
-                              ? FFAppState()
-                                  .headquartersSelectedList
-                                  .first
-                                  .idHeadquarter
-                              : null,
-                        ),
-                      ),
-                      
-                      // Tab 3: Mapa
-                      widget.isMapEnabled
-                          ? SizedBox(
-                              width: double.infinity,
-                              height: double.infinity,
-                              child: custom_widgets.OfflineMapTrackerVisits(
-                                width: MediaQuery.sizeOf(context).width,
-                                height: MediaQuery.sizeOf(context).height,
-                                mapFilePath: FFAppState().pathPmtiles,
-                                headquarters:
-                                    FFAppState().headquartersSelectedList,
-                                authToken:
-                                    FFAppState().loginResponse['token']
-                                            as String? ??
-                                        '',
-                              ),
-                            )
-                          : _buildMapLockedContent(),
-                    ],
-                  ),
+                  child: DoVisitsFormPageWidget(key: _formKey),
                 ),
               ],
             ),
           ),
         ),
+      ),
       ),
     );
   }
@@ -175,9 +120,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             child: Row(
               children: [
                 InkWell(
-                  onTap: () async {
-                    context.pop();
-                  },
+                  onTap: () => _showExitConfirmationDialog(onConfirm: () { if (mounted) context.pop(); }),
                   child: Container(
                     width: 36,
                     height: 36,
@@ -220,8 +163,8 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Botón para cambiar tipo de lectura (GPS/NFC/QR)
-                _buildReadTypeSelectorButton(),
+                // Menú con Brújula, Mapa y QR
+                _buildOtrasOpcionesButton(),
                 const SizedBox(width: 8),
                 // Botón de Novedades
                 InkWell(
@@ -229,17 +172,19 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                   focusColor: Colors.transparent,
                   hoverColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  onTap: () async {
+                  onTap: () {
                     HapticFeedback.mediumImpact();
-                    context.pushNamed(
-                      NewsPageWidget.routeName,
-                      extra: <String, dynamic>{
-                        kTransitionInfoKey: const TransitionInfo(
-                          hasTransition: true,
-                          transitionType: PageTransitionType.fade,
-                          duration: Duration(milliseconds: 500),
-                        ),
-                      },
+                    _showExitConfirmationDialog(
+                      onConfirm: () => context.pushNamed(
+                        NewsPageWidget.routeName,
+                        extra: <String, dynamic>{
+                          kTransitionInfoKey: const TransitionInfo(
+                            hasTransition: true,
+                            transitionType: PageTransitionType.fade,
+                            duration: Duration(milliseconds: 500),
+                          ),
+                        },
+                      ),
                     );
                   },
                   child: Container(
@@ -269,113 +214,6 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             ),
           ),
 
-          // Tabs compactos
-          Container(
-            height: 40,
-            margin: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withValues(alpha: 0.15),
-                  Colors.white.withValues(alpha: 0.05),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: const Color(0xFF00a86b).withValues(alpha: 0.3),
-                width: 1,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: TabBar(
-                controller: _tabController,
-                indicator: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      FlutterFlowTheme.of(context).primary,
-                      FlutterFlowTheme.of(context).primary.withValues(alpha: 0.8),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                indicatorSize: TabBarIndicatorSize.tab,
-                indicatorPadding: const EdgeInsets.all(4),
-                labelColor: Colors.white,
-                unselectedLabelColor: const Color(0xFF00ff9f).withValues(alpha: 0.6),
-                labelStyle: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-                unselectedLabelStyle: const TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-                onTap: (i) async {
-                  if (!widget.isMapEnabled && i == 2) {
-                    // Si el mapa está deshabilitado y el usuario intenta acceder
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'El mapa está deshabilitado. Debe generar una ruta óptima desde la pantalla anterior.',
-                          style: TextStyle(
-                            color: FlutterFlowTheme.of(context).primaryText,
-                          ),
-                        ),
-                        duration: const Duration(milliseconds: 3000),
-                        backgroundColor: FlutterFlowTheme.of(context).warning,
-                      ),
-                    );
-                    // Volver a la primera pestaña
-                    _tabController.animateTo(
-                      0,
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.ease,
-                    );
-                  }
-                },
-                tabs: [
-                  const Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.edit_note_rounded, size: 18),
-                        SizedBox(width: 6),
-                        Text('Formulario'),
-                      ],
-                    ),
-                  ),
-                  const Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.compass_calibration, size: 18),
-                        SizedBox(width: 6),
-                        Text('Brújula'),
-                      ],
-                    ),
-                  ),
-                  Tab(
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          widget.isMapEnabled ? Icons.map_rounded : Icons.lock_outline,
-                          size: 18,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(widget.isMapEnabled ? 'Mapa' : 'Mapa'),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
         ],
       ),
     );
@@ -434,69 +272,211 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
     );
   }
 
-  /// Botón compacto para cambiar el tipo de lectura (GPS/NFC/QR)
-  Widget _buildReadTypeSelectorButton() {
-    // Determinar icono y color según el tipo actual
-    IconData icon;
-    Color color;
-    switch (_currentReadType) {
-      case 'NFC':
-        icon = Icons.nfc_rounded;
-        color = const Color(0xFF2196F3); // Azul
-        break;
-      case 'QR':
-        icon = Icons.qr_code_rounded;
-        color = const Color(0xFF9C27B0); // Púrpura
-        break;
-      default:
-        icon = Icons.gps_fixed_rounded;
-        color = const Color(0xFF00a86b); // Verde
-    }
+  void _showExitConfirmationDialog({required VoidCallback onConfirm}) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.7),
+      builder: (dialogContext) {
+        int secondsLeft = 5;
+        Timer? autoCloseTimer;
 
+        return StatefulBuilder(
+          builder: (ctx, setStateDialog) {
+            autoCloseTimer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+              if (secondsLeft <= 1) {
+                t.cancel();
+                if (Navigator.canPop(dialogContext)) {
+                  Navigator.pop(dialogContext);
+                }
+                return;
+              }
+              setStateDialog(() => secondsLeft--);
+            });
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Container(
+                width: 280,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: Colors.red.withValues(alpha: 0.4),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.warning_amber_rounded,
+                        color: Colors.red,
+                        size: 30,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      '¿Desea salir?',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Los datos del formulario se perderán si sale ahora.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.7),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Cerrando en $secondsLeft s...',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 11,
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              autoCloseTimer?.cancel();
+                              Navigator.pop(dialogContext);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                ),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'Cancelar',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () {
+                              autoCloseTimer?.cancel();
+                              Navigator.pop(dialogContext);
+                              if (mounted) onConfirm();
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              height: 44,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    Colors.red.withValues(alpha: 0.8),
+                                    Colors.red.withValues(alpha: 0.6),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  'Salir',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildOtrasOpcionesButton() {
     return InkWell(
-      onTap: () => _showReadTypeSelectorDialog(),
+      onTap: () {
+        HapticFeedback.mediumImpact();
+        _showExitConfirmationDialog(onConfirm: _showOtrasOpcionesDialog);
+      },
       borderRadius: BorderRadius.circular(10),
       child: Container(
+        width: 36,
         height: 36,
-        padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              color.withValues(alpha: 0.3),
-              color.withValues(alpha: 0.15),
+              Colors.white.withValues(alpha: 0.2),
+              Colors.white.withValues(alpha: 0.1),
             ],
           ),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: color.withValues(alpha: 0.6),
+            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
             width: 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 6),
-            Text(
-              _currentReadType,
-              style: TextStyle(
-                fontFamily: 'Roboto',
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: color,
-                letterSpacing: 0.5,
-              ),
-            ),
-          ],
+        child: const Icon(
+          Icons.apps_rounded,
+          color: Colors.white,
+          size: 20,
         ),
       ),
     );
   }
 
-  /// Muestra el diálogo para seleccionar el tipo de lectura
-  void _showReadTypeSelectorDialog() {
-    HapticFeedback.mediumImpact();
-
+  void _showOtrasOpcionesDialog() {
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.7),
@@ -511,10 +491,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [
-                  Color(0xFF1E293B),
-                  Color(0xFF0F172A),
-                ],
+                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
@@ -532,9 +509,8 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Título
                 const Text(
-                  'TIPO DE LECTURA',
+                  'OPCIONES',
                   style: TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
@@ -544,35 +520,69 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                   ),
                 ),
                 const SizedBox(height: 20),
-
-                // Opciones
-                _buildReadTypeOption(
-                  dialogContext,
-                  'GPS',
-                  Icons.gps_fixed_rounded,
+                _buildOpcionItem(
+                  'Brújula',
+                  Icons.compass_calibration_rounded,
                   const Color(0xFF00a86b),
-                  'Ubicación GPS',
+                  'Ver brújula de orientación',
+                  () {
+                    Navigator.pop(dialogContext);
+                    _openBrujelaOverlay();
+                  },
                 ),
                 const SizedBox(height: 10),
-                _buildReadTypeOption(
-                  dialogContext,
-                  'NFC',
-                  Icons.nfc_rounded,
+                _buildOpcionItem(
+                  'Mapa',
+                  Icons.map_rounded,
                   const Color(0xFF2196F3),
-                  'Lectura TAG NFC',
+                  'Ver mapa de visitas',
+                  () {
+                    Navigator.pop(dialogContext);
+                    _openMapaOverlay();
+                  },
                 ),
                 const SizedBox(height: 10),
-                _buildReadTypeOption(
-                  dialogContext,
+                _buildOpcionItem(
                   'QR',
-                  Icons.qr_code_rounded,
+                  Icons.qr_code_scanner_rounded,
                   const Color(0xFF9C27B0),
                   'Escanear código QR',
+                  () async {
+                    Navigator.pop(dialogContext);
+                    if (!FFAppState().activitySelected.isSync) {
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Row(
+                            children: [
+                              Icon(Icons.sync_disabled_rounded, color: Colors.white),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'La actividad no está sincronizada. No se puede registrar la visita.',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          duration: const Duration(seconds: 3),
+                          backgroundColor: Colors.orange,
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          margin: const EdgeInsets.all(16),
+                        ),
+                      );
+                      return;
+                    }
+                    await _formKey.currentState?.triggerQrSaveFlow();
+                  },
                 ),
-
                 const SizedBox(height: 16),
-
-                // Botón cancelar
                 InkWell(
                   onTap: () => Navigator.pop(dialogContext),
                   borderRadius: BorderRadius.circular(10),
@@ -604,40 +614,25 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
     );
   }
 
-  /// Construye una opción del selector de tipo de lectura
-  Widget _buildReadTypeOption(
-    BuildContext dialogContext,
-    String type,
+  Widget _buildOpcionItem(
+    String title,
     IconData icon,
     Color color,
     String description,
+    VoidCallback onTap,
   ) {
-    final isSelected = _currentReadType == type;
-
     return InkWell(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        _updateReadType(type);
-        Navigator.pop(dialogContext);
-      },
+      onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          gradient: isSelected
-              ? LinearGradient(
-                  colors: [
-                    color.withValues(alpha: 0.3),
-                    color.withValues(alpha: 0.15),
-                  ],
-                )
-              : null,
-          color: isSelected ? null : Colors.white.withValues(alpha: 0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? color : Colors.white.withValues(alpha: 0.1),
-            width: isSelected ? 2 : 1,
+            color: Colors.white.withValues(alpha: 0.1),
+            width: 1,
           ),
         ),
         child: Row(
@@ -657,12 +652,12 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    type,
-                    style: TextStyle(
+                    title,
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: isSelected ? color : Colors.white,
+                      color: Colors.white,
                     ),
                   ),
                   Text(
@@ -676,37 +671,119 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget>
                 ],
               ),
             ),
-            if (isSelected)
-              Icon(Icons.check_circle_rounded, color: color, size: 22),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: color.withValues(alpha: 0.7),
+              size: 20,
+            ),
           ],
         ),
       ),
     );
   }
 
-  /// Actualiza el tipo de lectura y lo guarda en el currentActivity
-  void _updateReadType(String newType) {
-    setState(() {
-      _currentReadType = newType;
-    });
+  void _openBrujelaOverlay() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 300),
+      transitionBuilder: (ctx, anim, _, child) =>
+          FadeTransition(opacity: anim, child: child),
+      pageBuilder: (ctx, _, __) => Material(
+        color: FlutterFlowTheme.of(context).primaryBackground,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              custom_widgets.CompassClickpalm(
+                width: MediaQuery.sizeOf(context).width,
+                height: MediaQuery.sizeOf(context).height,
+                idHeadquarter:
+                    FFAppState().headquartersSelectedList.isNotEmpty
+                        ? FFAppState()
+                            .headquartersSelectedList
+                            .first
+                            .idHeadquarter
+                        : null,
+              ),
+              Positioned(
+                top: 8,
+                right: 12,
+                child: _buildOverlayCloseButton(ctx),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    // Actualizar el read_default en el currentActivity del AppState
-    final currentActivity = FFAppState().currentActivity;
-    if (currentActivity is Map<String, dynamic>) {
-      final updatedActivity = Map<String, dynamic>.from(currentActivity);
-      updatedActivity['read_default'] = newType;
-      FFAppState().currentActivity = updatedActivity;
-    } else if (currentActivity != null) {
-      // Si es un JSON dinámico, intentar convertirlo
-      try {
-        final Map<String, dynamic> activityMap = Map<String, dynamic>.from(currentActivity as Map);
-        activityMap['read_default'] = newType;
-        FFAppState().currentActivity = activityMap;
-      } catch (e) {
-        debugPrint('⚠️ No se pudo actualizar read_default: $e');
-      }
-    }
+  void _openMapaOverlay() {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black87,
+      transitionDuration: const Duration(milliseconds: 300),
+      transitionBuilder: (ctx, anim, _, child) =>
+          FadeTransition(opacity: anim, child: child),
+      pageBuilder: (ctx, _, __) => Material(
+        color: FlutterFlowTheme.of(context).primaryBackground,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              widget.isMapEnabled
+                  ? SizedBox(
+                      width: double.infinity,
+                      height: double.infinity,
+                      child: custom_widgets.OfflineMapTrackerVisits(
+                        width: MediaQuery.sizeOf(context).width,
+                        height: MediaQuery.sizeOf(context).height,
+                        mapFilePath: FFAppState().pathPmtiles,
+                        headquarters: FFAppState().headquartersSelectedList,
+                        authToken:
+                            FFAppState().loginResponse['token'] as String? ??
+                                '',
+                      ),
+                    )
+                  : _buildMapLockedContent(),
+              Positioned(
+                top: 8,
+                right: 12,
+                child: _buildOverlayCloseButton(ctx),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
-    debugPrint('✅ Tipo de lectura cambiado a: $newType');
+  Widget _buildOverlayCloseButton(BuildContext ctx) {
+    return InkWell(
+      onTap: () => Navigator.pop(ctx),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.white.withValues(alpha: 0.2),
+              Colors.white.withValues(alpha: 0.1),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: const Icon(
+          Icons.close_rounded,
+          color: Color(0xFF00ff9f),
+          size: 20,
+        ),
+      ),
+    );
   }
 }

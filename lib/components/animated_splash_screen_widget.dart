@@ -124,36 +124,37 @@ class _AnimatedSplashScreenWidgetState
         ),
         child: Stack(
           children: [
-            // Efecto de partículas sutiles en el fondo
-            ...List.generate(20, (index) {
-              return Positioned(
-                left: (index * 50.0) % MediaQuery.of(context).size.width,
-                top: (index * 80.0) % MediaQuery.of(context).size.height,
-                child: AnimatedBuilder(
-                  animation: _fadeController,
-                  builder: (context, child) {
-                    return Opacity(
-                      opacity: (0.1 + (index % 3) * 0.05) * _fadeAnimation.value,
-                      child: Container(
-                        width: 4 + (index % 4) * 2,
-                        height: 4 + (index % 4) * 2,
-                        decoration: BoxDecoration(
-                          color: Color(0xFF00a86b),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Color(0xFF00a86b).withOpacity(0.5),
-                              blurRadius: 8,
-                              spreadRadius: 2,
+            // Efecto de partículas sutiles en el fondo.
+            // RepaintBoundary aísla las 20 animaciones del resto del árbol,
+            // evitando que cada tick invalide el logo y el fondo.
+            // BoxShadow eliminado: causaba compilación de shaders Impeller
+            // para cada partícula en el primer frame (→ 58+ frames saltados).
+            RepaintBoundary(
+              child: Stack(
+                children: List.generate(20, (index) {
+                  return Positioned(
+                    left: (index * 50.0) % MediaQuery.of(context).size.width,
+                    top: (index * 80.0) % MediaQuery.of(context).size.height,
+                    child: AnimatedBuilder(
+                      animation: _fadeController,
+                      builder: (context, child) {
+                        return Opacity(
+                          opacity: (0.1 + (index % 3) * 0.05) * _fadeAnimation.value,
+                          child: Container(
+                            width: 4 + (index % 4) * 2,
+                            height: 4 + (index % 4) * 2,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF00a86b),
+                              shape: BoxShape.circle,
                             ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              );
-            }),
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                }),
+              ),
+            ),
 
             // Logo y texto animado
             Center(

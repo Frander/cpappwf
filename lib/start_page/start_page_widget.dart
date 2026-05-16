@@ -59,10 +59,6 @@ class _StartPageWidgetState extends State<StartPageWidget> {
     SchedulerBinding.instance.addPostFrameCallback((_) async {
       // Paso 1: Obteniendo ID del dispositivo
       _updateProgress(1, 'Identificando dispositivo...');
-      await Future.delayed(Duration(milliseconds: 500));
-
-      // DIAGNÓSTICO TEMPORAL — quitar cuando ya se confirmen las rutas disponibles
-      if (mounted) await actions.diagnoseStorage(context);
 
       _model.identifierCTR = await actions.getPersistentId(
         context,
@@ -354,7 +350,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
             FFAppState().headquarterSelected = HeadquartersStruct();
             FFAppState().zoneSelected = ZonesStruct();
             // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
-            FFAppState().headquartersSelectedList = [];
+            // headquartersSelectedList se mantiene persistida — NO limpiar
             FFAppState().newsList = [];
             FFAppState().isStabilized = false;
             FFAppState().visitDetails = [];
@@ -621,7 +617,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               FFAppState().headquarterSelected = HeadquartersStruct();
                               FFAppState().zoneSelected = ZonesStruct();
                               // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
-                              FFAppState().headquartersSelectedList = [];
+                              // headquartersSelectedList se mantiene persistida — NO limpiar
                               FFAppState().newsList = [];
                               FFAppState().isStabilized = false;
                               FFAppState().visitDetails = [];
@@ -881,7 +877,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                       FFAppState().lastSync = getCurrentTimestamp;
                       FFAppState().headquarterSelected = HeadquartersStruct();
                       FFAppState().zoneSelected = ZonesStruct();
-                      FFAppState().headquartersSelectedList = [];
+                      // headquartersSelectedList se mantiene persistida — NO limpiar
                       FFAppState().isStabilized = false;
                       FFAppState().visitDetails = [];
 
@@ -1107,7 +1103,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
               FFAppState().headquarterSelected = HeadquartersStruct();
               FFAppState().zoneSelected = ZonesStruct();
               // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
-              FFAppState().headquartersSelectedList = [];
+              // headquartersSelectedList se mantiene persistida — NO limpiar
               FFAppState().newsList = (getJsonField(
                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                 r'''$.news''',
@@ -1300,7 +1296,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                               FFAppState().headquarterSelected = HeadquartersStruct();
                               FFAppState().zoneSelected = ZonesStruct();
                               // activitiesJSON ya fue cargado por syncLogin desde el endpoint GZIP — NO sobrescribir
-                              FFAppState().headquartersSelectedList = [];
+                              // headquartersSelectedList se mantiene persistida — NO limpiar
                               FFAppState().newsList = (getJsonField(
                                 (_model.apiResultLoginDirect?.jsonBody ?? ''),
                                 r'''$.news''',
@@ -1702,7 +1698,7 @@ class _StartPageWidgetState extends State<StartPageWidget> {
                                 FFAppState().headquarterSelected =
                                     HeadquartersStruct();
                                 FFAppState().zoneSelected = ZonesStruct();
-                                FFAppState().headquartersSelectedList = [];
+                                // headquartersSelectedList se mantiene persistida — NO limpiar
                                 FFAppState().isStabilized = false;
                                 FFAppState().visitDetails = [];
 

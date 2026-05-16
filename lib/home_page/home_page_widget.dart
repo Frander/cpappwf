@@ -20,6 +20,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'home_page_model.dart';
 export 'home_page_model.dart';
 import '/index.dart';
+import '/release_log.dart';
 
 class HomePageWidget extends StatefulWidget {
   const HomePageWidget({super.key});
@@ -583,11 +584,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
     final userName = FFAppState().userSelected.nameUser;
     if (userName.isEmpty) return 'U';
 
-    final words = userName.trim().split(' ');
+    final words = userName.trim().split(' ').where((w) => w.isNotEmpty).toList();
+    if (words.isEmpty) return 'U';
     if (words.length >= 2) {
       return '${words[0][0]}${words[1][0]}'.toUpperCase();
     }
-    return userName[0].toUpperCase();
+    return words[0][0].toUpperCase();
   }
 
   // Cargar última fecha de visita - usando singleton global
@@ -814,6 +816,29 @@ class _HomePageWidgetState extends State<HomePageWidget>
     }
   }
 
+  /// Ejecuta un subbuilder atrapando cualquier excepción. Si falla, renderiza
+  /// un bloque rojo con el mensaje en lugar de propagar (que dejaría toda la
+  /// pantalla en blanco). Convierte un bug fantasmagórico en uno localizable.
+  Widget _safeBuild(String tag, Widget Function() builder) {
+    try {
+      return builder();
+    } catch (e, st) {
+      releaseLog('homePage.$tag build threw', e, st);
+      return Container(
+        padding: const EdgeInsets.all(8),
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFF441111),
+          border: Border.all(color: Colors.red, width: 1),
+        ),
+        child: Text(
+          '⚠ $tag: $e',
+          style: const TextStyle(color: Colors.white, fontSize: 10),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     context.watch<FFAppState>();
@@ -863,39 +888,42 @@ class _HomePageWidgetState extends State<HomePageWidget>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           // 0a. Banner de calibración (solo si la brújula/GPS no están calibrados)
-                          _buildCalibrationBanner(),
+                          _safeBuild('CalibrationBanner',
+                              () => _buildCalibrationBanner()),
 
                           // 0b. Banner de sincronización base (solo si no se ha sincronizado)
-                          _buildSyncBanner(),
+                          _safeBuild('SyncBanner', () => _buildSyncBanner()),
 
                           // 0c. Banner de mapas offline (si no se han descargado, y no fue omitido)
-                          _buildMapBanner(),
+                          _safeBuild('MapBanner', () => _buildMapBanner()),
 
                           // 0d. Banner de modelo de voz IA
-                          _buildVoiceBanner(),
+                          _safeBuild('VoiceBanner', () => _buildVoiceBanner()),
 
                           // 1. Header con identificación de usuario
-                          _buildUserHeader(),
+                          _safeBuild('UserHeader', () => _buildUserHeader()),
 
                           const SizedBox(height: 16),
 
                           // 2. Botones de Información y Sincronización (compactos)
-                          _buildInfoSyncButtons(),
+                          _safeBuild(
+                              'InfoSyncButtons', () => _buildInfoSyncButtons()),
 
                           const SizedBox(height: 16),
 
                           // 3. Cuadro de búsqueda con badge de actividad seleccionada
-                          _buildSearchSection(),
+                          _safeBuild(
+                              'SearchSection', () => _buildSearchSection()),
 
                           const SizedBox(height: 20),
 
                           // 4. Lista de módulos (5 primeros + "Ver más")
-                          _buildModulesList(),
+                          _safeBuild('ModulesList', () => _buildModulesList()),
 
                           const SizedBox(height: 20),
 
                           // 5. Dashboard Agronómico (sin título superior, 2 tabs)
-                          _buildDashboard(),
+                          _safeBuild('Dashboard', () => _buildDashboard()),
 
                           const SizedBox(height: 100), // Espacio para el botón flotante
                         ],
@@ -1969,7 +1997,7 @@ class _HomePageWidgetState extends State<HomePageWidget>
         highlightColor: Colors.transparent,
         onTap: () async {
           context.pushNamed(
-            InformationPageWidget.routeName,
+            'HistoryVisitsPage',
             extra: <String, dynamic>{
               kTransitionInfoKey: const TransitionInfo(
                 hasTransition: true,

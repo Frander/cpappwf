@@ -5,6 +5,8 @@ import '/backend/api_requests/api_manager.dart';
 import '/backend/sqlite/sqlite_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'flutter_flow/flutter_flow_util.dart';
+import 'release_log.dart';
+import 'safe_struct_hydration.dart';
 import 'dart:convert';
 
 class FFAppState extends ChangeNotifier {
@@ -44,71 +46,44 @@ class FFAppState extends ChangeNotifier {
     });
     _safeInit(() {
       if (prefs.containsKey('ff_userSelected')) {
-        try {
-          final serializedData = prefs.getString('ff_userSelected') ?? '{}';
-          _userSelected =
-              UsersStruct.fromSerializableMap(jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
+        final data = safeJsonDecodeMap(
+            'userSelected', prefs.getString('ff_userSelected') ?? '');
+        _userSelected = safeHydrateUsers(data);
       }
     });
     _safeInit(() {
       if (prefs.containsKey('ff_companyDefault')) {
-        try {
-          final serializedData = prefs.getString('ff_companyDefault') ?? '{}';
-          _companyDefault =
-              CompaniesStruct.fromSerializableMap(jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
+        final data = safeJsonDecodeMap(
+            'companyDefault', prefs.getString('ff_companyDefault') ?? '');
+        _companyDefault = safeHydrateCompanies(data);
       }
     });
     _safeInit(() {
       if (prefs.containsKey('ff_deviceDefault')) {
-        try {
-          final serializedData = prefs.getString('ff_deviceDefault') ?? '{}';
-          _deviceDefault =
-              DevicesStruct.fromSerializableMap(jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
+        final data = safeJsonDecodeMap(
+            'deviceDefault', prefs.getString('ff_deviceDefault') ?? '');
+        _deviceDefault = safeHydrateDevices(data);
       }
     });
     _safeInit(() {
       if (prefs.containsKey('ff_activityDefault')) {
-        try {
-          final serializedData = prefs.getString('ff_activityDefault') ?? '{}';
-          _activityDefault =
-              ActivitiesStruct.fromSerializableMap(jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
+        final data = safeJsonDecodeMap(
+            'activityDefault', prefs.getString('ff_activityDefault') ?? '');
+        _activityDefault = safeHydrateActivities(data);
       }
     });
     _safeInit(() {
       if (prefs.containsKey('ff_activitySelected')) {
-        try {
-          final serializedData = prefs.getString('ff_activitySelected') ?? '{}';
-          _activitySelected =
-              ActivitiesStruct.fromSerializableMap(jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
+        final data = safeJsonDecodeMap(
+            'activitySelected', prefs.getString('ff_activitySelected') ?? '');
+        _activitySelected = safeHydrateActivities(data);
       }
     });
     _safeInit(() {
       _headquartersList = prefs
               .getStringList('ff_headquartersList')
-              ?.map((x) {
-                try {
-                  return HeadquartersStruct.fromSerializableMap(jsonDecode(x));
-                } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
-                  return null;
-                }
-              })
-              .withoutNulls
+              ?.map((x) => safeHydrateHeadquarters(
+                  safeJsonDecodeMap('headquartersList[]', x)))
               .toList() ??
           _headquartersList;
     });
@@ -118,8 +93,8 @@ class FFAppState extends ChangeNotifier {
               ?.map((x) {
                 try {
                   return ProductsStruct.fromSerializableMap(jsonDecode(x));
-                } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                } catch (e, st) {
+                  releaseLog('hydrate productsList[]', e, st);
                   return null;
                 }
               })
@@ -130,15 +105,8 @@ class FFAppState extends ChangeNotifier {
     _safeInit(() {
       _usersList = prefs
               .getStringList('ff_usersList')
-              ?.map((x) {
-                try {
-                  return UsersStruct.fromSerializableMap(jsonDecode(x));
-                } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
-                  return null;
-                }
-              })
-              .withoutNulls
+              ?.map((x) =>
+                  safeHydrateUsers(safeJsonDecodeMap('usersList[]', x)))
               .toList() ??
           _usersList;
     });
@@ -159,14 +127,9 @@ class FFAppState extends ChangeNotifier {
     });
     _safeInit(() {
       if (prefs.containsKey('ff_headquarterSelected')) {
-        try {
-          final serializedData =
-              prefs.getString('ff_headquarterSelected') ?? '{}';
-          _headquarterSelected = HeadquartersStruct.fromSerializableMap(
-              jsonDecode(serializedData));
-        } catch (e) {
-          print("Can't decode persisted data type. Error: $e.");
-        }
+        final data = safeJsonDecodeMap('headquarterSelected',
+            prefs.getString('ff_headquarterSelected') ?? '');
+        _headquarterSelected = safeHydrateHeadquarters(data);
       }
     });
     _safeInit(() {
@@ -221,15 +184,8 @@ class FFAppState extends ChangeNotifier {
     _safeInit(() {
       _headquartersSelectedList = prefs
               .getStringList('ff_headquartersSelectedList')
-              ?.map((x) {
-                try {
-                  return HeadquartersStruct.fromSerializableMap(jsonDecode(x));
-                } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
-                  return null;
-                }
-              })
-              .withoutNulls
+              ?.map((x) => safeHydrateHeadquarters(
+                  safeJsonDecodeMap('headquartersSelectedList[]', x)))
               .toList() ??
           _headquartersSelectedList;
     });
@@ -403,10 +359,40 @@ class FFAppState extends ChangeNotifier {
       _routeConfigErrorMargin = prefs.getDouble('ff_routeConfigErrorMargin') ??
           _routeConfigErrorMargin;
     });
+
+    _logHydrationStatus();
+  }
+
+  /// Detecta structs persistidos cuya clave existe en SharedPreferences
+  /// pero quedaron deserializados vacíos (jsonDecode falló y _safeInit lo
+  /// silenció con el log). Sirve para identificar QUÉ clave quedó corrupta
+  /// la próxima vez que el bug aparezca.
+  void _logHydrationStatus() {
+    void check(String key, bool isEmpty) {
+      try {
+        if (prefs.containsKey(key) && isEmpty) {
+          releaseLog(
+              'FFAppState hydration WARN: $key present but struct empty');
+        }
+      } catch (e, st) {
+        releaseLog('FFAppState._logHydrationStatus $key', e, st);
+      }
+    }
+
+    check('ff_userSelected', !_userSelected.hasIdUser());
+    check('ff_companyDefault', !_companyDefault.hasIdCompany());
+    check('ff_deviceDefault', !_deviceDefault.hasIdDevice());
+    check('ff_activityDefault', !_activityDefault.hasIdActivity());
+    check('ff_activitySelected', !_activitySelected.hasIdActivity());
+    check('ff_headquarterSelected', !_headquarterSelected.hasIdHeadquarter());
   }
 
   void update(VoidCallback callback) {
-    callback();
+    try {
+      callback();
+    } catch (e, st) {
+      releaseLog('FFAppState.update callback threw', e, st);
+    }
     notifyListeners();
   }
 
@@ -426,8 +412,8 @@ class FFAppState extends ChangeNotifier {
   }
 
   // Modo GPS activo: 'LITE' (básico, bajo consumo) o 'ADVANCED' (UKF+IMU, preciso).
-  // Default LITE para usuarios existentes. Reactivo en UI vía notifyListeners.
-  String _gpsMode = 'LITE';
+  // Default ADVANCED para nuevas instalaciones. Reactivo en UI vía notifyListeners.
+  String _gpsMode = 'ADVANCED';
   String get gpsMode => _gpsMode;
   set gpsMode(String value) {
     _gpsMode = value;
@@ -458,55 +444,78 @@ class FFAppState extends ChangeNotifier {
   dynamic get loginResponse => _loginResponse;
   set loginResponse(dynamic value) {
     _loginResponse = value;
-    prefs.setString('ff_loginResponse', jsonEncode(value));
+    _safeWrite('loginResponse',
+        () => prefs.setString('ff_loginResponse', jsonEncode(value)));
   }
 
   UsersStruct _userSelected = UsersStruct();
   UsersStruct get userSelected => _userSelected;
   set userSelected(UsersStruct value) {
     _userSelected = value;
-    prefs.setString('ff_userSelected', value.serialize());
+    _safeWrite('userSelected',
+        () => prefs.setString('ff_userSelected', safeSerializeUsers(value)));
   }
 
   void updateUserSelectedStruct(Function(UsersStruct) updateFn) {
     updateFn(_userSelected);
-    prefs.setString('ff_userSelected', _userSelected.serialize());
+    _safeWrite(
+        'userSelected',
+        () => prefs.setString(
+            'ff_userSelected', safeSerializeUsers(_userSelected)));
   }
 
   CompaniesStruct _companyDefault = CompaniesStruct();
   CompaniesStruct get companyDefault => _companyDefault;
   set companyDefault(CompaniesStruct value) {
     _companyDefault = value;
-    prefs.setString('ff_companyDefault', value.serialize());
+    _safeWrite(
+        'companyDefault',
+        () => prefs.setString(
+            'ff_companyDefault', safeSerializeCompanies(value)));
   }
 
   void updateCompanyDefaultStruct(Function(CompaniesStruct) updateFn) {
     updateFn(_companyDefault);
-    prefs.setString('ff_companyDefault', _companyDefault.serialize());
+    _safeWrite(
+        'companyDefault',
+        () => prefs.setString(
+            'ff_companyDefault', safeSerializeCompanies(_companyDefault)));
   }
 
   DevicesStruct _deviceDefault = DevicesStruct();
   DevicesStruct get deviceDefault => _deviceDefault;
   set deviceDefault(DevicesStruct value) {
     _deviceDefault = value;
-    prefs.setString('ff_deviceDefault', value.serialize());
+    _safeWrite(
+        'deviceDefault',
+        () =>
+            prefs.setString('ff_deviceDefault', safeSerializeDevices(value)));
   }
 
   void updateDeviceDefaultStruct(Function(DevicesStruct) updateFn) {
     updateFn(_deviceDefault);
-    prefs.setString('ff_deviceDefault', _deviceDefault.serialize());
+    _safeWrite(
+        'deviceDefault',
+        () => prefs.setString(
+            'ff_deviceDefault', safeSerializeDevices(_deviceDefault)));
   }
 
   ActivitiesStruct _activityDefault = ActivitiesStruct();
   ActivitiesStruct get activityDefault => _activityDefault;
   set activityDefault(ActivitiesStruct value) {
     _activityDefault = value;
-    prefs.setString('ff_activityDefault', value.serialize());
+    _safeWrite(
+        'activityDefault',
+        () => prefs.setString(
+            'ff_activityDefault', safeSerializeActivities(value)));
   }
 
   void updateActivityDefaultStruct(Function(ActivitiesStruct) updateFn) {
     updateFn(_activityDefault);
-    prefs.setString('ff_activityDefault', _activityDefault.serialize());
+    _safeWrite(
+        'activityDefault',
+        () => prefs.setString('ff_activityDefault',
+            safeSerializeActivities(_activityDefault)));
   }
 
   // Actividad seleccionada (STRUCT - reemplaza activitySelectedJSON)
@@ -514,43 +523,58 @@ class FFAppState extends ChangeNotifier {
   ActivitiesStruct get activitySelected => _activitySelected;
   set activitySelected(ActivitiesStruct value) {
     _activitySelected = value;
-    prefs.setString('ff_activitySelected', value.serialize());
+    _safeWrite(
+        'activitySelected',
+        () => prefs.setString(
+            'ff_activitySelected', safeSerializeActivities(value)));
   }
 
   void updateActivitySelectedStruct(Function(ActivitiesStruct) updateFn) {
     updateFn(_activitySelected);
-    prefs.setString('ff_activitySelected', _activitySelected.serialize());
+    _safeWrite(
+        'activitySelected',
+        () => prefs.setString('ff_activitySelected',
+            safeSerializeActivities(_activitySelected)));
   }
 
   void clearActivitySelected() {
     _activitySelected = ActivitiesStruct();
-    prefs.remove('ff_activitySelected');
+    _safeWrite('activitySelected.clear',
+        () => prefs.remove('ff_activitySelected'));
   }
 
   List<HeadquartersStruct> _headquartersList = [];
   List<HeadquartersStruct> get headquartersList => _headquartersList;
   set headquartersList(List<HeadquartersStruct> value) {
     _headquartersList = value;
-    prefs.setStringList(
-        'ff_headquartersList', value.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersList',
+        () => prefs.setStringList('ff_headquartersList',
+            value.map(safeSerializeHeadquarters).toList()));
   }
 
   void addToHeadquartersList(HeadquartersStruct value) {
     headquartersList.add(value);
-    prefs.setStringList('ff_headquartersList',
-        _headquartersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersList.add',
+        () => prefs.setStringList('ff_headquartersList',
+            _headquartersList.map(safeSerializeHeadquarters).toList()));
   }
 
   void removeFromHeadquartersList(HeadquartersStruct value) {
     headquartersList.remove(value);
-    prefs.setStringList('ff_headquartersList',
-        _headquartersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersList.remove',
+        () => prefs.setStringList('ff_headquartersList',
+            _headquartersList.map(safeSerializeHeadquarters).toList()));
   }
 
   void removeAtIndexFromHeadquartersList(int index) {
     headquartersList.removeAt(index);
-    prefs.setStringList('ff_headquartersList',
-        _headquartersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersList.removeAt',
+        () => prefs.setStringList('ff_headquartersList',
+            _headquartersList.map(safeSerializeHeadquarters).toList()));
   }
 
   void updateHeadquartersListAtIndex(
@@ -558,14 +582,18 @@ class FFAppState extends ChangeNotifier {
     HeadquartersStruct Function(HeadquartersStruct) updateFn,
   ) {
     headquartersList[index] = updateFn(_headquartersList[index]);
-    prefs.setStringList('ff_headquartersList',
-        _headquartersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersList.updateAt',
+        () => prefs.setStringList('ff_headquartersList',
+            _headquartersList.map(safeSerializeHeadquarters).toList()));
   }
 
   void insertAtIndexInHeadquartersList(int index, HeadquartersStruct value) {
     headquartersList.insert(index, value);
-    prefs.setStringList('ff_headquartersList',
-        _headquartersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersList.insert',
+        () => prefs.setStringList('ff_headquartersList',
+            _headquartersList.map(safeSerializeHeadquarters).toList()));
   }
 
   List<ProductsStruct> _productsList = [];
@@ -613,26 +641,34 @@ class FFAppState extends ChangeNotifier {
   List<UsersStruct> get usersList => _usersList;
   set usersList(List<UsersStruct> value) {
     _usersList = value;
-    prefs.setStringList(
-        'ff_usersList', value.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'usersList',
+        () => prefs.setStringList(
+            'ff_usersList', value.map(safeSerializeUsers).toList()));
   }
 
   void addToUsersList(UsersStruct value) {
     usersList.add(value);
-    prefs.setStringList(
-        'ff_usersList', _usersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'usersList.add',
+        () => prefs.setStringList(
+            'ff_usersList', _usersList.map(safeSerializeUsers).toList()));
   }
 
   void removeFromUsersList(UsersStruct value) {
     usersList.remove(value);
-    prefs.setStringList(
-        'ff_usersList', _usersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'usersList.remove',
+        () => prefs.setStringList(
+            'ff_usersList', _usersList.map(safeSerializeUsers).toList()));
   }
 
   void removeAtIndexFromUsersList(int index) {
     usersList.removeAt(index);
-    prefs.setStringList(
-        'ff_usersList', _usersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'usersList.removeAt',
+        () => prefs.setStringList(
+            'ff_usersList', _usersList.map(safeSerializeUsers).toList()));
   }
 
   void updateUsersListAtIndex(
@@ -640,14 +676,18 @@ class FFAppState extends ChangeNotifier {
     UsersStruct Function(UsersStruct) updateFn,
   ) {
     usersList[index] = updateFn(_usersList[index]);
-    prefs.setStringList(
-        'ff_usersList', _usersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'usersList.updateAt',
+        () => prefs.setStringList(
+            'ff_usersList', _usersList.map(safeSerializeUsers).toList()));
   }
 
   void insertAtIndexInUsersList(int index, UsersStruct value) {
     usersList.insert(index, value);
-    prefs.setStringList(
-        'ff_usersList', _usersList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'usersList.insert',
+        () => prefs.setStringList(
+            'ff_usersList', _usersList.map(safeSerializeUsers).toList()));
   }
 
   List<ZonesStruct> _zonesList = [];
@@ -717,12 +757,18 @@ class FFAppState extends ChangeNotifier {
   HeadquartersStruct get headquarterSelected => _headquarterSelected;
   set headquarterSelected(HeadquartersStruct value) {
     _headquarterSelected = value;
-    prefs.setString('ff_headquarterSelected', value.serialize());
+    _safeWrite(
+        'headquarterSelected',
+        () => prefs.setString(
+            'ff_headquarterSelected', safeSerializeHeadquarters(value)));
   }
 
   void updateHeadquarterSelectedStruct(Function(HeadquartersStruct) updateFn) {
     updateFn(_headquarterSelected);
-    prefs.setString('ff_headquarterSelected', _headquarterSelected.serialize());
+    _safeWrite(
+        'headquarterSelected',
+        () => prefs.setString('ff_headquarterSelected',
+            safeSerializeHeadquarters(_headquarterSelected)));
   }
 
   List<ProductsStruct> _productsAdd = [];
@@ -799,7 +845,10 @@ class FFAppState extends ChangeNotifier {
   dynamic get activitySelectedJSON => _activitySelectedJSON;
   set activitySelectedJSON(dynamic value) {
     _activitySelectedJSON = value;
-    prefs.setString('ff_activitySelectedJSON', jsonEncode(value));
+    _safeWrite(
+        'activitySelectedJSON',
+        () => prefs.setString(
+            'ff_activitySelectedJSON', jsonEncode(value)));
   }
 
   String _pathDatabase = '';
@@ -922,7 +971,8 @@ class FFAppState extends ChangeNotifier {
   dynamic get activitiesJSON => _activitiesJSON;
   set activitiesJSON(dynamic value) {
     _activitiesJSON = value;
-    prefs.setString('ff_activitiesJSON', jsonEncode(value));
+    _safeWrite('activitiesJSON',
+        () => prefs.setString('ff_activitiesJSON', jsonEncode(value)));
   }
 
   dynamic _activityStatusSelectedJSON;
@@ -942,26 +992,43 @@ class FFAppState extends ChangeNotifier {
       _headquartersSelectedList;
   set headquartersSelectedList(List<HeadquartersStruct> value) {
     _headquartersSelectedList = value;
-    prefs.setStringList('ff_headquartersSelectedList',
-        value.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersSelectedList',
+        () => prefs.setStringList('ff_headquartersSelectedList',
+            value.map(safeSerializeHeadquarters).toList()));
   }
 
   void addToHeadquartersSelectedList(HeadquartersStruct value) {
     headquartersSelectedList.add(value);
-    prefs.setStringList('ff_headquartersSelectedList',
-        _headquartersSelectedList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersSelectedList.add',
+        () => prefs.setStringList(
+            'ff_headquartersSelectedList',
+            _headquartersSelectedList
+                .map(safeSerializeHeadquarters)
+                .toList()));
   }
 
   void removeFromHeadquartersSelectedList(HeadquartersStruct value) {
     headquartersSelectedList.remove(value);
-    prefs.setStringList('ff_headquartersSelectedList',
-        _headquartersSelectedList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersSelectedList.remove',
+        () => prefs.setStringList(
+            'ff_headquartersSelectedList',
+            _headquartersSelectedList
+                .map(safeSerializeHeadquarters)
+                .toList()));
   }
 
   void removeAtIndexFromHeadquartersSelectedList(int index) {
     headquartersSelectedList.removeAt(index);
-    prefs.setStringList('ff_headquartersSelectedList',
-        _headquartersSelectedList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersSelectedList.removeAt',
+        () => prefs.setStringList(
+            'ff_headquartersSelectedList',
+            _headquartersSelectedList
+                .map(safeSerializeHeadquarters)
+                .toList()));
   }
 
   void updateHeadquartersSelectedListAtIndex(
@@ -970,15 +1037,25 @@ class FFAppState extends ChangeNotifier {
   ) {
     headquartersSelectedList[index] =
         updateFn(_headquartersSelectedList[index]);
-    prefs.setStringList('ff_headquartersSelectedList',
-        _headquartersSelectedList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersSelectedList.updateAt',
+        () => prefs.setStringList(
+            'ff_headquartersSelectedList',
+            _headquartersSelectedList
+                .map(safeSerializeHeadquarters)
+                .toList()));
   }
 
   void insertAtIndexInHeadquartersSelectedList(
       int index, HeadquartersStruct value) {
     headquartersSelectedList.insert(index, value);
-    prefs.setStringList('ff_headquartersSelectedList',
-        _headquartersSelectedList.map((x) => x.serialize()).toList());
+    _safeWrite(
+        'headquartersSelectedList.insert',
+        () => prefs.setStringList(
+            'ff_headquartersSelectedList',
+            _headquartersSelectedList
+                .map(safeSerializeHeadquarters)
+                .toList()));
   }
 
   List<NewsStruct> _newsList = [];
@@ -1073,7 +1150,8 @@ class FFAppState extends ChangeNotifier {
   dynamic get userSelectedJSON => _userSelectedJSON;
   set userSelectedJSON(dynamic value) {
     _userSelectedJSON = value;
-    prefs.setString('ff_userSelectedJSON', jsonEncode(value));
+    _safeWrite('userSelectedJSON',
+        () => prefs.setString('ff_userSelectedJSON', jsonEncode(value)));
   }
 
   List<ActivitiesStatusStruct> _activitiesStatusSelected = [];
@@ -1313,7 +1391,8 @@ class FFAppState extends ChangeNotifier {
   dynamic get currentActivity => _currentActivity;
   set currentActivity(dynamic value) {
     _currentActivity = value;
-    prefs.setString('ff_currentActivity', jsonEncode(value));
+    _safeWrite('currentActivity',
+        () => prefs.setString('ff_currentActivity', jsonEncode(value)));
   }
 
   int _visitCount = 0;
@@ -1401,11 +1480,26 @@ class FFAppState extends ChangeNotifier {
 void _safeInit(Function() initializeField) {
   try {
     initializeField();
-  } catch (_) {}
+  } catch (e, st) {
+    releaseLog('FFAppState._safeInit failed', e, st);
+  }
 }
 
 Future _safeInitAsync(Function() initializeField) async {
   try {
     await initializeField();
-  } catch (_) {}
+  } catch (e, st) {
+    releaseLog('FFAppState._safeInitAsync failed', e, st);
+  }
+}
+
+/// Envuelve una escritura a SharedPreferences (incluida la serialización
+/// del valor) en try/catch para que un fallo de persistencia nunca tumbe
+/// al caller. Conserva el estado en memoria y registra el error.
+void _safeWrite(String tag, void Function() write) {
+  try {
+    write();
+  } catch (e, st) {
+    releaseLog('FFAppState.persist $tag', e, st);
+  }
 }

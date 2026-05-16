@@ -97,12 +97,12 @@ void onStart(ServiceInstance service) async {
   // Leer el modo GPS elegido por el usuario (persistido en SharedPreferences
   // por FFAppState). El isolate de background no tiene acceso directo a
   // FFAppState, por eso lo leemos desde prefs que ya está sincronizado.
-  String gpsMode = 'LITE';
+  String gpsMode = 'ADVANCED';
   try {
     final prefs = await SharedPreferences.getInstance();
-    gpsMode = prefs.getString('ff_gpsMode') ?? 'LITE';
+    gpsMode = prefs.getString('ff_gpsMode') ?? 'ADVANCED';
   } catch (e) {
-    debugPrint('⚠️ No se pudo leer ff_gpsMode: $e — usando LITE por defecto');
+    debugPrint('⚠️ No se pudo leer ff_gpsMode: $e — usando ADVANCED por defecto');
   }
 
   debugPrint('🎯 Modo GPS activo: $gpsMode');

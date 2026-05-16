@@ -835,7 +835,7 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                           onTap: () async {
                             HapticFeedback.mediumImpact();
                             context.pushNamed(
-                              InformationPageWidget.routeName,
+                              'HistoryVisitsPage',
                               extra: <String, dynamic>{
                                 kTransitionInfoKey: const TransitionInfo(
                                   hasTransition: true,

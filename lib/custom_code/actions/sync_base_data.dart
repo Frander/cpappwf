@@ -4,7 +4,6 @@ import '/flutter_flow/flutter_flow_util.dart';
 // Imports other custom actions
 // Imports custom functions
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show compute;
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -15,6 +14,7 @@ import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:convert';
+import '/stream_download.dart';
 
 // ============================================================================
 // FLAG: SINCRONIZACIÓN BASE INCOMPLETA
@@ -94,28 +94,36 @@ Future<bool> syncBaseData(
     debugPrint('   🔑 Token OK | idDevice: $idDevice | fecha: ${syncNow.toIso8601String()}');
 
     // ─────────────────────────────────────────────────────────────────────────
-    // LOTE 1: activities, headquarters, zones (0% → 25%)
-    // Users y Devices NO se descargan aquí — syncLogin los gestiona obligatoriamente.
+    // ESTRATEGIA — Bajar peak de RAM en gama media-baja:
+    // En lugar de descargar los 12 datasets y mantenerlos vivos hasta una
+    // única transacción gigante, el flujo se parte en 3 bloques con
+    // descarga → insert → liberación de memoria entre cada uno:
+    //
+    //   Bloque BASE: tablas pequeñas/medianas (types-points, companies, zones,
+    //                activities, headquarters, hq-weights, news, hq-coords)
+    //   Bloque PRODUCTS: products + products-coordinates
+    //   Bloque VPOINTS:  virtual-points
+    //
+    // Así nunca conviven products y virtual-points en memoria.
+    // Si un bloque falla, _sbSetIncomplete() ya está activo y el próximo
+    // intento limpia y re-sincroniza desde cero.
     // ─────────────────────────────────────────────────────────────────────────
-    // ── LOTE 1: actividades, lotes, zonas (pequeños, paralelo) ───────────────
-    onProgress?.call(0.03, 'Descargando actividades, lotes y zonas...');
-    debugPrint('\n📦 LOTE 1: activities | headquarters | zones');
+    await _sbSetIncomplete(); // marcamos pendiente desde antes del primer insert
 
+    // ═════════════ BLOQUE BASE ═════════════════════════════════════════════
+    debugPrint('\n📦 [BASE] Descargando tablas pequeñas/medianas en paralelo');
+    onProgress?.call(0.03, 'Descargando actividades, lotes y zonas...');
     final batch1 = await Future.wait([
       _sbFetchList('activities',   currentToken, {'idCompany': '$idCompany', 'idDevice': '$idDevice'}, imei: imei),
       _sbFetchList('headquarters', currentToken, {'idCompany': '$idCompany'}, imei: imei),
       _sbFetchList('zones',        currentToken, {'idCompany': '$idCompany'}, imei: imei),
     ]);
-
-    final activitiesData   = batch1[0];
-    final headquartersData = batch1[1];
-    final zonesData        = batch1[2];
-
+    List<dynamic>? activitiesData   = batch1[0];
+    List<dynamic>? headquartersData = batch1[1];
+    List<dynamic>? zonesData        = batch1[2];
     debugPrint('   activities:   ${activitiesData?.length ?? "❌ Error"}');
     debugPrint('   headquarters: ${headquartersData?.length ?? "❌ Error"}');
     debugPrint('   zones:        ${zonesData?.length ?? "❌ Error"}');
-
-    // ── Fix 3: Validar endpoints críticos del Lote 1 ─────────────────────────
     final lote1Errors = <String>[];
     if (activitiesData   == null) lote1Errors.add('activities');
     if (headquartersData == null) lote1Errors.add('headquarters');
@@ -124,114 +132,118 @@ Future<bool> syncBaseData(
       debugPrint('❌ [SyncBase] Endpoints críticos fallaron: $lote1Errors → abortando');
       return false;
     }
-    onProgress?.call(0.22, 'Lote 1 completo');
 
-    // ── PRODUCTS solo — separado para no solapar RAM con Virtual_points ───────
-    onProgress?.call(0.24, 'Descargando productos...');
-    debugPrint('\n📦 PRODUCTS (descarga independiente — ~200k registros)');
-    final productsData = await _sbFetchList('products', currentToken, {'idCompany': '$idCompany'}, imei: imei);
-    debugPrint('   products: ${productsData?.length ?? "❌ Error"}');
-
-    if (productsData == null) {
-      debugPrint('❌ [SyncBase] Endpoint crítico products falló → abortando');
-      return false;
-    }
-    onProgress?.call(0.44, 'Productos descargados');
-
-    // ── LOTE 2: news + companies (pequeños, paralelo) ─────────────────────────
-    onProgress?.call(0.45, 'Descargando noticias y empresa...');
-    debugPrint('\n📦 LOTE 2: news | companies');
-    final batch2 = await Future.wait([
-      _sbFetchList('news',      currentToken, {'idCompany': '$idCompany'}, imei: imei),
-      _sbFetchList('companies', currentToken, {'idCompany': '$idCompany'}, imei: imei),
-    ]);
-    final newsData      = batch2[0];
-    final companiesData = batch2[1];
-    debugPrint('   news:      ${newsData?.length ?? "❌ Error"}');
-    debugPrint('   companies: ${companiesData?.length ?? "❌ Error"}');
-    // news y companies son opcionales — no se aborta si fallan
-    onProgress?.call(0.55, 'Lote 2 completo');
-
-    // ── LOTE 3: pesos + tipos de puntos (medianos, paralelo) ──────────────────
-    onProgress?.call(0.56, 'Descargando pesos y tipos de puntos...');
-    debugPrint('\n📦 LOTE 3: headquarters-weights | types-points');
+    onProgress?.call(0.18, 'Descargando noticias, empresa, pesos y tipos de puntos...');
     final prevMonth = DateTime(syncNow.year, syncNow.month - 1);
-    final batch3 = await Future.wait([
+    final batch2 = await Future.wait([
+      _sbFetchList('news',                 currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('companies',            currentToken, {'idCompany': '$idCompany'}, imei: imei),
       _sbFetchList('headquarters-weights', currentToken, {
         'idCompany': '$idCompany',
         'year':      '${prevMonth.year}',
         'month':     '${prevMonth.month}',
       }, imei: imei),
-      _sbFetchList('types-points', currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('types-points',         currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('headquarters-coordinates', currentToken, {'idCompany': '$idCompany'}, imei: imei),
     ]);
-    final hqWeightsData   = batch3[0];
-    final typesPointsData = batch3[1];
-    debugPrint('   hq-weights:   ${hqWeightsData?.length ?? "❌ Error"}');
-    debugPrint('   types-points: ${typesPointsData?.length ?? "❌ Error"}');
-
+    List<dynamic>? newsData            = batch2[0];
+    List<dynamic>? companiesData       = batch2[1];
+    List<dynamic>? hqWeightsData       = batch2[2];
+    List<dynamic>? typesPointsData     = batch2[3];
+    List<dynamic>? hqCoordinatesData   = batch2[4];
+    debugPrint('   news:           ${newsData?.length ?? "❌ Error"}');
+    debugPrint('   companies:      ${companiesData?.length ?? "❌ Error"}');
+    debugPrint('   hq-weights:     ${hqWeightsData?.length ?? "❌ Error"}');
+    debugPrint('   types-points:   ${typesPointsData?.length ?? "❌ Error"}');
+    debugPrint('   hq-coordinates: ${hqCoordinatesData?.length ?? "❌ Error"}');
     if (typesPointsData == null) {
       debugPrint('❌ [SyncBase] Endpoint crítico types-points falló → abortando');
       return false;
     }
-    onProgress?.call(0.66, 'Lote 3 completo');
 
-    // ── VIRTUAL-POINTS solo — separado para no solapar RAM con Products ───────
-    onProgress?.call(0.67, 'Descargando puntos virtuales...');
-    debugPrint('\n📦 VIRTUAL-POINTS (descarga independiente — ~150k registros)');
-    final virtualPointsData = await _sbFetchList('virtual-points', currentToken, {'idCompany': '$idCompany'}, imei: imei);
+    onProgress?.call(0.35, 'Guardando datos base en SQLite...');
+    debugPrint('\n💾 [BASE] Guardando en SQLite y liberando memoria');
+    final savedBase = await _sbSyncBaseToSQLite(
+      activitiesData:    activitiesData!,
+      headquartersData:  headquartersData!,
+      zonesData:         zonesData!,
+      newsData:          newsData,
+      companiesData:     companiesData,
+      hqWeightsData:     hqWeightsData,
+      typesPointsData:   typesPointsData,
+      hqCoordinatesData: hqCoordinatesData,
+      onProgress:        onProgress,
+    );
+    // Liberar inmediatamente para que el GC reclame antes de descargar products
+    activitiesData    = null;
+    headquartersData  = null;
+    zonesData         = null;
+    newsData          = null;
+    companiesData     = null;
+    hqWeightsData     = null;
+    typesPointsData   = null;
+    hqCoordinatesData = null;
+    if (!savedBase) {
+      FFAppState().lastSyncBase = null;
+      debugPrint('❌ [SyncBase] Falló bloque BASE en SQLite');
+      return false;
+    }
+
+    // ═════════════ BLOQUE PRODUCTS ═════════════════════════════════════════
+    onProgress?.call(0.50, 'Descargando productos...');
+    debugPrint('\n📦 [PRODUCTS] Descarga independiente (~200k registros)');
+    List<dynamic>? productsData = await _sbFetchList(
+        'products', currentToken, {'idCompany': '$idCompany'}, imei: imei);
+    debugPrint('   products: ${productsData?.length ?? "❌ Error"}');
+    if (productsData == null) {
+      FFAppState().lastSyncBase = null;
+      debugPrint('❌ [SyncBase] Endpoint crítico products falló → abortando');
+      return false;
+    }
+
+    onProgress?.call(0.62, 'Descargando coordenadas de productos...');
+    List<dynamic>? productsCoordsData = await _sbFetchList(
+        'products-coordinates', currentToken, {'idCompany': '$idCompany'}, imei: imei);
+    debugPrint('   products-coordinates: ${productsCoordsData?.length ?? "❌ Error"}');
+    // products-coordinates es opcional
+
+    onProgress?.call(0.68, 'Guardando productos en SQLite...');
+    debugPrint('\n💾 [PRODUCTS] Guardando en SQLite y liberando memoria');
+    final savedProducts = await _sbSyncProductsToSQLite(
+      productsData:       productsData,
+      productsCoordsData: productsCoordsData,
+      onProgress:         onProgress,
+    );
+    productsData       = null;
+    productsCoordsData = null;
+    if (!savedProducts) {
+      FFAppState().lastSyncBase = null;
+      debugPrint('❌ [SyncBase] Falló bloque PRODUCTS en SQLite');
+      return false;
+    }
+
+    // ═════════════ BLOQUE VIRTUAL-POINTS ═══════════════════════════════════
+    onProgress?.call(0.80, 'Descargando puntos virtuales...');
+    debugPrint('\n📦 [VPOINTS] Descarga independiente (~150k registros)');
+    List<dynamic>? virtualPointsData = await _sbFetchList(
+        'virtual-points', currentToken, {'idCompany': '$idCompany'}, imei: imei);
     debugPrint('   virtual-points: ${virtualPointsData?.length ?? "❌ Error"}');
-
     if (virtualPointsData == null) {
+      FFAppState().lastSyncBase = null;
       debugPrint('❌ [SyncBase] Endpoint crítico virtual-points falló → abortando');
       return false;
     }
-    onProgress?.call(0.82, 'Puntos virtuales descargados');
 
-    // ── LOTE 4: hq-coordinates + products-coordinates (paralelo) ─────────────
-    onProgress?.call(0.83, 'Descargando coordenadas...');
-    debugPrint('\n📦 LOTE 4: headquarters-coordinates | products-coordinates');
-    final batch4 = await Future.wait([
-      _sbFetchList('headquarters-coordinates', currentToken, {'idCompany': '$idCompany'}, imei: imei),
-      _sbFetchList('products-coordinates',     currentToken, {'idCompany': '$idCompany'}, imei: imei),
-    ]);
-    final hqCoordinatesData  = batch4[0];
-    final productsCoordsData = batch4[1];
-    debugPrint('   hq-coordinates:       ${hqCoordinatesData?.length ?? "❌ Error"}');
-    debugPrint('   products-coordinates: ${productsCoordsData?.length ?? "❌ Error"}');
-    // hq-coordinates y products-coordinates son opcionales — no se aborta si fallan
-    onProgress?.call(0.90, 'Todos los datos descargados. Guardando en base de datos...');
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // GUARDAR EN SQLITE (90% → 100%)
-    // ─────────────────────────────────────────────────────────────────────────
-    debugPrint('');
-    debugPrint('💾 Guardando datos en SQLite...');
-    await _sbSetIncomplete(); // marcamos como pendiente antes de escribir
-
-    // Sin timeout global en SQLite — cada chunk cede el event loop con Future.delayed(Duration.zero),
-    // lo que previene ANR. Un timeout externo cancelaría la transacción dejando datos corruptos.
-    final saved = await _sbSyncToSQLite(
-      idCompany:           idCompany,
-      imei:                imei,
-      activitiesData:      activitiesData,
-      headquartersData:    headquartersData,
-      zonesData:           zonesData,
-      productsData:        productsData,
-      newsData:            newsData,
-      hqWeightsData:       hqWeightsData,
-      typesPointsData:     typesPointsData,
-      companiesData:       companiesData,
-      virtualPointsData:   virtualPointsData,
-      hqCoordinatesData:   hqCoordinatesData,
-      productsCoordsData:  productsCoordsData,
-      onProgress:          onProgress,
+    onProgress?.call(0.92, 'Guardando puntos virtuales en SQLite...');
+    debugPrint('\n💾 [VPOINTS] Guardando en SQLite y liberando memoria');
+    final savedVPoints = await _sbSyncVirtualPointsToSQLite(
+      virtualPointsData: virtualPointsData,
+      onProgress:        onProgress,
     );
-
-    if (!saved) {
-      // Datos en SQLite pueden estar corruptos/incompletos — forzar re-sync completo
+    virtualPointsData = null;
+    if (!savedVPoints) {
       FFAppState().lastSyncBase = null;
-      debugPrint('❌ [SyncBase] Error guardando datos base en SQLite');
-      debugPrint('   → lastSyncBase = null (se requiere re-sincronización completa)');
+      debugPrint('❌ [SyncBase] Falló bloque VPOINTS en SQLite');
       return false;
     }
 
@@ -278,6 +290,12 @@ int? _sbToInt(dynamic v) {
 /// - Backoff exponencial: 2s, 4s, 8s entre intentos
 /// - HTTP 401: renueva token una vez y reintenta inmediatamente
 /// - Timeout por intento: 4 min (endpoints grandes como products ~82 MB)
+///
+/// La descarga usa [streamDownloadGzippedToTempFile]: la respuesta gzip
+/// se descomprime al vuelo y se vuelca a un archivo temporal, evitando
+/// los picos de RAM que mataban al Dart VM en gama media-baja
+/// (`response.bodyBytes` + `gzip.decode(bodyBytes)` sumaban 250-500 MB).
+/// El parse JSON se delega a un isolate vía `compute` para no bloquear UI.
 Future<List<dynamic>?> _sbFetchList(
   String endpoint,
   String authToken,
@@ -288,56 +306,67 @@ Future<List<dynamic>?> _sbFetchList(
   String token = authToken;
 
   for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      final uri = Uri.parse('https://api.clickpalm.com/Users/login-data/$endpoint')
-          .replace(queryParameters: queryParams);
+    final uri = Uri.parse('https://api.clickpalm.com/Users/login-data/$endpoint')
+        .replace(queryParameters: queryParams);
 
-      if (attempt == 1) {
-        debugPrint('   📡 GET /login-data/$endpoint ...');
-      } else {
-        debugPrint('   🔄 GET /login-data/$endpoint (intento $attempt/$maxAttempts)...');
-      }
+    if (attempt == 1) {
+      debugPrint('   📡 GET /login-data/$endpoint ...');
+    } else {
+      debugPrint('   🔄 GET /login-data/$endpoint (intento $attempt/$maxAttempts)...');
+    }
 
-      final response = await http
-          .get(uri, headers: {'Authorization': 'Bearer $token'})
-          .timeout(const Duration(minutes: 4));
+    final result = await streamDownloadGzippedToTempFile(
+      url: uri,
+      headers: {'Authorization': 'Bearer $token'},
+      tagForLog: endpoint,
+      timeout: const Duration(minutes: 4),
+    );
 
-      debugPrint('   → HTTP ${response.statusCode} | ${response.bodyBytes.length} bytes');
+    debugPrint('   → HTTP ${result.statusCode}');
 
-      // ── 401: token expirado → renovar y reintentar inmediatamente ──────────
-      if (response.statusCode == 401) {
-        debugPrint('   🔑 [SyncBase] Token expirado en $endpoint, renovando...');
-        if (imei.isNotEmpty) {
-          final renewed = await _sbRenewAuthToken(imei);
-          if (renewed != null) {
-            token = renewed;
-            debugPrint('   ✅ Token renovado, reintentando $endpoint...');
-            continue; // reintenta sin contar este intento como fallo
-          }
+    // ── 401: token expirado → renovar y reintentar inmediatamente ──────────
+    if (result.statusCode == 401) {
+      debugPrint('   🔑 [SyncBase] Token expirado en $endpoint, renovando...');
+      if (imei.isNotEmpty) {
+        final renewed = await _sbRenewAuthToken(imei);
+        if (renewed != null) {
+          token = renewed;
+          debugPrint('   ✅ Token renovado, reintentando $endpoint...');
+          continue; // reintenta sin contar este intento como fallo
         }
-        debugPrint('   ❌ No se pudo renovar token para $endpoint');
-        return null;
       }
+      debugPrint('   ❌ No se pudo renovar token para $endpoint');
+      return null;
+    }
 
-      if (response.statusCode == 200) {
-        final data = await compute(_sbDecodeGzipAsListOrSingle, response.bodyBytes);
+    if (result.statusCode == 200 && result.file != null) {
+      final file = result.file!;
+      try {
+        final raw = await parseJsonFromFileInIsolate(file.path);
+        final List<dynamic>? data = raw is List
+            ? raw
+            : (raw is Map<String, dynamic> ? <dynamic>[raw] : null);
         if (data != null) {
           debugPrint('   ✅ $endpoint: ${data.length} elementos');
           return data;
         }
         debugPrint('   ⚠️ $endpoint: respuesta no es lista ni objeto válido');
         return null;
+      } catch (e) {
+        debugPrint('   ❌ Error parseando $endpoint: $e');
+      } finally {
+        try {
+          await file.delete();
+        } catch (_) {}
       }
-
-      debugPrint('   ❌ $endpoint → HTTP ${response.statusCode}');
-      // No reintentar en errores 4xx (excepto 401 ya manejado)
-      if (response.statusCode >= 400 && response.statusCode < 500) return null;
-
-    } catch (e) {
-      debugPrint('   ❌ Error en $endpoint (intento $attempt/$maxAttempts): $e');
+      return null;
     }
 
-    // Backoff exponencial antes del siguiente intento
+    debugPrint('   ❌ $endpoint → HTTP ${result.statusCode}');
+    // No reintentar en errores 4xx (excepto 401 ya manejado arriba)
+    if (result.statusCode >= 400 && result.statusCode < 500) return null;
+
+    // Backoff exponencial antes del siguiente intento (5xx / red / timeout)
     if (attempt < maxAttempts) {
       final waitSeconds = attempt * 2; // 2s, 4s
       debugPrint('   ⏳ Esperando ${waitSeconds}s antes de reintentar $endpoint...');
@@ -347,34 +376,6 @@ Future<List<dynamic>?> _sbFetchList(
 
   debugPrint('   ❌ $endpoint: falló tras $maxAttempts intentos');
   return null;
-}
-
-bool _sbIsGzip(List<int> bytes) =>
-    bytes.length >= 2 && bytes[0] == 0x1f && bytes[1] == 0x8b;
-
-List<dynamic>? _sbDecodeGzipList(List<int> bodyBytes) {
-  try {
-    final List<int> jsonBytes = _sbIsGzip(bodyBytes) ? gzip.decode(bodyBytes) : bodyBytes;
-    final data = jsonDecode(utf8.decode(jsonBytes));
-    return data is List ? data : null;
-  } catch (_) { return null; }
-}
-
-Map<String, dynamic>? _sbDecodeGzipObject(List<int> bodyBytes) {
-  try {
-    final List<int> jsonBytes = _sbIsGzip(bodyBytes) ? gzip.decode(bodyBytes) : bodyBytes;
-    final data = jsonDecode(utf8.decode(jsonBytes));
-    return data is Map<String, dynamic> ? data : null;
-  } catch (_) { return null; }
-}
-
-/// Wrapper top-level para compute(): decodifica GZIP+JSON y normaliza a List.
-/// Debe ser top-level (no closure) para poder ejecutarse en un isolate separado.
-List<dynamic>? _sbDecodeGzipAsListOrSingle(List<int> bodyBytes) {
-  final list = _sbDecodeGzipList(bodyBytes);
-  if (list != null) return list;
-  final obj = _sbDecodeGzipObject(bodyBytes);
-  return obj != null ? [obj] : null; // companies puede retornar objeto único
 }
 
 // ============================================================================
@@ -426,133 +427,187 @@ Future<String> _sbGetDatabasePath() async {
 // SINCRONIZACIÓN A SQLITE
 // ============================================================================
 
-Future<bool> _sbSyncToSQLite({
-  required int idCompany,
-  required String imei,
-  List<dynamic>? activitiesData,
-  List<dynamic>? headquartersData,
-  List<dynamic>? zonesData,
-  List<dynamic>? productsData,
+// ─────────────────────────────────────────────────────────────────────────
+// Abre la base y aplica los PRAGMAs de optimización para sync masivo.
+// El caller es responsable de cerrar la base.
+// ─────────────────────────────────────────────────────────────────────────
+Future<Database> _sbOpenTunedDb() async {
+  final String dbPath = await _sbGetDatabasePath();
+  final Database db = await openDatabase(dbPath);
+  // sqflite requiere rawQuery (no execute) para PRAGMAs
+  await db.rawQuery('PRAGMA synchronous=NORMAL');   // fsync solo en checkpoint
+  await db.rawQuery('PRAGMA busy_timeout=30000');   // 30s ante bloqueos
+  await db.rawQuery('PRAGMA cache_size=-32000');    // 32 MB de cache
+  return db;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOQUE BASE — Limpia todas las tablas base y carga las tablas
+// pequeñas/medianas. NO toca Products / Virtual_points: esos van en
+// transacciones separadas para minimizar el peak de RAM.
+// ═══════════════════════════════════════════════════════════════════════════
+Future<bool> _sbSyncBaseToSQLite({
+  required List<dynamic> activitiesData,
+  required List<dynamic> headquartersData,
+  required List<dynamic> zonesData,
   List<dynamic>? newsData,
+  List<dynamic>? companiesData,
   List<dynamic>? hqWeightsData,
   List<dynamic>? typesPointsData,
-  List<dynamic>? companiesData,
-  List<dynamic>? virtualPointsData,
   List<dynamic>? hqCoordinatesData,
-  List<dynamic>? productsCoordsData,
   void Function(double, String)? onProgress,
 }) async {
+  Database? db;
   try {
-    final String dbPath = await _sbGetDatabasePath();
-    final Database db  = await openDatabase(dbPath);
-
-    // Optimizar escrituras para esta sesión de sync masivo
-    // sqflite requiere rawQuery (no execute) para PRAGMAs
-    await db.rawQuery('PRAGMA synchronous=NORMAL');   // fsync solo en checkpoint, no en cada write
-    await db.rawQuery('PRAGMA busy_timeout=30000');   // 30s de espera en bloqueos (vs 0 por defecto)
-    await db.rawQuery('PRAGMA cache_size=-32000');    // 32 MB de caché de páginas en RAM
+    db = await _sbOpenTunedDb();
 
     await db.transaction((txn) async {
-      debugPrint('🔄 [SyncBase] Transacción iniciada');
+      debugPrint('🔄 [SyncBase/BASE] Transacción iniciada');
 
-      // ── 1. Limpiar TODAS las tablas base ──────────────────────────────────
-      onProgress?.call(0.91, 'Limpiando datos anteriores...');
+      onProgress?.call(0.36, 'Limpiando datos anteriores...');
       await _sbCleanAllBaseTables(txn);
 
-      // ── 2. Types_points (primero — FK en otras tablas) ─────────────────
       if (typesPointsData != null && typesPointsData.isNotEmpty) {
-        onProgress?.call(0.92, 'Guardando tipos de puntos...');
+        onProgress?.call(0.38, 'Guardando tipos de puntos...');
         await _sbInsertTypesPoints(txn, typesPointsData);
       }
 
-      // ── 3. Companies ───────────────────────────────────────────────────
       if (companiesData != null && companiesData.isNotEmpty) {
-        onProgress?.call(0.93, 'Guardando empresa...');
+        onProgress?.call(0.39, 'Guardando empresa...');
         await _sbInsertCompanies(txn, companiesData);
       }
 
-      // ── 4. Zones + Zones_polygons ──────────────────────────────────────
-      if (zonesData != null && zonesData.isNotEmpty) {
-        onProgress?.call(0.93, 'Guardando zonas geográficas...');
+      if (zonesData.isNotEmpty) {
+        onProgress?.call(0.40, 'Guardando zonas geográficas...');
         await _sbInsertZones(txn, zonesData);
       }
 
-      // ── 5. Activities + Steps + Status ────────────────────────────────
-      if (activitiesData != null && activitiesData.isNotEmpty) {
-        onProgress?.call(0.95, 'Guardando actividades...');
+      if (activitiesData.isNotEmpty) {
+        onProgress?.call(0.42, 'Guardando actividades...');
         await _sbInsertActivities(txn, activitiesData);
       }
 
-      // ── 8. Headquarters + Polygons (REPLACE para base fresca) ─────────
-      if (headquartersData != null && headquartersData.isNotEmpty) {
-        onProgress?.call(0.95, 'Guardando lotes (sedes)...');
+      if (headquartersData.isNotEmpty) {
+        onProgress?.call(0.44, 'Guardando lotes (sedes)...');
         await _sbInsertHeadquarters(txn, headquartersData);
       }
 
-      // ── 9. Headquarters_weights ────────────────────────────────────────
       if (hqWeightsData != null && hqWeightsData.isNotEmpty) {
-        onProgress?.call(0.96, 'Guardando pesos de lotes...');
+        onProgress?.call(0.46, 'Guardando pesos de lotes...');
         await _sbInsertHeadquartersWeights(txn, hqWeightsData);
       }
 
-      // ── 10. News ───────────────────────────────────────────────────────
       if (newsData != null && newsData.isNotEmpty) {
-        onProgress?.call(0.96, 'Guardando noticias...');
+        onProgress?.call(0.47, 'Guardando noticias...');
         await _sbInsertNews(txn, newsData);
       }
 
-      // ── 11. Products ──────────────────────────────────────────────────
-      if (productsData != null && productsData.isNotEmpty) {
-        onProgress?.call(0.97, 'Guardando productos/tags (${productsData.length})...');
-        // Full-sync: limpiar antes de insertar → INSERT INTO es 2-3x más rápido que INSERT OR REPLACE
-        await txn.execute('DELETE FROM Products_coordinates');
-        await txn.execute('DELETE FROM Products');
-        await _sbInsertProducts(txn, productsData);
-        productsData.clear(); // liberar ~200k items de RAM
-      }
-
-      // ── 11b. Products_coordinates (endpoint independiente) ────────────
-      if (productsCoordsData != null && productsCoordsData.isNotEmpty) {
-        onProgress?.call(0.975, 'Guardando coordenadas de productos (${productsCoordsData.length})...');
-        await _sbInsertProductsCoordinates(txn, productsCoordsData);
-        productsCoordsData.clear();
-      }
-
-      // ── 12. Virtual_points ────────────────────────────────────────────
-      if (virtualPointsData != null && virtualPointsData.isNotEmpty) {
-        onProgress?.call(0.98, 'Guardando puntos virtuales...');
-        // Full-sync: limpiar antes de insertar → evita conflict check + double index update por fila
-        await txn.execute('DELETE FROM Virtual_points');
-        await _sbInsertVirtualPoints(txn, virtualPointsData);
-        virtualPointsData.clear(); // liberar ~150k items de RAM
-      }
-
-      // ── 13. Headquarters_coordinates ──────────────────────────────────
       if (hqCoordinatesData != null && hqCoordinatesData.isNotEmpty) {
-        onProgress?.call(0.99, 'Guardando zonas de exclusión...');
+        onProgress?.call(0.48, 'Guardando zonas de exclusión...');
         await _sbInsertHeadquartersCoordinates(txn, hqCoordinatesData);
       }
 
-      debugPrint('✅ [SyncBase] Transacción completada');
+      debugPrint('✅ [SyncBase/BASE] Transacción completada');
     });
 
-    // ── Post-transacción: cargar Headquarters al AppState ─────────────────
-    onProgress?.call(0.995, 'Actualizando estado de la aplicación...');
+    // Cargar Headquarters al AppState (necesita la lectura, post-transacción)
+    onProgress?.call(0.49, 'Actualizando estado de la aplicación...');
     await _sbLoadHeadquartersToAppState(db);
 
-    await db.close();
-
-    // ── Actualizar activitiesJSON en AppState ──────────────────────────────
-    if (activitiesData != null && activitiesData.isNotEmpty) {
+    // Actualizar activitiesJSON en AppState
+    if (activitiesData.isNotEmpty) {
       FFAppState().activitiesJSON = _sbNormalizeActivities(activitiesData);
-      debugPrint('✅ [SyncBase] activitiesJSON actualizado: ${activitiesData.length} actividades');
+      debugPrint('✅ [SyncBase/BASE] activitiesJSON actualizado: ${activitiesData.length} actividades');
     }
 
     return true;
   } catch (e, st) {
-    debugPrint('❌ [SyncBase] Error en _sbSyncToSQLite: $e');
+    debugPrint('❌ [SyncBase/BASE] Error: $e');
     debugPrint('   Stack: $st');
     return false;
+  } finally {
+    try { await db?.close(); } catch (_) {}
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOQUE PRODUCTS — Inserta products + products_coordinates en su propia
+// transacción. Asume que las tablas padre ya fueron pobladas por el
+// bloque BASE (FKs).
+// ═══════════════════════════════════════════════════════════════════════════
+Future<bool> _sbSyncProductsToSQLite({
+  required List<dynamic> productsData,
+  List<dynamic>? productsCoordsData,
+  void Function(double, String)? onProgress,
+}) async {
+  Database? db;
+  try {
+    db = await _sbOpenTunedDb();
+
+    await db.transaction((txn) async {
+      debugPrint('🔄 [SyncBase/PRODUCTS] Transacción iniciada');
+
+      if (productsData.isNotEmpty) {
+        onProgress?.call(0.70, 'Guardando productos/tags (${productsData.length})...');
+        // Full-sync: limpiar antes de insertar → INSERT INTO es 2-3x más rápido que INSERT OR REPLACE
+        await txn.execute('DELETE FROM Products_coordinates');
+        await txn.execute('DELETE FROM Products');
+        await _sbInsertProducts(txn, productsData);
+        productsData.clear(); // liberar ~200k items mientras seguimos en TX
+      }
+
+      if (productsCoordsData != null && productsCoordsData.isNotEmpty) {
+        onProgress?.call(0.76, 'Guardando coordenadas de productos (${productsCoordsData.length})...');
+        await _sbInsertProductsCoordinates(txn, productsCoordsData);
+        productsCoordsData.clear();
+      }
+
+      debugPrint('✅ [SyncBase/PRODUCTS] Transacción completada');
+    });
+
+    return true;
+  } catch (e, st) {
+    debugPrint('❌ [SyncBase/PRODUCTS] Error: $e');
+    debugPrint('   Stack: $st');
+    return false;
+  } finally {
+    try { await db?.close(); } catch (_) {}
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// BLOQUE VIRTUAL-POINTS — Inserta virtual_points en su propia transacción.
+// Asume que Types_points / Headquarters ya están en la base (BASE).
+// ═══════════════════════════════════════════════════════════════════════════
+Future<bool> _sbSyncVirtualPointsToSQLite({
+  required List<dynamic> virtualPointsData,
+  void Function(double, String)? onProgress,
+}) async {
+  Database? db;
+  try {
+    db = await _sbOpenTunedDb();
+
+    await db.transaction((txn) async {
+      debugPrint('🔄 [SyncBase/VPOINTS] Transacción iniciada');
+
+      if (virtualPointsData.isNotEmpty) {
+        onProgress?.call(0.95, 'Guardando puntos virtuales (${virtualPointsData.length})...');
+        // Full-sync: limpiar antes de insertar → evita conflict check + double index update por fila
+        await txn.execute('DELETE FROM Virtual_points');
+        await _sbInsertVirtualPoints(txn, virtualPointsData);
+        virtualPointsData.clear(); // liberar ~150k items mientras seguimos en TX
+      }
+
+      debugPrint('✅ [SyncBase/VPOINTS] Transacción completada');
+    });
+
+    return true;
+  } catch (e, st) {
+    debugPrint('❌ [SyncBase/VPOINTS] Error: $e');
+    debugPrint('   Stack: $st');
+    return false;
+  } finally {
+    try { await db?.close(); } catch (_) {}
   }
 }
 

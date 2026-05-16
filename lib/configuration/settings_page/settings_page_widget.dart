@@ -4,9 +4,13 @@ import '/components/nfc_clear_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
+import '/custom_code/actions/device_transfer_service.dart';
+import '/adb_transfer_server_page/adb_transfer_server_page_widget.dart';
+import 'dart:async';
 import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import 'package:provider/provider.dart';
 import 'settings_page_model.dart';
@@ -886,6 +890,175 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
                               ),
                             ].divide(SizedBox(width: 10.0)),
                           ),
+                            Row(
+                              mainAxisSize: MainAxisSize.max,
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    splashColor: Colors.transparent,
+                                    focusColor: Colors.transparent,
+                                    hoverColor: Colors.transparent,
+                                    highlightColor: Colors.transparent,
+                                    onTap: () async {
+                                      final ctx = context;
+                                      final started = await DeviceTransferService
+                                          .instance
+                                          .startTransferServer();
+                                      if (!ctx.mounted) return;
+                                      if (!started) {
+                                        ScaffoldMessenger.of(ctx)
+                                            .showSnackBar(const SnackBar(
+                                          content: Text(
+                                              'No se pudo iniciar el servidor de transferencia'),
+                                        ));
+                                        return;
+                                      }
+                                      await showDialog(
+                                        context: ctx,
+                                        barrierDismissible: false,
+                                        builder: (_) =>
+                                            const _TransferServerDialog(),
+                                      );
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: FlutterFlowTheme.of(context)
+                                            .secondaryBackground,
+                                        boxShadow: [
+                                          BoxShadow(
+                                            blurRadius: 6.0,
+                                            color: Color(0x33000000),
+                                            offset: Offset(0.0, 2.0),
+                                          )
+                                        ],
+                                        borderRadius:
+                                            BorderRadius.circular(16.0),
+                                      ),
+                                      child: Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.max,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Transferir a\nnuevo dispositivo',
+                                              textAlign: TextAlign.center,
+                                              style: FlutterFlowTheme.of(
+                                                      context)
+                                                  .bodyMedium
+                                                  .override(
+                                                    font: TextStyle(
+                                                      fontFamily: 'Roboto',
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                      fontStyle:
+                                                          FlutterFlowTheme.of(
+                                                                  context)
+                                                              .bodyMedium
+                                                              .fontStyle,
+                                                    ),
+                                                    fontSize: 16.0,
+                                                    letterSpacing: 0.0,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontStyle:
+                                                        FlutterFlowTheme.of(
+                                                                context)
+                                                            .bodyMedium
+                                                            .fontStyle,
+                                                  ),
+                                            ),
+                                            Padding(
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(0.0, 5.0, 0.0, 0.0),
+                                              child: Icon(
+                                                Icons.share_rounded,
+                                                color: FlutterFlowTheme.of(
+                                                        context)
+                                                    .primaryText,
+                                                size: 80.0,
+                                              ),
+                                            ),
+                                          ].divide(SizedBox(height: 10.0)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ].divide(SizedBox(width: 10.0)),
+                            ),
+                            Row(
+                              mainAxisSize: MainAxisSize.max,
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    splashColor: Colors.transparent,
+                                    focusColor: Colors.transparent,
+                                    hoverColor: Colors.transparent,
+                                    highlightColor: Colors.transparent,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const AdbTransferServerPageWidget(),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: FlutterFlowTheme.of(context)
+                                            .secondaryBackground,
+                                        boxShadow: const [
+                                          BoxShadow(
+                                            blurRadius: 6.0,
+                                            color: Color(0x33000000),
+                                            offset: Offset(0.0, 2.0),
+                                          )
+                                        ],
+                                        borderRadius:
+                                            BorderRadius.circular(16.0),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Column(
+                                          mainAxisSize: MainAxisSize.max,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Transferir\npor ADB',
+                                              textAlign: TextAlign.center,
+                                              style: FlutterFlowTheme.of(
+                                                      context)
+                                                  .bodyMedium
+                                                  .override(
+                                                    font: const TextStyle(
+                                                      fontFamily: 'Roboto',
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                    fontSize: 16.0,
+                                                    letterSpacing: 0.0,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                            ),
+                                            const Padding(
+                                              padding: EdgeInsetsDirectional
+                                                  .fromSTEB(0.0, 5.0, 0.0, 0.0),
+                                              child: Icon(
+                                                Icons.cable_rounded,
+                                                color: Color(0xFF42A5F5),
+                                                size: 80.0,
+                                              ),
+                                            ),
+                                          ].divide(const SizedBox(height: 10.0)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ].divide(const SizedBox(width: 10.0)),
+                            ),
                         ].divide(SizedBox(height: 10.0)),
                         ),
                       ),
@@ -897,6 +1070,153 @@ class _SettingsPageWidgetState extends State<SettingsPageWidget> {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ── Dialog para el servidor de transferencia (ORIGEN) ──────────────────────
+
+class _TransferServerDialog extends StatefulWidget {
+  const _TransferServerDialog();
+
+  @override
+  State<_TransferServerDialog> createState() => _TransferServerDialogState();
+}
+
+class _TransferServerDialogState extends State<_TransferServerDialog> {
+  TransferServerEvent _event = TransferServerEvent.waiting;
+  late final StreamSubscription<TransferServerEvent> _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = DeviceTransferService.instance.onEvent.listen((event) {
+      if (mounted) setState(() => _event = event);
+      if (event == TransferServerEvent.complete ||
+          event == TransferServerEvent.error) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) Navigator.of(context).pop();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    DeviceTransferService.instance.stopTransferServer();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = DeviceTransferService.instance.serverUrl;
+
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Transferir a nuevo dispositivo',
+        style: TextStyle(
+            color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            child: QrImageView(data: url, version: QrVersions.auto, size: 180),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            url,
+            style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+                fontFamily: 'Roboto'),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Activa "Conexión compartida por USB" en el celular anterior\ny conecta el cable al nuevo dispositivo.',
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 11,
+                fontFamily: 'Roboto'),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          _buildStatus(),
+        ],
+      ),
+      actions: [
+        if (_event != TransferServerEvent.complete)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Color(0xFFE53935))),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildStatus() {
+    switch (_event) {
+      case TransferServerEvent.waiting:
+        return _statusRow(
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF42A5F5))),
+          ),
+          'Esperando conexión del nuevo dispositivo...',
+          const Color(0xFF90CAF9),
+        );
+      case TransferServerEvent.transferring:
+        return _statusRow(
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2,
+                valueColor:
+                    AlwaysStoppedAnimation<Color>(Color(0xFFFFB300))),
+          ),
+          'Transfiriendo base de datos...',
+          const Color(0xFFFFCA28),
+        );
+      case TransferServerEvent.complete:
+        return _statusRow(
+          const Icon(Icons.check_circle_rounded,
+              color: Color(0xFF66BB6A), size: 20),
+          'Transferencia completada ✓',
+          const Color(0xFF66BB6A),
+        );
+      case TransferServerEvent.error:
+        return _statusRow(
+          const Icon(Icons.error_rounded, color: Color(0xFFE53935), size: 20),
+          'Error durante la transferencia',
+          const Color(0xFFE53935),
+        );
+    }
+  }
+
+  Widget _statusRow(Widget leading, String text, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        leading,
+        const SizedBox(width: 8),
+        Flexible(
+          child: Text(text,
+              style: TextStyle(
+                  color: color, fontSize: 12, fontFamily: 'Roboto')),
+        ),
+      ],
     );
   }
 }

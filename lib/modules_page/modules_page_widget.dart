@@ -220,7 +220,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                       highlightColor: Colors.transparent,
                       onTap: () async {
                         context.pushNamed(
-                          InformationPageWidget.routeName,
+                          'HistoryVisitsPage',
                           extra: <String, dynamic>{
                             kTransitionInfoKey: TransitionInfo(
                               hasTransition: true,

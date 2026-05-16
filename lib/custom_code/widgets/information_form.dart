@@ -12,16 +12,14 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import '/components/nfc_view_raw_dialog_widget.dart';
-import '/components/nfc_clear_dialog_widget.dart';
 import '/tag_admin/tag_admin_center_widget.dart';
+import '/custom_code/actions/device_transfer_service.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 // ============================================================================
 // WIDGET PRINCIPAL - FORMULARIO DE INFORMACIÓN Y SINCRONIZACIÓN
@@ -90,6 +88,23 @@ class _InformationFormState extends State<InformationForm>
         setState(() {
           _appVersion = 'v${info.version} (${info.buildNumber})';
         });
+      }
+    });
+    if (!_isAuthenticatedForSession) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showAuthGate();
+      });
+    }
+  }
+
+  void _showAuthGate() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => _buildAccessCodeDialog(),
+    ).then((_) {
+      if (mounted && !_isAuthenticatedForSession) {
+        context.pop();
       }
     });
   }
@@ -263,88 +278,6 @@ class _InformationFormState extends State<InformationForm>
   }
 
   // ==========================================================================
-  // NAVEGACIÓN A HISTORIAL Y SINCRONIZACIÓN
-  // ==========================================================================
-
-  void _navigateToHistoryVisits() {
-    // Mostrar diálogo con HistoryVisitsForm
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(16),
-        child: HistoryVisitsForm(
-          width: MediaQuery.of(context).size.width - 32,
-          height: MediaQuery.of(context).size.height - 100,
-        ),
-      ),
-    );
-  }
-
-  void _navigateToSync() async {
-    // Obtener parámetros del App State
-    final newsAdd = FFAppState().newsAdd;
-    final idCompany = FFAppState().companyDefault.idCompany;
-    final idsHeadquarters =
-        joinHeadquarterIds(FFAppState().headquartersSelectedList);
-    final imei = FFAppState().deviceDefault.imeI1;
-    final authToken = (FFAppState().loginResponse?['token'] as String?) ?? '';
-
-    // Navegar a la nueva página de sincronización moderna
-    await context.pushNamed(
-      'ModernSyncPage',
-      queryParameters: {
-        'newsAdd': serializeParam(newsAdd, ParamType.DataStruct, isList: true),
-        'idCompany': serializeParam(idCompany, ParamType.int),
-        'idsHeadquarters': serializeParam(idsHeadquarters, ParamType.String),
-        'imei': serializeParam(imei, ParamType.String),
-        'authToken': serializeParam(authToken, ParamType.String),
-      }.withoutNulls,
-    );
-
-    // Después de regresar de la página de sincronización, recargar toda la información
-    debugPrint('🔄 Regresando de la sincronización - Recargando información de la UI...');
-
-    // Mostrar indicador de carga mientras se recargan los datos
-    if (mounted) {
-      setState(() {
-        _isLoadingData = true;
-      });
-    }
-
-    // Pequeño delay para que la UI se actualice
-    await Future.delayed(const Duration(milliseconds: 300));
-
-    // Recargar todos los datos
-    await _loadAllData();
-
-    debugPrint('✅ Información de la UI actualizada correctamente');
-  }
-
-  void _navigateToAdvancedConfig() {
-    // Si ya está autenticado en esta sesión, ir directo al menú
-    if (_isAuthenticatedForSession) {
-      _showAdvancedConfigMenu();
-      return;
-    }
-
-    // Si no está autenticado, mostrar diálogo de código de acceso
-    showDialog(
-      context: context,
-      builder: (context) => _buildAccessCodeDialog(),
-    );
-  }
-
-  void _showAdvancedConfigMenu() {
-    // Mostrar menú de opciones avanzadas después de autenticación exitosa
-    showDialog(
-      context: context,
-      builder: (context) => _buildAdvancedConfigMenu(),
-    );
-  }
-
-  // ==========================================================================
   // BUILD
   // ==========================================================================
 
@@ -411,7 +344,7 @@ class _InformationFormState extends State<InformationForm>
           // Título centrado
           Expanded(
             child: Text(
-              'Información del Sistema',
+              'Configuración Avanzada',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
@@ -489,26 +422,32 @@ class _InformationFormState extends State<InformationForm>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Botones de acción modernos (movidos al top)
-          _buildModernActionButtons(),
+          // Sección 1 — Herramientas avanzadas (grid)
+          _buildSectionHeader(
+            icon: Icons.admin_panel_settings,
+            title: 'Herramientas Avanzadas',
+            color: const Color(0xFFFF6B35),
+          ),
+          const SizedBox(height: 12),
+          _buildAdvancedToolsGrid(),
           const SizedBox(height: 24),
 
-          // Grid de Pendientes por Sincronizar
+          // Sección 2 — Información del dispositivo (colapsable)
+          _buildDeviceInfoCollapsible(),
+          const SizedBox(height: 24),
+
+          // Sección 3 — Pendientes por Sincronizar (grid)
           _buildSectionHeader(
             icon: Icons.cloud_upload_outlined,
             title: 'Pendientes por Sincronizar',
-            color: const Color(0xFFFF6B35),
+            color: const Color(0xFFFFAA00),
             badgeCount: _totalPendingItems,
           ),
           const SizedBox(height: 12),
           _buildPendingSyncGrid(),
           const SizedBox(height: 24),
 
-          // Información del dispositivo (colapsable)
-          _buildDeviceInfoCollapsible(),
-          const SizedBox(height: 24),
-
-          // Grid de Datos Descargados
+          // Sección 4 — Datos Descargados (grid)
           _buildSectionHeader(
             icon: Icons.cloud_download_outlined,
             title: 'Datos Descargados',
@@ -1131,121 +1070,121 @@ class _InformationFormState extends State<InformationForm>
     return colors[index % colors.length];
   }
 
-  Widget _buildModernActionButtons() {
-    return Column(
-      children: [
-        // Botón Historial de Visitas (icono mejorado)
-        _buildModernButton(
-          icon: Icons.assignment_outlined,
-          label: 'Historial de Visitas',
-          gradientColors: const [Color(0xFF52B788), Color(0xFF40916C)],
-          shadowColor: const Color(0xFF52B788),
-          onTap: _navigateToHistoryVisits,
-        ),
-        const SizedBox(height: 12),
+  // ── Sección 1: Grid de herramientas avanzadas ───────────────────────────
 
-        // Botón Sincronizar (icono mejorado)
-        _buildModernButton(
-          icon: Icons.sync,
-          label: 'Sincronizar Datos',
-          gradientColors: const [Color(0xFFFF6B35), Color(0xFFFF8C42)],
-          shadowColor: const Color(0xFFFF6B35),
-          onTap: _navigateToSync,
-          badge: _totalPendingItems > 0 ? _totalPendingItems.toString() : null,
-        ),
-        const SizedBox(height: 12),
+  Widget _buildAdvancedToolsGrid() {
+    final tools = [
+      _ToolItem(
+        icon: Icons.map,
+        label: 'Configuración\nde Mapas',
+        color: const Color(0xFF52B788),
+        onTap: () => context.pushNamed('ConfigMapsPage'),
+      ),
+      _ToolItem(
+        icon: Icons.record_voice_over_rounded,
+        label: 'Configuración\nde Voz',
+        color: const Color(0xFF0D9488),
+        onTap: () => context.pushNamed('ConfigVoicePage'),
+      ),
+      _ToolItem(
+        icon: Icons.system_update_alt,
+        label: 'Actualización\nde CTR',
+        color: const Color(0xFFFF6B35),
+        onTap: () => context.pushNamed('UpdatedAPPage'),
+      ),
+      _ToolItem(
+        icon: Icons.location_history,
+        label: 'Historial de\nGeo',
+        color: const Color(0xFF74C69D),
+        onTap: () => context.pushNamed('HistoryGeoPage'),
+      ),
+      _ToolItem(
+        icon: Icons.backup,
+        label: 'Copias de\nSeguridad',
+        color: const Color(0xFFFFAA00),
+        onTap: () => context.pushNamed('ConfigBackupsPage'),
+      ),
+      _ToolItem(
+        icon: Icons.nfc,
+        label: 'Centro\nNFC',
+        color: const Color(0xFF3B82F6),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const TagAdminCenterWidget())),
+      ),
+      _ToolItem(
+        icon: Icons.print,
+        label: 'Impresoras',
+        color: const Color(0xFF8B5CF6),
+        onTap: () => Navigator.push(context,
+            MaterialPageRoute(builder: (_) => const PrinterConfigurationPage())),
+      ),
+      _ToolItem(
+        icon: Icons.share_rounded,
+        label: 'Transferir\ndispositivo',
+        color: const Color(0xFF0EA5E9),
+        onTap: () => _showTransferDialog(context),
+      ),
+    ];
 
-        // Botón Configuración Avanzada (icono mejorado)
-        _buildModernButton(
-          icon: Icons.admin_panel_settings,
-          label: 'Configuración Avanzada',
-          gradientColors: [
-            const Color(0xFF2D6A4F).withValues(alpha: 0.7),
-            const Color(0xFF1B4332).withValues(alpha: 0.9),
-          ],
-          shadowColor: Colors.black,
-          onTap: _navigateToAdvancedConfig,
-          isSecondary: true,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildModernButton({
-    required IconData icon,
-    required String label,
-    required List<Color> gradientColors,
-    required Color shadowColor,
-    required VoidCallback onTap,
-    String? badge,
-    bool isSecondary = false,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: gradientColors,
-            ),
-            borderRadius: BorderRadius.circular(16),
-            border: isSecondary
-                ? Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5)
-                : null,
-            boxShadow: [
-              BoxShadow(
-                color: shadowColor.withValues(alpha: isSecondary ? 0.2 : 0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                icon,
-                color: isSecondary ? Colors.grey[300] : Colors.white,
-                size: 24,
-              ),
-              const SizedBox(width: 12),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSecondary ? Colors.grey[300] : Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.5,
+      ),
+      itemCount: tools.length,
+      itemBuilder: (context, index) {
+        final t = tools[index];
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: t.onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    t.color.withValues(alpha: 0.2),
+                    t.color.withValues(alpha: 0.05),
+                  ],
                 ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: t.color.withValues(alpha: 0.5), width: 1.5),
               ),
-              if (badge != null) ...[
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.25),
-                    borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: t.color.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(t.icon, color: t.color, size: 22),
                   ),
-                  child: Text(
-                    badge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      t.label,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.3,
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ],
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1464,16 +1403,8 @@ class _InformationFormState extends State<InformationForm>
                             if (validateAdvancedAccessCode(inputCode)) {
                               // Código correcto - marcar como autenticado para esta sesión
                               _isAuthenticatedForSession = true;
-
-                              // Cerrar diálogo y mostrar menú
+                              // Cerrar diálogo; la página ya está visible detrás
                               Navigator.pop(dialogContext);
-
-                              // Usar addPostFrameCallback para asegurar que el diálogo anterior se cierre completamente
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                if (mounted) {
-                                  _showAdvancedConfigMenu();
-                                }
-                              });
                             } else {
                               // Código incorrecto - mostrar error
                               setState(() {
@@ -1513,282 +1444,146 @@ class _InformationFormState extends State<InformationForm>
     );
   }
 
-  Widget _buildAdvancedConfigMenu() {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      backgroundColor: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(
-          maxWidth: 420,
-          maxHeight: 480,
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF1B4332),
-                Color(0xFF081C15),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.2),
-              width: 2,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.max,
-            children: [
-              // Header
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          const Color(0xFFFF6B35).withValues(alpha: 0.3),
-                          const Color(0xFFFF8C42).withValues(alpha: 0.3),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.admin_panel_settings,
-                      color: Color(0xFFFF6B35),
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Configuración Avanzada',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Opciones del sistema',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: Icon(Icons.close,
-                        color: Colors.grey[300],
-                        size: 20),
-                    tooltip: 'Cerrar',
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-
-              // Opciones de configuración (scrollable)
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    children: [
-                      _buildAdvancedOptionCard(
-                        icon: Icons.map,
-                        title: 'Configuración de Mapas',
-                        description: 'Gestionar recursos de mapas y tiles',
-                        color: const Color(0xFF52B788),
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.pushNamed('ConfigMapsPage');
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildAdvancedOptionCard(
-                        icon: Icons.record_voice_over_rounded,
-                        title: 'Configuración de Voz',
-                        description: 'Descargar modelo IA para asistente de voz offline',
-                        color: const Color(0xFF0D9488),
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.pushNamed('ConfigVoicePage');
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildAdvancedOptionCard(
-                        icon: Icons.system_update_alt,
-                        title: 'Actualización de CTR',
-                        description:
-                            'Descargar e instalar actualizaciones de la app',
-                        color: const Color(0xFFFF6B35),
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.pushNamed('UpdatedAPPage');
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildAdvancedOptionCard(
-                        icon: Icons.location_history,
-                        title: 'Historial de Geolocalizaciones',
-                        description: 'Ver registro de ubicaciones rastreadas',
-                        color: const Color(0xFF74C69D),
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.pushNamed('HistoryGeoPage');
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildAdvancedOptionCard(
-                        icon: Icons.backup,
-                        title: 'Copias de Seguridad',
-                        description: 'Administrar backups del sistema',
-                        color: const Color(0xFFFFAA00),
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.pushNamed('ConfigBackupsPage');
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildAdvancedOptionCard(
-                        icon: Icons.nfc,
-                        title: 'Centro de Administración NFC',
-                        description: 'Configurar, leer, escribir y gestionar TAGs NFC',
-                        color: const Color(0xFF3B82F6),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const TagAdminCenterWidget(),
-                            ),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      _buildAdvancedOptionCard(
-                        icon: Icons.print,
-                        title: 'Configuración de Impresoras',
-                        description: 'Conectar y configurar impresoras Bluetooth térmicas',
-                        color: const Color(0xFF8B5CF6),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const PrinterConfigurationPage(),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  Future<void> _showTransferDialog(BuildContext ctx) async {
+    final started = await DeviceTransferService.instance.startTransferServer();
+    if (!ctx.mounted) return;
+    if (!started) {
+      ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(
+        content: Text('No se pudo iniciar el servidor de transferencia'),
+      ));
+      return;
+    }
+    await showDialog(
+      context: ctx,
+      barrierDismissible: false,
+      builder: (_) => const _TransferServerDialog(),
     );
   }
 
-  Widget _buildAdvancedOptionCard({
-    required IconData icon,
-    required String title,
-    required String description,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                const Color(0xFF2D6A4F).withValues(alpha: 0.3),
-                const Color(0xFF1B4332).withValues(alpha: 0.5),
-              ],
-            ),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: color.withValues(alpha: 0.4),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.1),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              // Icono
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 12),
+}
 
-              // Texto
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      description,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 11,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+class _TransferServerDialog extends StatefulWidget {
+  const _TransferServerDialog();
+  @override
+  State<_TransferServerDialog> createState() => _TransferServerDialogState();
+}
 
-              // Flecha
-              Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 14,
-              ),
-            ],
-          ),
-        ),
+class _TransferServerDialogState extends State<_TransferServerDialog> {
+  TransferServerEvent _event = TransferServerEvent.waiting;
+  late final StreamSubscription<TransferServerEvent> _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _sub = DeviceTransferService.instance.onEvent.listen((event) {
+      if (mounted) setState(() => _event = event);
+      if (event == TransferServerEvent.complete ||
+          event == TransferServerEvent.error) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted) Navigator.of(context).pop();
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    DeviceTransferService.instance.stopTransferServer();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final url = DeviceTransferService.instance.serverUrl;
+    return AlertDialog(
+      backgroundColor: const Color(0xFF1E293B),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: const Text(
+        'Transferir a nuevo dispositivo',
+        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
       ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+                color: Colors.white, borderRadius: BorderRadius.circular(8)),
+            child: QrImageView(data: url, version: QrVersions.auto, size: 180),
+          ),
+          const SizedBox(height: 10),
+          Text(url,
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 4),
+          Text(
+            'Activa "Conexión compartida por USB" en ajustes\ny conecta el cable al nuevo dispositivo.',
+            style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 14),
+          _buildStatus(),
+        ],
+      ),
+      actions: [
+        if (_event != TransferServerEvent.complete)
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancelar',
+                style: TextStyle(color: Color(0xFFE53935))),
+          ),
+      ],
     );
   }
+
+  Widget _buildStatus() {
+    switch (_event) {
+      case TransferServerEvent.waiting:
+        return _statusRow(
+          const SizedBox(width: 16, height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF42A5F5)))),
+          'Esperando conexión del nuevo dispositivo...', const Color(0xFF90CAF9));
+      case TransferServerEvent.transferring:
+        return _statusRow(
+          const SizedBox(width: 16, height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFFB300)))),
+          'Transfiriendo base de datos...', const Color(0xFFFFCA28));
+      case TransferServerEvent.complete:
+        return _statusRow(
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF66BB6A), size: 20),
+          'Transferencia completada ✓', const Color(0xFF66BB6A));
+      case TransferServerEvent.error:
+        return _statusRow(
+          const Icon(Icons.error_rounded, color: Color(0xFFE53935), size: 20),
+          'Error durante la transferencia', const Color(0xFFE53935));
+    }
+  }
+
+  Widget _statusRow(Widget leading, String text, Color color) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        leading,
+        const SizedBox(width: 8),
+        Flexible(child: Text(text, style: TextStyle(color: color, fontSize: 12))),
+      ],
+    );
+  }
+}
+
+class _ToolItem {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ToolItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
 }
