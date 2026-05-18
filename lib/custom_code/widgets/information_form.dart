@@ -1,11 +1,8 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
+// Imports custom actions
 import '/flutter_flow/custom_functions.dart'; // Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
@@ -69,7 +66,7 @@ class _InformationFormState extends State<InformationForm>
   int _pendingTagsUpdated = 0;  // Productos TAG actualizados (Sync_status = 'updated')
 
   // Datos descargados (conteo de registros por tabla)
-  Map<String, int> _downloadedDataCounts = {};
+  final Map<String, int> _downloadedDataCounts = {};
 
   // Versión de la app
   String _appVersion = '';
@@ -342,11 +339,11 @@ class _InformationFormState extends State<InformationForm>
           ),
 
           // Título centrado
-          Expanded(
+          const Expanded(
             child: Text(
               'Configuración Avanzada',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,

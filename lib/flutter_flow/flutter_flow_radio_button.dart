@@ -219,10 +219,12 @@ class RadioButton<T> extends StatelessWidget {
         children: <Widget>[
           if (buttonPosition == RadioButtonPosition.right) radioButtonText,
           Radio<T>(
+            // ignore: deprecated_member_use
             groupValue: groupValue,
+            // ignore: deprecated_member_use
             onChanged: onChanged,
             value: value,
-            activeColor: activeColor,
+            fillColor: WidgetStateProperty.resolveWith<Color>((_) => activeColor),
             toggleable: toggleable,
           ),
           if (buttonPosition == RadioButtonPosition.left) radioButtonText,

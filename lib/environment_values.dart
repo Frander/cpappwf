@@ -1,6 +1,6 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'flutter_flow/flutter_flow_util.dart';
 
 class FFDevEnvironmentValues {
   static const String currentEnvironment = 'Production';
@@ -22,7 +22,7 @@ class FFDevEnvironmentValues {
           await rootBundle.loadString(environmentValuesPath);
       final data = await json.decode(response);
     } catch (e) {
-      print('Error loading environment values: $e');
+      debugPrint('Error loading environment values: $e');
     }
   }
 }

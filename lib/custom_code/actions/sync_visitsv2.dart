@@ -1,29 +1,20 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import '/custom_code/actions/index.dart';
-import '/flutter_flow/custom_functions.dart';
 
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
-import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 
 Future<bool> syncVisitsv2(
   BuildContext context,
@@ -1135,7 +1126,7 @@ Future<void> _cleanupSQLiteDataAfterSync() async {
 
     // Verificación adicional después de update()
     await Future.delayed(
-        Duration(milliseconds: 500)); // Dar tiempo para que persista
+        const Duration(milliseconds: 500)); // Dar tiempo para que persista
     debugPrint('   🔍 VERIFICACIÓN POST-UPDATE:');
     debugPrint('      visitCount = ${FFAppState().visitCount}');
     debugPrint('      visitsAdd.length = ${FFAppState().visitsAdd.length}');
@@ -1209,7 +1200,7 @@ String _compressPhotoBase64(String photoPathOrBase64) {
         photoPathOrBase64.contains('/cache/')) {
       // Es una ruta de archivo, leer el archivo
       debugPrint('   📂 Detectado como ruta de archivo');
-      debugPrint('   📂 Ruta: ${photoPathOrBase64.length > 80 ? photoPathOrBase64.substring(0, 80) + "..." : photoPathOrBase64}');
+      debugPrint('   📂 Ruta: ${photoPathOrBase64.length > 80 ? "${photoPathOrBase64.substring(0, 80)}..." : photoPathOrBase64}');
 
       final File photoFile = File(photoPathOrBase64);
       if (!photoFile.existsSync()) {
@@ -1279,7 +1270,7 @@ Future<String> _convertVideoToBase64(String videoPath) async {
     }
 
     debugPrint('🎥 Convirtiendo video a base64...');
-    debugPrint('   📂 Ruta: ${videoPath.length > 80 ? videoPath.substring(0, 80) + "..." : videoPath}');
+    debugPrint('   📂 Ruta: ${videoPath.length > 80 ? "${videoPath.substring(0, 80)}..." : videoPath}');
 
     final File videoFile = File(videoPath);
 

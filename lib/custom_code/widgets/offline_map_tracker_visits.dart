@@ -1,12 +1,10 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
+// Imports other custom widgets
 import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -15,7 +13,6 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:pmtiles/pmtiles.dart';
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:io';
 import 'dart:ui' as ui;
@@ -874,27 +871,27 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
 
   // Datos de headquarters
   HeadquarterData? _headquarter; // Headquarter activo actual
-  Map<int, HeadquarterData> _headquarters =
+  final Map<int, HeadquarterData> _headquarters =
       {}; // Todos los headquarters cargados
-  Map<int, TypePointData> _typePoints = {}; // Cache de Type_points por ID
+  final Map<int, TypePointData> _typePoints = {}; // Cache de Type_points por ID
 
   // Datos organizados por headquarter
   List<VirtualPoint> _virtualPoints = []; // Del headquarter activo
-  Map<int, List<VirtualPoint>> _virtualPointsByHeadquarter = {};
+  final Map<int, List<VirtualPoint>> _virtualPointsByHeadquarter = {};
 
   List<latlong.LatLng> _polygonPoints = []; // Del headquarter activo
-  Map<int, List<latlong.LatLng>> _polygonsByHeadquarter = {};
+  final Map<int, List<latlong.LatLng>> _polygonsByHeadquarter = {};
 
   List<ProductData> _products = []; // Del headquarter activo
-  Map<int, List<ProductData>> _productsByHeadquarter = {};
+  final Map<int, List<ProductData>> _productsByHeadquarter = {};
 
   List<CoordinateData> _coordinates = []; // Del headquarter activo
-  Map<int, List<CoordinateData>> _coordinatesByHeadquarter = {};
+  final Map<int, List<CoordinateData>> _coordinatesByHeadquarter = {};
 
   int? _activeHeadquarterId; // ID del lote activo en el selector de lotes
 
   // Simulación de recorrido
-  List<SimulatedLocationPoint> _simulatedRoute = [];
+  final List<SimulatedLocationPoint> _simulatedRoute = [];
   bool _showSimulatedRoute = false;
   RouteSimulationConfig? _routeConfig;
   VirtualPoint? _startingPoint; // Punto inicial del recorrido configurado
@@ -941,7 +938,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
   // Control de zonas de exclusión cercanas y modificación de tipos
   List<ExclusionZoneMarker> _nearbyExclusionZones = [];
   bool _showExclusionButton = false;
-  List<TypePointData> _availableTypesPoints = [];
+  final List<TypePointData> _availableTypesPoints = [];
 
   // Función para calcular el tamaño de los marcadores según el zoom
   double _getMarkerSize(double baseSize) {
@@ -1385,6 +1382,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
       if (mounted) {
         Navigator.pop(context);
         await _showSyncErrorDialog();
+        if (!mounted) return;
         Navigator.pop(context);
       }
     }
@@ -2834,7 +2832,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
     final allLines = lineGroups.keys.toList()..sort();
 
     debugPrint(
-        '🕸️ Zigzag Espiral (Telaraña): Inicio en L${startLine}P${startPoint}');
+        '🕸️ Zigzag Espiral (Telaraña): Inicio en L${startLine}P$startPoint');
 
     // Función auxiliar para marcar y agregar punto
     void addPoint(int line, int pointNum) {
@@ -2851,7 +2849,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
         if (point.pointNumber == pointNum) {
           result.add(point);
           visited.add(key);
-          debugPrint('   ✓ Agregado: L${line}P${pointNum}');
+          debugPrint('   ✓ Agregado: L${line}P$pointNum');
         }
       }
     }
@@ -3228,6 +3226,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
         debugPrint('⚠️ Ya existe una ruta con estos parámetros');
 
         // Mostrar diálogo de confirmación
+        if (!mounted) return;
         final bool? shouldReplace = await showDialog<bool>(
           context: context,
           builder: (BuildContext dialogContext) {
@@ -3243,7 +3242,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                     size: 28,
                   ),
                   const SizedBox(width: 12),
-                  Expanded(
+                  const Expanded(
                     child: Text(
                       'Ruta Ya Existente',
                       style: TextStyle(
@@ -5593,7 +5592,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           child: Switch(
             value: isVisible,
             onChanged: onChanged,
-            activeColor: color,
+            activeThumbColor: color,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
         ),
@@ -5775,7 +5774,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                               color: FlutterFlowTheme.of(context).primary,
                               size: 20,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
                               'Filtro de Tiempo',
                               style: TextStyle(
@@ -5888,7 +5887,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: color,
+            activeThumbColor: color,
           ),
         ],
       ),
@@ -8675,7 +8674,7 @@ class _OfflineMapTrackerVisitsState extends State<OfflineMapTrackerVisits>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (isActive) ...[
-                          Icon(
+                          const Icon(
                             Icons.layers_rounded,
                             size: 13,
                             color: Colors.white,
@@ -9525,7 +9524,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                           ),
                           elevation: 0,
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.refresh, size: 18),
@@ -9555,7 +9554,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                           elevation: 8,
                           shadowColor: Colors.white.withValues(alpha: 0.5),
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(Icons.check_circle, size: 18),
@@ -9742,26 +9741,6 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
 
       // 2. Obtener datos necesarios desde el widget
       final authToken = widget.authToken;
-
-      if (headquarterId == null) {
-        statusNotifier?.value = 'Error: No hay ID de headquarter disponible';
-        if (dialogContext.mounted) {
-          await showDialog(
-            context: dialogContext,
-            builder: (context) => AlertDialog(
-              title: const Text('Error'),
-              content: const Text('No hay ID de headquarter disponible.'),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-        }
-        return false;
-      }
 
       if (authToken == null || authToken.isEmpty) {
         statusNotifier?.value = 'Error: No hay token de autenticación';
@@ -10197,7 +10176,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                     ),
                   ),
                   const SizedBox(width: 16),
-                  Expanded(
+                  const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -10362,7 +10341,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                         // Divider entre rutas guardadas y nueva configuración
                         Row(
                           children: [
-                            Expanded(child: Divider(color: Colors.white24)),
+                            const Expanded(child: Divider(color: Colors.white24)),
                             Padding(
                               padding:
                                   const EdgeInsets.symmetric(horizontal: 16),
@@ -10376,7 +10355,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                                 ),
                               ),
                             ),
-                            Expanded(child: Divider(color: Colors.white24)),
+                            const Expanded(child: Divider(color: Colors.white24)),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -10575,6 +10554,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                                     await _showExistingRouteDialog(
                                         context, existingRoute);
 
+                                if (!context.mounted) return;
                                 if (useExisting == true) {
                                   // Cargar ruta existente directamente
                                   Navigator.pop(context, config);
@@ -10628,6 +10608,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                             }
                           }
 
+                          if (!context.mounted) return;
                           Navigator.pop(context, config);
                         }
                       },
@@ -10643,7 +10624,7 @@ class _SimulationConfigDialogState extends State<_SimulationConfigDialog> {
                             .primary
                             .withValues(alpha: 0.5),
                       ),
-                      child: Row(
+                      child: const Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.check_circle, size: 20),

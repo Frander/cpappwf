@@ -2,7 +2,6 @@ import 'package:collection/collection.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
-import 'flutter_flow_util.dart';
 
 Widget wrapWithModel<T extends FlutterFlowModel>({
   required T model,
@@ -44,17 +43,13 @@ abstract class FlutterFlowModel<W extends Widget> {
       initState(context);
       _isInitialized = true;
     }
-    if (context.widget is W) _widget = context.widget as W;
+    if (context.widget is W) widget = context.widget as W;
     _context = context;
   }
 
   // The widget associated with this model. This is useful for accessing the
   // parameters of the widget, for example.
-  W? _widget;
-  W? get widget => _widget;
-  void set widget(W? newWidget) {
-    _widget = newWidget;
-  }
+  W? widget;
 
   // The context associated with this model.
   BuildContext? _context;
@@ -71,7 +66,7 @@ abstract class FlutterFlowModel<W extends Widget> {
       dispose();
     }
     // Remove reference to widget for garbage collection purposes.
-    _widget = null;
+    widget = null;
   }
 
   // Whether to update the containing page / component on updates.
@@ -130,7 +125,11 @@ class FlutterFlowDynamicModels<T extends FlutterFlowModel> {
     return model != null ? getValue(model) : null;
   }
 
-  void dispose() => _childrenModels.values.forEach((model) => model.dispose());
+  void dispose() {
+    for (final model in _childrenModels.values) {
+      model.dispose();
+    }
+  }
 
   void _updateActiveKeys(String uniqueKey) {
     final shouldResetActiveKeys = _activeKeys == null;
@@ -157,13 +156,13 @@ class FlutterFlowDynamicModels<T extends FlutterFlowModel> {
 
 T? _getDefaultValue<T>() {
   switch (T) {
-    case int:
+    case int _:
       return 0 as T;
-    case double:
+    case double _:
       return 0.0 as T;
-    case String:
+    case String _:
       return '' as T;
-    case bool:
+    case bool _:
       return false as T;
     default:
       return null as T;

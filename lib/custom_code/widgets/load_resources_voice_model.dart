@@ -1,12 +1,7 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -141,10 +136,12 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
   }
 
   void _setErrorIfMounted(String msg) {
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _state = VoiceModelState.error;
       _errorMessage = msg;
     });
+    }
   }
 
   Future<void> _startDownload() async {
@@ -815,15 +812,15 @@ class _LoadResourcesVoiceModelState extends State<LoadResourcesVoiceModel>
               border: Border.all(
                   color: const Color(0xFF0D9488).withValues(alpha: 0.25)),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
+                Icon(Icons.info_outline_rounded,
                     color: Color(0xFF0D9488), size: 20),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Se recomienda descargar con WiFi. La descarga puede tardar varios minutos dependiendo de tu conexión.',
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: Color(0xFF94A3B8), fontSize: 12, height: 1.5),
                   ),
                 ),

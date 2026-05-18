@@ -1,10 +1,7 @@
 import 'dart:convert';
-import 'dart:typed_data';
-import '../schema/structs/index.dart';
 
 import 'package:flutter/foundation.dart';
 
-import '/flutter_flow/flutter_flow_util.dart';
 import 'api_manager.dart';
 
 export 'api_manager.dart' show ApiCallResponse;
@@ -311,7 +308,7 @@ class ActivitiesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities GET',
-      apiUrl: '${baseUrl}/Activities',
+      apiUrl: '$baseUrl/Activities',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -329,7 +326,7 @@ class ActivitiesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_activity": 123,
   "id_company": 123,
@@ -343,7 +340,7 @@ class ActivitiesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Activities POST',
-      apiUrl: '${baseUrl}/Activities',
+      apiUrl: '$baseUrl/Activities',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -367,7 +364,7 @@ class ActivitiesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities/{id} GET',
-      apiUrl: '${baseUrl}/Activities/${id}',
+      apiUrl: '$baseUrl/Activities/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -387,7 +384,7 @@ class ActivitiesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_activity": 123,
   "id_company": 123,
@@ -401,7 +398,7 @@ class ActivitiesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Activities/{id} PUT',
-      apiUrl: '${baseUrl}/Activities/${id}',
+      apiUrl: '$baseUrl/Activities/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -425,7 +422,7 @@ class ActivitiesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities/{id} DELETE',
-      apiUrl: '${baseUrl}/Activities/${id}',
+      apiUrl: '$baseUrl/Activities/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -450,7 +447,7 @@ class ActivitiesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities/filters GET',
-      apiUrl: '${baseUrl}/Activities/filters',
+      apiUrl: '$baseUrl/Activities/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -475,7 +472,7 @@ class ActivitiesStatusGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities_status GET',
-      apiUrl: '${baseUrl}/Activities_status',
+      apiUrl: '$baseUrl/Activities_status',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -493,7 +490,7 @@ class ActivitiesStatusPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_activity_status": 123,
   "id_activity": 123,
@@ -510,7 +507,7 @@ class ActivitiesStatusPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Activities_status POST',
-      apiUrl: '${baseUrl}/Activities_status',
+      apiUrl: '$baseUrl/Activities_status',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -534,7 +531,7 @@ class ActivitiesStatusidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities_status/{id} GET',
-      apiUrl: '${baseUrl}/Activities_status/${id}',
+      apiUrl: '$baseUrl/Activities_status/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -554,7 +551,7 @@ class ActivitiesStatusidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_activity_status": 123,
   "id_activity": 123,
@@ -571,7 +568,7 @@ class ActivitiesStatusidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Activities_status/{id} PUT',
-      apiUrl: '${baseUrl}/Activities_status/${id}',
+      apiUrl: '$baseUrl/Activities_status/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -595,7 +592,7 @@ class ActivitiesStatusidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities_status/{id} DELETE',
-      apiUrl: '${baseUrl}/Activities_status/${id}',
+      apiUrl: '$baseUrl/Activities_status/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -620,7 +617,7 @@ class ActivitiesStatusFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Activities_status/filters GET',
-      apiUrl: '${baseUrl}/Activities_status/filters',
+      apiUrl: '$baseUrl/Activities_status/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -645,7 +642,7 @@ class ArchivesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Archives GET',
-      apiUrl: '${baseUrl}/Archives',
+      apiUrl: '$baseUrl/Archives',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -663,7 +660,7 @@ class ArchivesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_archive": 123,
   "id_company": 123,
@@ -676,7 +673,7 @@ class ArchivesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Archives POST',
-      apiUrl: '${baseUrl}/Archives',
+      apiUrl: '$baseUrl/Archives',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -700,7 +697,7 @@ class ArchivesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Archives/{id} GET',
-      apiUrl: '${baseUrl}/Archives/${id}',
+      apiUrl: '$baseUrl/Archives/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -720,7 +717,7 @@ class ArchivesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_archive": 123,
   "id_company": 123,
@@ -733,7 +730,7 @@ class ArchivesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Archives/{id} PUT',
-      apiUrl: '${baseUrl}/Archives/${id}',
+      apiUrl: '$baseUrl/Archives/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -757,7 +754,7 @@ class ArchivesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Archives/{id} DELETE',
-      apiUrl: '${baseUrl}/Archives/${id}',
+      apiUrl: '$baseUrl/Archives/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -782,7 +779,7 @@ class ArchivesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Archives/filters GET',
-      apiUrl: '${baseUrl}/Archives/filters',
+      apiUrl: '$baseUrl/Archives/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -807,7 +804,7 @@ class BrazalsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Brazals GET',
-      apiUrl: '${baseUrl}/Brazals',
+      apiUrl: '$baseUrl/Brazals',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -825,7 +822,7 @@ class BrazalsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_brazal": 123,
   "id_headquarter_start": 123,
@@ -836,7 +833,7 @@ class BrazalsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Brazals POST',
-      apiUrl: '${baseUrl}/Brazals',
+      apiUrl: '$baseUrl/Brazals',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -860,7 +857,7 @@ class BrazalsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Brazals/{id} GET',
-      apiUrl: '${baseUrl}/Brazals/${id}',
+      apiUrl: '$baseUrl/Brazals/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -880,7 +877,7 @@ class BrazalsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_brazal": 123,
   "id_headquarter_start": 123,
@@ -891,7 +888,7 @@ class BrazalsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Brazals/{id} PUT',
-      apiUrl: '${baseUrl}/Brazals/${id}',
+      apiUrl: '$baseUrl/Brazals/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -915,7 +912,7 @@ class BrazalsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Brazals/{id} DELETE',
-      apiUrl: '${baseUrl}/Brazals/${id}',
+      apiUrl: '$baseUrl/Brazals/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -940,7 +937,7 @@ class BrazalsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Brazals/filters GET',
-      apiUrl: '${baseUrl}/Brazals/filters',
+      apiUrl: '$baseUrl/Brazals/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -965,7 +962,7 @@ class CompaniesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Companies GET',
-      apiUrl: '${baseUrl}/Companies',
+      apiUrl: '$baseUrl/Companies',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -983,7 +980,7 @@ class CompaniesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_company": 123,
   "name_company": "example string",
@@ -994,7 +991,7 @@ class CompaniesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Companies POST',
-      apiUrl: '${baseUrl}/Companies',
+      apiUrl: '$baseUrl/Companies',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1018,7 +1015,7 @@ class CompaniesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Companies/{id} GET',
-      apiUrl: '${baseUrl}/Companies/${id}',
+      apiUrl: '$baseUrl/Companies/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1038,7 +1035,7 @@ class CompaniesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_company": 123,
   "name_company": "example string",
@@ -1049,7 +1046,7 @@ class CompaniesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Companies/{id} PUT',
-      apiUrl: '${baseUrl}/Companies/${id}',
+      apiUrl: '$baseUrl/Companies/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -1073,7 +1070,7 @@ class CompaniesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Companies/{id} DELETE',
-      apiUrl: '${baseUrl}/Companies/${id}',
+      apiUrl: '$baseUrl/Companies/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -1098,7 +1095,7 @@ class CompaniesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Companies/filters GET',
-      apiUrl: '${baseUrl}/Companies/filters',
+      apiUrl: '$baseUrl/Companies/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -1123,7 +1120,7 @@ class CyclesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Cycles GET',
-      apiUrl: '${baseUrl}/Cycles',
+      apiUrl: '$baseUrl/Cycles',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1141,7 +1138,7 @@ class CyclesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_cycle": 123,
   "order_cycle": 123,
@@ -1150,7 +1147,7 @@ class CyclesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Cycles POST',
-      apiUrl: '${baseUrl}/Cycles',
+      apiUrl: '$baseUrl/Cycles',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1174,7 +1171,7 @@ class CyclesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Cycles/{id} GET',
-      apiUrl: '${baseUrl}/Cycles/${id}',
+      apiUrl: '$baseUrl/Cycles/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1194,7 +1191,7 @@ class CyclesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_cycle": 123,
   "order_cycle": 123,
@@ -1203,7 +1200,7 @@ class CyclesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Cycles/{id} PUT',
-      apiUrl: '${baseUrl}/Cycles/${id}',
+      apiUrl: '$baseUrl/Cycles/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -1227,7 +1224,7 @@ class CyclesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Cycles/{id} DELETE',
-      apiUrl: '${baseUrl}/Cycles/${id}',
+      apiUrl: '$baseUrl/Cycles/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -1252,7 +1249,7 @@ class CyclesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Cycles/filters GET',
-      apiUrl: '${baseUrl}/Cycles/filters',
+      apiUrl: '$baseUrl/Cycles/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -1282,7 +1279,7 @@ class DashboardsGetDashboardMainPOSTCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Dashboards/GetDashboardMain POST',
-      apiUrl: '${baseUrl}/Dashboards/GetDashboardMain',
+      apiUrl: '$baseUrl/Dashboards/GetDashboardMain',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1303,7 +1300,7 @@ class DevicesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Devices GET',
-      apiUrl: '${baseUrl}/Devices',
+      apiUrl: '$baseUrl/Devices',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1345,7 +1342,7 @@ class DevicesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Devices POST',
-      apiUrl: '${baseUrl}/Devices',
+      apiUrl: '$baseUrl/Devices',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1369,7 +1366,7 @@ class DevicesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Devices/{id} GET',
-      apiUrl: '${baseUrl}/Devices/${id}',
+      apiUrl: '$baseUrl/Devices/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1389,7 +1386,7 @@ class DevicesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_device": 123,
   "id_company": 123,
@@ -1403,7 +1400,7 @@ class DevicesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Devices/{id} PUT',
-      apiUrl: '${baseUrl}/Devices/${id}',
+      apiUrl: '$baseUrl/Devices/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -1427,7 +1424,7 @@ class DevicesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Devices/{id} DELETE',
-      apiUrl: '${baseUrl}/Devices/${id}',
+      apiUrl: '$baseUrl/Devices/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -1453,7 +1450,7 @@ class DevicesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Devices/filters GET',
-      apiUrl: '${baseUrl}/Devices/filters',
+      apiUrl: '$baseUrl/Devices/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -1479,7 +1476,7 @@ class FlowersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Flowers GET',
-      apiUrl: '${baseUrl}/Flowers',
+      apiUrl: '$baseUrl/Flowers',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1497,7 +1494,7 @@ class FlowersPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_flower": 123,
   "id_product": 123,
@@ -1506,7 +1503,7 @@ class FlowersPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Flowers POST',
-      apiUrl: '${baseUrl}/Flowers',
+      apiUrl: '$baseUrl/Flowers',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1530,7 +1527,7 @@ class FlowersidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Flowers/{id} GET',
-      apiUrl: '${baseUrl}/Flowers/${id}',
+      apiUrl: '$baseUrl/Flowers/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1550,7 +1547,7 @@ class FlowersidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_flower": 123,
   "id_product": 123,
@@ -1559,7 +1556,7 @@ class FlowersidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Flowers/{id} PUT',
-      apiUrl: '${baseUrl}/Flowers/${id}',
+      apiUrl: '$baseUrl/Flowers/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -1583,7 +1580,7 @@ class FlowersidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Flowers/{id} DELETE',
-      apiUrl: '${baseUrl}/Flowers/${id}',
+      apiUrl: '$baseUrl/Flowers/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -1608,7 +1605,7 @@ class FlowersFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Flowers/filters GET',
-      apiUrl: '${baseUrl}/Flowers/filters',
+      apiUrl: '$baseUrl/Flowers/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -1633,7 +1630,7 @@ class GroupsMetricsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Groups_metrics GET',
-      apiUrl: '${baseUrl}/Groups_metrics',
+      apiUrl: '$baseUrl/Groups_metrics',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1651,7 +1648,7 @@ class GroupsMetricsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_group_metric": 123,
   "id_company": 123,
@@ -1660,7 +1657,7 @@ class GroupsMetricsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Groups_metrics POST',
-      apiUrl: '${baseUrl}/Groups_metrics',
+      apiUrl: '$baseUrl/Groups_metrics',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1684,7 +1681,7 @@ class GroupsMetricsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Groups_metrics/{id} GET',
-      apiUrl: '${baseUrl}/Groups_metrics/${id}',
+      apiUrl: '$baseUrl/Groups_metrics/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1704,7 +1701,7 @@ class GroupsMetricsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_group_metric": 123,
   "id_company": 123,
@@ -1713,7 +1710,7 @@ class GroupsMetricsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Groups_metrics/{id} PUT',
-      apiUrl: '${baseUrl}/Groups_metrics/${id}',
+      apiUrl: '$baseUrl/Groups_metrics/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -1737,7 +1734,7 @@ class GroupsMetricsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Groups_metrics/{id} DELETE',
-      apiUrl: '${baseUrl}/Groups_metrics/${id}',
+      apiUrl: '$baseUrl/Groups_metrics/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -1762,7 +1759,7 @@ class GroupsMetricsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Groups_metrics/filters GET',
-      apiUrl: '${baseUrl}/Groups_metrics/filters',
+      apiUrl: '$baseUrl/Groups_metrics/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -1787,7 +1784,7 @@ class HeadquartersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters GET',
-      apiUrl: '${baseUrl}/Headquarters',
+      apiUrl: '$baseUrl/Headquarters',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1805,7 +1802,7 @@ class HeadquartersPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_headquarter": 123,
   "id_zone": 123,
@@ -1819,7 +1816,7 @@ class HeadquartersPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters POST',
-      apiUrl: '${baseUrl}/Headquarters',
+      apiUrl: '$baseUrl/Headquarters',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -1843,7 +1840,7 @@ class HeadquartersidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters/{id} GET',
-      apiUrl: '${baseUrl}/Headquarters/${id}',
+      apiUrl: '$baseUrl/Headquarters/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1863,7 +1860,7 @@ class HeadquartersidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_headquarter": 123,
   "id_zone": 123,
@@ -1877,7 +1874,7 @@ class HeadquartersidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters/{id} PUT',
-      apiUrl: '${baseUrl}/Headquarters/${id}',
+      apiUrl: '$baseUrl/Headquarters/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -1901,7 +1898,7 @@ class HeadquartersidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters/{id} DELETE',
-      apiUrl: '${baseUrl}/Headquarters/${id}',
+      apiUrl: '$baseUrl/Headquarters/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -1926,7 +1923,7 @@ class HeadquartersFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters/filters GET',
-      apiUrl: '${baseUrl}/Headquarters/filters',
+      apiUrl: '$baseUrl/Headquarters/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -1951,7 +1948,7 @@ class HeadquartersWeightsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters_weights GET',
-      apiUrl: '${baseUrl}/Headquarters_weights',
+      apiUrl: '$baseUrl/Headquarters_weights',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -1969,7 +1966,7 @@ class HeadquartersWeightsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_headquarter_weight": 123,
   "id_headquarter": 123,
@@ -1978,7 +1975,7 @@ class HeadquartersWeightsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters_weights POST',
-      apiUrl: '${baseUrl}/Headquarters_weights',
+      apiUrl: '$baseUrl/Headquarters_weights',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2002,7 +1999,7 @@ class HeadquartersWeightsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters_weights/{id} GET',
-      apiUrl: '${baseUrl}/Headquarters_weights/${id}',
+      apiUrl: '$baseUrl/Headquarters_weights/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2022,7 +2019,7 @@ class HeadquartersWeightsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_headquarter_weight": 123,
   "id_headquarter": 123,
@@ -2031,7 +2028,7 @@ class HeadquartersWeightsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters_weights/{id} PUT',
-      apiUrl: '${baseUrl}/Headquarters_weights/${id}',
+      apiUrl: '$baseUrl/Headquarters_weights/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2055,7 +2052,7 @@ class HeadquartersWeightsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters_weights/{id} DELETE',
-      apiUrl: '${baseUrl}/Headquarters_weights/${id}',
+      apiUrl: '$baseUrl/Headquarters_weights/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2080,7 +2077,7 @@ class HeadquartersWeightsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Headquarters_weights/filters GET',
-      apiUrl: '${baseUrl}/Headquarters_weights/filters',
+      apiUrl: '$baseUrl/Headquarters_weights/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -2105,7 +2102,7 @@ class MetricsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics GET',
-      apiUrl: '${baseUrl}/Metrics',
+      apiUrl: '$baseUrl/Metrics',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2123,7 +2120,7 @@ class MetricsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_metric": 123,
   "id_group_metric": 123,
@@ -2132,7 +2129,7 @@ class MetricsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics POST',
-      apiUrl: '${baseUrl}/Metrics',
+      apiUrl: '$baseUrl/Metrics',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2156,7 +2153,7 @@ class MetricsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics/{id} GET',
-      apiUrl: '${baseUrl}/Metrics/${id}',
+      apiUrl: '$baseUrl/Metrics/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2176,7 +2173,7 @@ class MetricsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_metric": 123,
   "id_group_metric": 123,
@@ -2185,7 +2182,7 @@ class MetricsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics/{id} PUT',
-      apiUrl: '${baseUrl}/Metrics/${id}',
+      apiUrl: '$baseUrl/Metrics/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2209,7 +2206,7 @@ class MetricsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics/{id} DELETE',
-      apiUrl: '${baseUrl}/Metrics/${id}',
+      apiUrl: '$baseUrl/Metrics/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2229,7 +2226,7 @@ class MetricsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_filters GET',
-      apiUrl: '${baseUrl}/Metrics_filters',
+      apiUrl: '$baseUrl/Metrics_filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2247,7 +2244,7 @@ class MetricsFiltersPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_metric_filter": 123,
   "id_metric": 123,
@@ -2255,7 +2252,7 @@ class MetricsFiltersPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_filters POST',
-      apiUrl: '${baseUrl}/Metrics_filters',
+      apiUrl: '$baseUrl/Metrics_filters',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2279,7 +2276,7 @@ class MetricsFiltersidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_filters/{id} GET',
-      apiUrl: '${baseUrl}/Metrics_filters/${id}',
+      apiUrl: '$baseUrl/Metrics_filters/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2299,7 +2296,7 @@ class MetricsFiltersidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_metric_filter": 123,
   "id_metric": 123,
@@ -2307,7 +2304,7 @@ class MetricsFiltersidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_filters/{id} PUT',
-      apiUrl: '${baseUrl}/Metrics_filters/${id}',
+      apiUrl: '$baseUrl/Metrics_filters/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2331,7 +2328,7 @@ class MetricsFiltersidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_filters/{id} DELETE',
-      apiUrl: '${baseUrl}/Metrics_filters/${id}',
+      apiUrl: '$baseUrl/Metrics_filters/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2356,7 +2353,7 @@ class MetricsFiltersFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_filters/filters GET',
-      apiUrl: '${baseUrl}/Metrics_filters/filters',
+      apiUrl: '$baseUrl/Metrics_filters/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -2381,7 +2378,7 @@ class MetricsItemsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_items GET',
-      apiUrl: '${baseUrl}/Metrics_items',
+      apiUrl: '$baseUrl/Metrics_items',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2399,7 +2396,7 @@ class MetricsItemsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_metric_item": 123,
   "id_metric": 123,
@@ -2408,7 +2405,7 @@ class MetricsItemsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_items POST',
-      apiUrl: '${baseUrl}/Metrics_items',
+      apiUrl: '$baseUrl/Metrics_items',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2432,7 +2429,7 @@ class MetricsItemsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_items/{id} GET',
-      apiUrl: '${baseUrl}/Metrics_items/${id}',
+      apiUrl: '$baseUrl/Metrics_items/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2452,7 +2449,7 @@ class MetricsItemsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_metric_item": 123,
   "id_metric": 123,
@@ -2461,7 +2458,7 @@ class MetricsItemsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_items/{id} PUT',
-      apiUrl: '${baseUrl}/Metrics_items/${id}',
+      apiUrl: '$baseUrl/Metrics_items/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2485,7 +2482,7 @@ class MetricsItemsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_items/{id} DELETE',
-      apiUrl: '${baseUrl}/Metrics_items/${id}',
+      apiUrl: '$baseUrl/Metrics_items/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2510,7 +2507,7 @@ class MetricsItemsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Metrics_items/filters GET',
-      apiUrl: '${baseUrl}/Metrics_items/filters',
+      apiUrl: '$baseUrl/Metrics_items/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -2535,7 +2532,7 @@ class PolinizationConfigurationGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration GET',
-      apiUrl: '${baseUrl}/Polinization_configuration',
+      apiUrl: '$baseUrl/Polinization_configuration',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2553,14 +2550,14 @@ class PolinizationConfigurationPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization_configuration": 123,
   "id_activity": 123
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration POST',
-      apiUrl: '${baseUrl}/Polinization_configuration',
+      apiUrl: '$baseUrl/Polinization_configuration',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2584,7 +2581,7 @@ class PolinizationConfigurationidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration/{id} GET',
-      apiUrl: '${baseUrl}/Polinization_configuration/${id}',
+      apiUrl: '$baseUrl/Polinization_configuration/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2604,14 +2601,14 @@ class PolinizationConfigurationidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization_configuration": 123,
   "id_activity": 123
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration/{id} PUT',
-      apiUrl: '${baseUrl}/Polinization_configuration/${id}',
+      apiUrl: '$baseUrl/Polinization_configuration/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2635,7 +2632,7 @@ class PolinizationConfigurationidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration/{id} DELETE',
-      apiUrl: '${baseUrl}/Polinization_configuration/${id}',
+      apiUrl: '$baseUrl/Polinization_configuration/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2660,7 +2657,7 @@ class PolinizationConfigurationFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration/filters GET',
-      apiUrl: '${baseUrl}/Polinization_configuration/filters',
+      apiUrl: '$baseUrl/Polinization_configuration/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -2685,7 +2682,7 @@ class PolinizationConfigurationStatusGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration_status GET',
-      apiUrl: '${baseUrl}/Polinization_configuration_status',
+      apiUrl: '$baseUrl/Polinization_configuration_status',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2703,7 +2700,7 @@ class PolinizationConfigurationStatusPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization_configuration_status": 123,
   "id_status": 123,
@@ -2711,7 +2708,7 @@ class PolinizationConfigurationStatusPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration_status POST',
-      apiUrl: '${baseUrl}/Polinization_configuration_status',
+      apiUrl: '$baseUrl/Polinization_configuration_status',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2735,7 +2732,7 @@ class PolinizationConfigurationStatusidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration_status/{id} GET',
-      apiUrl: '${baseUrl}/Polinization_configuration_status/${id}',
+      apiUrl: '$baseUrl/Polinization_configuration_status/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2755,7 +2752,7 @@ class PolinizationConfigurationStatusidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization_configuration_status": 123,
   "id_status": 123,
@@ -2763,7 +2760,7 @@ class PolinizationConfigurationStatusidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration_status/{id} PUT',
-      apiUrl: '${baseUrl}/Polinization_configuration_status/${id}',
+      apiUrl: '$baseUrl/Polinization_configuration_status/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2787,7 +2784,7 @@ class PolinizationConfigurationStatusidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration_status/{id} DELETE',
-      apiUrl: '${baseUrl}/Polinization_configuration_status/${id}',
+      apiUrl: '$baseUrl/Polinization_configuration_status/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2812,7 +2809,7 @@ class PolinizationConfigurationStatusFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinization_configuration_status/filters GET',
-      apiUrl: '${baseUrl}/Polinization_configuration_status/filters',
+      apiUrl: '$baseUrl/Polinization_configuration_status/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -2837,7 +2834,7 @@ class PolinizationsFlowersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinizations_flowers GET',
-      apiUrl: '${baseUrl}/Polinizations_flowers',
+      apiUrl: '$baseUrl/Polinizations_flowers',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2855,7 +2852,7 @@ class PolinizationsFlowersPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization": 123,
   "id_flower": 123,
@@ -2867,7 +2864,7 @@ class PolinizationsFlowersPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Polinizations_flowers POST',
-      apiUrl: '${baseUrl}/Polinizations_flowers',
+      apiUrl: '$baseUrl/Polinizations_flowers',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -2891,7 +2888,7 @@ class PolinizationsFlowersidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinizations_flowers/{id} GET',
-      apiUrl: '${baseUrl}/Polinizations_flowers/${id}',
+      apiUrl: '$baseUrl/Polinizations_flowers/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -2911,7 +2908,7 @@ class PolinizationsFlowersidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization": 123,
   "id_flower": 123,
@@ -2923,7 +2920,7 @@ class PolinizationsFlowersidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Polinizations_flowers/{id} PUT',
-      apiUrl: '${baseUrl}/Polinizations_flowers/${id}',
+      apiUrl: '$baseUrl/Polinizations_flowers/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -2947,7 +2944,7 @@ class PolinizationsFlowersidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinizations_flowers/{id} DELETE',
-      apiUrl: '${baseUrl}/Polinizations_flowers/${id}',
+      apiUrl: '$baseUrl/Polinizations_flowers/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -2972,7 +2969,7 @@ class PolinizationsFlowersFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Polinizations_flowers/filters GET',
-      apiUrl: '${baseUrl}/Polinizations_flowers/filters',
+      apiUrl: '$baseUrl/Polinizations_flowers/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -2997,7 +2994,7 @@ class PricesProductsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Prices_products GET',
-      apiUrl: '${baseUrl}/Prices_products',
+      apiUrl: '$baseUrl/Prices_products',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3015,7 +3012,7 @@ class PricesProductsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_price_product": 123,
   "id_product": 123,
@@ -3024,7 +3021,7 @@ class PricesProductsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Prices_products POST',
-      apiUrl: '${baseUrl}/Prices_products',
+      apiUrl: '$baseUrl/Prices_products',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3048,7 +3045,7 @@ class PricesProductsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Prices_products/{id} GET',
-      apiUrl: '${baseUrl}/Prices_products/${id}',
+      apiUrl: '$baseUrl/Prices_products/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3068,7 +3065,7 @@ class PricesProductsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_price_product": 123,
   "id_product": 123,
@@ -3077,7 +3074,7 @@ class PricesProductsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Prices_products/{id} PUT',
-      apiUrl: '${baseUrl}/Prices_products/${id}',
+      apiUrl: '$baseUrl/Prices_products/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -3101,7 +3098,7 @@ class PricesProductsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Prices_products/{id} DELETE',
-      apiUrl: '${baseUrl}/Prices_products/${id}',
+      apiUrl: '$baseUrl/Prices_products/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -3126,7 +3123,7 @@ class PricesProductsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Prices_products/filters GET',
-      apiUrl: '${baseUrl}/Prices_products/filters',
+      apiUrl: '$baseUrl/Prices_products/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -3151,7 +3148,7 @@ class ProductsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Products GET',
-      apiUrl: '${baseUrl}/Products',
+      apiUrl: '$baseUrl/Products',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3169,7 +3166,7 @@ class ProductsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_product": 123,
   "id_brazal": 123,
@@ -3187,7 +3184,7 @@ class ProductsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Products POST',
-      apiUrl: '${baseUrl}/Products',
+      apiUrl: '$baseUrl/Products',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3211,7 +3208,7 @@ class ProductsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Products/{id} GET',
-      apiUrl: '${baseUrl}/Products/${id}',
+      apiUrl: '$baseUrl/Products/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3231,7 +3228,7 @@ class ProductsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_product": 123,
   "id_brazal": 123,
@@ -3249,7 +3246,7 @@ class ProductsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Products/{id} PUT',
-      apiUrl: '${baseUrl}/Products/${id}',
+      apiUrl: '$baseUrl/Products/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -3273,7 +3270,7 @@ class ProductsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Products/{id} DELETE',
-      apiUrl: '${baseUrl}/Products/${id}',
+      apiUrl: '$baseUrl/Products/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -3298,7 +3295,7 @@ class ProductsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Products/filters GET',
-      apiUrl: '${baseUrl}/Products/filters',
+      apiUrl: '$baseUrl/Products/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -3323,7 +3320,7 @@ class ReportsReportsDailysPOSTCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Reports/ReportsDailys POST',
-      apiUrl: '${baseUrl}/Reports/ReportsDailys',
+      apiUrl: '$baseUrl/Reports/ReportsDailys',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3344,7 +3341,7 @@ class ReportsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Reports GET',
-      apiUrl: '${baseUrl}/Reports',
+      apiUrl: '$baseUrl/Reports',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3362,7 +3359,7 @@ class ReportsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_report": 123,
   "id_company": 123,
@@ -3371,7 +3368,7 @@ class ReportsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Reports POST',
-      apiUrl: '${baseUrl}/Reports',
+      apiUrl: '$baseUrl/Reports',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3395,7 +3392,7 @@ class ReportsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Reports/{id} GET',
-      apiUrl: '${baseUrl}/Reports/${id}',
+      apiUrl: '$baseUrl/Reports/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3415,7 +3412,7 @@ class ReportsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_report": 123,
   "id_company": 123,
@@ -3424,7 +3421,7 @@ class ReportsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Reports/{id} PUT',
-      apiUrl: '${baseUrl}/Reports/${id}',
+      apiUrl: '$baseUrl/Reports/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -3448,7 +3445,7 @@ class ReportsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Reports/{id} DELETE',
-      apiUrl: '${baseUrl}/Reports/${id}',
+      apiUrl: '$baseUrl/Reports/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -3473,7 +3470,7 @@ class ReportsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Reports/filters GET',
-      apiUrl: '${baseUrl}/Reports/filters',
+      apiUrl: '$baseUrl/Reports/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -3498,7 +3495,7 @@ class StockProductsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Stock_products GET',
-      apiUrl: '${baseUrl}/Stock_products',
+      apiUrl: '$baseUrl/Stock_products',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3516,7 +3513,7 @@ class StockProductsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_stock_product": 123,
   "id_product": 123,
@@ -3525,7 +3522,7 @@ class StockProductsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Stock_products POST',
-      apiUrl: '${baseUrl}/Stock_products',
+      apiUrl: '$baseUrl/Stock_products',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3549,7 +3546,7 @@ class StockProductsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Stock_products/{id} GET',
-      apiUrl: '${baseUrl}/Stock_products/${id}',
+      apiUrl: '$baseUrl/Stock_products/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3569,7 +3566,7 @@ class StockProductsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_stock_product": 123,
   "id_product": 123,
@@ -3578,7 +3575,7 @@ class StockProductsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Stock_products/{id} PUT',
-      apiUrl: '${baseUrl}/Stock_products/${id}',
+      apiUrl: '$baseUrl/Stock_products/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -3602,7 +3599,7 @@ class StockProductsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Stock_products/{id} DELETE',
-      apiUrl: '${baseUrl}/Stock_products/${id}',
+      apiUrl: '$baseUrl/Stock_products/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -3627,7 +3624,7 @@ class StockProductsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Stock_products/filters GET',
-      apiUrl: '${baseUrl}/Stock_products/filters',
+      apiUrl: '$baseUrl/Stock_products/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -3652,7 +3649,7 @@ class SyncTimesSyncFullPOSTCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times/SyncFull POST',
-      apiUrl: '${baseUrl}/Sync_times/SyncFull',
+      apiUrl: '$baseUrl/Sync_times/SyncFull',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3678,7 +3675,7 @@ class SyncTimesSyncFlowersPOSTCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times/SyncFlowers POST',
-      apiUrl: '${baseUrl}/Sync_times/SyncFlowers',
+      apiUrl: '$baseUrl/Sync_times/SyncFlowers',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3699,7 +3696,7 @@ class SyncTimesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times GET',
-      apiUrl: '${baseUrl}/Sync_times',
+      apiUrl: '$baseUrl/Sync_times',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3717,7 +3714,7 @@ class SyncTimesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_sync": 123,
   "created_at": "example string",
@@ -3727,7 +3724,7 @@ class SyncTimesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times POST',
-      apiUrl: '${baseUrl}/Sync_times',
+      apiUrl: '$baseUrl/Sync_times',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3745,8 +3742,8 @@ class SyncTimesPOSTCall {
 
 class SyncVisitsAddCall {
   Future<ApiCallResponse> call({
-    dynamic? visitsAddListJson,
-    dynamic? newsAddListJson,
+    dynamic visitsAddListJson,
+    dynamic newsAddListJson,
     String? createdAt = '',
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
@@ -3755,13 +3752,13 @@ class SyncVisitsAddCall {
     final newsAddList = _serializeJson(newsAddListJson, true);
     final ffApiRequestBody = '''
 {
-  "createdAt": "${createdAt}",
-  "visitsAdd": ${visitsAddList},
-  "newsAdd": ${newsAddList}
+  "createdAt": "$createdAt",
+  "visitsAdd": $visitsAddList,
+  "newsAdd": $newsAddList
 }''';
     return ApiManager.instance.makeApiCall(
       callName: 'SyncVisitsAdd',
-      apiUrl: '${baseUrl}/Sync_times/SyncVisitsAdd',
+      apiUrl: '$baseUrl/Sync_times/SyncVisitsAdd',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3785,7 +3782,7 @@ class SyncTimesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times/{id} GET',
-      apiUrl: '${baseUrl}/Sync_times/${id}',
+      apiUrl: '$baseUrl/Sync_times/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3805,7 +3802,7 @@ class SyncTimesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_sync": 123,
   "created_at": "example string",
@@ -3815,7 +3812,7 @@ class SyncTimesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times/{id} PUT',
-      apiUrl: '${baseUrl}/Sync_times/${id}',
+      apiUrl: '$baseUrl/Sync_times/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -3839,7 +3836,7 @@ class SyncTimesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times/{id} DELETE',
-      apiUrl: '${baseUrl}/Sync_times/${id}',
+      apiUrl: '$baseUrl/Sync_times/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -3864,7 +3861,7 @@ class SyncTimesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Sync_times/filters GET',
-      apiUrl: '${baseUrl}/Sync_times/filters',
+      apiUrl: '$baseUrl/Sync_times/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -3889,7 +3886,7 @@ class TasksGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Tasks GET',
-      apiUrl: '${baseUrl}/Tasks',
+      apiUrl: '$baseUrl/Tasks',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3907,7 +3904,7 @@ class TasksPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_task": 123,
   "id_company": 123,
@@ -3917,7 +3914,7 @@ class TasksPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Tasks POST',
-      apiUrl: '${baseUrl}/Tasks',
+      apiUrl: '$baseUrl/Tasks',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -3941,7 +3938,7 @@ class TasksidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Tasks/{id} GET',
-      apiUrl: '${baseUrl}/Tasks/${id}',
+      apiUrl: '$baseUrl/Tasks/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -3961,7 +3958,7 @@ class TasksidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_task": 123,
   "id_company": 123,
@@ -3971,7 +3968,7 @@ class TasksidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Tasks/{id} PUT',
-      apiUrl: '${baseUrl}/Tasks/${id}',
+      apiUrl: '$baseUrl/Tasks/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -3995,7 +3992,7 @@ class TasksidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Tasks/{id} DELETE',
-      apiUrl: '${baseUrl}/Tasks/${id}',
+      apiUrl: '$baseUrl/Tasks/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -4020,7 +4017,7 @@ class TasksFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Tasks/filters GET',
-      apiUrl: '${baseUrl}/Tasks/filters',
+      apiUrl: '$baseUrl/Tasks/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -4049,13 +4046,13 @@ class UsersLoginPOSTCall {
 
     final ffApiRequestBody = '''
 {
-  "type_login": "${typeLogin}",
-  "username": "${username}",
-  "password": "${password}"
+  "type_login": "$typeLogin",
+  "username": "$username",
+  "password": "$password"
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users/Login POST',
-      apiUrl: '${baseUrl}/Users/Login',
+      apiUrl: '$baseUrl/Users/Login',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4077,7 +4074,7 @@ class UsersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users GET',
-      apiUrl: '${baseUrl}/Users',
+      apiUrl: '$baseUrl/Users',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4095,7 +4092,7 @@ class UsersPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user": 123,
   "id_company": 123,
@@ -4107,7 +4104,7 @@ class UsersPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users POST',
-      apiUrl: '${baseUrl}/Users',
+      apiUrl: '$baseUrl/Users',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4131,7 +4128,7 @@ class UsersidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users/{id} GET',
-      apiUrl: '${baseUrl}/Users/${id}',
+      apiUrl: '$baseUrl/Users/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4151,7 +4148,7 @@ class UsersidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user": 123,
   "id_company": 123,
@@ -4163,7 +4160,7 @@ class UsersidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users/{id} PUT',
-      apiUrl: '${baseUrl}/Users/${id}',
+      apiUrl: '$baseUrl/Users/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -4187,7 +4184,7 @@ class UsersidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users/{id} DELETE',
-      apiUrl: '${baseUrl}/Users/${id}',
+      apiUrl: '$baseUrl/Users/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -4212,7 +4209,7 @@ class UsersFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users/filters GET',
-      apiUrl: '${baseUrl}/Users/filters',
+      apiUrl: '$baseUrl/Users/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -4239,7 +4236,7 @@ class UsersbyoperidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users/by-operid/{operID} GET',
-      apiUrl: '${baseUrl}/Users/by-operid/${operID}',
+      apiUrl: '$baseUrl/Users/by-operid/$operID',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4261,7 +4258,7 @@ class ValidateSupervisorGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/users/validate-supervisor/{code} GET',
-      apiUrl: '${baseUrl}/users/validate-supervisor/${code}',
+      apiUrl: '$baseUrl/users/validate-supervisor/$code',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4281,7 +4278,7 @@ class UsersCredentialsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_credentials GET',
-      apiUrl: '${baseUrl}/Users_credentials',
+      apiUrl: '$baseUrl/Users_credentials',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4299,7 +4296,7 @@ class UsersCredentialsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user_credential": 123,
   "id_user": 123,
@@ -4310,7 +4307,7 @@ class UsersCredentialsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users_credentials POST',
-      apiUrl: '${baseUrl}/Users_credentials',
+      apiUrl: '$baseUrl/Users_credentials',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4334,7 +4331,7 @@ class UsersCredentialsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_credentials/{id} GET',
-      apiUrl: '${baseUrl}/Users_credentials/${id}',
+      apiUrl: '$baseUrl/Users_credentials/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4354,7 +4351,7 @@ class UsersCredentialsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user_credential": 123,
   "id_user": 123,
@@ -4365,7 +4362,7 @@ class UsersCredentialsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users_credentials/{id} PUT',
-      apiUrl: '${baseUrl}/Users_credentials/${id}',
+      apiUrl: '$baseUrl/Users_credentials/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -4389,7 +4386,7 @@ class UsersCredentialsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_credentials/{id} DELETE',
-      apiUrl: '${baseUrl}/Users_credentials/${id}',
+      apiUrl: '$baseUrl/Users_credentials/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -4414,7 +4411,7 @@ class UsersCredentialsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_credentials/filters GET',
-      apiUrl: '${baseUrl}/Users_credentials/filters',
+      apiUrl: '$baseUrl/Users_credentials/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -4439,7 +4436,7 @@ class UsersDevicesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_devices GET',
-      apiUrl: '${baseUrl}/Users_devices',
+      apiUrl: '$baseUrl/Users_devices',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4457,7 +4454,7 @@ class UsersDevicesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user_device": 123,
   "created_at": "example string",
@@ -4469,7 +4466,7 @@ class UsersDevicesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users_devices POST',
-      apiUrl: '${baseUrl}/Users_devices',
+      apiUrl: '$baseUrl/Users_devices',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4493,7 +4490,7 @@ class UsersDevicesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_devices/{id} GET',
-      apiUrl: '${baseUrl}/Users_devices/${id}',
+      apiUrl: '$baseUrl/Users_devices/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4513,7 +4510,7 @@ class UsersDevicesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user_device": 123,
   "created_at": "example string",
@@ -4525,7 +4522,7 @@ class UsersDevicesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users_devices/{id} PUT',
-      apiUrl: '${baseUrl}/Users_devices/${id}',
+      apiUrl: '$baseUrl/Users_devices/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -4549,7 +4546,7 @@ class UsersDevicesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_devices/{id} DELETE',
-      apiUrl: '${baseUrl}/Users_devices/${id}',
+      apiUrl: '$baseUrl/Users_devices/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -4574,7 +4571,7 @@ class UsersDevicesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_devices/filters GET',
-      apiUrl: '${baseUrl}/Users_devices/filters',
+      apiUrl: '$baseUrl/Users_devices/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -4599,7 +4596,7 @@ class UsersPermissionsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_permissions GET',
-      apiUrl: '${baseUrl}/Users_permissions',
+      apiUrl: '$baseUrl/Users_permissions',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4617,7 +4614,7 @@ class UsersPermissionsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user_permission": 123,
   "id_user": 123,
@@ -4626,7 +4623,7 @@ class UsersPermissionsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users_permissions POST',
-      apiUrl: '${baseUrl}/Users_permissions',
+      apiUrl: '$baseUrl/Users_permissions',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4650,7 +4647,7 @@ class UsersPermissionsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_permissions/{id} GET',
-      apiUrl: '${baseUrl}/Users_permissions/${id}',
+      apiUrl: '$baseUrl/Users_permissions/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4670,7 +4667,7 @@ class UsersPermissionsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_user_permission": 123,
   "id_user": 123,
@@ -4679,7 +4676,7 @@ class UsersPermissionsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Users_permissions/{id} PUT',
-      apiUrl: '${baseUrl}/Users_permissions/${id}',
+      apiUrl: '$baseUrl/Users_permissions/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -4703,7 +4700,7 @@ class UsersPermissionsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_permissions/{id} DELETE',
-      apiUrl: '${baseUrl}/Users_permissions/${id}',
+      apiUrl: '$baseUrl/Users_permissions/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -4728,7 +4725,7 @@ class UsersPermissionsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Users_permissions/filters GET',
-      apiUrl: '${baseUrl}/Users_permissions/filters',
+      apiUrl: '$baseUrl/Users_permissions/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -4753,7 +4750,7 @@ class VisitsGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits GET',
-      apiUrl: '${baseUrl}/Visits',
+      apiUrl: '$baseUrl/Visits',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4771,7 +4768,7 @@ class VisitsPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_visit": 123,
   "id_company": 123,
@@ -4780,7 +4777,7 @@ class VisitsPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Visits POST',
-      apiUrl: '${baseUrl}/Visits',
+      apiUrl: '$baseUrl/Visits',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4804,7 +4801,7 @@ class VisitsidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits/{id} GET',
-      apiUrl: '${baseUrl}/Visits/${id}',
+      apiUrl: '$baseUrl/Visits/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4824,7 +4821,7 @@ class VisitsidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_visit": 123,
   "id_company": 123,
@@ -4833,7 +4830,7 @@ class VisitsidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Visits/{id} PUT',
-      apiUrl: '${baseUrl}/Visits/${id}',
+      apiUrl: '$baseUrl/Visits/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -4857,7 +4854,7 @@ class VisitsidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits/{id} DELETE',
-      apiUrl: '${baseUrl}/Visits/${id}',
+      apiUrl: '$baseUrl/Visits/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -4882,7 +4879,7 @@ class VisitsFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits/filters GET',
-      apiUrl: '${baseUrl}/Visits/filters',
+      apiUrl: '$baseUrl/Visits/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -4907,7 +4904,7 @@ class VisitsBulkGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_bulk GET',
-      apiUrl: '${baseUrl}/Visits_bulk',
+      apiUrl: '$baseUrl/Visits_bulk',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4925,7 +4922,7 @@ class VisitsBulkPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_bulk_visit": 123,
   "id_visit": 123,
@@ -4935,7 +4932,7 @@ class VisitsBulkPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_bulk POST',
-      apiUrl: '${baseUrl}/Visits_bulk',
+      apiUrl: '$baseUrl/Visits_bulk',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -4959,7 +4956,7 @@ class VisitsBulkidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_bulk/{id} GET',
-      apiUrl: '${baseUrl}/Visits_bulk/${id}',
+      apiUrl: '$baseUrl/Visits_bulk/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -4979,7 +4976,7 @@ class VisitsBulkidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_bulk_visit": 123,
   "id_visit": 123,
@@ -4989,7 +4986,7 @@ class VisitsBulkidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_bulk/{id} PUT',
-      apiUrl: '${baseUrl}/Visits_bulk/${id}',
+      apiUrl: '$baseUrl/Visits_bulk/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -5013,7 +5010,7 @@ class VisitsBulkidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_bulk/{id} DELETE',
-      apiUrl: '${baseUrl}/Visits_bulk/${id}',
+      apiUrl: '$baseUrl/Visits_bulk/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -5038,7 +5035,7 @@ class VisitsBulkFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_bulk/filters GET',
-      apiUrl: '${baseUrl}/Visits_bulk/filters',
+      apiUrl: '$baseUrl/Visits_bulk/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -5063,7 +5060,7 @@ class VisitsPolinizationsStatusGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_polinizations_status GET',
-      apiUrl: '${baseUrl}/Visits_polinizations_status',
+      apiUrl: '$baseUrl/Visits_polinizations_status',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -5081,7 +5078,7 @@ class VisitsPolinizationsStatusPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization_status": 123,
   "id_visit": 123,
@@ -5092,7 +5089,7 @@ class VisitsPolinizationsStatusPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_polinizations_status POST',
-      apiUrl: '${baseUrl}/Visits_polinizations_status',
+      apiUrl: '$baseUrl/Visits_polinizations_status',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -5116,7 +5113,7 @@ class VisitsPolinizationsStatusidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_polinizations_status/{id} GET',
-      apiUrl: '${baseUrl}/Visits_polinizations_status/${id}',
+      apiUrl: '$baseUrl/Visits_polinizations_status/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -5136,7 +5133,7 @@ class VisitsPolinizationsStatusidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_polinization_status": 123,
   "id_visit": 123,
@@ -5147,7 +5144,7 @@ class VisitsPolinizationsStatusidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_polinizations_status/{id} PUT',
-      apiUrl: '${baseUrl}/Visits_polinizations_status/${id}',
+      apiUrl: '$baseUrl/Visits_polinizations_status/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -5171,7 +5168,7 @@ class VisitsPolinizationsStatusidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_polinizations_status/{id} DELETE',
-      apiUrl: '${baseUrl}/Visits_polinizations_status/${id}',
+      apiUrl: '$baseUrl/Visits_polinizations_status/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -5196,7 +5193,7 @@ class VisitsPolinizationsStatusFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Visits_polinizations_status/filters GET',
-      apiUrl: '${baseUrl}/Visits_polinizations_status/filters',
+      apiUrl: '$baseUrl/Visits_polinizations_status/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -5221,7 +5218,7 @@ class ZonesGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Zones GET',
-      apiUrl: '${baseUrl}/Zones',
+      apiUrl: '$baseUrl/Zones',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -5239,7 +5236,7 @@ class ZonesPOSTCall {
   Future<ApiCallResponse> call() async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_zone": 123,
   "id_company": 123,
@@ -5250,7 +5247,7 @@ class ZonesPOSTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Zones POST',
-      apiUrl: '${baseUrl}/Zones',
+      apiUrl: '$baseUrl/Zones',
       callType: ApiCallType.POST,
       headers: {},
       params: {},
@@ -5274,7 +5271,7 @@ class ZonesidGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Zones/{id} GET',
-      apiUrl: '${baseUrl}/Zones/${id}',
+      apiUrl: '$baseUrl/Zones/$id',
       callType: ApiCallType.GET,
       headers: {},
       params: {},
@@ -5294,7 +5291,7 @@ class ZonesidPUTCall {
   }) async {
     final baseUrl = APIClickPalmGroup.getBaseUrl();
 
-    final ffApiRequestBody = '''
+    const ffApiRequestBody = '''
 {
   "id_zone": 123,
   "id_company": 123,
@@ -5305,7 +5302,7 @@ class ZonesidPUTCall {
 }''';
     return ApiManager.instance.makeApiCall(
       callName: '/Zones/{id} PUT',
-      apiUrl: '${baseUrl}/Zones/${id}',
+      apiUrl: '$baseUrl/Zones/$id',
       callType: ApiCallType.PUT,
       headers: {},
       params: {},
@@ -5329,7 +5326,7 @@ class ZonesidDELETECall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Zones/{id} DELETE',
-      apiUrl: '${baseUrl}/Zones/${id}',
+      apiUrl: '$baseUrl/Zones/$id',
       callType: ApiCallType.DELETE,
       headers: {},
       params: {},
@@ -5354,7 +5351,7 @@ class ZonesFiltersGETCall {
 
     return ApiManager.instance.makeApiCall(
       callName: '/Zones/filters GET',
-      apiUrl: '${baseUrl}/Zones/filters',
+      apiUrl: '$baseUrl/Zones/filters',
       callType: ApiCallType.GET,
       headers: {},
       params: {
@@ -5401,7 +5398,7 @@ String _serializeList(List? list) {
     return json.encode(list, toEncodable: _toEncodable);
   } catch (_) {
     if (kDebugMode) {
-      print("List serialization failed. Returning empty list.");
+      debugPrint("List serialization failed. Returning empty list.");
     }
     return '[]';
   }
@@ -5413,7 +5410,7 @@ String _serializeJson(dynamic jsonVar, [bool isList = false]) {
     return json.encode(jsonVar, toEncodable: _toEncodable);
   } catch (_) {
     if (kDebugMode) {
-      print("Json serialization failed. Returning empty json.");
+      debugPrint("Json serialization failed. Returning empty json.");
     }
     return isList ? '[]' : '{}';
   }

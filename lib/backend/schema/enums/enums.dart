@@ -15,7 +15,7 @@ extension FFEnumListExtensions<T extends Enum> on Iterable<T> {
 
 T? deserializeEnum<T>(String? value) {
   switch (T) {
-    case (Numbers):
+    case (Numbers _):
       return Numbers.values.deserialize(value) as T?;
     default:
       return null;

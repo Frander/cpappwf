@@ -279,7 +279,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
         height: 4,
         margin: const EdgeInsets.only(top: 12, bottom: 8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.25),
+          color: Colors.white.withValues(alpha: 0.25),
           borderRadius: BorderRadius.circular(2),
         ),
       ),
@@ -310,7 +310,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               Text(
                 _getPhaseDescription(),
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                   fontSize: 11,
                   fontWeight: FontWeight.w400,
                 ),
@@ -328,7 +328,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               padding: const EdgeInsets.all(8),
               child: Icon(
                 Icons.close_rounded,
-                color: Colors.white.withOpacity(0.5),
+                color: Colors.white.withValues(alpha: 0.5),
                 size: 22,
               ),
             ),
@@ -363,7 +363,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _getPhaseColor().withOpacity(0.2),
+          color: _getPhaseColor().withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -383,7 +383,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                     decoration: BoxDecoration(
                       color: isCompleted
                           ? const Color(0xFF00C853)
-                          : Colors.white.withOpacity(0.1),
+                          : Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(1),
                     ),
                   ),
@@ -403,7 +403,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               } else if (isActive) {
                 circleColor = _getPhaseColor();
               } else {
-                circleColor = Colors.white.withOpacity(0.15);
+                circleColor = Colors.white.withValues(alpha: 0.15);
               }
 
               return Column(
@@ -413,7 +413,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                     width: isActive ? 40 : 32,
                     height: isActive ? 40 : 32,
                     decoration: BoxDecoration(
-                      color: circleColor.withOpacity(isActive ? 0.2 : 0.1),
+                      color: circleColor.withValues(alpha: isActive ? 0.2 : 0.1),
                       shape: BoxShape.circle,
                       border: Border.all(
                         color: circleColor,
@@ -431,8 +431,8 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                     isRestarting ? 'Reinicio' : labels[stepIndex],
                     style: TextStyle(
                       color: isActive || isCompleted
-                          ? Colors.white.withOpacity(0.9)
-                          : Colors.white.withOpacity(0.35),
+                          ? Colors.white.withValues(alpha: 0.9)
+                          : Colors.white.withValues(alpha: 0.35),
                       fontSize: 10,
                       fontWeight:
                           isActive ? FontWeight.w600 : FontWeight.w400,
@@ -452,7 +452,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                   Text(
                     'Progreso general',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       fontSize: 11,
                     ),
                   ),
@@ -471,7 +471,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
                   value: _getOverallProgress(),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                   valueColor:
                       AlwaysStoppedAnimation<Color>(_getPhaseColor()),
                   minHeight: 6,
@@ -486,10 +486,10 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               padding:
                   const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF5722).withOpacity(0.12),
+                color: const Color(0xFFFF5722).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: const Color(0xFFFF5722).withOpacity(0.3),
+                  color: const Color(0xFFFF5722).withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -522,7 +522,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
   Widget _buildAccuracyCircle() {
     final color = _accuracy > 0
         ? _getAccuracyColor(_accuracy)
-        : Colors.white.withOpacity(0.2);
+        : Colors.white.withValues(alpha: 0.2);
     final label =
         _accuracy > 0 ? _getAccuracyLabel(_accuracy) : 'Sin datos';
     final displayAccuracy =
@@ -543,14 +543,14 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
           height: 160,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withOpacity(0.08),
+            color: color.withValues(alpha: 0.08),
             border: Border.all(
-              color: color.withOpacity(0.5),
+              color: color.withValues(alpha: 0.5),
               width: 3,
             ),
             boxShadow: [
               BoxShadow(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 blurRadius: 30,
                 spreadRadius: 5,
               ),
@@ -580,7 +580,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               Text(
                 label,
                 style: TextStyle(
-                  color: color.withOpacity(0.8),
+                  color: color.withValues(alpha: 0.8),
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                 ),
@@ -600,7 +600,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
         : '---';
     final bestAccColor = _bestAccuracy.isFinite
         ? _getAccuracyColor(_bestAccuracy)
-        : Colors.white.withOpacity(0.3);
+        : Colors.white.withValues(alpha: 0.3);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -608,7 +608,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
         Text(
           'MÉTRICAS EN TIEMPO REAL',
           style: TextStyle(
-            color: Colors.white.withOpacity(0.4),
+            color: Colors.white.withValues(alpha: 0.4),
             fontSize: 11,
             fontWeight: FontWeight.w600,
             letterSpacing: 1.2,
@@ -673,7 +673,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 value: '$_consecutiveRejects',
                 color: _consecutiveRejects > 2
                     ? const Color(0xFFFF5722)
-                    : Colors.white.withOpacity(0.5),
+                    : Colors.white.withValues(alpha: 0.5),
               ),
             ),
             const SizedBox(width: 10),
@@ -682,7 +682,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 icon: Icons.satellite_alt_rounded,
                 label: 'Lecturas GPS',
                 value: '$_updateCount',
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -704,14 +704,14 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
         color: const Color(0xFF161B22),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: color.withOpacity(0.15),
+          color: color.withValues(alpha: 0.15),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color.withOpacity(0.7), size: 16),
+          Icon(icon, color: color.withValues(alpha: 0.7), size: 16),
           const SizedBox(height: 8),
           Text(
             value,
@@ -725,7 +725,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
@@ -736,7 +736,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               borderRadius: BorderRadius.circular(2),
               child: LinearProgressIndicator(
                 value: progress,
-                backgroundColor: Colors.white.withOpacity(0.06),
+                backgroundColor: Colors.white.withValues(alpha: 0.06),
                 valueColor: AlwaysStoppedAnimation<Color>(color),
                 minHeight: 3,
               ),
@@ -759,7 +759,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
             Text(
               'HISTORIAL DE PRECISIÓN',
               style: TextStyle(
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 letterSpacing: 1.2,
@@ -769,7 +769,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
               Text(
                 '${_history.length} lecturas',
                 style: TextStyle(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                   fontSize: 10,
                 ),
               ),
@@ -788,14 +788,14 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 children: [
                   Icon(
                     Icons.hourglass_empty_rounded,
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     size: 32,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Esperando lecturas GPS...',
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                       fontSize: 12,
                     ),
                   ),
@@ -846,7 +846,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.7),
+                    color: color.withValues(alpha: 0.7),
                     borderRadius:
                         const BorderRadius.vertical(top: Radius.circular(3)),
                   ),
@@ -909,9 +909,9 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                     borderRadius: BorderRadius.circular(2),
                     child: LinearProgressIndicator(
                       value: (reading.accuracy / 50).clamp(0.0, 1.0),
-                      backgroundColor: Colors.white.withOpacity(0.04),
+                      backgroundColor: Colors.white.withValues(alpha: 0.04),
                       valueColor:
-                          AlwaysStoppedAnimation<Color>(color.withOpacity(0.5)),
+                          AlwaysStoppedAnimation<Color>(color.withValues(alpha: 0.5)),
                       minHeight: 4,
                     ),
                   ),
@@ -921,8 +921,8 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 Icon(
                   isGood ? Icons.check_circle_outline : Icons.cancel_outlined,
                   color: isGood
-                      ? const Color(0xFF00C853).withOpacity(0.6)
-                      : const Color(0xFFFF5722).withOpacity(0.6),
+                      ? const Color(0xFF00C853).withValues(alpha: 0.6)
+                      : const Color(0xFFFF5722).withValues(alpha: 0.6),
                   size: 14,
                 ),
                 const SizedBox(width: 8),
@@ -930,7 +930,7 @@ class _GPSStabilizationMonitorState extends State<GPSStabilizationMonitor>
                 Text(
                   timeStr,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.3),
+                    color: Colors.white.withValues(alpha: 0.3),
                     fontSize: 10,
                     fontFamily: 'monospace',
                   ),

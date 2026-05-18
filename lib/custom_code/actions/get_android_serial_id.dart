@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
-import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -38,7 +38,7 @@ Future<String> getAndroidSerialId() async {
       return 'DESKTOP_DEVICE';
     }
   } catch (e) {
-    print('Error getting Android serial ID: $e');
+    debugPrint('Error getting Android serial ID: $e');
     return 'ERROR_SERIAL';
   }
 }

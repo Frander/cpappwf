@@ -1,14 +1,12 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 import 'text_input_component_model.dart';
 export 'text_input_component_model.dart';
 
@@ -23,11 +21,11 @@ class TextInputComponentWidget extends StatefulWidget {
     String? placeholder,
     int? maxLength,
     bool? multiline,
-  })  : this.tittle = tittle ?? 'Ingresar Texto',
-        this.idStepParent = idStepParent ?? 0,
-        this.placeholder = placeholder ?? 'Escribe aquí...',
-        this.maxLength = maxLength ?? 500,
-        this.multiline = multiline ?? false;
+  })  : tittle = tittle ?? 'Ingresar Texto',
+        idStepParent = idStepParent ?? 0,
+        placeholder = placeholder ?? 'Escribe aquí...',
+        maxLength = maxLength ?? 500,
+        multiline = multiline ?? false;
 
   final String tittle;
   final int idStatus;
@@ -66,7 +64,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: Offset(0, 0.3),
+      begin: const Offset(0, 0.3),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
@@ -118,7 +116,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
     );
 
     FFAppState().visitDetails =
-        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+        visitDetailsCopy.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
 
     HapticFeedback.mediumImpact();
@@ -140,7 +138,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -158,7 +156,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
             children: [
               // Header
               Padding(
-                padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+                padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
                 child: Row(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -172,14 +170,14 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                         width: 44,
                         height: 44,
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
+                          color: Colors.white.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             width: 1,
                           ),
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.chevron_left,
                           color: Colors.white,
                           size: 28,
@@ -188,12 +186,12 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                     ),
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsetsDirectional.fromSTEB(
+                        padding: const EdgeInsetsDirectional.fromSTEB(
                             16.0, 0.0, 16.0, 0.0),
                         child: Text(
                           widget.tittle,
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -214,7 +212,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                 FlutterFlowTheme.of(context).error,
                                 FlutterFlowTheme.of(context)
                                     .error
-                                    .withOpacity(0.8),
+                                    .withValues(alpha: 0.8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
@@ -222,13 +220,13 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                               BoxShadow(
                                 color: FlutterFlowTheme.of(context)
                                     .error
-                                    .withOpacity(0.4),
+                                    .withValues(alpha: 0.4),
                                 blurRadius: 8,
-                                offset: Offset(0, 4),
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.clear_rounded,
                             color: Colors.white,
                             size: 24,
@@ -236,17 +234,17 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                         ),
                       )
                     else
-                      SizedBox(width: 44),
+                      const SizedBox(width: 44),
                   ],
                 ),
               ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // Contenido principal
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Column(
                     children: [
                       // Tarjeta con el campo de texto
@@ -256,20 +254,20 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Colors.white.withOpacity(0.1),
-                              Colors.white.withOpacity(0.05),
+                              Colors.white.withValues(alpha: 0.1),
+                              Colors.white.withValues(alpha: 0.05),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
+                            color: Colors.white.withValues(alpha: 0.2),
                             width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Color(0xFF00a86b).withOpacity(0.15),
+                              color: const Color(0xFF00a86b).withValues(alpha: 0.15),
                               blurRadius: 20,
-                              offset: Offset(0, 10),
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
@@ -278,7 +276,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                             child: Padding(
-                              padding: EdgeInsets.all(24),
+                              padding: const EdgeInsets.all(24),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -293,20 +291,20 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                             begin: Alignment.topLeft,
                                             end: Alignment.bottomRight,
                                             colors: [
-                                              Color(0xFF00ff9f).withOpacity(0.3),
-                                              Color(0xFF00a86b).withOpacity(0.3),
+                                              const Color(0xFF00ff9f).withValues(alpha: 0.3),
+                                              const Color(0xFF00a86b).withValues(alpha: 0.3),
                                             ],
                                           ),
                                           borderRadius:
                                               BorderRadius.circular(14),
                                         ),
-                                        child: Icon(
+                                        child: const Icon(
                                           Icons.edit_note_rounded,
                                           color: Color(0xFF00ff9f),
                                           size: 28,
                                         ),
                                       ),
-                                      SizedBox(width: 16),
+                                      const SizedBox(width: 16),
                                       Expanded(
                                         child: Column(
                                           crossAxisAlignment:
@@ -314,19 +312,19 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                           children: [
                                             Text(
                                               widget.statusName,
-                                              style: TextStyle(fontFamily: 'Roboto',
+                                              style: const TextStyle(fontFamily: 'Roboto',
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
                                                 color: Colors.white,
                                               ),
                                             ),
-                                            SizedBox(height: 2),
+                                            const SizedBox(height: 2),
                                             Text(
                                               'Máximo ${widget.maxLength} caracteres',
                                               style: TextStyle(fontFamily: 'Roboto',
                                                 fontSize: 12,
                                                 color: Colors.white
-                                                    .withOpacity(0.6),
+                                                    .withValues(alpha: 0.6),
                                               ),
                                             ),
                                           ],
@@ -335,7 +333,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                     ],
                                   ),
 
-                                  SizedBox(height: 20),
+                                  const SizedBox(height: 20),
 
                                   // Campo de texto
                                   Container(
@@ -344,12 +342,12 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                       maxHeight: widget.multiline ? 300 : 56,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.3),
+                                      color: Colors.black.withValues(alpha: 0.3),
                                       borderRadius: BorderRadius.circular(16),
                                       border: Border.all(
                                         color: _focusNode.hasFocus
-                                            ? Color(0xFF00ff9f)
-                                            : Colors.white.withOpacity(0.2),
+                                            ? const Color(0xFF00ff9f)
+                                            : Colors.white.withValues(alpha: 0.2),
                                         width: _focusNode.hasFocus ? 2 : 1.5,
                                       ),
                                     ),
@@ -359,7 +357,7 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                       maxLength: widget.maxLength,
                                       maxLines: widget.multiline ? null : 1,
                                       minLines: widget.multiline ? 6 : 1,
-                                      style: TextStyle(fontFamily: 'Roboto',
+                                      style: const TextStyle(fontFamily: 'Roboto',
                                         fontSize: 16,
                                         color: Colors.white,
                                         fontWeight: FontWeight.w500,
@@ -368,16 +366,16 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                         hintText: widget.placeholder,
                                         hintStyle: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 16,
-                                          color: Colors.white.withOpacity(0.4),
+                                          color: Colors.white.withValues(alpha: 0.4),
                                         ),
                                         border: InputBorder.none,
-                                        contentPadding: EdgeInsets.symmetric(
+                                        contentPadding: const EdgeInsets.symmetric(
                                           horizontal: 20,
                                           vertical: 16,
                                         ),
                                         counterStyle: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 11,
-                                          color: Colors.white.withOpacity(0.5),
+                                          color: Colors.white.withValues(alpha: 0.5),
                                         ),
                                       ),
                                       onChanged: (value) {
@@ -389,21 +387,21 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                                   ),
 
                                   if (_model.hasText) ...[
-                                    SizedBox(height: 16),
+                                    const SizedBox(height: 16),
                                     Row(
                                       children: [
-                                        Icon(
+                                        const Icon(
                                           Icons.check_circle_outline_rounded,
                                           color: Color(0xFF00ff9f),
                                           size: 18,
                                         ),
-                                        SizedBox(width: 8),
+                                        const SizedBox(width: 8),
                                         Text(
                                           'Texto ingresado: ${_textController.text.trim().length} caracteres',
                                           style: TextStyle(fontFamily: 'Roboto',
                                             fontSize: 13,
                                             color:
-                                                Colors.white.withOpacity(0.7),
+                                                Colors.white.withValues(alpha: 0.7),
                                             fontWeight: FontWeight.w500,
                                           ),
                                         ),
@@ -423,17 +421,18 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
 
               // Botón de guardar
               Padding(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 child: InkWell(
                   onTap: () async {
+                    final nav = Navigator.of(context);
                     await _saveText();
-                    Navigator.pop(context);
+                    nav.pop();
                   },
                   child: Container(
                     width: double.infinity,
                     height: 56,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                         colors: [
@@ -444,13 +443,13 @@ class _TextInputComponentWidgetState extends State<TextInputComponentWidget>
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                          color: Color(0xFF00a86b).withOpacity(0.4),
+                          color: const Color(0xFF00a86b).withValues(alpha: 0.4),
                           blurRadius: 16,
-                          offset: Offset(0, 8),
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: Center(
+                    child: const Center(
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [

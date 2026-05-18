@@ -1,15 +1,12 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'dart:convert';
 import 'dart:async';
-import 'dart:typed_data';
 import '/custom_code/platform_utils.dart';
 import 'nfc_view_raw_dialog_model.dart';
 export 'nfc_view_raw_dialog_model.dart';
@@ -141,7 +138,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
     if (_model.rawContent.isNotEmpty) {
       Clipboard.setData(ClipboardData(text: _model.rawContent));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text('Contenido copiado al portapapeles'),
           duration: Duration(seconds: 2),
           backgroundColor: Colors.green,
@@ -154,7 +151,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -162,7 +159,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,7 +168,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(
+                const Expanded(
                   child: Row(
                     children: [
                       Icon(
@@ -194,24 +191,24 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                   ),
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
-                  constraints: BoxConstraints(),
+                  constraints: const BoxConstraints(),
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Estado de lectura
             if (_model.isReading)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF374151),
+                  color: const Color(0xFF374151),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Column(
+                child: const Column(
                   children: [
                     CircularProgressIndicator(
                       valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
@@ -242,20 +239,20 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
             // Error
             if (!_model.isReading && _model.errorMessage.isNotEmpty)
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Color(0xFFDC2626).withOpacity(0.1),
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFDC2626), width: 1),
+                  border: Border.all(color: const Color(0xFFDC2626), width: 1),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Color(0xFFDC2626)),
-                    SizedBox(width: 12),
+                    const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _model.errorMessage,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -273,7 +270,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
+                      const Text(
                         'Contenido del TAG:',
                         style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
@@ -283,8 +280,8 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       ),
                       TextButton.icon(
                         onPressed: _copyToClipboard,
-                        icon: Icon(Icons.copy, size: 18, color: Color(0xFF3B82F6)),
-                        label: Text(
+                        icon: const Icon(Icons.copy, size: 18, color: Color(0xFF3B82F6)),
+                        label: const Text(
                           'Copiar',
                           style: TextStyle(fontFamily: 'Roboto',
                             color: Color(0xFF3B82F6),
@@ -294,20 +291,20 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Container(
                     width: double.infinity,
-                    constraints: BoxConstraints(maxHeight: 300),
-                    padding: EdgeInsets.all(16),
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Color(0xFF111827),
+                      color: const Color(0xFF111827),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Color(0xFF374151), width: 1),
+                      border: Border.all(color: const Color(0xFF374151), width: 1),
                     ),
                     child: SingleChildScrollView(
                       child: SelectableText(
                         _model.rawContent,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Roboto Mono',
                           fontSize: 13,
                           color: Color(0xFF10B981),
@@ -316,10 +313,10 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
                     'Caracteres: ${_model.rawContent.length}',
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 12,
                       color: Colors.white60,
                     ),
@@ -327,7 +324,7 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                 ],
               ),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Botones de acción
             Row(
@@ -337,11 +334,11 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                     child: FFButtonWidget(
                       onPressed: _startNfcReading,
                       text: 'Intentar de nuevo',
-                      icon: Icon(Icons.refresh, size: 20),
+                      icon: const Icon(Icons.refresh, size: 20),
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF3B82F6),
-                        textStyle: TextStyle(fontFamily: 'Roboto',
+                        color: const Color(0xFF3B82F6),
+                        textStyle: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -357,8 +354,8 @@ class _NfcViewRawDialogWidgetState extends State<NfcViewRawDialogWidget> {
                       text: 'Cerrar',
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF374151),
-                        textStyle: TextStyle(fontFamily: 'Roboto',
+                        color: const Color(0xFF374151),
+                        textStyle: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,

@@ -1,12 +1,10 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
+// Imports other custom widgets
 import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -203,7 +201,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
     with SingleTickerProviderStateMixin {
   // Estado
   SyncStep _currentStep = SyncStep.initial;
-  SyncStatistics _stats = SyncStatistics();
+  final SyncStatistics _stats = SyncStatistics();
   String _currentMessage = '';
   bool _isProcessing = false;
   double _progress = 0.0;
@@ -284,7 +282,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
         throw Exception('No hay conexión a Internet disponible');
       }
 
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 2. Recolectar datos y estadísticas
       setState(() {
@@ -294,7 +292,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       });
 
       await _collectSyncData();
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 3. Analizar zonas de exclusión modificadas
       setState(() {
@@ -304,7 +302,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
       });
 
       await _analyzeExclusionZones();
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 4. Sincronizar zonas de exclusión si hay cambios
       if (_stats.hasPendingExclusions) {
@@ -316,7 +314,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
         });
 
         await _syncExclusionZones();
-        await Future.delayed(Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 800));
       }
 
       // 4.5. Recolectar y sincronizar productos pendientes
@@ -331,7 +329,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
         });
 
         await _syncProducts();
-        await Future.delayed(Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 800));
       }
 
       // 5. Sincronizar visitas
@@ -350,7 +348,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
           _progress = 1.0;
         });
 
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
         _showSuccessDialog();
       } else {
         throw Exception('Error al sincronizar las visitas');
@@ -403,6 +401,7 @@ class _SyncVisitsFormState extends State<SyncVisitsForm>
         // Mostrar un diálogo de advertencia al usuario
         if (mounted) {
           await Future.delayed(const Duration(milliseconds: 500));
+          if (!mounted) return false;
           await showDialog(
             context: context,
             barrierDismissible: false,

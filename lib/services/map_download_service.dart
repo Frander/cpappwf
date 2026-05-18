@@ -372,7 +372,7 @@ class MapDownloadService {
       final dio = _getDioInstance();
       final response = await dio.head(
         _pmtilesUrl,
-        options: Options(receiveTimeout: Duration(seconds: 10)),
+        options: Options(receiveTimeout: const Duration(seconds: 10)),
       );
 
       final contentLength = response.headers.value('content-length');
@@ -808,17 +808,14 @@ class _ChunkInfo {
   final int index;
   final int startByte;
   final int endByte;
-  int downloadedBytes;
-  bool isComplete;
-  bool isDownloading;
+  int downloadedBytes = 0;
+  bool isComplete = false;
+  bool isDownloading = false;
 
   _ChunkInfo({
     required this.index,
     required this.startByte,
     required this.endByte,
-    this.downloadedBytes = 0,
-    this.isComplete = false,
-    this.isDownloading = false,
   });
 
   int get totalBytes => endByte - startByte + 1;

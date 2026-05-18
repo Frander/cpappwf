@@ -1,11 +1,7 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -40,7 +36,7 @@ Future<String?> downloadMapTiles(BuildContext context) async {
     // 3. Verificar si ya existe el archivo
     if (await file.exists()) {
       final int fileSize = await file.length();
-      debugPrint('Archivo ya existe: $filePath (${fileSize} bytes)');
+      debugPrint('Archivo ya existe: $filePath ($fileSize bytes)');
 
       // Verificar si el archivo no está corrupto (mayor a 1MB)
       if (fileSize > 1024 * 1024) {
@@ -84,7 +80,7 @@ Future<String?> downloadMapTiles(BuildContext context) async {
       await file.writeAsBytes(response.bodyBytes, flush: true);
 
       final int downloadedSize = response.bodyBytes.length;
-      debugPrint('Descarga completada: $filePath (${downloadedSize} bytes)');
+      debugPrint('Descarga completada: $filePath ($downloadedSize bytes)');
 
       // 7. Actualizar AppState con la nueva ruta
       FFAppState().update(() {
@@ -146,8 +142,8 @@ void _showDownloadDialog(BuildContext context) {
     context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
-      return WillPopScope(
-        onWillPop: () async => false,
+      return PopScope(
+        canPop: false,
         child: AlertDialog(
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -215,6 +211,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
 
       if (photosStatus.isGranted && videosStatus.isGranted) return true;
 
+      if (!context.mounted) return false;
       final shouldContinue = await _showPermissionExplanationDialog(
         context,
         'La aplicación necesita acceso para guardar el mapa offline.',
@@ -234,6 +231,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
       final manageStatus = await Permission.manageExternalStorage.status;
       if (manageStatus.isGranted) return true;
 
+      if (!context.mounted) return false;
       final shouldContinue = await _showPermissionExplanationDialog(
         context,
         'Para descargar el mapa, se requiere permiso para gestionar el almacenamiento.',
@@ -248,6 +246,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
     final storageStatus = await Permission.storage.status;
     if (storageStatus.isGranted) return true;
 
+    if (!context.mounted) return false;
     final shouldContinue = await _showPermissionExplanationDialog(
       context,
       'Se necesita permiso para descargar el mapa.',

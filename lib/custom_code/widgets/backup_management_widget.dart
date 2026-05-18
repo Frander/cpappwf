@@ -384,7 +384,7 @@ class _BackupManagementWidgetState extends State<BackupManagementWidget> {
         ),
         title: Text(
           name,
-          style: FlutterFlowTheme.of(context).bodyLarge?.copyWith(
+          style: FlutterFlowTheme.of(context).bodyLarge.copyWith(
             fontWeight: FontWeight.bold,
           ),
         ),

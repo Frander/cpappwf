@@ -1,15 +1,12 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'dart:io';
 import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/platform_utils.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'photo_capture_component_model.dart';
 export 'photo_capture_component_model.dart';
@@ -22,8 +19,8 @@ class PhotoCaptureComponentWidget extends StatefulWidget {
     required this.statusName,
     required this.statusJSON,
     int? idStepParent,
-  })  : this.tittle = tittle ?? 'Capturar Fotografía',
-        this.idStepParent = idStepParent ?? 0;
+  })  : tittle = tittle ?? 'Capturar Fotografía',
+        idStepParent = idStepParent ?? 0;
 
   final String tittle;
   final int idStatus;
@@ -110,6 +107,8 @@ class _PhotoCaptureComponentWidgetState
 
   Future<void> _capturePhoto(ImageSource source) async {
     if (!Platforms.isMobile) return; // Captura de cámara no disponible en desktop
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = FlutterFlowTheme.of(context).error;
     try {
       HapticFeedback.mediumImpact();
 
@@ -134,10 +133,10 @@ class _PhotoCaptureComponentWidgetState
       }
     } catch (e) {
       debugPrint('Error capturando foto: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('Error al capturar foto: $e'),
-          backgroundColor: FlutterFlowTheme.of(context).error,
+          backgroundColor: errorColor,
         ),
       );
     }
@@ -160,7 +159,7 @@ class _PhotoCaptureComponentWidgetState
     );
 
     FFAppState().visitDetails =
-        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+        visitDetailsCopy.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
 
     debugPrint('✅ Foto guardada exitosamente en visitDetails (path)');
@@ -211,7 +210,7 @@ class _PhotoCaptureComponentWidgetState
         .replaceAll(RegExp(r'[^\w\s]'), '')
         .toLowerCase();
 
-    return '${cleanActivityName}_${dateStr}_${timeStr}.jpg';
+    return '${cleanActivityName}_${dateStr}_$timeStr.jpg';
   }
 
   @override
@@ -219,7 +218,7 @@ class _PhotoCaptureComponentWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -235,7 +234,7 @@ class _PhotoCaptureComponentWidgetState
           children: [
             // Header
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -249,14 +248,14 @@ class _PhotoCaptureComponentWidgetState
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.chevron_left,
                         color: Colors.white,
                         size: 28,
@@ -266,11 +265,11 @@ class _PhotoCaptureComponentWidgetState
                   Expanded(
                     child: Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                          const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
                       child: Text(
                         widget.tittle,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -291,7 +290,7 @@ class _PhotoCaptureComponentWidgetState
                               FlutterFlowTheme.of(context).error,
                               FlutterFlowTheme.of(context)
                                   .error
-                                  .withOpacity(0.8),
+                                  .withValues(alpha: 0.8),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -299,13 +298,13 @@ class _PhotoCaptureComponentWidgetState
                             BoxShadow(
                               color: FlutterFlowTheme.of(context)
                                   .error
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               blurRadius: 8,
-                              offset: Offset(0, 4),
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.delete_outline,
                           color: Colors.white,
                           size: 22,
@@ -313,7 +312,7 @@ class _PhotoCaptureComponentWidgetState
                       ),
                     )
                   else
-                    SizedBox(width: 44),
+                    const SizedBox(width: 44),
                 ],
               ),
             ),
@@ -321,7 +320,7 @@ class _PhotoCaptureComponentWidgetState
             // Preview Area
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(20.0),
                 child: _model.isPhotoTaken && _model.photoPath != null
                     ? _buildPhotoPreview()
                     : _buildEmptyState(),
@@ -330,22 +329,21 @@ class _PhotoCaptureComponentWidgetState
 
             // Botones de captura
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
               child: Column(
                 children: [
                   // Botón "CONTINUAR CON ESTA FOTO" (solo visible si hay foto)
                   if (_model.isPhotoTaken && _model.photoPath != null)
                     Padding(
-                      padding: EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.only(bottom: 16),
                       child: InkWell(
                         onTap: () async {
                           HapticFeedback.mediumImpact();
                           // Guardar la foto en visitDetails
+                          final nav = Navigator.of(context);
                           await _savePhoto(_model.photoPath!);
                           // Cerrar el diálogo
-                          if (mounted) {
-                            Navigator.pop(context);
-                          }
+                          nav.pop();
                         },
                         child: Container(
                           width: double.infinity,
@@ -356,7 +354,7 @@ class _PhotoCaptureComponentWidgetState
                               end: Alignment.bottomRight,
                               colors: [
                                 FlutterFlowTheme.of(context).success,
-                                FlutterFlowTheme.of(context).success.withOpacity(0.8),
+                                FlutterFlowTheme.of(context).success.withValues(alpha: 0.8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(20),
@@ -364,13 +362,13 @@ class _PhotoCaptureComponentWidgetState
                               BoxShadow(
                                 color: FlutterFlowTheme.of(context)
                                     .success
-                                    .withOpacity(0.5),
+                                    .withValues(alpha: 0.5),
                                 blurRadius: 20,
-                                offset: Offset(0, 8),
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
@@ -416,13 +414,13 @@ class _PhotoCaptureComponentWidgetState
                             BoxShadow(
                               color: FlutterFlowTheme.of(context)
                                   .primary
-                                  .withOpacity(0.5),
+                                  .withValues(alpha: 0.5),
                               blurRadius: 20,
-                              offset: Offset(0, 8),
+                              offset: const Offset(0, 8),
                             ),
                           ],
                         ),
-                        child: Row(
+                        child: const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
@@ -446,7 +444,7 @@ class _PhotoCaptureComponentWidgetState
                     ),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Botón galería
                   InkWell(
@@ -455,10 +453,10 @@ class _PhotoCaptureComponentWidgetState
                       width: double.infinity,
                       height: 56,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(18),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1.5,
                         ),
                       ),
@@ -467,16 +465,16 @@ class _PhotoCaptureComponentWidgetState
                         children: [
                           Icon(
                             Icons.photo_library_rounded,
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             size: 24,
                           ),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           Text(
                             'Seleccionar de Galería',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                               letterSpacing: 0.3,
                             ),
                           ),
@@ -499,9 +497,9 @@ class _PhotoCaptureComponentWidgetState
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 30,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -558,8 +556,8 @@ class _PhotoCaptureComponentWidgetState
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.black.withOpacity(0.0),
-                      Colors.black.withOpacity(0.2),
+                      Colors.black.withValues(alpha: 0.0),
+                      Colors.black.withValues(alpha: 0.2),
                     ],
                   ),
                 ),
@@ -571,13 +569,13 @@ class _PhotoCaptureComponentWidgetState
               top: 16,
               right: 16,
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.7),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
                       FlutterFlowTheme.of(context).success,
-                      FlutterFlowTheme.of(context).success.withOpacity(0.8),
+                      FlutterFlowTheme.of(context).success.withValues(alpha: 0.8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
@@ -585,9 +583,9 @@ class _PhotoCaptureComponentWidgetState
                     BoxShadow(
                       color: FlutterFlowTheme.of(context)
                           .success
-                          .withOpacity(0.4),
+                          .withValues(alpha: 0.4),
                       blurRadius: 12,
-                      offset: Offset(0, 4),
+                      offset: const Offset(0, 4),
                     ),
                   ],
                 ),
@@ -595,7 +593,7 @@ class _PhotoCaptureComponentWidgetState
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Row(
+                    const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
@@ -614,11 +612,11 @@ class _PhotoCaptureComponentWidgetState
                         ),
                       ],
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       _generatePhotoName(),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                       ),
@@ -638,10 +636,10 @@ class _PhotoCaptureComponentWidgetState
   Widget _buildEmptyState() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 2,
         ),
       ),
@@ -656,36 +654,36 @@ class _PhotoCaptureComponentWidgetState
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                  FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                  FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+                  FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.3),
                 ],
               ),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.add_a_photo_rounded,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               size: 56,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             'Sin fotografía',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Toca el botón de abajo para capturar\nuna fotografía o seleccionar de la galería',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 height: 1.5,
               ),
             ),

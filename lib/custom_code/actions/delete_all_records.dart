@@ -1,12 +1,7 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -23,17 +18,17 @@ Future<void> deleteAllRecords(String databasePath, String tableName) async {
       );
 
       if (tableExists.isEmpty) {
-        print('La tabla $tableName no existe en la base de datos.');
+        debugPrint('La tabla $tableName no existe en la base de datos.');
         return;
       }
 
       // Eliminar todos los registros de la tabla
       final deletedRows = await db.delete(tableName);
 
-      print('$deletedRows registros eliminados de la tabla $tableName.');
+      debugPrint('$deletedRows registros eliminados de la tabla $tableName.');
     });
   } catch (e) {
-    print('Error al intentar eliminar registros de la tabla $tableName: $e');
+    debugPrint('Error al intentar eliminar registros de la tabla $tableName: $e');
   }
 }
 // Set your action name, define your arguments and return parameter,

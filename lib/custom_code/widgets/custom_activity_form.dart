@@ -1,30 +1,26 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 class CustomActivityForm extends StatefulWidget {
   const CustomActivityForm({
-    Key? key,
+    super.key,
     this.width,
     this.height,
     required this.jsonData,
-  }) : super(key: key);
+  });
 
   final double? width;
   final double? height;
   final dynamic jsonData;
 
   @override
-  _CustomActivityFormState createState() => _CustomActivityFormState();
+  State<CustomActivityForm> createState() => _CustomActivityFormState();
 }
 
 class _CustomActivityFormState extends State<CustomActivityForm> {
@@ -54,7 +50,7 @@ class _CustomActivityFormState extends State<CustomActivityForm> {
           Text(
             activity.name,
             style: FlutterFlowTheme.of(context)
-                .title1
+                .displaySmall
                 .override(fontSize: 24, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
@@ -87,14 +83,14 @@ class _CustomActivityFormState extends State<CustomActivityForm> {
                 Expanded(
                   child: Text(
                     step.nameStep,
-                    style: FlutterFlowTheme.of(context).subtitle1.override(
+                    style: FlutterFlowTheme.of(context).titleMedium.override(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                   ),
                 ),
                 if (completedSteps.contains(step.id))
-                  Icon(Icons.check_circle, color: Colors.green, size: 24),
+                  const Icon(Icons.check_circle, color: Colors.green, size: 24),
               ],
             ),
           ),
@@ -108,19 +104,21 @@ class _CustomActivityFormState extends State<CustomActivityForm> {
                   title: Text(
                     status.name,
                     style: FlutterFlowTheme.of(context)
-                        .bodyText1
+                        .bodyMedium
                         .override(fontSize: 18),
                   ),
                   value: status,
+                  // ignore: deprecated_member_use
                   groupValue: null,
+                  // ignore: deprecated_member_use
                   onChanged: (_) => _onStatusSelected(step, status),
-                  activeColor: FlutterFlowTheme.of(context).primaryColor,
+                  fillColor: WidgetStateProperty.resolveWith<Color>((_) => FlutterFlowTheme.of(context).primary),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                   dense: true,
                 ),
               ),
             );
-          }).toList(),
+          }),
           const Divider(thickness: 1.5),
         ],
       ),
@@ -130,7 +128,7 @@ class _CustomActivityFormState extends State<CustomActivityForm> {
   Widget _buildCompletion() {
     bool allDone = completedSteps.length == rootSteps.length;
     if (!allDone) {
-      WidgetsBinding.instance!.addPostFrameCallback((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         setState(() {
           currentSteps =
               rootSteps.where((s) => !completedSteps.contains(s.id)).toList();
@@ -139,14 +137,14 @@ class _CustomActivityFormState extends State<CustomActivityForm> {
       return Center(
         child: Text(
           'Regresando a pasos pendientes...',
-          style: FlutterFlowTheme.of(context).bodyText1.override(fontSize: 16),
+          style: FlutterFlowTheme.of(context).bodyMedium.override(fontSize: 16),
         ),
       );
     }
     return Center(
       child: Text(
         'Proceso completado',
-        style: FlutterFlowTheme.of(context).bodyText1.override(fontSize: 16),
+        style: FlutterFlowTheme.of(context).bodyMedium.override(fontSize: 16),
       ),
     );
   }

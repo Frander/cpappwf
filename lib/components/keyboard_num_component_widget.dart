@@ -1,8 +1,6 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -21,9 +19,9 @@ class KeyboardNumComponentWidget extends StatefulWidget {
     this.statusName,
     this.statusJSON,
     int? idStepParent,
-  })  : this.tittle = tittle ?? 'Ingrese el código',
-        this.isBackButton = isBackButton ?? false,
-        this.idStepParent = idStepParent ?? 0;
+  })  : tittle = tittle ?? 'Ingrese el código',
+        isBackButton = isBackButton ?? false,
+        idStepParent = idStepParent ?? 0;
 
   final String tittle;
   final bool isBackButton;
@@ -70,11 +68,11 @@ class _KeyboardNumComponentWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width * 1.0,
       height: MediaQuery.sizeOf(context).height * 1.0,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF101827),
       ),
       child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(24.0, 10.0, 24.0, 24.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(24.0, 10.0, 24.0, 24.0),
         child: Column(
           mainAxisSize: MainAxisSize.max,
           mainAxisAlignment: MainAxisAlignment.start,
@@ -84,7 +82,7 @@ class _KeyboardNumComponentWidgetState
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (valueOrDefault<bool>(
-                  widget!.isBackButton,
+                  widget.isBackButton,
                   false,
                 ))
                   InkWell(
@@ -103,7 +101,7 @@ class _KeyboardNumComponentWidgetState
                   ),
                 Container(
                   height: 48.39,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8.0),
                     child: Image.asset(
@@ -115,7 +113,7 @@ class _KeyboardNumComponentWidgetState
               ],
             ),
             Text(
-              widget!.tittle,
+              widget.tittle,
               style: FlutterFlowTheme.of(context).headlineMedium.override(
                     font: TextStyle(fontFamily: 'Roboto',
                       fontWeight: FontWeight.w600,
@@ -138,12 +136,12 @@ class _KeyboardNumComponentWidgetState
               ),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Color(0xFF004628),
+                  color: const Color(0xFF004628),
                   borderRadius: BorderRadius.circular(16.0),
                 ),
                 child: Padding(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(10.0, 10.0, 10.0, 10.0),
+                      const EdgeInsetsDirectional.fromSTEB(10.0, 10.0, 10.0, 10.0),
                   child: Column(
                     mainAxisSize: MainAxisSize.max,
                     children: [
@@ -151,13 +149,13 @@ class _KeyboardNumComponentWidgetState
                         width: MediaQuery.sizeOf(context).width * 1.0,
                         height: 60.0,
                         decoration: BoxDecoration(
-                          color: Color(0xFFE6FFE6),
+                          color: const Color(0xFFE6FFE6),
                           borderRadius: BorderRadius.circular(12.0),
                         ),
                         child: Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
+                          alignment: const AlignmentDirectional(0.0, 0.0),
                           child: Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 16.0, 0.0, 16.0, 0.0),
                             child: Text(
                               FFAppState().codeKeyboard,
@@ -216,13 +214,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '1',
                                           textAlign: TextAlign.center,
@@ -278,13 +276,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '2',
                                           textAlign: TextAlign.center,
@@ -340,13 +338,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '3',
                                           textAlign: TextAlign.center,
@@ -408,13 +406,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '4',
                                           textAlign: TextAlign.center,
@@ -470,13 +468,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '5',
                                           textAlign: TextAlign.center,
@@ -532,13 +530,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '6',
                                           textAlign: TextAlign.center,
@@ -600,13 +598,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '7',
                                           textAlign: TextAlign.center,
@@ -662,13 +660,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '8',
                                           textAlign: TextAlign.center,
@@ -724,13 +722,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '9',
                                           textAlign: TextAlign.center,
@@ -792,11 +790,11 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Icon(
                                         Icons.backspace,
                                         color:
@@ -828,13 +826,13 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Padding(
-                                        padding: EdgeInsets.all(8.0),
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Text(
                                           '0',
                                           textAlign: TextAlign.center,
@@ -875,37 +873,36 @@ class _KeyboardNumComponentWidgetState
                                 hoverColor: Colors.transparent,
                                 highlightColor: Colors.transparent,
                                 onTap: () async {
-                                  var _shouldSetState = false;
-                                  if ((widget!.idStatus.toString() != null &&
-                                          widget!.idStatus.toString() != '') &&
-                                      (widget!.idStatus! > 0)) {
+                                  if ((widget.idStatus.toString() != '') &&
+                                      (widget.idStatus! > 0)) {
                                     _model.visitDetails =
                                         await actions.updateOrAddVisitDetail(
                                       FFAppState().visitDetails.toList(),
-                                      widget!.idStatus!,
-                                      widget!.idStepParent,
-                                      widget!.statusName!,
+                                      widget.idStatus!,
+                                      widget.idStepParent,
+                                      widget.statusName!,
                                       FFAppState().codeKeyboard,
                                       getJsonField(
-                                        widget!.statusJSON,
+                                        widget.statusJSON,
                                         r'''$.remember_status''',
                                       ),
                                       getJsonField(
-                                        widget!.statusJSON,
+                                        widget.statusJSON,
                                         r'''$.default_status''',
                                       ).toString(),
                                       0,
                                     );
-                                    _shouldSetState = true;
                                     FFAppState().visitDetails = _model
                                         .visitDetails!
                                         .toList()
                                         .cast<VisitsDetailsStruct>();
 
-                                    context.pushNamed(
+                                    if (!mounted) return;
+                                    safeSetState(() {});
+                                    this.context.pushNamed(
                                       DoVisitsFormPageWidget.routeName,
                                       extra: <String, dynamic>{
-                                        kTransitionInfoKey: TransitionInfo(
+                                        kTransitionInfoKey: const TransitionInfo(
                                           hasTransition: true,
                                           transitionType:
                                               PageTransitionType.fade,
@@ -913,20 +910,13 @@ class _KeyboardNumComponentWidgetState
                                         ),
                                       },
                                     );
-
-                                    if (_shouldSetState) safeSetState(() {});
-                                    return;
                                   } else {
                                     FFAppState().codeKeyboard =
                                         functions.concatenateStrings(
                                             FFAppState().codeKeyboard, '');
                                     FFAppState().update(() {});
                                     context.safePop();
-                                    if (_shouldSetState) safeSetState(() {});
-                                    return;
                                   }
-
-                                  if (_shouldSetState) safeSetState(() {});
                                 },
                                 child: Material(
                                   color: Colors.transparent,
@@ -938,11 +928,11 @@ class _KeyboardNumComponentWidgetState
                                     width: 80.0,
                                     height: 80.0,
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFE6FFE6),
+                                      color: const Color(0xFFE6FFE6),
                                       borderRadius: BorderRadius.circular(40.0),
                                     ),
                                     child: Align(
-                                      alignment: AlignmentDirectional(0.0, 0.0),
+                                      alignment: const AlignmentDirectional(0.0, 0.0),
                                       child: Icon(
                                         Icons.check_circle,
                                         color: FlutterFlowTheme.of(context)
@@ -955,14 +945,14 @@ class _KeyboardNumComponentWidgetState
                               ),
                             ],
                           ),
-                        ].divide(SizedBox(height: 10.0)),
+                        ].divide(const SizedBox(height: 10.0)),
                       ),
-                    ].divide(SizedBox(height: 10.0)),
+                    ].divide(const SizedBox(height: 10.0)),
                   ),
                 ),
               ),
             ),
-          ].divide(SizedBox(height: 15.0)),
+          ].divide(const SizedBox(height: 15.0)),
         ),
       ),
     );

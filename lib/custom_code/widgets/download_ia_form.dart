@@ -1,12 +1,9 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -128,7 +125,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
         boxShadow: [
           BoxShadow(
             blurRadius: 20,
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             offset: const Offset(0, 10),
           ),
         ],
@@ -178,7 +175,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: _getPhaseColor().withOpacity(0.5),
+                      color: _getPhaseColor().withValues(alpha: 0.5),
                       blurRadius: 20,
                       spreadRadius: 2,
                     ),
@@ -282,7 +279,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
                 ? [
                     BoxShadow(
                       color:
-                          FlutterFlowTheme.of(context).primary.withOpacity(0.5),
+                          FlutterFlowTheme.of(context).primary.withValues(alpha: 0.5),
                       blurRadius: 12,
                       spreadRadius: 2,
                     ),
@@ -347,12 +344,12 @@ class _DownloadIaFormState extends State<DownloadIaForm>
           border: Border.all(
             color: _currentPhase == AISetupPhase.error
                 ? Colors.red
-                : _getPhaseColor().withOpacity(0.3),
+                : _getPhaseColor().withValues(alpha: 0.3),
             width: 2,
           ),
           boxShadow: [
             BoxShadow(
-              color: _getPhaseColor().withOpacity(0.1),
+              color: _getPhaseColor().withValues(alpha: 0.1),
               blurRadius: 12,
               spreadRadius: 2,
             ),
@@ -505,7 +502,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.green.withOpacity(0.1),
+            color: Colors.green.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.green, width: 1),
           ),
@@ -570,7 +567,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.red.withOpacity(0.1),
+        color: Colors.red.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.red, width: 1),
       ),
@@ -791,7 +788,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
 
       // Obtener ruta de almacenamiento
       final String storagePath = await _getAIModelStoragePath();
-      final String fileName = 'DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf';
+      const String fileName = 'DeepSeek-R1-Distill-Qwen-7B-Q4_K_M.gguf';
       final String filePath = path.join(storagePath, fileName);
 
       // Verificar si existe y eliminar
@@ -1031,7 +1028,7 @@ class _DownloadIaFormState extends State<DownloadIaForm>
     final baseColor = _getPhaseColor();
     return [
       baseColor,
-      baseColor.withOpacity(0.7),
+      baseColor.withValues(alpha: 0.7),
     ];
   }
 

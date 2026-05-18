@@ -39,7 +39,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
     // Animación de entrada
     _animationController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 600),
     );
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeOut),
@@ -79,7 +79,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
         body: Container(
           width: double.infinity,
           height: double.infinity,
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -119,13 +119,13 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
 
   Widget _buildHeader(BuildContext context) {
     return Container(
-      padding: EdgeInsets.fromLTRB(12, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(12, 8, 16, 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF00a86b).withOpacity(0.2),
+            const Color(0xFF00a86b).withValues(alpha: 0.2),
             Colors.transparent,
           ],
         ),
@@ -145,17 +145,17 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.white.withOpacity(0.2),
-                    Colors.white.withOpacity(0.1),
+                    Colors.white.withValues(alpha: 0.2),
+                    Colors.white.withValues(alpha: 0.1),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
-                  color: Color(0xFF00a86b).withOpacity(0.3),
+                  color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                   width: 1,
                 ),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.chevron_left_rounded,
                 color: Color(0xFF00ff9f),
                 size: 28,
@@ -163,7 +163,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
             ),
           ),
 
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
 
           // Título e icono
           Expanded(
@@ -175,23 +175,23 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       colors: [
-                        Color(0xFFFF9800).withOpacity(0.3),
+                        const Color(0xFFFF9800).withValues(alpha: 0.3),
                         Colors.transparent,
                       ],
                     ),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.warning_amber_rounded,
                     color: Color(0xFFFF9800),
                     size: 28,
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Novedades',
                       style: TextStyle(
                         fontFamily: 'Roboto',
@@ -206,7 +206,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 12,
-                        color: Colors.white.withOpacity(0.6),
+                        color: Colors.white.withValues(alpha: 0.6),
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -222,17 +222,17 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
 
   Widget _buildSearchBar(BuildContext context) {
     return Container(
-      margin: EdgeInsets.fromLTRB(16, 0, 16, 16),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.white.withOpacity(0.1),
-            Colors.white.withOpacity(0.05),
+            Colors.white.withValues(alpha: 0.1),
+            Colors.white.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: Color(0xFF00a86b).withOpacity(0.3),
+          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -248,7 +248,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                 _searchQuery = value;
               });
             },
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Roboto',
               fontSize: 15,
               color: Colors.white,
@@ -258,9 +258,9 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
               hintStyle: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 15,
-                color: Colors.white.withOpacity(0.4),
+                color: Colors.white.withValues(alpha: 0.4),
               ),
-              prefixIcon: Icon(
+              prefixIcon: const Icon(
                 Icons.search_rounded,
                 color: Color(0xFF00a86b),
                 size: 22,
@@ -269,7 +269,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                   ? IconButton(
                       icon: Icon(
                         Icons.clear_rounded,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         size: 20,
                       ),
                       onPressed: () {
@@ -281,7 +281,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                     )
                   : null,
               border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
           ),
         ),
@@ -300,7 +300,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  Color(0xFF00a86b).withOpacity(0.2),
+                  const Color(0xFF00a86b).withValues(alpha: 0.2),
                   Colors.transparent,
                 ],
               ),
@@ -309,10 +309,10 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
             child: Icon(
               Icons.inbox_rounded,
               size: 56,
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withValues(alpha: 0.3),
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Text(
             _searchQuery.isEmpty
                 ? 'No hay novedades disponibles'
@@ -321,10 +321,10 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
               fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.w500,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             _searchQuery.isEmpty
                 ? 'Las novedades aparecerán aquí'
@@ -332,7 +332,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 13,
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -342,7 +342,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
 
   Widget _buildNewsList(BuildContext context, List<dynamic> newsList) {
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: newsList.length,
       itemBuilder: (context, index) {
         final newsItem = newsList[index];
@@ -368,16 +368,16 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
   Widget _buildNewsCard(BuildContext context, dynamic newsItem, int index) {
     // Colores alternados para variedad visual
     final List<Color> accentColors = [
-      Color(0xFFFF9800), // Naranja
-      Color(0xFF2196F3), // Azul
-      Color(0xFFE91E63), // Rosa
-      Color(0xFF9C27B0), // Púrpura
-      Color(0xFF00BCD4), // Cian
+      const Color(0xFFFF9800), // Naranja
+      const Color(0xFF2196F3), // Azul
+      const Color(0xFFE91E63), // Rosa
+      const Color(0xFF9C27B0), // Púrpura
+      const Color(0xFF00BCD4), // Cian
     ];
     final accentColor = accentColors[index % accentColors.length];
 
     return Container(
-      margin: EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 12),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
@@ -406,20 +406,20 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.white.withOpacity(0.12),
-                  Colors.white.withOpacity(0.05),
+                  Colors.white.withValues(alpha: 0.12),
+                  Colors.white.withValues(alpha: 0.05),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: accentColor.withOpacity(0.3),
+                color: accentColor.withValues(alpha: 0.3),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: accentColor.withOpacity(0.1),
+                  color: accentColor.withValues(alpha: 0.1),
                   blurRadius: 20,
-                  offset: Offset(0, 8),
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
@@ -428,7 +428,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                 child: Padding(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
                       // Icono con color de acento
@@ -438,13 +438,13 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                         decoration: BoxDecoration(
                           gradient: RadialGradient(
                             colors: [
-                              accentColor.withOpacity(0.3),
-                              accentColor.withOpacity(0.1),
+                              accentColor.withValues(alpha: 0.3),
+                              accentColor.withValues(alpha: 0.1),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: accentColor.withOpacity(0.4),
+                            color: accentColor.withValues(alpha: 0.4),
                             width: 1,
                           ),
                         ),
@@ -455,7 +455,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                         ),
                       ),
 
-                      SizedBox(width: 14),
+                      const SizedBox(width: 14),
 
                       // Contenido
                       Expanded(
@@ -464,7 +464,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                           children: [
                             Text(
                               newsItem.nameNew ?? 'Sin nombre',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontFamily: 'Roboto',
                                 fontSize: 16,
                                 fontWeight: FontWeight.w600,
@@ -474,21 +474,21 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Row(
                               children: [
                                 Icon(
                                   Icons.touch_app_rounded,
                                   size: 14,
-                                  color: accentColor.withOpacity(0.8),
+                                  color: accentColor.withValues(alpha: 0.8),
                                 ),
-                                SizedBox(width: 4),
+                                const SizedBox(width: 4),
                                 Text(
                                   'Toca para reportar',
                                   style: TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 12,
-                                    color: Colors.white.withOpacity(0.5),
+                                    color: Colors.white.withValues(alpha: 0.5),
                                     letterSpacing: 0.2,
                                   ),
                                 ),
@@ -503,7 +503,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.15),
+                          color: accentColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: Icon(
@@ -544,24 +544,24 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
         content: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(6),
+              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Icon(
+              child: const Icon(
                 Icons.check_circle_rounded,
                 color: Colors.white,
                 size: 22,
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
+                  const Text(
                     'Novedad registrada',
                     style: TextStyle(
                       fontFamily: 'Roboto',
@@ -575,7 +575,7 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 12,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -585,13 +585,13 @@ class _NewsPageWidgetState extends State<NewsPageWidget>
             ),
           ],
         ),
-        duration: Duration(milliseconds: 2500),
-        backgroundColor: Color(0xFF00a86b),
+        duration: const Duration(milliseconds: 2500),
+        backgroundColor: const Color(0xFF00a86b),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
-        margin: EdgeInsets.all(16),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }

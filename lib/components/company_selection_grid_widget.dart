@@ -1,6 +1,5 @@
-﻿import '/backend/api_requests/api_calls.dart';
+import '/backend/api_requests/api_calls.dart';
 import '/backend/schema/structs/index.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 
@@ -87,7 +86,7 @@ class _CompanySelectionGridWidgetState
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
-        duration: Duration(seconds: 3),
+        duration: const Duration(seconds: 3),
       ),
     );
   }
@@ -116,7 +115,7 @@ class _CompanySelectionGridWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -132,10 +131,10 @@ class _CompanySelectionGridWidgetState
           children: [
             // Header
             Padding(
-              padding: EdgeInsets.all(24.0),
+              padding: const EdgeInsets.all(24.0),
               child: Column(
                 children: [
-                  Text(
+                  const Text(
                     'Selecciona tu Empresa',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 28,
@@ -144,52 +143,52 @@ class _CompanySelectionGridWidgetState
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
                     'Elige la empresa para continuar',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   // Search field
                   TextFormField(
                     controller: _model.textController,
                     focusNode: _model.textFieldFocusNode,
                     onChanged: _filterCompanies,
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: const TextStyle(fontFamily: 'Roboto',
                       color: Colors.white,
                       fontSize: 15,
                     ),
                     decoration: InputDecoration(
                       hintText: 'Buscar empresa...',
                       hintStyle: TextStyle(fontFamily: 'Roboto',
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                       ),
-                      prefixIcon: Icon(
+                      prefixIcon: const Icon(
                         Icons.search,
                         color: Color(0xFF00a86b),
                         size: 22,
                       ),
                       filled: true,
-                      fillColor: Colors.white.withOpacity(0.05),
+                      fillColor: Colors.white.withValues(alpha: 0.05),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                         ),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
                         borderSide: BorderSide(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                         ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
+                        borderSide: const BorderSide(
                           color: Color(0xFF00a86b),
                           width: 2,
                         ),
@@ -203,7 +202,7 @@ class _CompanySelectionGridWidgetState
             // Companies grid
             Expanded(
               child: _model.isLoading
-                  ? Center(
+                  ? const Center(
                       child: CircularProgressIndicator(
                         valueColor: AlwaysStoppedAnimation<Color>(
                           Color(0xFF00a86b),
@@ -216,14 +215,14 @@ class _CompanySelectionGridWidgetState
                             'No se encontraron empresas',
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 16,
-                              color: Colors.white.withOpacity(0.6),
+                              color: Colors.white.withValues(alpha: 0.6),
                             ),
                           ),
                         )
                       : GridView.builder(
-                          padding: EdgeInsets.symmetric(horizontal: 24),
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
                           gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             crossAxisSpacing: 16,
                             mainAxisSpacing: 16,
@@ -257,32 +256,32 @@ class _CompanySelectionGridWidgetState
                                     begin: Alignment.topLeft,
                                     end: Alignment.bottomRight,
                                     colors: [
-                                      Color(0xFF1E293B).withOpacity(0.8),
-                                      Color(0xFF003420).withOpacity(0.6),
+                                      const Color(0xFF1E293B).withValues(alpha: 0.8),
+                                      const Color(0xFF003420).withValues(alpha: 0.6),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(16),
                                   border: Border.all(
-                                    color: Color(0xFF00a86b).withOpacity(0.3),
+                                    color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                                     width: 1,
                                   ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Color(0xFF00a86b).withOpacity(0.1),
+                                      color: const Color(0xFF00a86b).withValues(alpha: 0.1),
                                       blurRadius: 10,
                                       spreadRadius: 2,
                                     ),
                                   ],
                                 ),
                                 child: Padding(
-                                  padding: EdgeInsets.all(12),
+                                  padding: const EdgeInsets.all(12),
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       Container(
                                         width: 45,
                                         height: 45,
-                                        decoration: BoxDecoration(
+                                        decoration: const BoxDecoration(
                                           gradient: LinearGradient(
                                             colors: [
                                               Color(0xFF003420),
@@ -291,17 +290,17 @@ class _CompanySelectionGridWidgetState
                                           ),
                                           shape: BoxShape.circle,
                                         ),
-                                        child: Icon(
+                                        child: const Icon(
                                           Icons.business,
                                           color: Colors.white,
                                           size: 24,
                                         ),
                                       ),
-                                      SizedBox(height: 10),
+                                      const SizedBox(height: 10),
                                       Flexible(
                                         child: Text(
                                           companyName,
-                                          style: TextStyle(fontFamily: 'Roboto',
+                                          style: const TextStyle(fontFamily: 'Roboto',
                                             fontSize: 13,
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
@@ -312,12 +311,12 @@ class _CompanySelectionGridWidgetState
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      SizedBox(height: 6),
+                                      const SizedBox(height: 6),
                                       Text(
                                         'NIT: $companyNit',
                                         style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 10,
-                                          color: Colors.white.withOpacity(0.6),
+                                          color: Colors.white.withValues(alpha: 0.6),
                                         ),
                                         textAlign: TextAlign.center,
                                         maxLines: 1,
@@ -332,7 +331,7 @@ class _CompanySelectionGridWidgetState
                         ),
             ),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
           ],
         ),
       ),

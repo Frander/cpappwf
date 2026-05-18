@@ -153,8 +153,9 @@ class CompassVoiceController {
     if (inactivity) {
       shouldAnnounce = true;                                         // fallback 3 min
     } else if (cooldownOk) {
-      if (keyChanged) shouldAnnounce = true;                         // nueva palma
-      else if (milestoneEntered && curMilestone >= 0) shouldAnnounce = true; // zona más cercana
+      if (keyChanged) {
+        shouldAnnounce = true;                         // nueva palma
+      } else if (milestoneEntered && curMilestone >= 0) { shouldAnnounce = true; } // zona más cercana
     }
 
     if (!shouldAnnounce) return;
@@ -859,15 +860,15 @@ class _CompassClickpalmState extends State<CompassClickpalm>
         decoration: BoxDecoration(
           shape: BoxShape.circle,
           color: _isAnnouncingLocation
-              ? const Color(0xFF00E676).withOpacity(0.3)
-              : const Color(0xFF00E676).withOpacity(0.15),
+              ? const Color(0xFF00E676).withValues(alpha: 0.3)
+              : const Color(0xFF00E676).withValues(alpha: 0.15),
           border: Border.all(
-            color: const Color(0xFF00E676).withOpacity(0.7),
+            color: const Color(0xFF00E676).withValues(alpha: 0.7),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF00E676).withOpacity(0.3),
+              color: const Color(0xFF00E676).withValues(alpha: 0.3),
               blurRadius: 12,
               spreadRadius: 2,
             ),
@@ -963,10 +964,10 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                         shape: BoxShape.circle,
                         color: hasLocation
                             ? Color.lerp(const Color(0xFF00CC66), const Color(0xFF00FF88), _pulseAnimation.value)
-                            : Colors.grey.withOpacity(0.4),
+                            : Colors.grey.withValues(alpha: 0.4),
                         boxShadow: hasLocation
                             ? [BoxShadow(
-                                color: const Color(0xFF00FF88).withOpacity(0.6),
+                                color: const Color(0xFF00FF88).withValues(alpha: 0.6),
                                 blurRadius: 5,
                                 spreadRadius: 1,
                               )]
@@ -982,8 +983,8 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                       color: hasLocation
-                          ? const Color(0xFF00FF88).withOpacity(0.8)
-                          : Colors.grey.withOpacity(0.5),
+                          ? const Color(0xFF00FF88).withValues(alpha: 0.8)
+                          : Colors.grey.withValues(alpha: 0.5),
                       letterSpacing: 2.5,
                     ),
                   ),
@@ -999,10 +1000,10 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF10B981).withOpacity(0.18),
+                        color: const Color(0xFF10B981).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: const Color(0xFF10B981).withOpacity(0.5),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.5),
                         ),
                       ),
                       child: Row(
@@ -1049,10 +1050,10 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF59E0B).withOpacity(0.15),
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(
-                            color: const Color(0xFFF59E0B).withOpacity(0.5),
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.5),
                           ),
                         ),
                         child: FutureBuilder<bool>(
@@ -1087,13 +1088,13 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
                         color: _voiceController.voiceEnabled
-                            ? const Color(0xFF00E676).withOpacity(0.15)
-                            : Colors.white.withOpacity(0.05),
+                            ? const Color(0xFF00E676).withValues(alpha: 0.15)
+                            : Colors.white.withValues(alpha: 0.05),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _voiceController.voiceEnabled
-                              ? const Color(0xFF00E676).withOpacity(0.6)
-                              : Colors.white.withOpacity(0.15),
+                              ? const Color(0xFF00E676).withValues(alpha: 0.6)
+                              : Colors.white.withValues(alpha: 0.15),
                         ),
                       ),
                       child: Row(
@@ -1190,7 +1191,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
     } else if (hasPoint) {
       cardColor = _kCyan;
     } else {
-      cardColor = Colors.white.withOpacity(0.18);
+      cardColor = Colors.white.withValues(alpha: 0.18);
     }
 
     String distanceLabel = '';
@@ -1214,12 +1215,12 @@ class _CompassClickpalmState extends State<CompassClickpalm>
             width:  cardW,
             height: cardH,
             decoration: BoxDecoration(
-                color:        _kCard.withOpacity(0.82),
+                color:        _kCard.withValues(alpha: 0.82),
                 borderRadius: BorderRadius.circular(12),
                 border:       Border.all(color: cardColor, width: 1.2),
                 boxShadow:    hasPoint
                     ? [BoxShadow(
-                        color:      cardColor.withOpacity(0.25),
+                        color:      cardColor.withValues(alpha: 0.25),
                         blurRadius: 10,
                         spreadRadius: 1,
                       )]
@@ -1242,7 +1243,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                     width:  34,
                     height: 1,
                     margin: const EdgeInsets.symmetric(vertical: 4),
-                    color:  cardColor.withOpacity(0.4),
+                    color:  cardColor.withValues(alpha: 0.4),
                   ),
                   if (hasPoint) ...[
                     Text(
@@ -1251,7 +1252,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                         fontFamily: 'Roboto',
                         fontSize:   15,
                         fontWeight: FontWeight.w600,
-                        color:      Colors.white.withOpacity(0.8),
+                        color:      Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1267,7 +1268,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
                   ] else
                     Icon(
                       Icons.remove,
-                      color: Colors.white.withOpacity(0.18),
+                      color: Colors.white.withValues(alpha: 0.18),
                       size:  14,
                     ),
                 ],
@@ -1313,12 +1314,12 @@ class _CompassClickpalmState extends State<CompassClickpalm>
           colors: [Color(0xFF183215), _kCard],
         ),
         border: Border.all(
-          color: _kCyan.withOpacity(0.4),
+          color: _kCyan.withValues(alpha: 0.4),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color:       _kCyan.withOpacity(0.12),
+            color:       _kCyan.withValues(alpha: 0.12),
             blurRadius:  14,
             spreadRadius: 2,
           ),
@@ -1344,13 +1345,13 @@ class _CompassClickpalmState extends State<CompassClickpalm>
               fontFamily: 'Roboto Mono',
               fontSize:   10,
               fontWeight: FontWeight.w500,
-              color:      Colors.white.withOpacity(0.55),
+              color:      Colors.white.withValues(alpha: 0.55),
             ),
           ),
           Container(
             width: 28, height: 1,
             margin: const EdgeInsets.symmetric(vertical: 3),
-            color: _kCyan.withOpacity(0.25),
+            color: _kCyan.withValues(alpha: 0.25),
           ),
           if (_currentLocation != null) ...[
             Text(
@@ -1358,7 +1359,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
               style: TextStyle(
                 fontFamily: 'Roboto Mono',
                 fontSize:   7,
-                color:      Colors.white.withOpacity(0.35),
+                color:      Colors.white.withValues(alpha: 0.35),
               ),
             ),
             Text(
@@ -1366,11 +1367,11 @@ class _CompassClickpalmState extends State<CompassClickpalm>
               style: TextStyle(
                 fontFamily: 'Roboto Mono',
                 fontSize:   7,
-                color:      Colors.white.withOpacity(0.35),
+                color:      Colors.white.withValues(alpha: 0.35),
               ),
             ),
           ] else
-            Icon(Icons.my_location_rounded, color: _kCyan.withOpacity(0.5), size: 16),
+            Icon(Icons.my_location_rounded, color: _kCyan.withValues(alpha: 0.5), size: 16),
         ],
       ),
     );
@@ -1383,7 +1384,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
       margin:   const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       padding:  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color:        _kCard.withOpacity(0.85),
+        color:        _kCard.withValues(alpha: 0.85),
         borderRadius: BorderRadius.circular(10),
         border:       Border.all(color: const Color(0xFF1A3015), width: 1),
       ),
@@ -1398,7 +1399,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
             style: TextStyle(
               fontFamily:    'Roboto Mono',
               fontSize:      11,
-              color:         Colors.white.withOpacity(0.6),
+              color:         Colors.white.withValues(alpha: 0.6),
               letterSpacing: 0.4,
             ),
           ),
@@ -1407,11 +1408,11 @@ class _CompassClickpalmState extends State<CompassClickpalm>
               width:  1,
               height: 12,
               margin: const EdgeInsets.symmetric(horizontal: 12),
-              color:  Colors.white.withOpacity(0.15),
+              color:  Colors.white.withValues(alpha: 0.15),
             ),
             Icon(
               Icons.battery_charging_full_rounded,
-              color: Colors.white.withOpacity(0.4),
+              color: Colors.white.withValues(alpha: 0.4),
               size:  13,
             ),
             const SizedBox(width: 4),
@@ -1420,7 +1421,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize:   11,
-                color:      Colors.white.withOpacity(0.4),
+                color:      Colors.white.withValues(alpha: 0.4),
               ),
             ),
           ],
@@ -1451,7 +1452,7 @@ class _CompassClickpalmState extends State<CompassClickpalm>
       child: Center(
         child: Text(
           _errorMessage ?? 'Error desconocido',
-          style: TextStyle(color: Colors.white.withOpacity(0.6)),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.6)),
           textAlign: TextAlign.center,
         ),
       ),
@@ -1497,15 +1498,15 @@ class _CompassPainter extends CustomPainter {
 
     // Second ring
     canvas.drawCircle(center, 148,
-      p..color = const Color(0xFF122B0E).withOpacity(0.7)..strokeWidth = 1.0);
+      p..color = const Color(0xFF122B0E).withValues(alpha: 0.7)..strokeWidth = 1.0);
 
     // Inner ring
     canvas.drawCircle(center, 110,
-      p..color = const Color(0xFF183215).withOpacity(0.5)..strokeWidth = 1.0);
+      p..color = const Color(0xFF183215).withValues(alpha: 0.5)..strokeWidth = 1.0);
 
     // Innermost decorative ring
     canvas.drawCircle(center, 75,
-      p..color = const Color(0xFF183215).withOpacity(0.35)..strokeWidth = 0.8);
+      p..color = const Color(0xFF183215).withValues(alpha: 0.35)..strokeWidth = 0.8);
   }
 
   // ── Marcas de grado en bezel ──────────────────────────────────────────────
@@ -1527,15 +1528,15 @@ class _CompassPainter extends CustomPainter {
       if (isCardinal) {
         tickLen    = 16.0;
         strokeW    = 2.0;
-        tickColor  = (i == 0) ? _red.withOpacity(0.9) : _cyan.withOpacity(0.7);
+        tickColor  = (i == 0) ? _red.withValues(alpha: 0.9) : _cyan.withValues(alpha: 0.7);
       } else if (isIntercardinal) {
         tickLen    = 10.0;
         strokeW    = 1.2;
-        tickColor  = Colors.white.withOpacity(0.45);
+        tickColor  = Colors.white.withValues(alpha: 0.45);
       } else {
         tickLen    = 5.0;
         strokeW    = 0.8;
-        tickColor  = Colors.white.withOpacity(0.18);
+        tickColor  = Colors.white.withValues(alpha: 0.18);
       }
 
       p..color = tickColor..strokeWidth = strokeW;
@@ -1587,7 +1588,7 @@ class _CompassPainter extends CustomPainter {
     canvas.drawPath(sweepPath, Paint()
       ..shader = ui.Gradient.sweep(
         center,
-        [Colors.transparent, _cyan.withOpacity(0.11)],
+        [Colors.transparent, _cyan.withValues(alpha: 0.11)],
         [0.0, 1.0],
         TileMode.clamp,
         startAngle,
@@ -1600,7 +1601,7 @@ class _CompassPainter extends CustomPainter {
       Offset(center.dx + innerR * math.cos(endAngle), center.dy + innerR * math.sin(endAngle)),
       Offset(center.dx + outerR * math.cos(endAngle), center.dy + outerR * math.sin(endAngle)),
       Paint()
-        ..color = _cyan.withOpacity(0.55)
+        ..color = _cyan.withValues(alpha: 0.55)
         ..strokeWidth = 1.5
         ..style = PaintingStyle.stroke
         ..strokeCap = StrokeCap.round,
@@ -1639,7 +1640,7 @@ class _CompassPainter extends CustomPainter {
 
       // Glow halo
       canvas.drawLine(startPt, endPt, Paint()
-        ..color       = lineColor.withOpacity(0.10 + pulseValue * 0.08)
+        ..color       = lineColor.withValues(alpha: 0.10 + pulseValue * 0.08)
         ..strokeWidth = 7
         ..maskFilter  = const MaskFilter.blur(BlurStyle.normal, 4)
         ..style       = PaintingStyle.stroke
@@ -1680,7 +1681,7 @@ class _CompassPainter extends CustomPainter {
       ..shader = ui.Gradient.radial(
         center,
         glowR,
-        [_cyan.withOpacity(0.09), Colors.transparent],
+        [_cyan.withValues(alpha: 0.09), Colors.transparent],
       )
       ..style = PaintingStyle.fill);
   }

@@ -4,7 +4,6 @@ import '/components/gps_quality_indicator_widget.dart';
 import '/components/calibration_required_dialog_widget.dart';
 import '/components/modern_calibrate_compass_widget.dart';
 import '/custom_code/actions/index.dart';
-import '/backend/schema/structs/read_geo_struct.dart';
 import 'dart:async';
 import '/custom_code/platform_utils.dart';
 import 'dart:ui';
@@ -12,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/services/map_download_service.dart';
@@ -250,10 +248,12 @@ class _HomePageWidgetState extends State<HomePageWidget>
     final prefs = await SharedPreferences.getInstance();
     final dismissed = prefs.getBool('voice_banner_dismissed') ?? false;
     final ready = prefs.getBool('voice_model_ready') ?? false;
-    if (mounted) setState(() {
+    if (mounted) {
+      setState(() {
       _voiceBannerDismissed = dismissed;
       _voiceModelReady = ready;
     });
+    }
   }
 
   Future<void> _dismissVoiceBanner() async {

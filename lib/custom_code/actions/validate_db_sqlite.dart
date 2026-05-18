@@ -1,11 +1,6 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -917,6 +912,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
 
       if (photosStatus.isGranted && videosStatus.isGranted) return true;
 
+      if (!context.mounted) return false;
       final shouldContinue = await _showPermissionExplanationDialog(
         context,
         'La aplicación necesita acceso a tus fotos y videos para guardar la base de datos.',
@@ -936,6 +932,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
       final manageStatus = await Permission.manageExternalStorage.status;
       if (manageStatus.isGranted) return true;
 
+      if (!context.mounted) return false;
       final shouldContinue = await _showPermissionExplanationDialog(
         context,
         'Para continuar, se requiere permiso para gestionar el almacenamiento externo.',
@@ -950,6 +947,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
     final storageStatus = await Permission.storage.status;
     if (storageStatus.isGranted) return true;
 
+    if (!context.mounted) return false;
     await _showPermissionExplanationDialog(
       context,
       'Se necesita permiso para acceder al almacenamiento externo.',

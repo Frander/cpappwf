@@ -1,7 +1,6 @@
 // ignore_for_file: unnecessary_getters_setters
 
 import '/backend/schema/util/schema_util.dart';
-import '/backend/schema/enums/enums.dart';
 
 import 'index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -103,14 +102,14 @@ class HeadquartersStruct extends BaseStruct {
 
   static HeadquartersStruct fromMap(Map<String, dynamic> data) =>
       HeadquartersStruct(
-        idHeadquarter: castToType<int>(data['id_headquarter']),
-        idZone: castToType<int>(data['id_zone']),
+        idHeadquarter: (data['id_headquarter'] as num?)?.toInt(),
+        idZone: (data['id_zone'] as num?)?.toInt(),
         createdAt: data['created_at'] as String?,
         nameHeadquarter: data['name_headquarter'] as String?,
-        densityHeadquarter: castToType<int>(data['density_headquarter']),
+        densityHeadquarter: (data['density_headquarter'] as num?)?.toInt(),
         seedTime: data['seed_time'] as String?,
         stateHeadquarter: data['state_headquarter'] as String?,
-        areaHeadquarter: castToType<double>(data['area_headquarter']),
+        areaHeadquarter: (data['area_headquarter'] as num?)?.toDouble(),
         polygon: data['polygon'] as String?,
       );
 

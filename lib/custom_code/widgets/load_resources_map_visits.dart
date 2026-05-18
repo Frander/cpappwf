@@ -1,18 +1,15 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:sqflite/sqflite.dart';
@@ -378,18 +375,18 @@ class _LoadResourcesMapVisitsState extends State<LoadResourcesMapVisits>
         });
 
         debugPrint(
-            '🌴 Procesando ${_currentHeadquarterIndex}/$_totalHeadquarters: $_currentHeadquarterName');
+            '🌴 Procesando $_currentHeadquarterIndex/$_totalHeadquarters: $_currentHeadquarterName');
 
         if (config.pattern == RoutePattern.rutaOptimizada) {
           // Cargar ruta optimizada desde API
-          await _loadOptimizedRoute(config, hq.idHeadquarter!);
+          await _loadOptimizedRoute(config, hq.idHeadquarter);
         } else {
           // Cargar datos estándar
-          await _loadStandardRoute(config, hq.idHeadquarter!);
+          await _loadStandardRoute(config, hq.idHeadquarter);
         }
 
         debugPrint(
-            '✅ Completado ${_currentHeadquarterIndex}/$_totalHeadquarters');
+            '✅ Completado $_currentHeadquarterIndex/$_totalHeadquarters');
       }
 
       // Detener animación
@@ -1795,7 +1792,7 @@ class _LoadResourcesMapVisitsState extends State<LoadResourcesMapVisits>
     final visited = <String>{}; // "lineNumber:pointNumber"
     final allLines = lineGroups.keys.toList()..sort();
 
-    debugPrint('🕸️ Zigzag Espiral: Inicio en L${startLine}P${startPoint}');
+    debugPrint('🕸️ Zigzag Espiral: Inicio en L${startLine}P$startPoint');
 
     // Función auxiliar para marcar y agregar punto
     void addPoint(int line, int pointNum) {

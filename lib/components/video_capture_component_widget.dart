@@ -1,15 +1,12 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'dart:io';
 import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/platform_utils.dart';
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:video_player/video_player.dart';
 import 'video_capture_component_model.dart';
@@ -23,8 +20,8 @@ class VideoCaptureComponentWidget extends StatefulWidget {
     required this.statusName,
     required this.statusJSON,
     int? idStepParent,
-  })  : this.tittle = tittle ?? 'Capturar Video',
-        this.idStepParent = idStepParent ?? 0;
+  })  : tittle = tittle ?? 'Capturar Video',
+        idStepParent = idStepParent ?? 0;
 
   final String tittle;
   final int idStatus;
@@ -150,6 +147,7 @@ class _VideoCaptureComponentWidgetState
       }
     } catch (e) {
       debugPrint('Error capturando video: $e');
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error al capturar video: $e'),
@@ -176,7 +174,7 @@ class _VideoCaptureComponentWidgetState
     );
 
     FFAppState().visitDetails =
-        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+        visitDetailsCopy.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
 
     debugPrint('✅ Video guardado exitosamente en visitDetails (path)');
@@ -361,9 +359,8 @@ class _VideoCaptureComponentWidgetState
                         onTap: () async {
                           HapticFeedback.mediumImpact();
                           await _saveVideo(_model.videoPath!);
-                          if (mounted) {
-                            Navigator.pop(context);
-                          }
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
                         },
                         child: Container(
                           width: double.infinity,

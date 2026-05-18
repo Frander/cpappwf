@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/api_requests/api_manager.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'release_log.dart';
 import 'safe_struct_hydration.dart';
-import 'dart:convert';
 
 class FFAppState extends ChangeNotifier {
   static FFAppState _instance = FFAppState._internal();
@@ -40,7 +36,7 @@ class FFAppState extends ChangeNotifier {
           _loginResponse =
               jsonDecode(prefs.getString('ff_loginResponse') ?? '');
         } catch (e) {
-          print("Can't decode persisted json. Error: $e.");
+          debugPrint("Can't decode persisted json. Error: $e.");
         }
       }
     });
@@ -117,7 +113,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return ZonesStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -139,7 +135,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return VisitsStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -177,7 +173,7 @@ class FFAppState extends ChangeNotifier {
           _activitiesJSON =
               jsonDecode(prefs.getString('ff_activitiesJSON') ?? '');
         } catch (e) {
-          print("Can't decode persisted json. Error: $e.");
+          debugPrint("Can't decode persisted json. Error: $e.");
         }
       }
     });
@@ -196,7 +192,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return NewsStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -211,7 +207,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return NewsStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -225,7 +221,7 @@ class FFAppState extends ChangeNotifier {
           _userSelectedJSON =
               jsonDecode(prefs.getString('ff_userSelectedJSON') ?? '');
         } catch (e) {
-          print("Can't decode persisted json. Error: $e.");
+          debugPrint("Can't decode persisted json. Error: $e.");
         }
       }
     });
@@ -235,7 +231,7 @@ class FFAppState extends ChangeNotifier {
           _activitySelectedJSON =
               jsonDecode(prefs.getString('ff_activitySelectedJSON') ?? '');
         } catch (e) {
-          print("Can't decode persisted json. Error: $e.");
+          debugPrint("Can't decode persisted json. Error: $e.");
         }
       }
     });
@@ -245,7 +241,7 @@ class FFAppState extends ChangeNotifier {
           _currentActivity =
               jsonDecode(prefs.getString('ff_currentActivity') ?? '');
         } catch (e) {
-          print("Can't decode persisted json. Error: $e.");
+          debugPrint("Can't decode persisted json. Error: $e.");
         }
       }
     });
@@ -257,7 +253,7 @@ class FFAppState extends ChangeNotifier {
                   return ActivitiesStatusStruct.fromSerializableMap(
                       jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -272,7 +268,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return VisitsNewsStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -281,20 +277,20 @@ class FFAppState extends ChangeNotifier {
           _newsAdd;
     });
     _safeInit(() {
-      _StatusAdd = prefs
+      _statusAdd = prefs
               .getStringList('ff_StatusAdd')
               ?.map((x) {
                 try {
                   return ActivitiesStatusStruct.fromSerializableMap(
                       jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
               .withoutNulls
               .toList() ??
-          _StatusAdd;
+          _statusAdd;
     });
     _safeInit(() {
       _sp3NavFile = prefs.getString('ff_sp3NavFile') ?? _sp3NavFile;
@@ -306,7 +302,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return ReadGeoStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -321,7 +317,7 @@ class FFAppState extends ChangeNotifier {
                 try {
                   return VisitsDetailsStruct.fromSerializableMap(jsonDecode(x));
                 } catch (e) {
-                  print("Can't decode persisted data type. Error: $e.");
+                  debugPrint("Can't decode persisted data type. Error: $e.");
                   return null;
                 }
               })
@@ -398,11 +394,7 @@ class FFAppState extends ChangeNotifier {
 
   late SharedPreferences prefs;
 
-  String _codeKeyboard = '';
-  String get codeKeyboard => _codeKeyboard;
-  set codeKeyboard(String value) {
-    _codeKeyboard = value;
-  }
+  String codeKeyboard = '';
 
   bool _isSync = false;
   bool get isSync => _isSync;
@@ -421,11 +413,7 @@ class FFAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  DateTime? _lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
-  DateTime? get lastSync => _lastSync;
-  set lastSync(DateTime? value) {
-    _lastSync = value;
-  }
+  DateTime? lastSync = DateTime.fromMillisecondsSinceEpoch(1743526800000);
 
   // Fecha de la última sincronización de datos base (12 endpoints GZIP).
   // null = nunca sincronizado (primera vez). Persistido en SharedPreferences.
@@ -731,26 +719,14 @@ class FFAppState extends ChangeNotifier {
         'ff_zonesList', _zonesList.map((x) => x.serialize()).toList());
   }
 
-  String _codeSupervisor = '';
-  String get codeSupervisor => _codeSupervisor;
-  set codeSupervisor(String value) {
-    _codeSupervisor = value;
-  }
+  String codeSupervisor = '';
 
-  String _codeOperator = '';
-  String get codeOperator => _codeOperator;
-  set codeOperator(String value) {
-    _codeOperator = value;
-  }
+  String codeOperator = '';
 
-  ZonesStruct _zoneSelected = ZonesStruct();
-  ZonesStruct get zoneSelected => _zoneSelected;
-  set zoneSelected(ZonesStruct value) {
-    _zoneSelected = value;
-  }
+  ZonesStruct zoneSelected = ZonesStruct();
 
   void updateZoneSelectedStruct(Function(ZonesStruct) updateFn) {
-    updateFn(_zoneSelected);
+    updateFn(zoneSelected);
   }
 
   HeadquartersStruct _headquarterSelected = HeadquartersStruct();
@@ -771,11 +747,7 @@ class FFAppState extends ChangeNotifier {
             safeSerializeHeadquarters(_headquarterSelected)));
   }
 
-  List<ProductsStruct> _productsAdd = [];
-  List<ProductsStruct> get productsAdd => _productsAdd;
-  set productsAdd(List<ProductsStruct> value) {
-    _productsAdd = value;
-  }
+  List<ProductsStruct> productsAdd = [];
 
   void addToProductsAdd(ProductsStruct value) {
     productsAdd.add(value);
@@ -793,7 +765,7 @@ class FFAppState extends ChangeNotifier {
     int index,
     ProductsStruct Function(ProductsStruct) updateFn,
   ) {
-    productsAdd[index] = updateFn(_productsAdd[index]);
+    productsAdd[index] = updateFn(productsAdd[index]);
   }
 
   void insertAtIndexInProductsAdd(int index, ProductsStruct value) {
@@ -879,20 +851,12 @@ class FFAppState extends ChangeNotifier {
     prefs.setString('ff_androidID', value);
   }
 
-  bool _stopVoice = false;
-  bool get stopVoice => _stopVoice;
-  set stopVoice(bool value) {
-    _stopVoice = value;
-  }
+  bool stopVoice = false;
 
   // Variable para guardar la preferencia de generar ruta óptima durante la sesión
   // null = no se ha preguntado aún, true/false = preferencia guardada
   // NO se persiste para que se resetee al reiniciar la app
-  bool? _shouldGenerateOptimalRoute;
-  bool? get shouldGenerateOptimalRoute => _shouldGenerateOptimalRoute;
-  set shouldGenerateOptimalRoute(bool? value) {
-    _shouldGenerateOptimalRoute = value;
-  }
+  bool? shouldGenerateOptimalRoute;
 
   bool _isCalibrateVoice = false;
   bool get isCalibrateVoice => _isCalibrateVoice;
@@ -936,11 +900,7 @@ class FFAppState extends ChangeNotifier {
     prefs.setStringList('ff_listVoiceCalibration', _listVoiceCalibration);
   }
 
-  int _idActivityStatus = 0;
-  int get idActivityStatus => _idActivityStatus;
-  set idActivityStatus(int value) {
-    _idActivityStatus = value;
-  }
+  int idActivityStatus = 0;
 
   bool _calibrateCompass = false;
   bool get calibrateCompass => _calibrateCompass;
@@ -949,23 +909,11 @@ class FFAppState extends ChangeNotifier {
     prefs.setBool('ff_calibrateCompass', value);
   }
 
-  String _nfcRead = '';
-  String get nfcRead => _nfcRead;
-  set nfcRead(String value) {
-    _nfcRead = value;
-  }
+  String nfcRead = '';
 
-  String _nfcHardwareTagId = '';
-  String get nfcHardwareTagId => _nfcHardwareTagId;
-  set nfcHardwareTagId(String value) {
-    _nfcHardwareTagId = value;
-  }
+  String nfcHardwareTagId = '';
 
-  String _nfcLastProductName = '';
-  String get nfcLastProductName => _nfcLastProductName;
-  set nfcLastProductName(String value) {
-    _nfcLastProductName = value;
-  }
+  String nfcLastProductName = '';
 
   dynamic _activitiesJSON;
   dynamic get activitiesJSON => _activitiesJSON;
@@ -975,17 +923,9 @@ class FFAppState extends ChangeNotifier {
         () => prefs.setString('ff_activitiesJSON', jsonEncode(value)));
   }
 
-  dynamic _activityStatusSelectedJSON;
-  dynamic get activityStatusSelectedJSON => _activityStatusSelectedJSON;
-  set activityStatusSelectedJSON(dynamic value) {
-    _activityStatusSelectedJSON = value;
-  }
+  dynamic activityStatusSelectedJSON;
 
-  String _qrRead = '';
-  String get qrRead => _qrRead;
-  set qrRead(String value) {
-    _qrRead = value;
-  }
+  String qrRead = '';
 
   List<HeadquartersStruct> _headquartersSelectedList = [];
   List<HeadquartersStruct> get headquartersSelectedList =>
@@ -1140,11 +1080,7 @@ class FFAppState extends ChangeNotifier {
         'ff_newsSelected', _newsSelected.map((x) => x.serialize()).toList());
   }
 
-  String _moduleSelected = '';
-  String get moduleSelected => _moduleSelected;
-  set moduleSelected(String value) {
-    _moduleSelected = value;
-  }
+  String moduleSelected = '';
 
   dynamic _userSelectedJSON;
   dynamic get userSelectedJSON => _userSelectedJSON;
@@ -1238,45 +1174,45 @@ class FFAppState extends ChangeNotifier {
         'ff_newsAdd', _newsAdd.map((x) => x.serialize()).toList());
   }
 
-  List<ActivitiesStatusStruct> _StatusAdd = [];
-  List<ActivitiesStatusStruct> get StatusAdd => _StatusAdd;
-  set StatusAdd(List<ActivitiesStatusStruct> value) {
-    _StatusAdd = value;
+  List<ActivitiesStatusStruct> _statusAdd = [];
+  List<ActivitiesStatusStruct> get statusAdd => _statusAdd;
+  set statusAdd(List<ActivitiesStatusStruct> value) {
+    _statusAdd = value;
     prefs.setStringList(
         'ff_StatusAdd', value.map((x) => x.serialize()).toList());
   }
 
   void addToStatusAdd(ActivitiesStatusStruct value) {
-    StatusAdd.add(value);
+    statusAdd.add(value);
     prefs.setStringList(
-        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+        'ff_StatusAdd', _statusAdd.map((x) => x.serialize()).toList());
   }
 
   void removeFromStatusAdd(ActivitiesStatusStruct value) {
-    StatusAdd.remove(value);
+    statusAdd.remove(value);
     prefs.setStringList(
-        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+        'ff_StatusAdd', _statusAdd.map((x) => x.serialize()).toList());
   }
 
   void removeAtIndexFromStatusAdd(int index) {
-    StatusAdd.removeAt(index);
+    statusAdd.removeAt(index);
     prefs.setStringList(
-        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+        'ff_StatusAdd', _statusAdd.map((x) => x.serialize()).toList());
   }
 
   void updateStatusAddAtIndex(
     int index,
     ActivitiesStatusStruct Function(ActivitiesStatusStruct) updateFn,
   ) {
-    StatusAdd[index] = updateFn(_StatusAdd[index]);
+    statusAdd[index] = updateFn(_statusAdd[index]);
     prefs.setStringList(
-        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+        'ff_StatusAdd', _statusAdd.map((x) => x.serialize()).toList());
   }
 
   void insertAtIndexInStatusAdd(int index, ActivitiesStatusStruct value) {
-    StatusAdd.insert(index, value);
+    statusAdd.insert(index, value);
     prefs.setStringList(
-        'ff_StatusAdd', _StatusAdd.map((x) => x.serialize()).toList());
+        'ff_StatusAdd', _statusAdd.map((x) => x.serialize()).toList());
   }
 
   String _sp3NavFile = '';
@@ -1375,17 +1311,9 @@ class FFAppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  int _totalStepsActivity = 0;
-  int get totalStepsActivity => _totalStepsActivity;
-  set totalStepsActivity(int value) {
-    _totalStepsActivity = value;
-  }
+  int totalStepsActivity = 0;
 
-  int _countStepsActivity = 0;
-  int get countStepsActivity => _countStepsActivity;
-  set countStepsActivity(int value) {
-    _countStepsActivity = value;
-  }
+  int countStepsActivity = 0;
 
   dynamic _currentActivity;
   dynamic get currentActivity => _currentActivity;
@@ -1395,11 +1323,7 @@ class FFAppState extends ChangeNotifier {
         () => prefs.setString('ff_currentActivity', jsonEncode(value)));
   }
 
-  int _visitCount = 0;
-  int get visitCount => _visitCount;
-  set visitCount(int value) {
-    _visitCount = value;
-  }
+  int visitCount = 0;
 
   String _pathPmtiles = ' ';
   String get pathPmtiles => _pathPmtiles;
@@ -1457,24 +1381,12 @@ class FFAppState extends ChangeNotifier {
     prefs.setDouble('ff_routeConfigErrorMargin', value);
   }
 
-  String _printerMacAddress = '';
-  String get printerMacAddress => _printerMacAddress;
-  set printerMacAddress(String value) {
-    _printerMacAddress = value;
-  }
+  String printerMacAddress = '';
 
-  String _printerName = '';
-  String get printerName => _printerName;
-  set printerName(String value) {
-    _printerName = value;
-  }
+  String printerName = '';
 
   // Caché temporal del formulario (no persistido)
-  Map<String, dynamic> _formCacheMap = {};
-  Map<String, dynamic> get formCacheMap => _formCacheMap;
-  set formCacheMap(Map<String, dynamic> value) {
-    _formCacheMap = value;
-  }
+  Map<String, dynamic> formCacheMap = {};
 }
 
 void _safeInit(Function() initializeField) {

@@ -1,12 +1,7 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -24,7 +19,7 @@ Future<String> getDatabase() async {
     path,
     version: 1,
     onCreate: (db, version) async {
-      print("Base de datos creada en $path");
+      debugPrint("Base de datos creada en $path");
     },
   );
 

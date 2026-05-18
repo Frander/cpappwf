@@ -1,10 +1,8 @@
-﻿import '/flutter_flow/flutter_flow_count_controller.dart';
+import '/flutter_flow/flutter_flow_count_controller.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'counter_control_component_model.dart';
 export 'counter_control_component_model.dart';
 
@@ -45,7 +43,7 @@ class _CounterControlComponentWidgetState
       width: 120.0,
       height: 40.0,
       decoration: BoxDecoration(
-        color: Color(0xFF101827),
+        color: const Color(0xFF101827),
         borderRadius: BorderRadius.circular(8.0),
         shape: BoxShape.rectangle,
       ),
@@ -82,7 +80,7 @@ class _CounterControlComponentWidgetState
         updateCount: (count) =>
             safeSetState(() => _model.countControllerValue = count),
         stepSize: 1,
-        contentPadding: EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 0.0),
+        contentPadding: const EdgeInsetsDirectional.fromSTEB(12.0, 0.0, 12.0, 0.0),
       ),
     );
   }

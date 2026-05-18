@@ -12,14 +12,14 @@ Future<List<T>> _readQuery<T>(
 Future<List<GetAllUsersRow>> performGetAllUsers(
   Database database,
 ) {
-  final query = '''
+  const query = '''
 select * from Users
 ''';
   return _readQuery(database, query, (d) => GetAllUsersRow(d));
 }
 
 class GetAllUsersRow extends SqliteRow {
-  GetAllUsersRow(Map<String, dynamic> data) : super(data);
+  GetAllUsersRow(super.data);
 
   int get idUser => data['idUser'] as int;
   int get idCompany => data['idCompany'] as int;
@@ -34,14 +34,14 @@ class GetAllUsersRow extends SqliteRow {
 Future<List<SelectAllGeoRow>> performSelectAllGeo(
   Database database,
 ) {
-  final query = '''
+  const query = '''
 select * from ReadGeo
 ''';
   return _readQuery(database, query, (d) => SelectAllGeoRow(d));
 }
 
 class SelectAllGeoRow extends SqliteRow {
-  SelectAllGeoRow(Map<String, dynamic> data) : super(data);
+  SelectAllGeoRow(super.data);
 }
 
 /// END SELECTALLGEO
@@ -50,14 +50,14 @@ class SelectAllGeoRow extends SqliteRow {
 Future<List<GetCountVisitRow>> performGetCountVisit(
   Database database,
 ) {
-  final query = '''
+  const query = '''
 SELECT COUNT(*) as count2 FROM Visits
 ''';
   return _readQuery(database, query, (d) => GetCountVisitRow(d));
 }
 
 class GetCountVisitRow extends SqliteRow {
-  GetCountVisitRow(Map<String, dynamic> data) : super(data);
+  GetCountVisitRow(super.data);
 
   int get count2 => data['count2'] as int;
 }
@@ -82,7 +82,7 @@ LIMIT 1
 }
 
 class GetHeadquarterWeightsRow extends SqliteRow {
-  GetHeadquarterWeightsRow(Map<String, dynamic> data) : super(data);
+  GetHeadquarterWeightsRow(super.data);
 
   int get idHeadquarterWeight => data['Id_headquarter_weight'] as int;
   int get idHeadquarter => data['Id_headquarter'] as int;

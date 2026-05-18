@@ -4,7 +4,7 @@ import 'package:sqflite/sqflite.dart';
 Future performDeleteAllUsers(
   Database database,
 ) {
-  final query = '''
+  const query = '''
 DELETE FROM Users
 ''';
   return database.rawQuery(query);
@@ -22,7 +22,7 @@ Future performAddReadGeo(
   String? dateHourRead,
 }) {
   final query = '''
-Insert into ReadGeo (latitude,longitude,altitude,errorHorizontal,dateHourRead) values (${latitude}, ${longitude}, ${altitude}, ${errorHorizontal}, '${dateHourRead}')
+Insert into ReadGeo (latitude,longitude,altitude,errorHorizontal,dateHourRead) values ($latitude, $longitude, $altitude, $errorHorizontal, '$dateHourRead')
 ''';
   return database.rawQuery(query);
 }

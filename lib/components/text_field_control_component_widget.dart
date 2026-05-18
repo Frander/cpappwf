@@ -1,9 +1,7 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'text_field_control_component_model.dart';
 export 'text_field_control_component_model.dart';
 
@@ -43,7 +41,7 @@ class _TextFieldControlComponentWidgetState
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: double.infinity,
       child: TextFormField(
         controller: _model.textController,
@@ -74,14 +72,14 @@ class _TextFieldControlComponentWidgetState
                 fontStyle: FlutterFlowTheme.of(context).labelMedium.fontStyle,
               ),
           enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(
+            borderSide: const BorderSide(
               color: Color(0x00000000),
               width: 1.0,
             ),
             borderRadius: BorderRadius.circular(8.0),
           ),
           focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(
+            borderSide: const BorderSide(
               color: Color(0x00000000),
               width: 1.0,
             ),

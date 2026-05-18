@@ -1,11 +1,7 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
+// Imports other custom widgets
+// Imports custom actions
 import '/flutter_flow/custom_functions.dart'; // Imports custom functions
 import 'package:flutter/material.dart';
 
@@ -83,6 +79,7 @@ class _ActivityNode {
   final String name;
   final bool isMultiDetail;
   final double totalFactor;
+  final String factorUnit;
   final List<_UserNode> users;
 
   const _ActivityNode({
@@ -90,6 +87,7 @@ class _ActivityNode {
     required this.name,
     required this.isMultiDetail,
     required this.totalFactor,
+    required this.factorUnit,
     required this.users,
   });
 }
@@ -100,16 +98,16 @@ class _ActivityNode {
 
 class HistoryVisitsForm extends StatefulWidget {
   const HistoryVisitsForm({
-    Key? key,
+    super.key,
     this.width,
     this.height,
-  }) : super(key: key);
+  });
 
   final double? width;
   final double? height;
 
   @override
-  _HistoryVisitsFormState createState() => _HistoryVisitsFormState();
+  State<HistoryVisitsForm> createState() => _HistoryVisitsFormState();
 }
 
 class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
@@ -228,11 +226,24 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
 
     final users = isMultiDetail ? _groupMultiDetail(rows) : _groupAggregated(rows);
 
+    final unityResult = await globalDb.executeOperation<List<Map<String, dynamic>>>(
+      (db) => db.rawQuery(
+        'SELECT COALESCE(Unity, ?) as unity FROM Activities WHERE Id_activity = ?',
+        ['F', activityId],
+      ),
+    );
+    final factorUnit = unityResult.isNotEmpty
+        ? ((unityResult[0]['unity'] as String?)?.trim().isNotEmpty == true
+            ? unityResult[0]['unity'] as String
+            : 'F')
+        : 'F';
+
     return _ActivityNode(
       id: activityId,
       name: activityName,
       isMultiDetail: isMultiDetail,
       totalFactor: users.fold(0.0, (s, u) => s + u.totalFactor),
+      factorUnit: factorUnit,
       users: users,
     );
   }
@@ -605,23 +616,16 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
             ],
           ),
           const SizedBox(height: 10),
-          Text(
-            '$value',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 34,
-              fontWeight: FontWeight.w900,
-              color: color,
-              height: 1.0,
-            ),
-          ),
-          const SizedBox(height: 4),
-          const Text(
-            'registros',
-            style: TextStyle(
-              fontFamily: 'Roboto',
-              fontSize: 10,
-              color: Colors.white38,
+          Center(
+            child: Text(
+              '$value',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 34,
+                fontWeight: FontWeight.w900,
+                color: color,
+                height: 1.0,
+              ),
             ),
           ),
         ],
@@ -651,6 +655,14 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
     final isLoaded = _activityCache.containsKey(activityId);
     final isLoading = _activityLoading[activityId] == true;
     final node = _activityCache[activityId];
+
+    // initiallyExpanded:true no dispara onExpansionChanged, así que cargamos
+    // los datos vía post-frame para que el árbol aparezca al primer render.
+    if (!isLoaded && !isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _ensureActivityLoaded(activityId, activityName);
+      });
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -726,7 +738,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      _buildFactorBadge(node.totalFactor),
+                      _buildFactorBadge(node.totalFactor, node.factorUnit),
                     ],
                   ),
                 )
@@ -769,13 +781,13 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
     }
     return Column(
       children: node.users
-          .map((user) => _buildUserTile(user, node.isMultiDetail))
+          .map((user) => _buildUserTile(user, node.isMultiDetail, node.factorUnit))
           .toList(),
     );
   }
 
   // Nivel 1 — Usuario
-  Widget _buildUserTile(_UserNode user, bool isMulti) {
+  Widget _buildUserTile(_UserNode user, bool isMulti, String factorUnit) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
@@ -826,7 +838,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildFactorBadge(user.totalFactor),
+              _buildFactorBadge(user.totalFactor, factorUnit),
               const SizedBox(width: 6),
               _buildBadge(user.totalVisits, _kGreen2),
               const SizedBox(width: 4),
@@ -840,7 +852,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               child: Column(
                 children: user.headquarters
-                    .map((hq) => _buildHqTile(hq, isMulti))
+                    .map((hq) => _buildHqTile(hq, isMulti, factorUnit))
                     .toList(),
               ),
             ),
@@ -851,7 +863,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
   }
 
   // Nivel 2 — Lote / Headquarter
-  Widget _buildHqTile(_HqNode hq, bool isMulti) {
+  Widget _buildHqTile(_HqNode hq, bool isMulti, String factorUnit) {
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       decoration: BoxDecoration(
@@ -883,7 +895,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildFactorBadge(hq.totalFactor),
+              _buildFactorBadge(hq.totalFactor, factorUnit),
               const SizedBox(width: 6),
               _buildBadge(hq.totalVisits, const Color(0xFF00B4D8)),
               const SizedBox(width: 4),
@@ -1106,26 +1118,11 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
       children: [
         _buildSectionTitle('SINCRONIZACIÓN', Icons.sync_rounded),
         const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildSyncButton(
-                label: 'Sincronizar\nAhora',
-                icon: Icons.bolt_rounded,
-                colors: const [_kGreen2, _kGreen1],
-                onTap: _navigateToSync,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _buildSyncButton(
-                label: 'Datos\nBase',
-                icon: Icons.cloud_download_rounded,
-                colors: const [Color(0xFF1A237E), Color(0xFF0277BD)],
-                onTap: _navigateToSync,
-              ),
-            ),
-          ],
+        _buildSyncButton(
+          label: 'SINCRONIZAR',
+          icon: Icons.sync_rounded,
+          colors: const [_kGreen2, _kGreen1],
+          onTap: _navigateToSync,
         ),
       ],
     );
@@ -1140,6 +1137,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
     return GestureDetector(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -1204,8 +1202,8 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
                 width: 1,
               ),
             ),
-            child: Row(
-              children: const [
+            child: const Row(
+              children: [
                 Icon(Icons.admin_panel_settings,
                     color: Color(0xFF00ff9f), size: 22),
                 SizedBox(width: 12),
@@ -1256,7 +1254,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
     );
   }
 
-  Widget _buildFactorBadge(double factor) {
+  Widget _buildFactorBadge(double factor, String factorUnit) {
     final display = factor == factor.truncateToDouble()
         ? factor.toInt().toString()
         : factor.toStringAsFixed(1);
@@ -1271,9 +1269,9 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text(
-            'F',
-            style: TextStyle(
+          Text(
+            factorUnit,
+            style: const TextStyle(
               fontSize: 9,
               fontWeight: FontWeight.w900,
               color: Color(0xFFFFB300),

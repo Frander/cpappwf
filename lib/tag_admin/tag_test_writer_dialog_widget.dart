@@ -1,10 +1,8 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'tag_test_writer_dialog_model.dart';
 export 'tag_test_writer_dialog_model.dart';
 
@@ -58,7 +56,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
       visits: 15,
       results: 10,
       headquarterId: 204,
-      dateTime: DateTime.now().add(Duration(minutes: 10)),
+      dateTime: DateTime.now().add(const Duration(minutes: 10)),
     );
 
     actions.addVisitToNfcJson(
@@ -67,7 +65,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
       visits: 17,
       results: 11,
       headquarterId: 204,
-      dateTime: DateTime.now().add(Duration(minutes: 20)),
+      dateTime: DateTime.now().add(const Duration(minutes: 20)),
     );
 
     _model.dataToWrite = actions.nfcJsonToString(testJson);
@@ -100,7 +98,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
         });
 
         // Esperar un momento y cerrar
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           Navigator.pop(context, true);
         }
@@ -119,7 +117,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -128,7 +126,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
       ),
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -137,7 +135,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.edit_note_rounded,
@@ -156,12 +154,12 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                   ],
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Preview de datos
             if (!_model.isWriting && !_model.isSuccess && _model.errorMessage == null)
@@ -169,15 +167,15 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Color(0xFF374151),
+                      color: const Color(0xFF374151),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Icon(Icons.info_outline, color: Color(0xFF3B82F6), size: 20),
                             SizedBox(width: 8),
@@ -191,28 +189,28 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                             ),
                           ],
                         ),
-                        SizedBox(height: 12),
-                        Text(
+                        const SizedBox(height: 12),
+                        const Text(
                           'Se escribirá el siguiente contenido de prueba en el TAG:',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             color: Colors.white70,
                           ),
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
                         Container(
-                          padding: EdgeInsets.all(12),
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Color(0xFF1F2937),
+                            color: const Color(0xFF1F2937),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
-                              color: Color(0xFF10B981).withOpacity(0.3),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.3),
                               width: 1,
                             ),
                           ),
                           child: Text(
                             _model.dataToWrite,
-                            style: TextStyle(fontFamily: 'Roboto Mono',
+                            style: const TextStyle(fontFamily: 'Roboto Mono',
                               fontSize: 11,
                               color: Color(0xFF10B981),
                               height: 1.6,
@@ -222,7 +220,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                       ],
                     ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   _buildDataPreview(),
                 ],
               ),
@@ -230,12 +228,12 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
             // Estado de escritura
             if (_model.isWriting)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF374151),
+                  color: const Color(0xFF374151),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Color(0xFF10B981),
+                    color: const Color(0xFF10B981),
                     width: 2,
                   ),
                 ),
@@ -244,20 +242,20 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     ScaleTransition(
                       scale: _pulseAnimation,
                       child: Container(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Color(0xFF10B981).withOpacity(0.2),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.nfc,
                           color: Color(0xFF10B981),
                           size: 48,
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
-                    Text(
+                    const SizedBox(height: 20),
+                    const Text(
                       'ACERQUE EL TAG',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Roboto',
@@ -267,8 +265,8 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                         letterSpacing: 0.5,
                       ),
                     ),
-                    SizedBox(height: 12),
-                    Row(
+                    const SizedBox(height: 12),
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
@@ -292,13 +290,13 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
             // Éxito
             if (_model.isSuccess)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFF10B981), width: 1),
+                  border: Border.all(color: const Color(0xFF10B981), width: 1),
                 ),
-                child: Column(
+                child: const Column(
                   children: [
                     Icon(
                       Icons.check_circle_outline_rounded,
@@ -331,20 +329,20 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
             // Error
             if (!_model.isWriting && _model.errorMessage != null)
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Color(0xFFDC2626).withOpacity(0.1),
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFDC2626), width: 1),
+                  border: Border.all(color: const Color(0xFFDC2626), width: 1),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Color(0xFFDC2626)),
-                    SizedBox(width: 12),
+                    const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _model.errorMessage!,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -354,7 +352,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                 ),
               ),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Botones de acción
             if (!_model.isWriting)
@@ -366,8 +364,8 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                       text: _model.isSuccess ? 'Cerrar' : 'Cancelar',
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF374151),
-                        textStyle: TextStyle(fontFamily: 'Roboto',
+                        color: const Color(0xFF374151),
+                        textStyle: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -377,7 +375,7 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                     ),
                   ),
                   if (!_model.isSuccess)
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                   if (!_model.isSuccess)
                     Expanded(
                       child: FFButtonWidget(
@@ -389,8 +387,8 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
                         ),
                         options: FFButtonOptions(
                           height: 48,
-                          color: Color(0xFF10B981),
-                          textStyle: TextStyle(fontFamily: 'Roboto',
+                          color: const Color(0xFF10B981),
+                          textStyle: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -410,15 +408,15 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
 
   Widget _buildDataPreview() {
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Vista previa del contenido',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
@@ -426,14 +424,14 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
               color: Colors.white70,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _buildPreviewItem('Fecha/Hora', '27/11/2025 13:36:48'),
           _buildPreviewItem('Operador ID', '4442'),
           _buildPreviewItem('Visitas', '3 (por registro)'),
           _buildPreviewItem('Resultados', '6 (por registro)'),
           _buildPreviewItem('Lote ID', '112'),
-          SizedBox(height: 8),
-          Row(
+          const SizedBox(height: 8),
+          const Row(
             children: [
               Icon(Icons.copy_all, color: Color(0xFF3B82F6), size: 14),
               SizedBox(width: 6),
@@ -454,21 +452,21 @@ class _TagTestWriterDialogWidgetState extends State<TagTestWriterDialogWidget>
 
   Widget _buildPreviewItem(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
-          Icon(Icons.chevron_right, color: Color(0xFF10B981), size: 16),
-          SizedBox(width: 6),
+          const Icon(Icons.chevron_right, color: Color(0xFF10B981), size: 16),
+          const SizedBox(width: 6),
           Text(
             '$label: ',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               color: Colors.white60,
             ),
           ),
           Text(
             value,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.w600,
               color: Colors.white,

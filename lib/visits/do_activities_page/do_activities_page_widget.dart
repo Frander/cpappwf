@@ -1,4 +1,4 @@
-﻿import '/components/info_dialog_widget.dart';
+import '/components/info_dialog_widget.dart';
 import '/components/gps_stabilization_monitor_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
@@ -9,7 +9,6 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '/custom_code/platform_utils.dart';
-import '../formulario_extractora_form_page/formulario_extractora_form_page_widget.dart';
 import 'do_activities_page_model.dart';
 export 'do_activities_page_model.dart';
 

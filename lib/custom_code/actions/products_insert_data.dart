@@ -1,12 +1,8 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -38,10 +34,10 @@ Future<void> productsInsertData(
       final fields = firstUser.keys
           .map((key) => "$key ${_getSqlType(firstUser[key])}")
           .join(", ");
-      print('Campos detectados para la tabla $tableName: $fields');
+      debugPrint('Campos detectados para la tabla $tableName: $fields');
 
       await db.execute("CREATE TABLE $tableName ($fields)");
-      print('Tabla $tableName creada con campos: $fields');
+      debugPrint('Tabla $tableName creada con campos: $fields');
     }
 
     // Insertar los registros en la tabla
@@ -53,7 +49,7 @@ Future<void> productsInsertData(
       );
     }
 
-    print('Datos insertados en la tabla $tableName');
+    debugPrint('Datos insertados en la tabla $tableName');
   });
 }
 

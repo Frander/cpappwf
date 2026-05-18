@@ -1,12 +1,9 @@
-﻿import '/components/calculate_coordenates_install_component_widget.dart';
+import '/components/calculate_coordenates_install_component_widget.dart';
 import '/flutter_flow/flutter_flow_count_controller.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'add_product_page_model.dart';
 export 'add_product_page_model.dart';
 
@@ -49,7 +46,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: Color(0xFF101827),
           ),
           child: Column(
@@ -58,14 +55,14 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Container(
                 width: double.infinity,
                 height: 130.47,
-                decoration: BoxDecoration(),
+                decoration: const BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsetsDirectional.fromSTEB(
+                        padding: const EdgeInsetsDirectional.fromSTEB(
                             0.0, 15.0, 10.0, 0.0),
                         child: Row(
                           mainAxisSize: MainAxisSize.max,
@@ -93,7 +90,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                       child: Container(
                         width: double.infinity,
                         height: double.infinity,
-                        decoration: BoxDecoration(),
+                        decoration: const BoxDecoration(),
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -119,13 +116,13 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                         .fontStyle,
                                   ),
                             ),
-                          ].divide(SizedBox(height: 10.0)),
+                          ].divide(const SizedBox(height: 10.0)),
                         ),
                       ),
                     ),
                     Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 10.0),
+                          const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 10.0),
                       child: Text(
                         'Registrar la palma implica que se activará el seguimiento GPS a la ubicación en la que se encuentra el dispositivo en estos momentos',
                         textAlign: TextAlign.center,
@@ -152,7 +149,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
@@ -192,16 +189,16 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                 fit: BoxFit.cover,
                               ),
                             ),
-                          ].divide(SizedBox(width: 20.0)),
+                          ].divide(const SizedBox(width: 20.0)),
                         ),
                         Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
                               30.0, 0.0, 30.0, 0.0),
                           child: Container(
                             width: MediaQuery.sizeOf(context).width * 1.0,
                             height: 80.0,
                             decoration: BoxDecoration(
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   blurRadius: 8.0,
                                   color: Color(0x33000000),
@@ -272,13 +269,13 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                   safeSetState(() {});
                                 },
                                 stepSize: 1,
-                                contentPadding: EdgeInsetsDirectional.fromSTEB(
+                                contentPadding: const EdgeInsetsDirectional.fromSTEB(
                                     12.0, 0.0, 12.0, 0.0),
                               ),
                             ),
                           ),
                         ),
-                      ].divide(SizedBox(height: 5.0)),
+                      ].divide(const SizedBox(height: 5.0)),
                     ),
                   ),
                 ),
@@ -286,7 +283,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
@@ -326,16 +323,16 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                 fit: BoxFit.cover,
                               ),
                             ),
-                          ].divide(SizedBox(width: 20.0)),
+                          ].divide(const SizedBox(width: 20.0)),
                         ),
                         Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
                               30.0, 0.0, 30.0, 0.0),
                           child: Container(
                             width: MediaQuery.sizeOf(context).width * 1.0,
                             height: 80.0,
                             decoration: BoxDecoration(
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   blurRadius: 8.0,
                                   color: Color(0x33000000),
@@ -406,13 +403,13 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                   safeSetState(() {});
                                 },
                                 stepSize: 1,
-                                contentPadding: EdgeInsetsDirectional.fromSTEB(
+                                contentPadding: const EdgeInsetsDirectional.fromSTEB(
                                     12.0, 0.0, 12.0, 0.0),
                               ),
                             ),
                           ),
                         ),
-                      ].divide(SizedBox(height: 5.0)),
+                      ].divide(const SizedBox(height: 5.0)),
                     ),
                   ),
                 ),
@@ -420,7 +417,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
@@ -446,7 +443,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                   ),
                         ),
                         Padding(
-                          padding: EdgeInsetsDirectional.fromSTEB(
+                          padding: const EdgeInsetsDirectional.fromSTEB(
                               30.0, 0.0, 30.0, 0.0),
                           child: Container(
                             width: MediaQuery.sizeOf(context).width * 1.0,
@@ -454,7 +451,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                             decoration: BoxDecoration(
                               color: FlutterFlowTheme.of(context)
                                   .secondaryBackground,
-                              boxShadow: [
+                              boxShadow: const [
                                 BoxShadow(
                                   blurRadius: 8.0,
                                   color: Color(0x33000000),
@@ -473,7 +470,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                 Container(
                                   width: 50.0,
                                   height: 50.0,
-                                  decoration: BoxDecoration(),
+                                  decoration: const BoxDecoration(),
                                   child: Theme(
                                     data: ThemeData(
                                       checkboxTheme: CheckboxThemeData(
@@ -502,7 +499,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                               width: 2,
                                               color:
                                                   FlutterFlowTheme.of(context)
-                                                      .alternate!,
+                                                      .alternate,
                                             )
                                           : null,
                                       activeColor:
@@ -533,11 +530,11 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                             .fontStyle,
                                       ),
                                 ),
-                              ].divide(SizedBox(width: 10.0)),
+                              ].divide(const SizedBox(width: 10.0)),
                             ),
                           ),
                         ),
-                      ].divide(SizedBox(height: 15.0)),
+                      ].divide(const SizedBox(height: 15.0)),
                     ),
                   ),
                 ),
@@ -545,7 +542,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
               Expanded(
                 child: Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
@@ -553,7 +550,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                       children: [
                         Builder(
                           builder: (context) => Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 30.0, 0.0, 30.0, 0.0),
                             child: InkWell(
                               splashColor: Colors.transparent,
@@ -569,7 +566,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
                                       child: GestureDetector(
                                         onTap: () {
@@ -578,7 +575,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                           FocusManager.instance.primaryFocus
                                               ?.unfocus();
                                         },
-                                        child: Container(
+                                        child: SizedBox(
                                           height: MediaQuery.sizeOf(context)
                                                   .height *
                                               0.9,
@@ -602,7 +599,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                 decoration: BoxDecoration(
                                   color:
                                       FlutterFlowTheme.of(context).primaryText,
-                                  boxShadow: [
+                                  boxShadow: const [
                                     BoxShadow(
                                       blurRadius: 8.0,
                                       color: Color(0x33000000),
@@ -622,7 +619,7 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                     Container(
                                       width: 50.0,
                                       height: 50.0,
-                                      decoration: BoxDecoration(),
+                                      decoration: const BoxDecoration(),
                                       child: Icon(
                                         Icons.save,
                                         color: FlutterFlowTheme.of(context)
@@ -654,13 +651,13 @@ class _AddProductPageWidgetState extends State<AddProductPageWidget> {
                                                     .fontStyle,
                                           ),
                                     ),
-                                  ].divide(SizedBox(width: 10.0)),
+                                  ].divide(const SizedBox(width: 10.0)),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                      ].divide(SizedBox(height: 15.0)),
+                      ].divide(const SizedBox(height: 15.0)),
                     ),
                   ),
                 ),

@@ -1,15 +1,11 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'date_picker_component_model.dart';
 export 'date_picker_component_model.dart';
 
@@ -21,8 +17,8 @@ class DatePickerComponentWidget extends StatefulWidget {
     required this.statusName,
     required this.statusJSON,
     int? idStepParent,
-  })  : this.tittle = tittle ?? 'Seleccionar Fecha',
-        this.idStepParent = idStepParent ?? 0;
+  })  : tittle = tittle ?? 'Seleccionar Fecha',
+        idStepParent = idStepParent ?? 0;
 
   final String tittle;
   final int idStatus;
@@ -59,7 +55,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: Offset(0, 0.3),
+      begin: const Offset(0, 0.3),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
@@ -142,7 +138,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
     );
 
     FFAppState().visitDetails =
-        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+        visitDetailsCopy.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
   }
 
@@ -195,7 +191,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
       child: Container(
         width: MediaQuery.sizeOf(context).width,
         height: MediaQuery.sizeOf(context).height,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -222,7 +218,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                     // Header
                     Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+                          const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
                       child: Row(
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -236,14 +232,14 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                               width: 44,
                               height: 44,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
+                                color: Colors.white.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: Colors.white.withValues(alpha: 0.2),
                                   width: 1,
                                 ),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.chevron_left,
                                 color: Colors.white,
                                 size: 28,
@@ -252,12 +248,12 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                           ),
                           Expanded(
                             child: Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   16.0, 0.0, 16.0, 0.0),
                               child: Text(
                                 widget.tittle,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 20,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -278,7 +274,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                                       FlutterFlowTheme.of(context).error,
                                       FlutterFlowTheme.of(context)
                                           .error
-                                          .withOpacity(0.8),
+                                          .withValues(alpha: 0.8),
                                     ],
                                   ),
                                   borderRadius: BorderRadius.circular(12),
@@ -286,13 +282,13 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                                     BoxShadow(
                                       color: FlutterFlowTheme.of(context)
                                           .error
-                                          .withOpacity(0.4),
+                                          .withValues(alpha: 0.4),
                                       blurRadius: 8,
-                                      offset: Offset(0, 4),
+                                      offset: const Offset(0, 4),
                                     ),
                                   ],
                                 ),
-                                child: Icon(
+                                child: const Icon(
                                   Icons.clear,
                                   color: Colors.white,
                                   size: 22,
@@ -300,7 +296,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                               ),
                             )
                           else
-                            SizedBox(width: 44),
+                            const SizedBox(width: 44),
                         ],
                       ),
                     ),
@@ -308,7 +304,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                     // Visualización de fecha
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsets.all(20.0),
+                        padding: const EdgeInsets.all(20.0),
                         child: _model.isDateSelected && _model.selectedDate != null
                             ? _buildDateDisplay()
                             : _buildEmptyState(),
@@ -318,7 +314,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                     // Botón de selección
                     Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
+                          const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
                       child: InkWell(
                         onTap: () {
                           debugPrint('🔘 Botón "Seleccionar Fecha" presionado');
@@ -346,26 +342,26 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                               BoxShadow(
                                 color: FlutterFlowTheme.of(context)
                                     .primary
-                                    .withOpacity(0.5),
+                                    .withValues(alpha: 0.5),
                                 blurRadius: 20,
-                                offset: Offset(0, 8),
+                                offset: const Offset(0, 8),
                               ),
                             ],
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.calendar_today_rounded,
                                 color: Colors.white,
                                 size: 24,
                               ),
-                              SizedBox(width: 12),
+                              const SizedBox(width: 12),
                               Text(
                                 _model.isDateSelected
                                     ? 'Cambiar Fecha'
                                     : 'Seleccionar Fecha',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -394,20 +390,20 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-            FlutterFlowTheme.of(context).secondary.withOpacity(0.2),
+            FlutterFlowTheme.of(context).primary.withValues(alpha: 0.2),
+            FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
             blurRadius: 30,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -429,20 +425,20 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
               boxShadow: [
                 BoxShadow(
                   color:
-                      FlutterFlowTheme.of(context).primary.withOpacity(0.5),
+                      FlutterFlowTheme.of(context).primary.withValues(alpha: 0.5),
                   blurRadius: 20,
-                  offset: Offset(0, 8),
+                  offset: const Offset(0, 8),
                 ),
               ],
             ),
-            child: Icon(
+            child: const Icon(
               Icons.event_rounded,
               color: Colors.white,
               size: 48,
             ),
           ),
 
-          SizedBox(height: 32),
+          const SizedBox(height: 32),
 
           // Día de la semana
           Text(
@@ -450,17 +446,17 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               letterSpacing: 2,
             ),
           ),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
           // Día del mes
           Text(
             date.day.toString(),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 80,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -468,7 +464,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
             ),
           ),
 
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
           // Mes y año
           Text(
@@ -476,21 +472,21 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w600,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
               letterSpacing: 1,
             ),
           ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Formato corto
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -499,7 +495,7 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 letterSpacing: 1,
               ),
             ),
@@ -512,10 +508,10 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
   Widget _buildEmptyState() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 2,
         ),
       ),
@@ -530,36 +526,36 @@ class _DatePickerComponentWidgetState extends State<DatePickerComponentWidget>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                  FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                  FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+                  FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.3),
                 ],
               ),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.calendar_month_rounded,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
               size: 56,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             'Sin fecha seleccionada',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Toca el botón de abajo para\nseleccionar una fecha',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 height: 1.5,
               ),
             ),
@@ -628,14 +624,14 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       width: MediaQuery.sizeOf(context).width,
       child: Column(
         mainAxisSize: MainAxisSize.max,
         children: [
           // Header con botón atrás
           Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+            padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -648,21 +644,21 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.1),
+                      color: Colors.white.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.chevron_left,
                       color: Colors.white,
                       size: 28,
                     ),
                   ),
                 ),
-                Text(
+                const Text(
                   'Seleccionar Fecha',
                   style: TextStyle(
                     fontSize: 20,
@@ -671,7 +667,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                     letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(width: 44),
+                const SizedBox(width: 44),
               ],
             ),
           ),
@@ -679,16 +675,16 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
           // Calendario
           Expanded(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Container(
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                     colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
                   ),
                   borderRadius: BorderRadius.circular(32),
-                  border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(32),
@@ -697,7 +693,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                     children: [
               // Header con mes/año y controles
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [widget.primaryColor, widget.secondaryColor],
@@ -710,14 +706,14 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                       children: [
                         IconButton(
                           onPressed: () => _changeMonth(-1),
-                          icon: Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                          icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
                         ),
                         Expanded(
                           child: Column(
                             children: [
                               Text(
                                 _getMonthName(_currentMonth.month),
-                                style: TextStyle(fontFamily: 'Roboto',
+                                style: const TextStyle(fontFamily: 'Roboto',
                                   fontSize: 22,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -727,7 +723,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                                 '${_currentMonth.year}',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
-                                  color: Colors.white.withOpacity(0.8),
+                                  color: Colors.white.withValues(alpha: 0.8),
                                 ),
                               ),
                             ],
@@ -735,22 +731,22 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                         ),
                         IconButton(
                           onPressed: () => _changeMonth(1),
-                          icon: Icon(Icons.chevron_right, color: Colors.white, size: 28),
+                          icon: const Icon(Icons.chevron_right, color: Colors.white, size: 28),
                         ),
                       ],
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     // Botón HOY
                     InkWell(
                       onTap: _selectToday,
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                         ),
-                        child: Text(
+                        child: const Text(
                           'HOY',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 12,
@@ -767,8 +763,8 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
 
               // Días de la semana
               Container(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                color: Colors.white.withOpacity(0.05),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                color: Colors.white.withValues(alpha: 0.05),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: ['L', 'M', 'M', 'J', 'V', 'S', 'D']
@@ -780,7 +776,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                               style: TextStyle(fontFamily: 'Roboto',
                                 fontSize: 14,
                                 fontWeight: FontWeight.w600,
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha: 0.6),
                               ),
                             ),
                           ))
@@ -791,22 +787,22 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
               // Calendario
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: _buildCalendarGrid(),
                 ),
               ),
 
               // Botones de acción
               Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: widget.onCancel,
                         style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.white.withOpacity(0.1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -816,12 +812,12 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: _selectedDate != null
@@ -831,14 +827,14 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                               }
                             : null,
                         style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: widget.primaryColor,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 8,
                         ),
-                        child: Text(
+                        child: const Text(
                           'Confirmar',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
@@ -874,7 +870,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
 
     // Días vacíos al inicio
     for (int i = 1; i < firstWeekday; i++) {
-      dayWidgets.add(SizedBox(width: 40, height: 40));
+      dayWidgets.add(const SizedBox(width: 40, height: 40));
     }
 
     // Días del mes
@@ -899,7 +895,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
           child: Container(
             width: 40,
             height: 40,
-            margin: EdgeInsets.all(2),
+            margin: const EdgeInsets.all(2),
             decoration: BoxDecoration(
               gradient: isSelected
                   ? LinearGradient(
@@ -907,18 +903,18 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                     )
                   : null,
               color: isToday && !isSelected
-                  ? Colors.white.withOpacity(0.1)
+                  ? Colors.white.withValues(alpha: 0.1)
                   : Colors.transparent,
               borderRadius: BorderRadius.circular(12),
               border: isToday && !isSelected
-                  ? Border.all(color: widget.primaryColor.withOpacity(0.5), width: 2)
+                  ? Border.all(color: widget.primaryColor.withValues(alpha: 0.5), width: 2)
                   : null,
               boxShadow: isSelected
                   ? [
                       BoxShadow(
-                        color: widget.primaryColor.withOpacity(0.5),
+                        color: widget.primaryColor.withValues(alpha: 0.5),
                         blurRadius: 12,
-                        offset: Offset(0, 4),
+                        offset: const Offset(0, 4),
                       ),
                     ]
                   : null,
@@ -933,7 +929,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
                       ? Colors.white
                       : isToday
                           ? widget.primaryColor
-                          : Colors.white.withOpacity(0.8),
+                          : Colors.white.withValues(alpha: 0.8),
                 ),
               ),
             ),
@@ -945,7 +941,7 @@ class _InlineCalendarViewState extends State<_InlineCalendarView> {
     return GridView.count(
       crossAxisCount: 7,
       shrinkWrap: true,
-      physics: NeverScrollableScrollPhysics(),
+      physics: const NeverScrollableScrollPhysics(),
       children: dayWidgets,
     );
   }

@@ -1,4 +1,3 @@
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
@@ -57,15 +56,15 @@ extension TagTypeExtension on TagType {
   Color get color {
     switch (this) {
       case TagType.puntoVigilancia:
-        return Color(0xFF3B82F6);
+        return const Color(0xFF3B82F6);
       case TagType.puntoAcopio:
-        return Color(0xFF10B981);
+        return const Color(0xFF10B981);
       case TagType.tijera:
-        return Color(0xFFF59E0B);
+        return const Color(0xFFF59E0B);
       case TagType.caja:
-        return Color(0xFF8B5CF6);
+        return const Color(0xFF8B5CF6);
       case TagType.extractora:
-        return Color(0xFFEC4899);
+        return const Color(0xFFEC4899);
     }
   }
 }
@@ -123,7 +122,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       vsync: this,
     );
     _slideAnimation = Tween<Offset>(
-      begin: Offset(1.0, 0.0),
+      begin: const Offset(1.0, 0.0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
@@ -586,7 +585,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             content: Text(_isUpdateMode
                 ? 'Producto actualizado exitosamente'
                 : 'TAG instalado exitosamente'),
-            backgroundColor: Color(0xFF10B981),
+            backgroundColor: const Color(0xFF10B981),
           ),
         );
       }
@@ -616,7 +615,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       padding: EdgeInsets.only(bottom: keyboardHeight),
       child: Container(
         height: MediaQuery.of(context).size.height * 0.9 - keyboardHeight,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           color: Color(0xFF1F2937),
           borderRadius: BorderRadius.only(
             topLeft: Radius.circular(24),
@@ -644,8 +643,8 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   Widget _buildHeader() {
     return Container(
-      padding: EdgeInsets.all(20),
-      decoration: BoxDecoration(
+      padding: const EdgeInsets.all(20),
+      decoration: const BoxDecoration(
         color: Color(0xFF374151),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -660,19 +659,19 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(8),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Color(0xFF10B981).withOpacity(0.2),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(Icons.add_location_alt,
+                    child: const Icon(Icons.add_location_alt,
                         color: Color(0xFF10B981), size: 24),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Instalar TAG',
                         style: TextStyle(
                           fontFamily: 'Roboto',
@@ -683,13 +682,13 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                       ),
                       if (_isUpdateMode)
                         Container(
-                          margin: EdgeInsets.only(top: 4),
-                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: Color(0xFFF59E0B).withOpacity(0.2),
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text(
+                          child: const Text(
                             'MODO ACTUALIZAR',
                             style: TextStyle(
                               fontFamily: 'Roboto',
@@ -704,12 +703,12 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 ],
               ),
               IconButton(
-                icon: Icon(Icons.close, color: Colors.white),
+                icon: const Icon(Icons.close, color: Colors.white),
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildProgressIndicator(),
         ],
       ),
@@ -731,24 +730,24 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                     Container(
                       height: 4,
                       decoration: BoxDecoration(
-                        color: isActive ? Color(0xFF10B981) : Color(0xFF4B5563),
+                        color: isActive ? const Color(0xFF10B981) : const Color(0xFF4B5563),
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       steps[index],
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 10,
-                        color: isActive ? Color(0xFF10B981) : Colors.white38,
+                        color: isActive ? const Color(0xFF10B981) : Colors.white38,
                         fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
                       ),
                     ),
                   ],
                 ),
               ),
-              if (index < 4) SizedBox(width: 4),
+              if (index < 4) const SizedBox(width: 4),
             ],
           ),
         );
@@ -776,7 +775,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   // ==================== PASO 1: LEER TAG ====================
   Widget _buildStep1ReadTag() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -784,9 +783,9 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             icon: Icons.nfc,
             title: 'Paso 1: Leer TAG',
             subtitle: 'Acerque el TAG NFC para obtener su identificación',
-            color: Color(0xFF3B82F6),
+            color: const Color(0xFF3B82F6),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           if (!_isReading && _tagId.isEmpty)
             _buildReadyToScanCard(),
@@ -797,7 +796,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           if (_tagId.isNotEmpty && !_isReading)
             _buildTagInfoCard(),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -806,12 +805,12 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 child: FFButtonWidget(
                   onPressed: _isReading ? null : _readTag,
                   text: _tagId.isEmpty ? 'Leer TAG' : 'Leer Otro TAG',
-                  icon: Icon(Icons.nfc, size: 20),
+                  icon: const Icon(Icons.nfc, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF3B82F6),
-                    disabledColor: Color(0xFF4B5563),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF3B82F6),
+                    disabledColor: const Color(0xFF4B5563),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -822,16 +821,16 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 ),
               ),
               if (_tagId.isNotEmpty) ...[
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: FFButtonWidget(
                     onPressed: _nextStep,
                     text: 'Continuar',
-                    icon: Icon(Icons.arrow_forward, size: 20),
+                    icon: const Icon(Icons.arrow_forward, size: 20),
                     options: FFButtonOptions(
                       height: 50,
-                      color: Color(0xFF10B981),
-                      textStyle: TextStyle(
+                      color: const Color(0xFF10B981),
+                      textStyle: const TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
@@ -852,24 +851,24 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   Widget _buildReadyToScanCard() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(32),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Color(0xFF3B82F6).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Color(0xFF3B82F6).withOpacity(0.2),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 56),
+            child: const Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 56),
           ),
-          SizedBox(height: 20),
-          Text(
+          const SizedBox(height: 20),
+          const Text(
             'Acerque el TAG NFC',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -879,8 +878,8 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
+          const SizedBox(height: 8),
+          const Text(
             'Presione el botón y acerque el TAG al dispositivo',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -897,14 +896,14 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   Widget _buildScanningCard() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(32),
+      padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Column(
+      child: const Column(
         children: [
-          const RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFF3B82F6))),
+          RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFF3B82F6))),
           SizedBox(height: 20),
           Text(
             'Leyendo TAG...',
@@ -930,12 +929,12 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   Widget _buildTagInfoCard() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: _isUpdateMode ? Color(0xFFF59E0B) : Color(0xFF10B981),
+          color: _isUpdateMode ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
           width: 2,
         ),
       ),
@@ -946,27 +945,27 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             children: [
               Icon(
                 _isUpdateMode ? Icons.update : Icons.check_circle,
-                color: _isUpdateMode ? Color(0xFFF59E0B) : Color(0xFF10B981),
+                color: _isUpdateMode ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
                 size: 24,
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text(
                 _isUpdateMode ? 'Producto Existente' : 'TAG Nuevo',
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: _isUpdateMode ? Color(0xFFF59E0B) : Color(0xFF10B981),
+                  color: _isUpdateMode ? const Color(0xFFF59E0B) : const Color(0xFF10B981),
                 ),
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildInfoRow('TAG ID (RFID)', _tagId),
           if (_tagContent.isNotEmpty && _tagContent != '0')
             _buildInfoRow('Contenido', _tagContent),
           if (_isUpdateMode && _existingProduct != null) ...[
-            Divider(color: Colors.white24, height: 24),
+            const Divider(color: Colors.white24, height: 24),
             _buildInfoRow('Nombre actual', _existingProduct!['Name_product'] ?? 'Sin nombre'),
             _buildInfoRow('Tipo actual', _existingProduct!['Type_product'] ?? 'Sin tipo'),
           ],
@@ -977,7 +976,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -985,7 +984,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             width: 100,
             child: Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 12,
                 color: Colors.white60,
@@ -995,7 +994,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto Mono',
                 fontSize: 12,
                 color: Colors.white,
@@ -1010,7 +1009,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   // ==================== PASO 2: SELECCIONAR TIPO ====================
   Widget _buildStep2SelectType() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1018,14 +1017,14 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             icon: Icons.category,
             title: 'Paso 2: Tipo de TAG',
             subtitle: 'Seleccione el tipo de punto a instalar',
-            color: Color(0xFF8B5CF6),
+            color: const Color(0xFF8B5CF6),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Grid de tipos
           GridView.count(
             shrinkWrap: true,
-            physics: NeverScrollableScrollPhysics(),
+            physics: const NeverScrollableScrollPhysics(),
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
@@ -1033,7 +1032,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             children: TagType.values.map((type) => _buildTypeCard(type)).toList(),
           ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -1042,11 +1041,11 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 child: FFButtonWidget(
                   onPressed: _previousStep,
                   text: 'Atrás',
-                  icon: Icon(Icons.arrow_back, size: 20),
+                  icon: const Icon(Icons.arrow_back, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF374151),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF374151),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1056,7 +1055,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _selectedTagType != null ? () {
@@ -1064,12 +1063,12 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                     _nextStep();
                   } : null,
                   text: 'Continuar',
-                  icon: Icon(Icons.arrow_forward, size: 20),
+                  icon: const Icon(Icons.arrow_forward, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF10B981),
-                    disabledColor: Color(0xFF4B5563),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF10B981),
+                    disabledColor: const Color(0xFF4B5563),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1092,20 +1091,20 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       onTap: () => setState(() => _selectedTagType = type),
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
-        padding: EdgeInsets.all(16),
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? type.color.withOpacity(0.2) : Color(0xFF374151),
+          color: isSelected ? type.color.withValues(alpha: 0.2) : const Color(0xFF374151),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? type.color : Color(0xFF4B5563),
+            color: isSelected ? type.color : const Color(0xFF4B5563),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected ? [
             BoxShadow(
-              color: type.color.withOpacity(0.3),
+              color: type.color.withValues(alpha: 0.3),
               blurRadius: 12,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ] : null,
         ),
@@ -1114,9 +1113,9 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: type.color.withOpacity(isSelected ? 0.3 : 0.15),
+                color: type.color.withValues(alpha: isSelected ? 0.3 : 0.15),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(type.icon, color: type.color, size: 26),
@@ -1136,7 +1135,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             ),
             if (isSelected)
               Padding(
-                padding: EdgeInsets.only(top: 4),
+                padding: const EdgeInsets.only(top: 4),
                 child: Icon(Icons.check_circle, color: type.color, size: 16),
               ),
           ],
@@ -1148,7 +1147,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   // ==================== PASO 3: SELECCIONAR ZONA ====================
   Widget _buildStep3SelectZone() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1156,20 +1155,20 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             icon: Icons.map,
             title: 'Paso 3: Seleccionar Zona',
             subtitle: 'Elija la zona donde se instalará el TAG',
-            color: Color(0xFFF59E0B),
+            color: const Color(0xFFF59E0B),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           if (_zones.isEmpty)
             Container(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Color(0xFF374151),
+                color: const Color(0xFF374151),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
+              child: const Column(
                 children: [
-                  const RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFFF59E0B))),
+                  RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFFF59E0B))),
                   SizedBox(height: 16),
                   Text(
                     'Cargando zonas...',
@@ -1181,13 +1180,13 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           else
             ListView.separated(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: _zones.length,
-              separatorBuilder: (_, __) => SizedBox(height: 12),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) => _buildZoneCard(_zones[index]),
             ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -1196,11 +1195,11 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 child: FFButtonWidget(
                   onPressed: _previousStep,
                   text: 'Atrás',
-                  icon: Icon(Icons.arrow_back, size: 20),
+                  icon: const Icon(Icons.arrow_back, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF374151),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF374151),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1210,7 +1209,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _selectedZone != null ? () {
@@ -1218,12 +1217,12 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                     _nextStep();
                   } : null,
                   text: 'Continuar',
-                  icon: Icon(Icons.arrow_forward, size: 20),
+                  icon: const Icon(Icons.arrow_forward, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF10B981),
-                    disabledColor: Color(0xFF4B5563),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF10B981),
+                    disabledColor: const Color(0xFF4B5563),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1246,43 +1245,43 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       onTap: () => setState(() => _selectedZone = zone),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Color(0xFFF59E0B).withOpacity(0.15) : Color(0xFF374151),
+          color: isSelected ? const Color(0xFFF59E0B).withValues(alpha: 0.15) : const Color(0xFF374151),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Color(0xFFF59E0B) : Color(0xFF4B5563),
+            color: isSelected ? const Color(0xFFF59E0B) : const Color(0xFF4B5563),
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Color(0xFFF59E0B).withOpacity(0.2),
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(Icons.map, color: Color(0xFFF59E0B), size: 24),
+              child: const Icon(Icons.map, color: Color(0xFFF59E0B), size: 24),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     zone['Name_zone'] ?? 'Sin nombre',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'ID: ${zone['Id_zone']}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 12,
                       color: Colors.white60,
@@ -1292,7 +1291,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
               ),
             ),
             if (isSelected)
-              Icon(Icons.check_circle, color: Color(0xFFF59E0B), size: 24),
+              const Icon(Icons.check_circle, color: Color(0xFFF59E0B), size: 24),
           ],
         ),
       ),
@@ -1302,7 +1301,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   // ==================== PASO 4: SELECCIONAR HEADQUARTER ====================
   Widget _buildStep4SelectHeadquarter() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1312,7 +1311,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             subtitle: _searchHQQuery.isEmpty
                 ? 'Top 5 lotes más cercanos a tu ubicación'
                 : '${_activeHeadquarters.length} coincidencias encontradas',
-            color: Color(0xFF10B981),
+            color: const Color(0xFF10B981),
           ),
           const SizedBox(height: 16),
 
@@ -1360,11 +1359,11 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 color: const Color(0xFF374151),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Column(
+              child: const Column(
                 children: [
-                  const RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFF10B981))),
-                  const SizedBox(height: 16),
-                  const Text(
+                  RepaintBoundary(child: CircularProgressIndicator(color: Color(0xFF10B981))),
+                  SizedBox(height: 16),
+                  Text(
                     'Buscando lotes cercanos...',
                     style: TextStyle(color: Colors.white60),
                   ),
@@ -1393,16 +1392,16 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           else
             ListView.separated(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: _activeHeadquarters.length,
-              separatorBuilder: (_, __) => SizedBox(height: 12),
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) => _buildHeadquarterCard(
                 _activeHeadquarters[index],
                 index + 1,
               ),
             ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -1411,11 +1410,11 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 child: FFButtonWidget(
                   onPressed: _previousStep,
                   text: 'Atrás',
-                  icon: Icon(Icons.arrow_back, size: 20),
+                  icon: const Icon(Icons.arrow_back, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF374151),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF374151),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1425,17 +1424,17 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _selectedHeadquarter != null ? _nextStep : null,
                   text: 'Continuar',
-                  icon: Icon(Icons.arrow_forward, size: 20),
+                  icon: const Icon(Icons.arrow_forward, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF10B981),
-                    disabledColor: Color(0xFF4B5563),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF10B981),
+                    disabledColor: const Color(0xFF4B5563),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1470,12 +1469,12 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       onTap: () => setState(() => _selectedHeadquarter = hq),
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: isSelected ? Color(0xFF10B981).withOpacity(0.15) : Color(0xFF374151),
+          color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.15) : const Color(0xFF374151),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? Color(0xFF10B981) : Color(0xFF4B5563),
+            color: isSelected ? const Color(0xFF10B981) : const Color(0xFF4B5563),
             width: isSelected ? 2 : 1,
           ),
         ),
@@ -1486,13 +1485,13 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: rank == 1 ? Color(0xFF10B981) : Color(0xFF4B5563),
+                color: rank == 1 ? const Color(0xFF10B981) : const Color(0xFF4B5563),
                 shape: BoxShape.circle,
               ),
               child: Center(
                 child: Text(
                   '$rank',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -1501,25 +1500,25 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 ),
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     hq['Name_headquarter'] ?? 'Lote ${hq['Id_headquarter']}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.straighten, color: Colors.white38, size: 14),
-                      SizedBox(width: 4),
+                      const Icon(Icons.straighten, color: Colors.white38, size: 14),
+                      const SizedBox(width: 4),
                       Text(
                         distanceStr,
                         style: TextStyle(
@@ -1527,16 +1526,16 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                           fontSize: 12,
                           color: distance.isInfinite || distance.isNaN
                               ? Colors.orange
-                              : (distance < 100 ? Color(0xFF10B981) : Colors.white60),
+                              : (distance < 100 ? const Color(0xFF10B981) : Colors.white60),
                           fontWeight: !distance.isInfinite && !distance.isNaN && distance < 100
                               ? FontWeight.w600
                               : FontWeight.normal,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Text(
                         'ID: ${hq['Id_headquarter']}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 12,
                           color: Colors.white38,
@@ -1548,7 +1547,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
               ),
             ),
             if (isSelected)
-              Icon(Icons.check_circle, color: Color(0xFF10B981), size: 24),
+              const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 24),
           ],
         ),
       ),
@@ -1558,7 +1557,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
   // ==================== PASO 5: DATOS DEL PRODUCTO ====================
   Widget _buildStep5ProductData() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1566,13 +1565,13 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             icon: Icons.edit_note,
             title: 'Paso 5: Datos del Producto',
             subtitle: 'Complete la información del producto',
-            color: Color(0xFF8B5CF6),
+            color: const Color(0xFF8B5CF6),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Resumen de selecciones
           _buildSummaryCard(),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
 
           // Formulario
           _buildTextField(
@@ -1581,7 +1580,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             hint: 'Ej: Punto de vigilancia entrada',
             icon: Icons.label,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           _buildTextField(
             controller: _descriptionController,
@@ -1590,25 +1589,25 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
             icon: Icons.description,
             maxLines: 3,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Campos de solo lectura
           _buildReadOnlyField('RFID (TAG ID)', _tagId, Icons.nfc),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
 
           Row(
             children: [
               Expanded(
                 child: _buildReadOnlyField('Line', '0', Icons.horizontal_rule),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _buildReadOnlyField('Palm', '0', Icons.park),
               ),
             ],
           ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -1617,11 +1616,11 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                 child: FFButtonWidget(
                   onPressed: _previousStep,
                   text: 'Atrás',
-                  icon: Icon(Icons.arrow_back, size: 20),
+                  icon: const Icon(Icons.arrow_back, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF374151),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF374151),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1631,7 +1630,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _isSaving ? null : _saveProduct,
@@ -1641,9 +1640,9 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
                   icon: Icon(_isSaving ? Icons.hourglass_empty : Icons.save, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF10B981),
-                    disabledColor: Color(0xFF4B5563),
-                    textStyle: TextStyle(
+                    color: const Color(0xFF10B981),
+                    disabledColor: const Color(0xFF4B5563),
+                    textStyle: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
@@ -1662,16 +1661,16 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   Widget _buildSummaryCard() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF4B5563)),
+        border: Border.all(color: const Color(0xFF4B5563)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Resumen de instalación',
             style: TextStyle(
               fontFamily: 'Roboto',
@@ -1680,7 +1679,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
               color: Colors.white70,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _buildSummaryRow(Icons.category, 'Tipo', _selectedTagType?.displayName ?? '-'),
           _buildSummaryRow(Icons.map, 'Zona', _selectedZone?['Name_zone'] ?? '-'),
           _buildSummaryRow(Icons.location_on, 'Lote', _selectedHeadquarter?['Name_headquarter'] ?? '-'),
@@ -1691,16 +1690,16 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
 
   Widget _buildSummaryRow(IconData icon, String label, String value) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
           Icon(icon, color: Colors.white38, size: 18),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           SizedBox(
             width: 60,
             child: Text(
               label,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 12,
                 color: Colors.white60,
@@ -1710,7 +1709,7 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
           Expanded(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 13,
                 color: Colors.white,
@@ -1735,41 +1734,41 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Colors.white70,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         TextField(
           controller: controller,
           maxLines: maxLines,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 15,
             color: Colors.white,
           ),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: Colors.white38),
+            hintStyle: const TextStyle(color: Colors.white38),
             prefixIcon: Icon(icon, color: Colors.white38, size: 20),
             filled: true,
-            fillColor: Color(0xFF374151),
+            fillColor: const Color(0xFF374151),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Color(0xFF4B5563)),
+              borderSide: const BorderSide(color: Color(0xFF4B5563)),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Color(0xFF4B5563)),
+              borderSide: const BorderSide(color: Color(0xFF4B5563)),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: Color(0xFF3B82F6), width: 2),
+              borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 2),
             ),
-            contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           ),
         ),
       ],
@@ -1782,36 +1781,36 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 13,
             fontWeight: FontWeight.w500,
             color: Colors.white70,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Container(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Color(0xFF1F2937),
+            color: const Color(0xFF1F2937),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Color(0xFF4B5563)),
+            border: Border.all(color: const Color(0xFF4B5563)),
           ),
           child: Row(
             children: [
               Icon(icon, color: Colors.white38, size: 20),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   value,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto Mono',
                     fontSize: 13,
                     color: Colors.white60,
                   ),
                 ),
               ),
-              Icon(Icons.lock, color: Colors.white24, size: 16),
+              const Icon(Icons.lock, color: Colors.white24, size: 16),
             ],
           ),
         ),
@@ -1829,31 +1828,31 @@ class _TagInstallStepperWidgetState extends State<TagInstallStepperWidget>
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 28),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: TextStyle(
+                style: const TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 12,
                   color: Colors.white60,

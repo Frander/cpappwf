@@ -1,4 +1,3 @@
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'nfc_write_dialog_widget.dart' show NfcWriteDialogWidget;
 import 'package:flutter/material.dart';

@@ -1,4 +1,3 @@
-import '/flutter_flow/flutter_flow_theme.dart';
 import 'package:flutter/material.dart';
 
 class AnimatedSplashScreenWidget extends StatefulWidget {
@@ -110,7 +109,7 @@ class _AnimatedSplashScreenWidgetState
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
@@ -176,16 +175,16 @@ class _AnimatedSplashScreenWidgetState
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  Color(0xFF00a86b).withOpacity(0.3),
+                                  const Color(0xFF00a86b).withValues(alpha: 0.3),
                                   Colors.transparent,
                                 ],
                               ),
                             ),
                             child: Center(
                               child: CustomPaint(
-                                size: Size(80, 80),
+                                size: const Size(80, 80),
                                 painter: PalmTreeIconPainter(
-                                  color: Color(0xFF00a86b),
+                                  color: const Color(0xFF00a86b),
                                   glowIntensity: _fadeAnimation.value,
                                 ),
                               ),
@@ -197,7 +196,7 @@ class _AnimatedSplashScreenWidgetState
                           // Texto "CLICKPALM" con efecto brillante
                           ShaderMask(
                             shaderCallback: (bounds) {
-                              return LinearGradient(
+                              return const LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
                                 colors: [
@@ -216,11 +215,11 @@ class _AnimatedSplashScreenWidgetState
                                 color: Colors.white,
                                 shadows: [
                                   Shadow(
-                                    color: Color(0xFF00a86b).withOpacity(0.8),
+                                    color: const Color(0xFF00a86b).withValues(alpha: 0.8),
                                     blurRadius: 20,
                                   ),
                                   Shadow(
-                                    color: Color(0xFF00a86b).withOpacity(0.5),
+                                    color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                                     blurRadius: 40,
                                   ),
                                 ],
@@ -239,7 +238,7 @@ class _AnimatedSplashScreenWidgetState
                                 fontSize: 14,
                                 fontWeight: FontWeight.w400,
                                 letterSpacing: 2,
-                                color: Color(0xFF00a86b).withOpacity(0.8),
+                                color: const Color(0xFF00a86b).withValues(alpha: 0.8),
                               ),
                             ),
                           ),
@@ -257,7 +256,7 @@ class _AnimatedSplashScreenWidgetState
                                   width: double.infinity,
                                   height: 3,
                                   decoration: BoxDecoration(
-                                    color: Color(0xFF00a86b).withOpacity(0.2),
+                                    color: const Color(0xFF00a86b).withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(2),
                                   ),
                                 ),
@@ -270,7 +269,7 @@ class _AnimatedSplashScreenWidgetState
                                       child: Container(
                                         height: 3,
                                         decoration: BoxDecoration(
-                                          gradient: LinearGradient(
+                                          gradient: const LinearGradient(
                                             colors: [
                                               Color(0xFF00a86b),
                                               Color(0xFF00ff9f),
@@ -279,8 +278,8 @@ class _AnimatedSplashScreenWidgetState
                                           borderRadius: BorderRadius.circular(2),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: Color(0xFF00a86b)
-                                                  .withOpacity(0.5),
+                                              color: const Color(0xFF00a86b)
+                                                  .withValues(alpha: 0.5),
                                               blurRadius: 10,
                                               spreadRadius: 2,
                                             ),
@@ -325,9 +324,9 @@ class PalmTreeIconPainter extends CustomPainter {
       ..strokeWidth = 2;
 
     final glowPaint = Paint()
-      ..color = color.withOpacity(0.3 * glowIntensity)
+      ..color = color.withValues(alpha: 0.3 * glowIntensity)
       ..style = PaintingStyle.fill
-      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 8);
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
 
     final centerX = size.width / 2;
     final centerY = size.height / 2;
@@ -469,7 +468,7 @@ class PalmTreeIconPainter extends CustomPainter {
   }
 
   void _drawRacimo(Canvas canvas, Paint paint, double x, double y, int count) {
-    final radius = 1.5;
+    const radius = 1.5;
     final positions = [
       Offset(x, y),
       Offset(x - 2.5, y + 2),

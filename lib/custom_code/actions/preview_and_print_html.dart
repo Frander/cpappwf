@@ -1,17 +1,12 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -48,11 +43,11 @@ class HTMLPreviewScreen extends StatefulWidget {
   final String pdfFilename;
 
   const HTMLPreviewScreen({
-    Key? key,
+    super.key,
     required this.htmlContent,
     required this.title,
     this.pdfFilename = 'ticket',
-  }) : super(key: key);
+  });
 
   @override
   State<HTMLPreviewScreen> createState() => _HTMLPreviewScreenState();
@@ -412,6 +407,7 @@ Future<void> savePdfToFile(
     targetDir = savedDir;
     debugPrint('💾 Usando directorio guardado: $targetDir');
   } else if (Platform.isAndroid) {
+    if (!context.mounted) return;
     targetDir = await _pickDirAndroid(context, prefs);
   } else {
     targetDir = await _pickDirDesktop(prefs);

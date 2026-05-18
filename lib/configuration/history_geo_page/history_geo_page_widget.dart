@@ -1,4 +1,3 @@
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -276,7 +275,7 @@ class _HistoryGeoPageWidgetState extends State<HistoryGeoPageWidget> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: _accentBlue.withValues(alpha: 0.4), width: 1),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
@@ -287,7 +286,7 @@ class _HistoryGeoPageWidgetState extends State<HistoryGeoPageWidget> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: 4),
                   Icon(Icons.arrow_forward_ios_rounded, color: _accentBlue, size: 12),
                 ],
               ),

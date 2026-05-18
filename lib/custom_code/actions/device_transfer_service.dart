@@ -77,7 +77,7 @@ class DeviceTransferService {
               final dbPath = await globalDb.dbPath;
               final file = File(dbPath);
               if (!await file.exists()) {
-                request.response..statusCode = HttpStatus.notFound;
+                request.response.statusCode = HttpStatus.notFound;
                 await request.response.close();
                 return;
               }
@@ -98,14 +98,14 @@ class DeviceTransferService {
               debugPrint('❌ DeviceTransferService: Error enviando BD: $e');
               _eventController.add(TransferServerEvent.error);
               try {
-                request.response..statusCode = HttpStatus.internalServerError;
+                request.response.statusCode = HttpStatus.internalServerError;
                 await request.response.close();
               } catch (_) {}
             }
             return;
           }
 
-          request.response..statusCode = HttpStatus.notFound;
+          request.response.statusCode = HttpStatus.notFound;
           await request.response.close();
         },
         onError: (e) => debugPrint('❌ DeviceTransferService: Error en servidor: $e'),

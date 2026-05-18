@@ -1,5 +1,3 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import '/tag_admin/tag_configuration_stepper_widget.dart';
 import '/tag_admin/tag_install_stepper_widget.dart';
 import '/tag_admin/tag_test_writer_dialog_widget.dart';
@@ -11,7 +9,6 @@ import '/components/nfc_clear_dialog_widget.dart';
 import '/components/nfc_transfer_dialog_widget.dart';
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 
 class TagAdminCenterWidget extends StatefulWidget {
   const TagAdminCenterWidget({super.key});
@@ -47,26 +44,26 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF1E293B),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Color(0xFF3B82F6).withOpacity(0.2),
+                color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 24),
+              child: const Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 24),
             ),
-            SizedBox(width: 12),
-            Expanded(
+            const SizedBox(width: 12),
+            const Expanded(
               child: Text(
                 'Centro de Administración NFC',
                 maxLines: 1,
@@ -82,24 +79,24 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
         ),
       ),
       body: SingleChildScrollView(
-        padding: EdgeInsets.all(20),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header description
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Color(0xFF3B82F6).withOpacity(0.08),
-                    Color(0xFF8B5CF6).withOpacity(0.08),
+                    const Color(0xFF3B82F6).withValues(alpha: 0.08),
+                    const Color(0xFF8B5CF6).withValues(alpha: 0.08),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Color(0xFF3B82F6).withOpacity(0.2)),
+                border: Border.all(color: const Color(0xFF3B82F6).withValues(alpha: 0.2)),
               ),
-              child: Row(
+              child: const Row(
                 children: [
                   Icon(Icons.info_outline, color: Color(0xFF3B82F6), size: 18),
                   SizedBox(width: 10),
@@ -116,14 +113,14 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                 ],
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Main actions - Limpiar TAG e Instalar TAG
             _buildMainActionCards(),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Section title
-            Text(
+            const Text(
               'Operaciones de TAG',
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 16,
@@ -131,12 +128,12 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Grid of actions
             GridView.count(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               crossAxisCount: 2,
               crossAxisSpacing: 16,
               mainAxisSpacing: 16,
@@ -146,49 +143,49 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                   icon: Icons.edit,
                   title: 'Escribir Prueba',
                   subtitle: 'Escribir datos de prueba',
-                  color: Color(0xFF10B981),
+                  color: const Color(0xFF10B981),
                   onTap: () => _showTestWriter(),
                 ),
                 _buildActionCard(
                   icon: Icons.visibility,
                   title: 'Leer TAG',
                   subtitle: 'Ver contenido del TAG',
-                  color: Color(0xFF3B82F6),
+                  color: const Color(0xFF3B82F6),
                   onTap: () => _showTestReader(),
                 ),
                 _buildActionCard(
                   icon: Icons.swap_horiz,
                   title: 'Transferir',
                   subtitle: 'Copiar entre TAGs',
-                  color: Color(0xFF8B5CF6),
+                  color: const Color(0xFF8B5CF6),
                   onTap: () => _showTagTransfer(),
                 ),
                 _buildActionCard(
                   icon: Icons.code,
                   title: 'Ver Raw',
                   subtitle: 'Contenido técnico',
-                  color: Color(0xFFF59E0B),
+                  color: const Color(0xFFF59E0B),
                   onTap: () => _showRawReader(),
                 ),
                 _buildActionCard(
                   icon: Icons.cleaning_services,
                   title: 'Limpiar TAG',
                   subtitle: 'Borrar contenido',
-                  color: Color(0xFFEF4444),
+                  color: const Color(0xFFEF4444),
                   onTap: () => _showClearTag(),
                 ),
                 _buildActionCard(
                   icon: Icons.history,
                   title: 'Historial',
                   subtitle: 'TAGs registrados',
-                  color: Color(0xFF8B5CF6),
+                  color: const Color(0xFF8B5CF6),
                   onTap: () => _showTagHistory(),
                 ),
                 _buildActionCard(
                   icon: Icons.calculate_outlined,
                   title: 'Test Capacidad',
                   subtitle: 'Calcular registros',
-                  color: Color(0xFF06B6D4),
+                  color: const Color(0xFF06B6D4),
                   onTap: () => _showCapacityTest(),
                 ),
               ],
@@ -208,9 +205,9 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             onTap: () => _showConfigurationStepper(),
             borderRadius: BorderRadius.circular(16),
             child: Container(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [Color(0xFFEF4444), Color(0xFFF97316)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -218,24 +215,24 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: Color(0xFFEF4444).withOpacity(0.3),
+                    color: const Color(0xFFEF4444).withValues(alpha: 0.3),
                     blurRadius: 12,
-                    offset: Offset(0, 6),
+                    offset: const Offset(0, 6),
                   ),
                 ],
               ),
               child: Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(Icons.cleaning_services, color: Colors.white, size: 28),
+                    child: const Icon(Icons.cleaning_services, color: Colors.white, size: 28),
                   ),
-                  SizedBox(height: 12),
-                  Text(
+                  const SizedBox(height: 12),
+                  const Text(
                     'Limpiar TAG',
                     style: TextStyle(
                       fontFamily: 'Roboto',
@@ -244,13 +241,13 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Verificar y borrar',
                     style: TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 11,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
@@ -258,7 +255,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             ),
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         // Botón Instalar TAG
         Expanded(
           child: ScaleTransition(
@@ -267,9 +264,9 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
               onTap: () => _showInstallStepper(),
               borderRadius: BorderRadius.circular(16),
               child: Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
+                  gradient: const LinearGradient(
                     colors: [Color(0xFF10B981), Color(0xFF3B82F6)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
@@ -277,24 +274,24 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0xFF10B981).withOpacity(0.3),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
                       blurRadius: 12,
-                      offset: Offset(0, 6),
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
                 child: Column(
                   children: [
                     Container(
-                      padding: EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.add_location_alt, color: Colors.white, size: 28),
+                      child: const Icon(Icons.add_location_alt, color: Colors.white, size: 28),
                     ),
-                    SizedBox(height: 12),
-                    Text(
+                    const SizedBox(height: 12),
+                    const Text(
                       'Instalar TAG',
                       style: TextStyle(
                         fontFamily: 'Roboto',
@@ -303,13 +300,13 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       'Registrar producto',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 11,
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                       ),
                     ),
                   ],
@@ -333,20 +330,20 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Color(0xFF1E293B),
+          color: const Color(0xFF1E293B),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: EdgeInsets.all(12),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.2),
+                color: color.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: color, size: 28),
@@ -355,7 +352,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
             Text(
               title,
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -363,11 +360,11 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             Text(
               subtitle,
               textAlign: TextAlign.center,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(fontFamily: 'Roboto',
                 fontSize: 11,
                 color: Colors.white60,
               ),
@@ -385,7 +382,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TagConfigurationStepperWidget(),
+      builder: (context) => const TagConfigurationStepperWidget(),
     );
   }
 
@@ -395,7 +392,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TagInstallStepperWidget(),
+      builder: (context) => const TagInstallStepperWidget(),
     );
   }
 
@@ -404,7 +401,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TagTestWriterDialogWidget(),
+      builder: (context) => const TagTestWriterDialogWidget(),
     );
   }
 
@@ -413,14 +410,14 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TagTestReaderDialogWidget(),
+      builder: (context) => const TagTestReaderDialogWidget(),
     );
   }
 
   void _showTagTransfer() {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
+      builder: (context) => const Dialog(
         backgroundColor: Colors.transparent,
         child: NfcTransferDialogWidget(),
       ),
@@ -432,7 +429,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TagRawReaderDialogWidget(),
+      builder: (context) => const TagRawReaderDialogWidget(),
     );
   }
 
@@ -441,7 +438,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => NfcClearDialogWidget(),
+      builder: (context) => const NfcClearDialogWidget(),
     );
   }
 
@@ -459,7 +456,7 @@ class _TagAdminCenterWidgetState extends State<TagAdminCenterWidget>
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => TagCapacityTestWidget(),
+      builder: (context) => const TagCapacityTestWidget(),
     );
   }
 }

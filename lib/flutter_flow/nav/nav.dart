@@ -1,21 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:page_transition/page_transition.dart';
 import 'package:provider/provider.dart';
 
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
 
-import '/backend/sqlite/sqlite_manager.dart';
 
-import '/main.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/lat_lng.dart';
-import '/flutter_flow/place.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'serialization_util.dart';
 
 import '/index.dart';
 
@@ -46,31 +37,15 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
       refreshListenable: appStateNotifier,
       navigatorKey: appNavigatorKey,
       errorBuilder: (context, state) => appStateNotifier.showSplashImage
-          ? Builder(
-              builder: (context) => Container(
-                color: Colors.transparent,
-                child: Image.asset(
-                  'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-                  fit: BoxFit.cover,
-                ),
-              ),
-            )
-          : StartPageWidget(),
+          ? Container(color: const Color(0xFF00150A))
+          : const StartPageWidget(),
       routes: [
         FFRoute(
           name: '_initialize',
           path: '/',
           builder: (context, _) => appStateNotifier.showSplashImage
-              ? Builder(
-                  builder: (context) => Container(
-                    color: Colors.transparent,
-                    child: Image.asset(
-                      'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                )
-              : StartPageWidget(),
+              ? Container(color: const Color(0xFF00150A))
+              : const StartPageWidget(),
         ),
         FFRoute(
           name: DoVisitsFormPageWidget.routeName,
@@ -116,12 +91,12 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: HeadquartersPageWidget.routeName,
           path: HeadquartersPageWidget.routePath,
-          builder: (context, params) => HeadquartersPageWidget(),
+          builder: (context, params) => const HeadquartersPageWidget(),
         ),
         FFRoute(
           name: InfoPageWidget.routeName,
           path: InfoPageWidget.routePath,
-          builder: (context, params) => InfoPageWidget(),
+          builder: (context, params) => const InfoPageWidget(),
         ),
         FFRoute(
           name: DetailsCoordenatesVisitsPageWidget.routeName,
@@ -160,7 +135,7 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: ActivitiesPageWidget.routeName,
           path: ActivitiesPageWidget.routePath,
-          builder: (context, params) => ActivitiesPageWidget(),
+          builder: (context, params) => const ActivitiesPageWidget(),
         ),
         FFRoute(
           name: DoActivitiesPageWidget.routeName,
@@ -175,32 +150,32 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: AddProductPageWidget.routeName,
           path: AddProductPageWidget.routePath,
-          builder: (context, params) => AddProductPageWidget(),
+          builder: (context, params) => const AddProductPageWidget(),
         ),
         FFRoute(
           name: ZonesPageWidget.routeName,
           path: ZonesPageWidget.routePath,
-          builder: (context, params) => ZonesPageWidget(),
+          builder: (context, params) => const ZonesPageWidget(),
         ),
         FFRoute(
           name: DetailsInfoPageWidget.routeName,
           path: DetailsInfoPageWidget.routePath,
-          builder: (context, params) => DetailsInfoPageWidget(),
+          builder: (context, params) => const DetailsInfoPageWidget(),
         ),
         FFRoute(
           name: ModulesPageWidget.routeName,
           path: ModulesPageWidget.routePath,
-          builder: (context, params) => ModulesPageWidget(),
+          builder: (context, params) => const ModulesPageWidget(),
         ),
         FFRoute(
           name: HomePageWidget.routeName,
           path: HomePageWidget.routePath,
-          builder: (context, params) => HomePageWidget(),
+          builder: (context, params) => const HomePageWidget(),
         ),
         FFRoute(
           name: NewsPageWidget.routeName,
           path: NewsPageWidget.routePath,
-          builder: (context, params) => NewsPageWidget(),
+          builder: (context, params) => const NewsPageWidget(),
         ),
         FFRoute(
           name: DetailsVisitPageWidget.routeName,
@@ -243,27 +218,27 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: HeadquartersInstallPageWidget.routeName,
           path: HeadquartersInstallPageWidget.routePath,
-          builder: (context, params) => HeadquartersInstallPageWidget(),
+          builder: (context, params) => const HeadquartersInstallPageWidget(),
         ),
         FFRoute(
           name: HistoryGeoPageWidget.routeName,
           path: HistoryGeoPageWidget.routePath,
-          builder: (context, params) => HistoryGeoPageWidget(),
+          builder: (context, params) => const HistoryGeoPageWidget(),
         ),
         FFRoute(
           name: HistoryGeoSqlitePageWidget.routeName,
           path: HistoryGeoSqlitePageWidget.routePath,
-          builder: (context, params) => HistoryGeoSqlitePageWidget(),
+          builder: (context, params) => const HistoryGeoSqlitePageWidget(),
         ),
         FFRoute(
           name: SettingsPageWidget.routeName,
           path: SettingsPageWidget.routePath,
-          builder: (context, params) => SettingsPageWidget(),
+          builder: (context, params) => const SettingsPageWidget(),
         ),
         FFRoute(
           name: MapVisitsPageWidget.routeName,
           path: MapVisitsPageWidget.routePath,
-          builder: (context, params) => MapVisitsPageWidget(),
+          builder: (context, params) => const MapVisitsPageWidget(),
         ),
         FFRoute(
           name: DownloadRoutePageWidget.routeName,
@@ -282,17 +257,17 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: HistoryVisitsPageWidget.routeName,
           path: HistoryVisitsPageWidget.routePath,
-          builder: (context, params) => HistoryVisitsPageWidget(),
+          builder: (context, params) => const HistoryVisitsPageWidget(),
         ),
         FFRoute(
           name: ConfigMapsPageWidget.routeName,
           path: ConfigMapsPageWidget.routePath,
-          builder: (context, params) => ConfigMapsPageWidget(),
+          builder: (context, params) => const ConfigMapsPageWidget(),
         ),
         FFRoute(
           name: SyncPageWidget.routeName,
           path: SyncPageWidget.routePath,
-          builder: (context, params) => SyncPageWidget(),
+          builder: (context, params) => const SyncPageWidget(),
         ),
         FFRoute(
           name: ModernSyncPageWidget.routeName,
@@ -325,27 +300,27 @@ GoRouter createRouter(AppStateNotifier appStateNotifier) => GoRouter(
         FFRoute(
           name: ConfigBackupsPageWidget.routeName,
           path: ConfigBackupsPageWidget.routePath,
-          builder: (context, params) => ConfigBackupsPageWidget(),
+          builder: (context, params) => const ConfigBackupsPageWidget(),
         ),
         FFRoute(
           name: LoadCoordinatesPageWidget.routeName,
           path: LoadCoordinatesPageWidget.routePath,
-          builder: (context, params) => LoadCoordinatesPageWidget(),
+          builder: (context, params) => const LoadCoordinatesPageWidget(),
         ),
         FFRoute(
           name: InformationPageWidget.routeName,
           path: InformationPageWidget.routePath,
-          builder: (context, params) => InformationPageWidget(),
+          builder: (context, params) => const InformationPageWidget(),
         ),
         FFRoute(
           name: UpdatedAPPageWidget.routeName,
           path: UpdatedAPPageWidget.routePath,
-          builder: (context, params) => UpdatedAPPageWidget(),
+          builder: (context, params) => const UpdatedAPPageWidget(),
         ),
         FFRoute(
           name: ConfigVoicePageWidget.routeName,
           path: ConfigVoicePageWidget.routePath,
-          builder: (context, params) => ConfigVoicePageWidget(),
+          builder: (context, params) => const ConfigVoicePageWidget(),
         )
       ].map((r) => r.toRoute(appStateNotifier)).toList(),
     );

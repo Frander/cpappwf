@@ -1,11 +1,7 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -51,6 +47,7 @@ Future<String?> readQR(BuildContext context) async {
 
     // Solo cerramos el popup actual si obtuvimos un valor válido
     if (qrValue != null && qrValue.isNotEmpty) {
+      if (!context.mounted) return qrValue;
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -60,6 +57,7 @@ Future<String?> readQR(BuildContext context) async {
     return null;
   } catch (e) {
     debugPrint('Error al escanear QR: $e');
+    if (!context.mounted) return null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Error al escanear QR: ${e.toString()}')),
     );

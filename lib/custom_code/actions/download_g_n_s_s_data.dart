@@ -1,11 +1,8 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -41,7 +38,7 @@ Future<String> downloadGNSSData() async {
         // Verificar si el archivo existe antes de descargar
         final response = await dio.head(url);
         if (response.statusCode != 200) {
-          print("Archivo no encontrado: $url");
+          debugPrint("Archivo no encontrado: $url");
           continue;
         }
 
@@ -56,12 +53,12 @@ Future<String> downloadGNSSData() async {
 
         if (downloadResponse.statusCode == 200) {
           await File(filePath).writeAsBytes(downloadResponse.data);
-          print("Datos GNSS descargados en: $filePath");
+          debugPrint("Datos GNSS descargados en: $filePath");
           fileFound = true;
           return await decompressGNSSFile(filePath);
         }
       } catch (e) {
-        print("Intento fallido con DOY ${doy - i}: $e");
+        debugPrint("Intento fallido con DOY ${doy - i}: $e");
       }
     }
 
@@ -71,7 +68,7 @@ Future<String> downloadGNSSData() async {
     }
     return "";
   } catch (e) {
-    print("Error crítico al descargar datos GNSS: $e");
+    debugPrint("Error crítico al descargar datos GNSS: $e");
     return "";
   }
 }
@@ -90,7 +87,7 @@ Future<String> decompressGNSSFile(String gzFilePath) async {
 
     // Verificar la firma GZip (0x1f y 0x8b)
     if (bytes.length < 2 || bytes[0] != 0x1F || bytes[1] != 0x8B) {
-      print(
+      debugPrint(
           "El archivo descargado no tiene firma GZip válida: ${bytes.take(10).toList()}");
       return "ERROR: Archivo no válido, no tiene firma GZip";
     }
@@ -101,10 +98,10 @@ Future<String> decompressGNSSFile(String gzFilePath) async {
     String decompressedPath = gzFilePath.replaceAll(".gz", "");
     File decompressedFile = File(decompressedPath);
     await decompressedFile.writeAsBytes(decompressedBytes);
-    print("Archivo GNSS descomprimido en: $decompressedPath");
+    debugPrint("Archivo GNSS descomprimido en: $decompressedPath");
     return decompressedPath;
   } catch (e) {
-    print("Error al descomprimir archivo GNSS: $e");
+    debugPrint("Error al descomprimir archivo GNSS: $e");
     return "";
   }
 }

@@ -1,7 +1,5 @@
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
@@ -52,7 +50,7 @@ class _SyncPageWidgetState extends State<SyncPageWidget> {
         body: SafeArea(
           top: true,
           child: Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Color(0xFF101827),
             ),
             child: Column(
@@ -60,7 +58,7 @@ class _SyncPageWidgetState extends State<SyncPageWidget> {
               children: [
                 Expanded(
                   child: Padding(
-                    padding: EdgeInsets.all(4.0),
+                    padding: const EdgeInsets.all(4.0),
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12.0),
@@ -68,7 +66,7 @@ class _SyncPageWidgetState extends State<SyncPageWidget> {
                           width: 1.0,
                         ),
                       ),
-                      child: Container(
+                      child: SizedBox(
                         width: MediaQuery.sizeOf(context).width * 0.99,
                         height: MediaQuery.sizeOf(context).height * 0.99,
                         child: custom_widgets.SyncVisitsForm(

@@ -1,7 +1,5 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 
@@ -61,7 +59,7 @@ class _DetailsMultilpleVisitsPageWidgetState
           body: SafeArea(
             top: true,
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Color(0xFF101827),
               ),
               child: Column(
@@ -70,7 +68,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                   Expanded(
                     child: Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(10.0, 0.0, 10.0, 10.0),
+                          const EdgeInsetsDirectional.fromSTEB(10.0, 0.0, 10.0, 10.0),
                       child: Container(
                         width: double.infinity,
                         height: double.infinity,
@@ -78,16 +76,16 @@ class _DetailsMultilpleVisitsPageWidgetState
                           borderRadius: BorderRadius.circular(22.0),
                         ),
                         child: Padding(
-                          padding: EdgeInsets.all(8.0),
+                          padding: const EdgeInsets.all(8.0),
                           child: Column(
                             mainAxisSize: MainAxisSize.max,
                             children: [
                               Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     0.0, 20.0, 0.0, 0.0),
                                 child: Text(
                                   getJsonField(
-                                    widget!.jsonSummary,
+                                    widget.jsonSummary,
                                     r'''$.Form''',
                                   ).toString(),
                                   style: FlutterFlowTheme.of(context)
@@ -113,7 +111,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                               ),
                               Text(
                                 getJsonField(
-                                  widget!.jsonSummary,
+                                  widget.jsonSummary,
                                   r'''$.DateHour''',
                                 ).toString(),
                                 style: FlutterFlowTheme.of(context)
@@ -137,11 +135,11 @@ class _DetailsMultilpleVisitsPageWidgetState
                               Expanded(
                                 child: Container(
                                   height: double.infinity,
-                                  decoration: BoxDecoration(),
+                                  decoration: const BoxDecoration(),
                                   child: Builder(
                                     builder: (context) {
                                       final summaryItem = getJsonField(
-                                        widget!.jsonSummary,
+                                        widget.jsonSummary,
                                         r'''$.WorkersPairsSummary''',
                                       ).toList();
 
@@ -151,7 +149,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                         scrollDirection: Axis.vertical,
                                         itemCount: summaryItem.length,
                                         separatorBuilder: (_, __) =>
-                                            SizedBox(height: 10.0),
+                                            const SizedBox(height: 10.0),
                                         itemBuilder:
                                             (context, summaryItemIndex) {
                                           final summaryItemItem =
@@ -162,7 +160,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                               color:
                                                   FlutterFlowTheme.of(context)
                                                       .secondaryBackground,
-                                              boxShadow: [
+                                              boxShadow: const [
                                                 BoxShadow(
                                                   blurRadius: 4.0,
                                                   color: Color(0x33000000),
@@ -176,7 +174,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                   BorderRadius.circular(12.0),
                                             ),
                                             child: Padding(
-                                              padding: EdgeInsets.all(8.0),
+                                              padding: const EdgeInsets.all(8.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
                                                 crossAxisAlignment:
@@ -282,12 +280,12 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                     child: Container(
                                                       width: double.infinity,
                                                       decoration:
-                                                          BoxDecoration(),
+                                                          const BoxDecoration(),
                                                       child: Text(
-                                                        '${getJsonField(
+                                                        getJsonField(
                                                           summaryItemItem,
                                                           r'''$.Recolector''',
-                                                        ).toString()}',
+                                                        ).toString(),
                                                         style: FlutterFlowTheme
                                                                 .of(context)
                                                             .bodyMedium
@@ -351,12 +349,12 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                     child: Container(
                                                       width: double.infinity,
                                                       decoration:
-                                                          BoxDecoration(),
+                                                          const BoxDecoration(),
                                                       child: Text(
-                                                        '${getJsonField(
+                                                        getJsonField(
                                                           summaryItemItem,
                                                           r'''$.Cortero''',
-                                                        ).toString()}',
+                                                        ).toString(),
                                                         style: FlutterFlowTheme
                                                                 .of(context)
                                                             .bodyMedium
@@ -470,7 +468,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                     ),
                                                   ),
                                                 ].divide(
-                                                    SizedBox(height: 10.0)),
+                                                    const SizedBox(height: 10.0)),
                                               ),
                                             ),
                                           );
@@ -496,7 +494,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .error,
-                                          boxShadow: [
+                                          boxShadow: const [
                                             BoxShadow(
                                               blurRadius: 8.0,
                                               color: Color(0x33000000),
@@ -517,9 +515,9 @@ class _DetailsMultilpleVisitsPageWidgetState
                                             Container(
                                               width: 50.0,
                                               height: 50.0,
-                                              decoration: BoxDecoration(),
+                                              decoration: const BoxDecoration(),
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         10.0, 0.0, 0.0, 0.0),
                                                 child: Icon(
@@ -533,7 +531,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                             ),
                                             Expanded(
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         10.0, 0.0, 10.0, 0.0),
                                                 child: Text(
@@ -568,7 +566,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                 ),
                                               ),
                                             ),
-                                          ].divide(SizedBox(width: 10.0)),
+                                          ].divide(const SizedBox(width: 10.0)),
                                         ),
                                       ),
                                     ),
@@ -587,7 +585,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                               .companyDefault
                                               .nameCompany,
                                           getJsonField(
-                                            widget!.jsonSummary,
+                                            widget.jsonSummary,
                                             r'''$''',
                                           ),
                                         );
@@ -599,7 +597,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .primaryText,
-                                          boxShadow: [
+                                          boxShadow: const [
                                             BoxShadow(
                                               blurRadius: 8.0,
                                               color: Color(0x33000000),
@@ -619,7 +617,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                           children: [
                                             Expanded(
                                               child: Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         10.0, 0.0, 0.0, 0.0),
                                                 child: Text(
@@ -657,7 +655,7 @@ class _DetailsMultilpleVisitsPageWidgetState
                                             Container(
                                               width: 50.0,
                                               height: 50.0,
-                                              decoration: BoxDecoration(),
+                                              decoration: const BoxDecoration(),
                                               child: Icon(
                                                 Icons.print,
                                                 color:
@@ -666,14 +664,14 @@ class _DetailsMultilpleVisitsPageWidgetState
                                                 size: 30.0,
                                               ),
                                             ),
-                                          ].divide(SizedBox(width: 10.0)),
+                                          ].divide(const SizedBox(width: 10.0)),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ].divide(SizedBox(width: 10.0)),
+                                ].divide(const SizedBox(width: 10.0)),
                               ),
-                            ].divide(SizedBox(height: 10.0)),
+                            ].divide(const SizedBox(height: 10.0)),
                           ),
                         ),
                       ),

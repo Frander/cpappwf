@@ -1,15 +1,7 @@
 import 'dart:convert';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:timeago/timeago.dart' as timeago;
-import 'lat_lng.dart';
-import 'place.dart';
-import 'uploaded_file.dart';
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 
 String concatenateStrings(
   String string1,
@@ -73,7 +65,7 @@ List<String> extractFieldFromJson(
     // Extraer los valores del campo especificado
     return jsonList.map<String>((item) => item[fieldName].toString()).toList();
   } catch (e) {
-    print("Error parsing JSON: $e");
+    debugPrint("Error parsing JSON: $e");
     return [];
   }
 }
@@ -186,15 +178,15 @@ dynamic filterByModuleActivity(
 
 String concatHeadquartersNames(List<HeadquartersStruct> headquartersList) {
   // Si la lista es null o está vacía, devolvemos cadena vacía
-  if (headquartersList == null || headquartersList.isEmpty) {
+  if (headquartersList.isEmpty) {
     return '';
   }
   // Extraemos los name_headquarter, filtramos nulls y strings vacíos,
   // y luego unimos con ' - '
   final validNames = headquartersList
       .map((hq) => hq.nameHeadquarter) // String?
-      .where((name) => name != null && name.isNotEmpty) // filtra null y ''
-      .map((name) => name!) // cast a String no-null
+      .where((name) => name.isNotEmpty) // filtra null y ''
+      .map((name) => name) // cast a String no-null
       .toList();
 
   return validNames.join(' - ');
@@ -234,7 +226,7 @@ List<UsersStruct> filterUsersByName(
   // Filtrar la lista por name_user (case insensitive)
   return usersList
       .where((user) =>
-          user.nameUser?.toLowerCase().contains(filterName.toLowerCase()) ??
+          user.nameUser.toLowerCase().contains(filterName.toLowerCase()) ??
           false)
       .toList();
 }
@@ -252,7 +244,7 @@ List<HeadquartersStruct> filterHeadquartersByName(
   return headquartersList
       .where((hq) =>
           hq.nameHeadquarter
-              ?.toLowerCase()
+              .toLowerCase()
               .contains(filterName.toLowerCase()) ??
           false)
       .toList();
@@ -332,7 +324,7 @@ dynamic groupVisitsByActivityAndStatus(
 
     return result;
   } catch (e) {
-    print('Error processing visits: $e');
+    debugPrint('Error processing visits: $e');
     return [];
   }
 }
@@ -403,7 +395,9 @@ List<String> filterAndFormatGeoReads(List<ReadGeoStruct> reads) {
 
   // Log opcional
   debugPrint('--- Lecturas recientes (${formatted.length}) ---');
-  for (final line in formatted) debugPrint(line);
+  for (final line in formatted) {
+    debugPrint(line);
+  }
 
   return formatted;
 }
@@ -500,11 +494,10 @@ List<int> extractActivityStepParents(
 
   // Process each visit detail
   for (var visitDetail in visitsDetails) {
-    if (visitDetail.idActivityStatus != null &&
-        visitDetail.idActivityStatus! > 0) {
+    if (visitDetail.idActivityStatus > 0) {
       // Search through the JSON data (could be List or Map)
       var stepParent =
-          findActivityStepParent(jsonData, visitDetail.idActivityStatus!);
+          findActivityStepParent(jsonData, visitDetail.idActivityStatus);
       if (stepParent != null) {
         result.add(stepParent);
       }
@@ -604,7 +597,7 @@ dynamic searchInActivitiesStatus(
     return matchingItems;
   } catch (e) {
     // En caso de error, retornar estructura vacía
-    print('Error en searchInActivitiesStatus: $e');
+    debugPrint('Error en searchInActivitiesStatus: $e');
     return [];
   }
 }
@@ -615,15 +608,6 @@ dynamic processVisitSummary(
 ) {
   try {
     // Validaciones iniciales
-    if (visit == null) {
-      return {
-        'Form': 'Error',
-        'DateHour': '',
-        'Results': [],
-        'error': 'Visit object is null'
-      };
-    }
-
     if (activityJson == null) {
       return {
         'Form': 'Error',
@@ -640,7 +624,7 @@ dynamic processVisitSummary(
     } else if (activityJson is Map<String, dynamic>) {
       activity = activityJson;
     } else {
-      print('ERROR: Invalid activityJson format: ${activityJson.runtimeType}');
+      debugPrint('ERROR: Invalid activityJson format: ${activityJson.runtimeType}');
       return {
         'Form': 'Error',
         'DateHour': '',
@@ -664,7 +648,7 @@ dynamic processVisitSummary(
       activityData = activityList[0] as Map<String, dynamic>;
     } else {
       // Si no es lista, es directamente el objeto de actividad
-      activityData = activity as Map<String, dynamic>;
+      activityData = activity;
     }
 
     // Crear mapas para acceso rápido
@@ -743,10 +727,8 @@ dynamic processVisitSummary(
     // Procesar los detalles de la visita
     List<Map<String, dynamic>> results = [];
 
-    if (visit.visitsDetails != null && visit.visitsDetails.isNotEmpty) {
+    if (visit.visitsDetails.isNotEmpty) {
       for (var visitDetail in visit.visitsDetails) {
-        if (visitDetail == null) continue;
-
         int activityStatusId = visitDetail.idActivityStatus;
         String response = visitDetail.statusResponse ?? '';
         int stepParentId = visitDetail.idStepParent ?? 0;
@@ -820,13 +802,13 @@ dynamic processVisitSummary(
     }
 
     return finalResult;
-  } catch (e, stackTrace) {
+  } catch (e) {
     return {
       'Form': 'Error',
       'DateHour': '',
       'Results': [],
       'error': 'Error processing visit summary: ${e.toString()}',
-      'visit_id': visit?.idVisit?.toString() ?? 'unknown',
+      'visit_id': visit.idVisit.toString() ?? 'unknown',
     };
   }
 }
@@ -837,7 +819,7 @@ dynamic processMultipleVisitsSummary(
 ) {
   try {
     // Validaciones iniciales
-    if (visits == null || visits.isEmpty) {
+    if (visits.isEmpty) {
       dynamic errorResult = {
         'Form': 'Error',
         'DateHour': '',
@@ -892,7 +874,7 @@ dynamic processMultipleVisitsSummary(
       }
       activityData = activityList[0] as Map<String, dynamic>;
     } else {
-      activityData = activity as Map<String, dynamic>;
+      activityData = activity;
     }
 
     // Crear mapas para acceso rápido
@@ -971,7 +953,7 @@ dynamic processMultipleVisitsSummary(
     // Encontrar fecha más reciente
     DateTime? mostRecentDate;
     for (var visit in visits) {
-      if (visit?.createdAt != null) {
+      if (visit.createdAt != null) {
         if (mostRecentDate == null ||
             visit.createdAt!.isAfter(mostRecentDate)) {
           mostRecentDate = visit.createdAt;
@@ -1025,20 +1007,19 @@ dynamic processMultipleVisitsSummary(
       // PRIMERA PASADA: Recopilar toda la información
       for (int visitIndex = 0; visitIndex < visits.length; visitIndex++) {
         var visit = visits[visitIndex];
-        print('=== PRIMERA PASADA - Visit $visitIndex ===');
+        debugPrint('=== PRIMERA PASADA - Visit $visitIndex ===');
 
-        if (visit?.visitsDetails != null && visit.visitsDetails.isNotEmpty) {
+        if (visit.visitsDetails.isNotEmpty) {
           for (int detailIndex = 0;
               detailIndex < visit.visitsDetails.length;
               detailIndex++) {
             var visitDetail = visit.visitsDetails[detailIndex];
-            if (visitDetail == null) continue;
 
             int activityStatusId = visitDetail.idActivityStatus;
             String response = visitDetail.statusResponse ?? '';
             int stepParentId = visitDetail.idStepParent ?? 0;
 
-            print(
+            debugPrint(
                 '  Detail $detailIndex: StatusID=$activityStatusId, Response="$response", StepParent=$stepParentId');
 
             if (response.isNotEmpty && response != '0' && response != 'false') {
@@ -1047,11 +1028,11 @@ dynamic processMultipleVisitsSummary(
               if (stepParentId == 0) {
                 stepName =
                     statusMap[activityStatusId]?['status_name'] ?? 'Unknown';
-                print(
+                debugPrint(
                     '    Usando activity_status: stepName="$stepName" (idStepParent=0)');
               } else {
                 stepName = stepMap[stepParentId] ?? 'Unknown';
-                print(
+                debugPrint(
                     '    Usando stepMap: stepName="$stepName" (idStepParent=$stepParentId)');
               }
 
@@ -1064,28 +1045,28 @@ dynamic processMultipleVisitsSummary(
                 }
               }
 
-              print(
+              debugPrint(
                   '    Resultado final: stepName="$stepName", statusName="$statusName"');
 
               // Identificar el tipo de información usando el stepName correcto
               switch (stepName) {
                 case 'Recolector':
                   globalRecolector = statusName;
-                  print('    → Recolector GLOBAL asignado: $globalRecolector');
+                  debugPrint('    → Recolector GLOBAL asignado: $globalRecolector');
                   break;
                 case 'Cortero':
                   globalCortero = statusName;
-                  print('    → Cortero GLOBAL asignado: $globalCortero');
+                  debugPrint('    → Cortero GLOBAL asignado: $globalCortero');
                   break;
                 case 'Lista de cajas':
                   todasLasCajas.add(statusName);
-                  print('    → Caja GLOBAL agregada: $statusName');
+                  debugPrint('    → Caja GLOBAL agregada: $statusName');
                   break;
                 default:
                   // Para lotes (Lotes Araki, Lotes Palmeiras, etc.)
                   if (stepName.contains('Lotes')) {
                     // Necesitamos asociar el lote con alguna caja, por ahora lo guardamos para todas
-                    print('    → Lote GLOBAL agregado: $statusName');
+                    debugPrint('    → Lote GLOBAL agregado: $statusName');
                   }
                   break;
               }
@@ -1094,17 +1075,17 @@ dynamic processMultipleVisitsSummary(
         }
       }
 
-      print('=== INFORMACIÓN GLOBAL RECOPILADA ===');
-      print('Recolector global: $globalRecolector');
-      print('Cortero global: $globalCortero');
-      print('Todas las cajas: ${todasLasCajas.toList()}');
+      debugPrint('=== INFORMACIÓN GLOBAL RECOPILADA ===');
+      debugPrint('Recolector global: $globalRecolector');
+      debugPrint('Cortero global: $globalCortero');
+      debugPrint('Todas las cajas: ${todasLasCajas.toList()}');
 
       // SEGUNDA PASADA: Procesar racimos, tusa y lotes por caja
       for (int visitIndex = 0; visitIndex < visits.length; visitIndex++) {
         var visit = visits[visitIndex];
-        print('=== SEGUNDA PASADA - Visit $visitIndex ===');
+        debugPrint('=== SEGUNDA PASADA - Visit $visitIndex ===');
 
-        if (visit?.visitsDetails != null && visit.visitsDetails.isNotEmpty) {
+        if (visit.visitsDetails.isNotEmpty) {
           String? cajaActual;
           int racimosVisita = 0;
           int tusaVisita = 0;
@@ -1112,8 +1093,6 @@ dynamic processMultipleVisitsSummary(
 
           // Primero, identificar la caja de esta visita
           for (var visitDetail in visit.visitsDetails) {
-            if (visitDetail == null) continue;
-
             int activityStatusId = visitDetail.idActivityStatus;
             String response = visitDetail.statusResponse ?? '';
             int stepParentId = visitDetail.idStepParent ?? 0;
@@ -1137,7 +1116,7 @@ dynamic processMultipleVisitsSummary(
 
               if (stepName == 'Lista de cajas') {
                 cajaActual = statusName;
-                print('  → Caja actual identificada: $cajaActual');
+                debugPrint('  → Caja actual identificada: $cajaActual');
                 break;
               }
             }
@@ -1145,8 +1124,6 @@ dynamic processMultipleVisitsSummary(
 
           // Luego, recopilar racimos, tusa y lotes para esta caja
           for (var visitDetail in visit.visitsDetails) {
-            if (visitDetail == null) continue;
-
             int activityStatusId = visitDetail.idActivityStatus;
             String response = visitDetail.statusResponse ?? '';
             int stepParentId = visitDetail.idStepParent ?? 0;
@@ -1163,11 +1140,11 @@ dynamic processMultipleVisitsSummary(
               switch (stepName) {
                 case 'Número de racimos':
                   racimosVisita = int.tryParse(response) ?? 0;
-                  print('  → Racimos para esta visita: $racimosVisita');
+                  debugPrint('  → Racimos para esta visita: $racimosVisita');
                   break;
                 case 'Tusa':
                   tusaVisita = int.tryParse(response) ?? 0;
-                  print('  → Tusa para esta visita: $tusaVisita');
+                  debugPrint('  → Tusa para esta visita: $tusaVisita');
                   break;
                 default:
                   if (stepName.contains('Lotes')) {
@@ -1179,7 +1156,7 @@ dynamic processMultipleVisitsSummary(
                       }
                     }
                     lotesVisita.add(statusName);
-                    print('  → Lote para esta visita: $statusName');
+                    debugPrint('  → Lote para esta visita: $statusName');
                   }
                   break;
               }
@@ -1198,14 +1175,14 @@ dynamic processMultipleVisitsSummary(
             }
             lotesPorCaja[cajaActual]!.addAll(lotesVisita);
 
-            print(
+            debugPrint(
                 '  → Asignado a caja "$cajaActual": Racimos=$racimosVisita, Tusa=$tusaVisita, Lotes=${lotesVisita.toList()}');
           } else if ((racimosVisita > 0 ||
                   tusaVisita > 0 ||
                   lotesVisita.isNotEmpty) &&
               todasLasCajas.isNotEmpty) {
             // Si hay datos pero no hay caja específica, distribuir entre todas las cajas
-            print(
+            debugPrint(
                 '  → No hay caja específica, distribuyendo entre todas las cajas');
             for (String caja in todasLasCajas) {
               totalRacimosPorCaja[caja] = (totalRacimosPorCaja[caja] ?? 0) +
@@ -1222,18 +1199,18 @@ dynamic processMultipleVisitsSummary(
         }
       }
 
-      print('=== TOTALES POR CAJA ===');
-      print('Racimos por caja: $totalRacimosPorCaja');
-      print('Tusa por caja: $totalTusaPorCaja');
-      print('Lotes por caja: $lotesPorCaja');
+      debugPrint('=== TOTALES POR CAJA ===');
+      debugPrint('Racimos por caja: $totalRacimosPorCaja');
+      debugPrint('Tusa por caja: $totalTusaPorCaja');
+      debugPrint('Lotes por caja: $lotesPorCaja');
 
       // CREAR TRIPLETES FINALES
       Map<String, Map<String, dynamic>> tripletSummary = {};
 
       if (globalRecolector != null &&
-          globalRecolector!.isNotEmpty &&
+          globalRecolector.isNotEmpty &&
           globalCortero != null &&
-          globalCortero!.isNotEmpty) {
+          globalCortero.isNotEmpty) {
         if (todasLasCajas.isNotEmpty) {
           for (String caja in todasLasCajas) {
             String tripletKey = '$globalRecolector|$globalCortero|$caja';
@@ -1247,10 +1224,10 @@ dynamic processMultipleVisitsSummary(
               'Lotes': lotesPorCaja[caja] ?? <String>{},
             };
 
-            print('→ Triplete creado: $tripletKey');
-            print('  Racimos: ${totalRacimosPorCaja[caja] ?? 0}');
-            print('  Tusa: ${totalTusaPorCaja[caja] ?? 0}');
-            print('  Lotes: ${(lotesPorCaja[caja] ?? <String>{}).toList()}');
+            debugPrint('→ Triplete creado: $tripletKey');
+            debugPrint('  Racimos: ${totalRacimosPorCaja[caja] ?? 0}');
+            debugPrint('  Tusa: ${totalTusaPorCaja[caja] ?? 0}');
+            debugPrint('  Lotes: ${(lotesPorCaja[caja] ?? <String>{}).toList()}');
           }
         } else {
           // Sin cajas específicas
@@ -1260,7 +1237,9 @@ dynamic processMultipleVisitsSummary(
           int totalTusaGlobal =
               totalTusaPorCaja.values.fold(0, (sum, val) => sum + val);
           Set<String> todosLosLotes = <String>{};
-          lotesPorCaja.values.forEach((lotes) => todosLosLotes.addAll(lotes));
+          for (var lotes in lotesPorCaja.values) {
+            todosLosLotes.addAll(lotes);
+          }
 
           tripletSummary[tripletKey] = {
             'Recolector': globalRecolector,
@@ -1271,27 +1250,27 @@ dynamic processMultipleVisitsSummary(
             'Lotes': todosLosLotes,
           };
 
-          print('→ Triplete creado (sin cajas): $tripletKey');
+          debugPrint('→ Triplete creado (sin cajas): $tripletKey');
         }
       }
 
-      print('TripletSummary final: ${tripletSummary.keys.toList()}');
-      print('=== FIN PROCESAMIENTO ACTIVIDAD 222 - AGRUPADO POR CAJA ===\n');
+      debugPrint('TripletSummary final: ${tripletSummary.keys.toList()}');
+      debugPrint('=== FIN PROCESAMIENTO ACTIVIDAD 222 - AGRUPADO POR CAJA ===\n');
 
       // Convertir a formato final para actividad 222 con agrupación por caja
       List<Map<String, dynamic>> tripletResults = [];
 
-      print('=== CONVIRTIENDO TRIPLET SUMMARY A RESULTADO FINAL ===');
-      print('Número de tripletes procesados: ${tripletSummary.length}');
+      debugPrint('=== CONVIRTIENDO TRIPLET SUMMARY A RESULTADO FINAL ===');
+      debugPrint('Número de tripletes procesados: ${tripletSummary.length}');
 
       tripletSummary.forEach((tripletKey, data) {
-        print('Procesando triplete: $tripletKey');
-        print('  - Recolector: ${data['Recolector']}');
-        print('  - Cortero: ${data['Cortero']}');
-        print('  - Caja: ${data['Caja']}');
-        print('  - TotalRacimos: ${data['TotalRacimos']}');
-        print('  - TotalTusa: ${data['TotalTusa']}');
-        print('  - Lotes: ${(data['Lotes'] as Set<String>).toList()}');
+        debugPrint('Procesando triplete: $tripletKey');
+        debugPrint('  - Recolector: ${data['Recolector']}');
+        debugPrint('  - Cortero: ${data['Cortero']}');
+        debugPrint('  - Caja: ${data['Caja']}');
+        debugPrint('  - TotalRacimos: ${data['TotalRacimos']}');
+        debugPrint('  - TotalTusa: ${data['TotalTusa']}');
+        debugPrint('  - Lotes: ${(data['Lotes'] as Set<String>).toList()}');
 
         tripletResults.add({
           'Recolector': data['Recolector'],
@@ -1303,9 +1282,9 @@ dynamic processMultipleVisitsSummary(
         });
       });
 
-      print('Resultado final antes de ordenar:');
+      debugPrint('Resultado final antes de ordenar:');
       for (int i = 0; i < tripletResults.length; i++) {
-        print('  [$i]: ${tripletResults[i]}');
+        debugPrint('  [$i]: ${tripletResults[i]}');
       }
 
       // Ordenar por total de racimos descendente, luego por recolector, cortero y caja
@@ -1330,8 +1309,8 @@ dynamic processMultipleVisitsSummary(
       };
 
       // PRINT DEBUG - Resultado final para actividad 222 con agrupación por caja
-      print('=== RESULTADO FINAL - ACTIVIDAD 222 CON AGRUPACIÓN POR CAJA ===');
-      print(JsonEncoder.withIndent('  ').convert(result));
+      debugPrint('=== RESULTADO FINAL - ACTIVIDAD 222 CON AGRUPACIÓN POR CAJA ===');
+      debugPrint(const JsonEncoder.withIndent('  ').convert(result));
 
       return result;
     } else {
@@ -1339,10 +1318,8 @@ dynamic processMultipleVisitsSummary(
       Map<String, Map<String, int>> aggregatedData = {};
 
       for (var visit in visits) {
-        if (visit?.visitsDetails != null && visit.visitsDetails.isNotEmpty) {
+        if (visit.visitsDetails.isNotEmpty) {
           for (var visitDetail in visit.visitsDetails) {
-            if (visitDetail == null) continue;
-
             int activityStatusId = visitDetail.idActivityStatus;
             String response = visitDetail.statusResponse ?? '';
 
@@ -1405,8 +1382,8 @@ dynamic processMultipleVisitsSummary(
       };
 
       // PRINT DEBUG - Resultado final para actividades normales
-      print('=== RESULTADO FINAL - ACTIVIDAD NORMAL ===');
-      print(JsonEncoder.withIndent('  ').convert(result));
+      debugPrint('=== RESULTADO FINAL - ACTIVIDAD NORMAL ===');
+      debugPrint(const JsonEncoder.withIndent('  ').convert(result));
 
       return result;
     }
@@ -1419,8 +1396,8 @@ dynamic processMultipleVisitsSummary(
     };
 
     // PRINT DEBUG - Error general
-    print('=== ERROR GENERAL ===');
-    print(JsonEncoder.withIndent('  ').convert(errorResult));
+    debugPrint('=== ERROR GENERAL ===');
+    debugPrint(const JsonEncoder.withIndent('  ').convert(errorResult));
 
     return errorResult;
   }
@@ -1531,7 +1508,7 @@ dynamic insertActivityStep(
   dynamic newStep,
   int targetId,
 ) {
-  print("🔍ENTRANDO A NUEVA FUNCION");
+  debugPrint("🔍ENTRANDO A NUEVA FUNCION");
   try {
     // Convertir a Map si es necesario
     Map<String, dynamic> data;
@@ -1544,9 +1521,9 @@ dynamic insertActivityStep(
       return jsonData;
     }
 
-    print("🔍Convertir a Map si es necesario");
+    debugPrint("🔍Convertir a Map si es necesario");
 
-    print(newStep);
+    debugPrint(newStep);
     // Convertir newStep a Map si es necesario
     Map<String, dynamic> newStepData;
     if (newStep is String) {
@@ -1555,11 +1532,11 @@ dynamic insertActivityStep(
       newStepData = Map<String, dynamic>.from(newStep);
     } else {
       // Si el tipo no es reconocido, devolver el original
-      print("Si el tipo no es reconocido, devolver el original 2");
+      debugPrint("Si el tipo no es reconocido, devolver el original 2");
       return jsonData;
     }
 
-    print("Verificar que existe el campo activity_steps");
+    debugPrint("Verificar que existe el campo activity_steps");
     // Verificar que existe el campo activity_steps
     if (!data.containsKey('activity_steps')) {
       // Si no existe, crear el array con el nuevo elemento
@@ -1570,11 +1547,11 @@ dynamic insertActivityStep(
     // Obtener el array de activity_steps
     List<dynamic> activitySteps = List.from(data['activity_steps'] ?? []);
 
-    print("Obtener el array de activity_steps");
+    debugPrint("Obtener el array de activity_steps");
 
     // NUEVO: Verificar si existe un elemento con el mismo customParent
     // y eliminarlo antes de insertar el nuevo
-    print(newStepData['customParent']);
+    debugPrint(newStepData['customParent']);
     if (newStepData.containsKey('customParent') &&
         newStepData['customParent'] != null) {
       activitySteps.removeWhere((step) {
@@ -1582,7 +1559,7 @@ dynamic insertActivityStep(
           bool shouldRemove =
               step['customParent'] == newStepData['customParent'];
           if (shouldRemove) {
-            print(
+            debugPrint(
                 "⚠️ Eliminando elemento existente con customParent: ${step['customParent']}");
           }
           return shouldRemove;
@@ -1605,7 +1582,7 @@ dynamic insertActivityStep(
       }
     }
 
-    print(targetIndex);
+    debugPrint('$targetIndex');
 
     // Si se encontró el elemento, insertar después de él
     if (targetIndex != -1) {
@@ -1617,16 +1594,16 @@ dynamic insertActivityStep(
       activitySteps.add(newStepData);
     }
 
-    print("Actualizar el array en el objeto principal");
+    debugPrint("Actualizar el array en el objeto principal");
     // Actualizar el array en el objeto principal
     data['activity_steps'] = activitySteps;
 
     // Devolver el Map actualizado
-    print(data);
+    debugPrint(data.toString());
     return data;
   } catch (e) {
     // En caso de error, devolver el JSON original
-    print('Error al insertar activity step: $e');
+    debugPrint('Error al insertar activity step: $e');
     return jsonData;
   }
 }
@@ -1640,9 +1617,9 @@ List<VisitsDetailsStruct> updateStepsVisitList(
   if (visitsList.isEmpty) {
     return visitsList;
   }
-  print("Variables");
-  print(idStepParent);
-  print(visitsList.length);
+  debugPrint("Variables");
+  debugPrint('$idStepParent');
+  debugPrint('${visitsList.length}');
 
   // Parseo robusto de jsonData -> Map<String,dynamic>
   Map<String, dynamic> data;
@@ -1655,7 +1632,7 @@ List<VisitsDetailsStruct> updateStepsVisitList(
         return visitsList;
       }
     } catch (e) {
-      print('Error parsing JSON: $e');
+      debugPrint('Error parsing JSON: $e');
       return visitsList;
     }
   } else if (jsonData is Map) {
@@ -1665,27 +1642,27 @@ List<VisitsDetailsStruct> updateStepsVisitList(
   }
 
   // Helpers de tipo
-  List<dynamic>? _asList(dynamic v) => (v is List) ? v : null;
-  Map<String, dynamic>? _asMap(dynamic v) =>
+  List<dynamic>? asList(dynamic v) => (v is List) ? v : null;
+  Map<String, dynamic>? asMap(dynamic v) =>
       (v is Map) ? Map<String, dynamic>.from(v) : null;
 
   // Buscar un status por ID recorriendo TODAS las ramas (statuses y steps)
-  Map<String, dynamic>? _findActivityStatusById(int targetId) {
+  Map<String, dynamic>? findActivityStatusById(int targetId) {
     final statusStack = <Map<String, dynamic>>[];
     final stepStack = <Map<String, dynamic>>[];
 
     // Cargar top-level
-    final topStatuses = _asList(data['activity_status']);
+    final topStatuses = asList(data['activity_status']);
     if (topStatuses != null) {
       for (final s in topStatuses) {
-        final m = _asMap(s);
+        final m = asMap(s);
         if (m != null) statusStack.add(m);
       }
     }
-    final rootSteps = _asList(data['activity_steps']);
+    final rootSteps = asList(data['activity_steps']);
     if (rootSteps != null) {
       for (final st in rootSteps) {
-        final m = _asMap(st);
+        final m = asMap(st);
         if (m != null) stepStack.add(m);
       }
     }
@@ -1700,17 +1677,17 @@ List<VisitsDetailsStruct> updateStepsVisitList(
         }
 
         // Profundizar en hijos
-        final statusChilds = _asList(status['activities_status_childs']);
+        final statusChilds = asList(status['activities_status_childs']);
         if (statusChilds != null) {
           for (final sc in statusChilds) {
-            final m = _asMap(sc);
+            final m = asMap(sc);
             if (m != null) statusStack.add(m);
           }
         }
-        final stepsChilds = _asList(status['activities_steps_childs']);
+        final stepsChilds = asList(status['activities_steps_childs']);
         if (stepsChilds != null) {
           for (final st in stepsChilds) {
-            final m = _asMap(st);
+            final m = asMap(st);
             if (m != null) stepStack.add(m);
           }
         }
@@ -1718,10 +1695,10 @@ List<VisitsDetailsStruct> updateStepsVisitList(
 
       if (stepStack.isNotEmpty) {
         final step = stepStack.removeLast();
-        final statuses = _asList(step['activities_status']);
+        final statuses = asList(step['activities_status']);
         if (statuses != null) {
           for (final s in statuses) {
-            final m = _asMap(s);
+            final m = asMap(s);
             if (m != null) statusStack.add(m);
           }
         }
@@ -1731,21 +1708,21 @@ List<VisitsDetailsStruct> updateStepsVisitList(
   }
 
   // Buscar el parent_id de un activity_step dado su id recorriendo todas las ramas
-  int? _findParentIdActivityStep(int targetIdActivityStep) {
+  int? findParentIdActivityStep(int targetIdActivityStep) {
     final statusStack = <Map<String, dynamic>>[];
     final stepStack = <Map<String, dynamic>>[];
 
     // Cargar raíces
-    final rootSteps = _asList(data['activity_steps']);
+    final rootSteps = asList(data['activity_steps']);
     if (rootSteps != null) {
       for (final st in rootSteps) {
-        final m = _asMap(st);
+        final m = asMap(st);
         if (m != null) stepStack.add(m);
       }
     }
 
-    if (targetIdActivityStep == 54) print("ACAAA 54 #1");
-    if (targetIdActivityStep == 54) print(stepStack.length);
+    if (targetIdActivityStep == 54) debugPrint("ACAAA 54 #1");
+    if (targetIdActivityStep == 54) debugPrint('${stepStack.length}');
 
     while (statusStack.isNotEmpty || stepStack.isNotEmpty) {
       // Procesar steps
@@ -1753,12 +1730,12 @@ List<VisitsDetailsStruct> updateStepsVisitList(
         final step = stepStack.removeLast();
 
         // ¿Es el que buscamos?
-        if (targetIdActivityStep == 54) print(step['id_activity_step']);
+        if (targetIdActivityStep == 54) debugPrint('${step['id_activity_step']}');
 
         if (step['id_activity_step'] == targetIdActivityStep) {
           final parentStatusId = step['id_activity_status_parent'];
           if (parentStatusId != null) {
-            final parentStatus = _findActivityStatusById(parentStatusId);
+            final parentStatus = findActivityStatusById(parentStatusId);
             if (parentStatus != null &&
                 parentStatus.containsKey('id_activity_step_parent')) {
               final v = parentStatus['id_activity_step_parent'];
@@ -1771,12 +1748,12 @@ List<VisitsDetailsStruct> updateStepsVisitList(
         }
 
         // Añadir sus statuses para seguir bajando
-        final statuses = _asList(step['activities_status']);
+        final statuses = asList(step['activities_status']);
         if (statuses != null) {
           for (final s in statuses) {
-            final m = _asMap(s);
+            final m = asMap(s);
             if (m != null) {
-              if (targetIdActivityStep == 54) print(statuses.length);
+              if (targetIdActivityStep == 54) debugPrint('${statuses.length}');
               statusStack.add(m);
             }
           }
@@ -1788,24 +1765,24 @@ List<VisitsDetailsStruct> updateStepsVisitList(
         final status = statusStack.removeLast();
 
         // Sus steps hijos
-        final stepsChilds = _asList(status['activities_steps_childs']);
-        //if(step['id_activity_step'] == 52) print(statuses.length);
+        final stepsChilds = asList(status['activities_steps_childs']);
+        //if(step['id_activity_step'] == 52) debugPrint(statuses.length);
 
         if (stepsChilds != null) {
           for (final st in stepsChilds) {
-            final m = _asMap(st);
+            final m = asMap(st);
 
             if (m != null) {
-              if (m['id_activity_step'] == 54) print("ACAAA 54");
+              if (m['id_activity_step'] == 54) debugPrint("ACAAA 54");
               stepStack.add(m);
             }
           }
         }
         // Y sus statuses hijos
-        final statusChilds = _asList(status['activities_status_childs']);
+        final statusChilds = asList(status['activities_status_childs']);
         if (statusChilds != null) {
           for (final sc in statusChilds) {
-            final m = _asMap(sc);
+            final m = asMap(sc);
             if (m != null) statusStack.add(m);
           }
         }
@@ -1819,19 +1796,19 @@ List<VisitsDetailsStruct> updateStepsVisitList(
 
   // Eliminar visits cuyo parent_id_activity_step == idStepParent
   updatedList.removeWhere((visit) {
-    final int? visitIdParent = visit.idStepParent;
-    print("visitIdParent");
-    print(visitIdParent);
+    final int visitIdParent = visit.idStepParent;
+    debugPrint("visitIdParent");
+    debugPrint('$visitIdParent');
 
-    if (visitIdParent == null || visitIdParent == 0) return false;
+    if (visitIdParent == 0) return false;
 
-    final int? foundParentId = _findParentIdActivityStep(visitIdParent);
-    print("foundParentId");
+    final int? foundParentId = findParentIdActivityStep(visitIdParent);
+    debugPrint("foundParentId");
 
-    print(foundParentId);
+    debugPrint('$foundParentId');
 
     if (foundParentId != null && foundParentId == idStepParent) {
-      print(
+      debugPrint(
         'Eliminando visit con idParent: $visitIdParent porque su parent_id ($foundParentId) coincide con $idStepParent',
       );
       return true;
@@ -1839,13 +1816,13 @@ List<VisitsDetailsStruct> updateStepsVisitList(
     return false;
   });
 
-  print(updatedList.length);
+  debugPrint('${updatedList.length}');
 
-  print("Visit Detail");
+  debugPrint("Visit Detail");
 
   for (int i = 0; i < updatedList.length; i++) {
     var visit = visitsList[i];
-    print(visit);
+    debugPrint(visit.toString());
   }
   return updatedList;
 }
@@ -1871,8 +1848,8 @@ bool validateRequiredSteps(
   List<VisitsDetailsStruct> visitsList,
 ) {
   // Validar inputs
-  if (visitsList == null || jsonData == null) {
-    print('Error: Inputs nulos');
+  if (jsonData == null) {
+    debugPrint('Error: Inputs nulos');
     return false;
   }
 
@@ -1882,13 +1859,13 @@ bool validateRequiredSteps(
     try {
       data = Map<String, dynamic>.from(json.decode(jsonData));
     } catch (e) {
-      print('Error parsing JSON: $e');
+      debugPrint('Error parsing JSON: $e');
       return false;
     }
   } else if (jsonData is Map) {
     data = Map<String, dynamic>.from(jsonData);
   } else {
-    print('Error: Tipo de datos no reconocido');
+    debugPrint('Error: Tipo de datos no reconocido');
     return false;
   }
 
@@ -1911,7 +1888,7 @@ bool validateRequiredSteps(
       if (status.containsKey('id_activity_status')) {
         int statusId = status['id_activity_status'];
         requiredStatusIds.add(statusId);
-        print(
+        debugPrint(
             'Activity_status encontrado (primer nivel): ID=$statusId, Nombre=${status['status_name'] ?? 'Sin nombre'}');
       }
     }
@@ -1934,7 +1911,7 @@ bool validateRequiredSteps(
             step.containsKey('id_activity_step')) {
           int stepId = step['id_activity_step'];
           requiredStepIds.add(stepId);
-          print(
+          debugPrint(
               'Step requerido encontrado: ID=$stepId, Nombre=${step['name_step'] ?? 'Sin nombre'}');
         }
 
@@ -1960,31 +1937,31 @@ bool validateRequiredSteps(
 
   // Si no hay nada requerido, retornar true
   if (requiredStepIds.isEmpty && requiredStatusIds.isEmpty) {
-    print('No hay steps ni status requeridos');
+    debugPrint('No hay steps ni status requeridos');
     return true;
   }
 
-  print('Total de steps requeridos: ${requiredStepIds.length}');
-  print('IDs de steps requeridos: $requiredStepIds');
-  print('Total de status requeridos: ${requiredStatusIds.length}');
-  print('IDs de status requeridos: $requiredStatusIds');
+  debugPrint('Total de steps requeridos: ${requiredStepIds.length}');
+  debugPrint('IDs de steps requeridos: $requiredStepIds');
+  debugPrint('Total de status requeridos: ${requiredStatusIds.length}');
+  debugPrint('IDs de status requeridos: $requiredStatusIds');
 
   // Verificar cada elemento en la lista de visits
   for (var visit in visitsList) {
     // Si idStepParent es 0, buscar en activity_status
     if (visit.idStepParent == 0) {
       // Buscar por idActivityStatus en lugar de idStepParent
-      if (visit.idActivityStatus != null && visit.idActivityStatus != 0) {
+      if (visit.idActivityStatus != 0) {
         // Remover de la lista de status requeridos si existe
         requiredStatusIds.remove(visit.idActivityStatus);
-        print(
+        debugPrint(
             '✓ Activity_status encontrado en visits: ID=${visit.idActivityStatus}');
       }
-    } else if (visit.idStepParent != null && visit.idStepParent != 0) {
+    } else if (visit.idStepParent != 0) {
       // Si idStepParent NO es 0, buscar normalmente en activity_steps
       // Remover de la lista de steps requeridos si existe
       requiredStepIds.remove(visit.idStepParent);
-      print('✓ Step encontrado en visits: ID=${visit.idStepParent}');
+      debugPrint('✓ Step encontrado en visits: ID=${visit.idStepParent}');
     }
   }
 
@@ -1996,26 +1973,26 @@ bool validateRequiredSteps(
   bool hasAllRequired = missingStepIds.isEmpty && missingStatusIds.isEmpty;
 
   if (!hasAllRequired) {
-    print('VALIDACIÓN FALLIDA');
+    debugPrint('VALIDACIÓN FALLIDA');
     if (missingStepIds.isNotEmpty) {
-      print(
+      debugPrint(
           'Faltan ${missingStepIds.length} steps requeridos: $missingStepIds');
     }
     if (missingStatusIds.isNotEmpty) {
-      print(
+      debugPrint(
           'Faltan ${missingStatusIds.length} status requeridos: $missingStatusIds');
     }
     return false;
   }
 
-  print('VALIDACIÓN EXITOSA - Todos los elementos requeridos están presentes');
+  debugPrint('VALIDACIÓN EXITOSA - Todos los elementos requeridos están presentes');
   return true;
 }
 
 dynamic sortActivityStepsByOrder(dynamic jsonData) {
   // Validar input
   if (jsonData == null) {
-    print('Error: JSON nulo');
+    debugPrint('Error: JSON nulo');
     return jsonData;
   }
 
@@ -2025,20 +2002,20 @@ dynamic sortActivityStepsByOrder(dynamic jsonData) {
     try {
       data = Map<String, dynamic>.from(json.decode(jsonData));
     } catch (e) {
-      print('Error parsing JSON: $e');
+      debugPrint('Error parsing JSON: $e');
       return jsonData;
     }
   } else if (jsonData is Map) {
     // Crear una copia profunda para no modificar el original
     data = Map<String, dynamic>.from(json.decode(json.encode(jsonData)));
   } else {
-    print('Error: Tipo de datos no reconocido');
+    debugPrint('Error: Tipo de datos no reconocido');
     return jsonData;
   }
 
   // Verificar que existe activity_steps
   if (!data.containsKey('activity_steps')) {
-    print('No se encontró activity_steps en el JSON');
+    debugPrint('No se encontró activity_steps en el JSON');
     return data;
   }
 
@@ -2117,7 +2094,7 @@ dynamic sortActivityStepsByOrder(dynamic jsonData) {
   if (data['activity_steps'] is List) {
     List<dynamic> mainSteps = List.from(data['activity_steps']);
 
-    print('Ordenando ${mainSteps.length} activity_steps principales');
+    debugPrint('Ordenando ${mainSteps.length} activity_steps principales');
 
     // Ordenar por order_step
     mainSteps.sort((a, b) {
@@ -2128,7 +2105,7 @@ dynamic sortActivityStepsByOrder(dynamic jsonData) {
         // Log para debugging
         String nameA = a['name_step'] ?? 'Sin nombre';
         String nameB = b['name_step'] ?? 'Sin nombre';
-        print(
+        debugPrint(
             'Comparando: "$nameA" (order: $orderA) vs "$nameB" (order: $orderB)');
 
         return orderA.compareTo(orderB);
@@ -2141,7 +2118,7 @@ dynamic sortActivityStepsByOrder(dynamic jsonData) {
     // Procesar recursivamente todos los steps anidados
     sortStepsRecursively(data);
 
-    print('Ordenamiento completado');
+    debugPrint('Ordenamiento completado');
   }
 
   return data;

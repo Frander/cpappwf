@@ -1,8 +1,6 @@
-﻿import '/components/info_dialog_widget.dart';
+import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
@@ -54,7 +52,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
         body: SafeArea(
           top: true,
           child: Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Color(0xFF101827),
             ),
             child: Column(
@@ -63,7 +61,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                 Container(
                   width: double.infinity,
                   height: 146.69,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: Column(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -75,10 +73,10 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                           children: [
                             Container(
                               width: 180.7,
-                              decoration: BoxDecoration(),
-                              alignment: AlignmentDirectional(-1.0, -1.0),
+                              decoration: const BoxDecoration(),
+                              alignment: const AlignmentDirectional(-1.0, -1.0),
                               child: Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     0.0, 20.0, 0.0, 0.0),
                                 child: InkWell(
                                   splashColor: Colors.transparent,
@@ -98,14 +96,14 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                             ),
                             Expanded(
                               child: Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     0.0, 5.0, 10.0, 0.0),
                                 child: Column(
                                   mainAxisSize: MainAxisSize.max,
                                   crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                      padding: const EdgeInsetsDirectional.fromSTEB(
                                           0.0, 10.0, 0.0, 0.0),
                                       child: Text(
                                         'Versión 16',
@@ -157,7 +155,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                       backgroundColor:
                                                           Colors.transparent,
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                                   0.0, 0.0)
                                                               .resolve(
                                                                   Directionality.of(
@@ -171,7 +169,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                               .primaryFocus
                                                               ?.unfocus();
                                                         },
-                                                        child: InfoDialogWidget(
+                                                        child: const InfoDialogWidget(
                                                           info:
                                                               'Este módulo se encuentra en mantenimiento, pronto estarán disponibles todas las funciones para ti!',
                                                         ),
@@ -207,7 +205,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                       backgroundColor:
                                                           Colors.transparent,
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                                   0.0, 0.0)
                                                               .resolve(
                                                                   Directionality.of(
@@ -221,7 +219,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                               .primaryFocus
                                                               ?.unfocus();
                                                         },
-                                                        child: InfoDialogWidget(
+                                                        child: const InfoDialogWidget(
                                                           info:
                                                               'Este módulo se encuentra en mantenimiento, pronto estarán disponibles todas las funciones para ti!',
                                                         ),
@@ -257,7 +255,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                       backgroundColor:
                                                           Colors.transparent,
                                                       alignment:
-                                                          AlignmentDirectional(
+                                                          const AlignmentDirectional(
                                                                   0.0, 0.0)
                                                               .resolve(
                                                                   Directionality.of(
@@ -271,7 +269,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                               .primaryFocus
                                                               ?.unfocus();
                                                         },
-                                                        child: InfoDialogWidget(
+                                                        child: const InfoDialogWidget(
                                                           info:
                                                               'Este módulo se encuentra en mantenimiento, pronto estarán disponibles todas las funciones para ti!',
                                                         ),
@@ -301,7 +299,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                       ),
                       Container(
                         width: double.infinity,
-                        decoration: BoxDecoration(),
+                        decoration: const BoxDecoration(),
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -328,7 +326,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                   ),
                             ),
                             Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 5.0),
                               child: Text(
                                 FFAppState().companyDefault.businessName,
@@ -353,7 +351,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 5.0),
                               child: Text(
                                 'Identificación del CTR: ${FFAppState().androidID}',
@@ -377,7 +375,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                     ),
                               ),
                             ),
-                          ].divide(SizedBox(height: 5.0)),
+                          ].divide(const SizedBox(height: 5.0)),
                         ),
                       ),
                     ],
@@ -387,15 +385,15 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                   child: Container(
                     width: double.infinity,
                     height: double.infinity,
-                    decoration: BoxDecoration(),
+                    decoration: const BoxDecoration(),
                     child: Padding(
-                      padding: EdgeInsets.all(10.0),
+                      padding: const EdgeInsets.all(10.0),
                       child: SingleChildScrollView(
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           children: [
                             Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   10.0, 0.0, 5.0, 0.0),
                               child: Row(
                                 mainAxisSize: MainAxisSize.max,
@@ -432,7 +430,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                             }.withoutNulls,
                                             extra: <String, dynamic>{
                                               kTransitionInfoKey:
-                                                  TransitionInfo(
+                                                  const TransitionInfo(
                                                 hasTransition: true,
                                                 transitionType:
                                                     PageTransitionType.fade,
@@ -448,7 +446,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                             HistoryVisitsPageWidget.routeName,
                                             extra: <String, dynamic>{
                                               kTransitionInfoKey:
-                                                  TransitionInfo(
+                                                  const TransitionInfo(
                                                 hasTransition: true,
                                                 transitionType:
                                                     PageTransitionType.fade,
@@ -463,8 +461,8 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                       },
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Color(0xFFE3D4D4),
-                                          boxShadow: [
+                                          color: const Color(0xFFE3D4D4),
+                                          boxShadow: const [
                                             BoxShadow(
                                               blurRadius: 6.0,
                                               color: Color(0x33000000),
@@ -479,7 +477,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                         ),
                                         child: Padding(
                                           padding:
-                                              EdgeInsetsDirectional.fromSTEB(
+                                              const EdgeInsetsDirectional.fromSTEB(
                                                   15.0, 5.0, 15.0, 15.0),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.max,
@@ -489,7 +487,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 10.0, 0.0, 0.0),
                                                 child: Text(
@@ -604,7 +602,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                                   .fontStyle,
                                                         ),
                                               ),
-                                            ].divide(SizedBox(height: 10.0)),
+                                            ].divide(const SizedBox(height: 10.0)),
                                           ),
                                         ),
                                       ),
@@ -615,9 +613,9 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                             ),
                             Container(
                               width: double.infinity,
-                              decoration: BoxDecoration(),
+                              decoration: const BoxDecoration(),
                               child: Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     10.0, 0.0, 5.0, 0.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.max,
@@ -627,7 +625,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .secondaryBackground,
-                                          boxShadow: [
+                                          boxShadow: const [
                                             BoxShadow(
                                               blurRadius: 6.0,
                                               color: Color(0x33000000),
@@ -642,7 +640,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                         ),
                                         child: Padding(
                                           padding:
-                                              EdgeInsetsDirectional.fromSTEB(
+                                              const EdgeInsetsDirectional.fromSTEB(
                                                   15.0, 5.0, 15.0, 15.0),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.max,
@@ -652,7 +650,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                 CrossAxisAlignment.start,
                                             children: [
                                               Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 10.0, 0.0, 0.0),
                                                 child: Text(
@@ -823,7 +821,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                                   .fontStyle,
                                                         ),
                                               ),
-                                            ].divide(SizedBox(height: 10.0)),
+                                            ].divide(const SizedBox(height: 10.0)),
                                           ),
                                         ),
                                       ),
@@ -839,7 +837,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                 borderRadius: BorderRadius.circular(12.0),
                               ),
                               child: Padding(
-                                padding: EdgeInsetsDirectional.fromSTEB(
+                                padding: const EdgeInsetsDirectional.fromSTEB(
                                     10.0, 0.0, 5.0, 0.0),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.max,
@@ -855,7 +853,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                             SettingsPageWidget.routeName,
                                             extra: <String, dynamic>{
                                               kTransitionInfoKey:
-                                                  TransitionInfo(
+                                                  const TransitionInfo(
                                                 hasTransition: true,
                                                 transitionType:
                                                     PageTransitionType.fade,
@@ -869,7 +867,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                           decoration: BoxDecoration(
                                             color: FlutterFlowTheme.of(context)
                                                 .secondaryBackground,
-                                            boxShadow: [
+                                            boxShadow: const [
                                               BoxShadow(
                                                 blurRadius: 6.0,
                                                 color: Color(0x33000000),
@@ -888,7 +886,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                 MainAxisAlignment.start,
                                             children: [
                                               Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 10.0, 0.0, 0.0),
                                                 child: Text(
@@ -926,7 +924,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .primaryText,
                                                 size: 80.0,
                                               ),
-                                            ].divide(SizedBox(height: 10.0)),
+                                            ].divide(const SizedBox(height: 10.0)),
                                           ),
                                         ),
                                       ),
@@ -942,7 +940,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                             SyncPageWidget.routeName,
                                             extra: <String, dynamic>{
                                               kTransitionInfoKey:
-                                                  TransitionInfo(
+                                                  const TransitionInfo(
                                                 hasTransition: true,
                                                 transitionType:
                                                     PageTransitionType.fade,
@@ -954,8 +952,8 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                         },
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            color: Color(0xFFCBEEE0),
-                                            boxShadow: [
+                                            color: const Color(0xFFCBEEE0),
+                                            boxShadow: const [
                                               BoxShadow(
                                                 blurRadius: 6.0,
                                                 color: Color(0x33000000),
@@ -974,7 +972,7 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                 MainAxisAlignment.start,
                                             children: [
                                               Padding(
-                                                padding: EdgeInsetsDirectional
+                                                padding: const EdgeInsetsDirectional
                                                     .fromSTEB(
                                                         0.0, 10.0, 0.0, 0.0),
                                                 child: Text(
@@ -1012,16 +1010,16 @@ class _InfoPageWidgetState extends State<InfoPageWidget> {
                                                         .primaryText,
                                                 size: 80.0,
                                               ),
-                                            ].divide(SizedBox(height: 10.0)),
+                                            ].divide(const SizedBox(height: 10.0)),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  ].divide(SizedBox(width: 10.0)),
+                                  ].divide(const SizedBox(width: 10.0)),
                                 ),
                               ),
                             ),
-                          ].divide(SizedBox(height: 10.0)),
+                          ].divide(const SizedBox(height: 10.0)),
                         ),
                       ),
                     ),

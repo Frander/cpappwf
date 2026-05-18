@@ -1,13 +1,10 @@
-﻿import '/backend/schema/structs/index.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'nfc_read_dialog_model.dart';
 export 'nfc_read_dialog_model.dart';
 
@@ -98,7 +95,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
         clearAfterRead: widget.isTagTransferMode,
       );
 
-      if (nfcData != null && nfcData.isNotEmpty) {
+      if (nfcData.isNotEmpty) {
         // Para modo tag-transfer, validar que tenga contenido válido con visitas
         if (widget.isTagTransferMode) {
           // Detectar errores específicos del RFID antes de validar el formato
@@ -159,8 +156,9 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               _model.isSuccess = false;
             });
 
+            if (!mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
+              const SnackBar(
                 content: Row(
                   children: [
                     Icon(Icons.cleaning_services, color: Colors.white),
@@ -183,7 +181,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             );
 
             // Cerrar el diálogo después de mostrar el mensaje
-            await Future.delayed(Duration(seconds: 2));
+            await Future.delayed(const Duration(seconds: 2));
             if (mounted) {
               Navigator.pop(context);
             }
@@ -324,7 +322,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             backgroundColor: Colors.transparent,
             child: Container(
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
@@ -334,11 +332,11 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                 ),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -349,19 +347,19 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: [
-                          Colors.orange.withOpacity(0.3),
-                          Colors.red.withOpacity(0.3)
+                          Colors.orange.withValues(alpha: 0.3),
+                          Colors.red.withValues(alpha: 0.3)
                         ],
                       ),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.delete_forever,
+                    child: const Icon(Icons.delete_forever,
                         color: Colors.white, size: 40),
                   ),
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Título
-                  Text(
+                  const Text(
                     '¿Eliminar contenido del tag?',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontFamily: 'Roboto',
@@ -370,7 +368,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
                   // Descripción
                   Text(
@@ -378,10 +376,10 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                     textAlign: TextAlign.center,
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                     ),
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   // Botones
                   Row(
@@ -396,14 +394,14 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           child: Container(
                             height: 50,
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
+                              color: Colors.white.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
+                                color: Colors.white.withValues(alpha: 0.3),
                                 width: 1,
                               ),
                             ),
-                            child: Center(
+                            child: const Center(
                               child: Text(
                                 'Cancelar',
                                 style: TextStyle(fontFamily: 'Roboto',
@@ -416,7 +414,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                           ),
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
 
                       // Botón Eliminar
                       Expanded(
@@ -434,13 +432,13 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.red.withOpacity(0.3),
+                                  color: Colors.red.withValues(alpha: 0.3),
                                   blurRadius: 10,
-                                  offset: Offset(0, 4),
+                                  offset: const Offset(0, 4),
                                 ),
                               ],
                             ),
-                            child: Center(
+                            child: const Center(
                               child: Text(
                                 'Eliminar',
                                 style: TextStyle(fontFamily: 'Roboto',
@@ -480,8 +478,9 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
         HapticFeedback.heavyImpact();
 
         // Mostrar mensaje de éxito
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+          const SnackBar(
             content: Row(
               children: [
                 Icon(Icons.check_circle, color: Colors.white),
@@ -513,16 +512,17 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
     } catch (e) {
       HapticFeedback.vibrate();
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
             children: [
-              Icon(Icons.error, color: Colors.white),
-              SizedBox(width: 12),
+              const Icon(Icons.error, color: Colors.white),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Error al eliminar: ${e.toString()}',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -532,7 +532,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             ],
           ),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -741,7 +741,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -757,7 +757,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
           children: [
             // Header
             Padding(
-              padding: EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(20.0),
               child: Row(
                 children: [
                   InkWell(
@@ -769,13 +769,13 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.close, color: Colors.white),
+                      child: const Icon(Icons.close, color: Colors.white),
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       children: [
@@ -788,18 +788,18 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Container(
                           padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(colors: [
                               Colors.blue,
-                              Colors.blue.withOpacity(0.7),
+                              Colors.blue.withValues(alpha: 0.7),
                             ]),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(
+                          child: const Text(
                             'LECTURA',
                             style: TextStyle(
                               fontSize: 11,
@@ -811,7 +811,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                       ],
                     ),
                   ),
-                  SizedBox(width: 60),
+                  const SizedBox(width: 60),
                 ],
               ),
             ),
@@ -832,26 +832,26 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             // Botón de acción
             if (!_model.isReading && !_model.isSuccess)
               Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 30),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
                 child: InkWell(
                   onTap: _startReading,
                   child: Container(
                     width: double.infinity,
                     height: 64,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [Colors.blue, Colors.lightBlue],
                       ),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.blue.withOpacity(0.5),
+                          color: Colors.blue.withValues(alpha: 0.5),
                           blurRadius: 20,
-                          offset: Offset(0, 8),
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.nfc, color: Colors.white, size: 28),
@@ -888,18 +888,18 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    Colors.blue.withOpacity(0.3),
-                    Colors.lightBlue.withOpacity(0.3)
+                    Colors.blue.withValues(alpha: 0.3),
+                    Colors.lightBlue.withValues(alpha: 0.3)
                   ],
                 ),
                 shape: BoxShape.circle,
               ),
               child: Icon(Icons.contactless,
-                  color: Colors.white.withOpacity(0.7), size: 60),
+                  color: Colors.white.withValues(alpha: 0.7), size: 60),
             ),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             'Listo para leer',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -907,15 +907,15 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Toca el botón de abajo y acerca el tag NFC para leer los datos',
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
               ),
             ),
           ),
@@ -934,16 +934,16 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             child: Container(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient:
                     LinearGradient(colors: [Colors.blue, Colors.lightBlue]),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.nfc, color: Colors.white, size: 60),
+              child: const Icon(Icons.nfc, color: Colors.white, size: 60),
             ),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             'Acerque el tag para leer',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
@@ -951,7 +951,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             widget.isTagTransferMode
                 ? 'Mantenga el tag cerca — se leerá y limpiará en un solo paso'
@@ -959,7 +959,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -969,7 +969,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
 
   Widget _buildTableState() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -978,19 +978,19 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
               letterSpacing: 1.5,
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Tabla de resultados
           Container(
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -998,20 +998,20 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               children: [
                 // Header de tabla
                 Container(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.blue.withOpacity(0.3),
-                        Colors.lightBlue.withOpacity(0.2)
+                        Colors.blue.withValues(alpha: 0.3),
+                        Colors.lightBlue.withValues(alpha: 0.2)
                       ],
                     ),
-                    borderRadius: BorderRadius.only(
+                    borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(16),
                       topRight: Radius.circular(16),
                     ),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Expanded(
                         flex: 3,
@@ -1082,10 +1082,10 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                   final isEven = index % 2 == 0;
 
                   return Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isEven
-                          ? Colors.white.withOpacity(0.02)
+                          ? Colors.white.withValues(alpha: 0.02)
                           : Colors.transparent,
                     ),
                     child: Row(
@@ -1096,7 +1096,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             _formatDateHour(record.dateHour),
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                             ),
                           ),
                         ),
@@ -1106,7 +1106,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             record.operatorName,
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                             ),
                           ),
                         ),
@@ -1116,7 +1116,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             '${record.visits}',
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -1127,7 +1127,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             '${record.results}',
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -1138,7 +1138,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                             record.loteName,
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 10,
-                              color: Colors.white.withOpacity(0.8),
+                              color: Colors.white.withValues(alpha: 0.8),
                             ),
                             textAlign: TextAlign.center,
                           ),
@@ -1146,7 +1146,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                       ],
                     ),
                   );
-                }).toList(),
+                }),
               ],
             ),
           ),
@@ -1160,9 +1160,9 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: Colors.red, size: 80),
-          SizedBox(height: 20),
-          Text(
+          const Icon(Icons.error_outline, color: Colors.red, size: 80),
+          const SizedBox(height: 20),
+          const Text(
             'Error',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -1170,15 +1170,15 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -1209,7 +1209,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
 
     return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -1236,13 +1236,13 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                 size: 54,
               ),
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Título
             Text(
               title,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -1250,7 +1250,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                 letterSpacing: 0.5,
               ),
             ),
-            SizedBox(height: 14),
+            const SizedBox(height: 14),
 
             // Mensaje descriptivo (puede ser multi-línea)
             Text(
@@ -1260,11 +1260,11 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                 fontFamily: 'Roboto',
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
-                color: Colors.white.withOpacity(0.85),
+                color: Colors.white.withValues(alpha: 0.85),
                 height: 1.5,
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
 
             // Hint
             Text(
@@ -1273,10 +1273,10 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
               style: TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 13,
-                color: Colors.white.withOpacity(0.55),
+                color: Colors.white.withValues(alpha: 0.55),
               ),
             ),
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
 
             // Botón de reintentar
             InkWell(
@@ -1294,13 +1294,13 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
                   borderRadius: BorderRadius.circular(16),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.orange.withOpacity(0.4),
+                      color: Colors.orange.withValues(alpha: 0.4),
                       blurRadius: 16,
-                      offset: Offset(0, 6),
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(Icons.refresh, color: Colors.white, size: 24),

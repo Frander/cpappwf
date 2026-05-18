@@ -1,6 +1,4 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -146,7 +144,7 @@ class _NfcTransferWriteDialogWidgetState
       HapticFeedback.heavyImpact();
 
       // Esperar un momento y cerrar el diálogo retornando el contenido escrito
-      await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
         Navigator.pop(context, contentToWrite);
       }
@@ -167,7 +165,7 @@ class _NfcTransferWriteDialogWidgetState
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -183,7 +181,7 @@ class _NfcTransferWriteDialogWidgetState
           children: [
             // Header
             Padding(
-              padding: EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(20.0),
               child: Row(
                 children: [
                   InkWell(
@@ -195,25 +193,25 @@ class _NfcTransferWriteDialogWidgetState
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.close, color: Colors.white),
+                      child: const Icon(Icons.close, color: Colors.white),
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Text(
                       widget.destinationTitle ?? 'TRANSFERIR A TAG DE DESTINO',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(fontFamily: 'Roboto',
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
                     ),
                   ),
-                  SizedBox(width: 60),
+                  const SizedBox(width: 60),
                 ],
               ),
             ),
@@ -242,17 +240,17 @@ class _NfcTransferWriteDialogWidgetState
             child: Container(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.orange, Colors.deepOrange],
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.nfc, color: Colors.white, size: 60),
+              child: const Icon(Icons.nfc, color: Colors.white, size: 60),
             ),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             'ACERQUE EL TAG DE DESTINO',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
@@ -260,13 +258,13 @@ class _NfcTransferWriteDialogWidgetState
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             'Se leerá el tag de destino y se agregarán\nlas visitas del tag de origen',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               height: 1.5,
             ),
           ),
@@ -283,16 +281,16 @@ class _NfcTransferWriteDialogWidgetState
           Container(
             width: 120,
             height: 120,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF00a86b), Color(0xFF003420)],
               ),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.check_circle, color: Colors.white, size: 64),
+            child: const Icon(Icons.check_circle, color: Colors.white, size: 64),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             '¡Transferencia Exitosa!',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -300,13 +298,13 @@ class _NfcTransferWriteDialogWidgetState
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             'El contenido se ha transferido\ncorrectamente al tag de destino',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -319,9 +317,9 @@ class _NfcTransferWriteDialogWidgetState
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: Colors.red, size: 80),
-          SizedBox(height: 20),
-          Text(
+          const Icon(Icons.error_outline, color: Colors.red, size: 80),
+          const SizedBox(height: 20),
+          const Text(
             'Error',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -329,19 +327,19 @@ class _NfcTransferWriteDialogWidgetState
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
           ),
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
           InkWell(
             onTap: () {
               // Reintentar
@@ -352,14 +350,14 @@ class _NfcTransferWriteDialogWidgetState
               _startWriting();
             },
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [Color(0xFF00a86b), Color(0xFF003420)],
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
+              child: const Text(
                 'Reintentar',
                 style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 16,

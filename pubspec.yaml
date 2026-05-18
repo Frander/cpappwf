@@ -131,6 +131,10 @@ dependencies:
   cupertino_icons: ^1.0.0
   flutter_widget_from_html: ^0.17.2
 
+  collection: any
+  http_parser: any
+  vector_tile_renderer: any
+  ndef_record: any
 dependency_overrides:
   http: 1.4.0
   intl: 0.20.2

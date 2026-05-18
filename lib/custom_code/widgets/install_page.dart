@@ -1,12 +1,10 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -766,7 +764,7 @@ class _InstallPageState extends State<InstallPage>
       final fileSize = await apkFile.length();
       if (fileSize <= 0) {
         if (mounted) Navigator.pop(context);
-        throw Exception('Archivo APK está vacío (${fileSize} bytes)');
+        throw Exception('Archivo APK está vacío ($fileSize bytes)');
       }
       
       debugPrint('✅ APK validado: ${(fileSize / (1024 * 1024)).toStringAsFixed(2)} MB');
@@ -1180,8 +1178,8 @@ class _InstallPageState extends State<InstallPage>
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF1A0A0A),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
+        title: const Row(
+          children: [
             Icon(Icons.warning_rounded, color: Color(0xFFFF5252), size: 28),
             SizedBox(width: 10),
             Text('Desinstalación Completa',
@@ -1312,7 +1310,7 @@ class _InstallPageState extends State<InstallPage>
         FFAppState().newsSelected = [];
         FFAppState().activitiesStatusSelected = [];
         FFAppState().newsAdd = [];
-        FFAppState().StatusAdd = [];
+        FFAppState().statusAdd = [];
         FFAppState().lastLineInstall = 0;
         FFAppState().lastPalmInstall = 0;
       });
@@ -1406,8 +1404,8 @@ class _InstallPageState extends State<InstallPage>
         builder: (ctx) => AlertDialog(
           backgroundColor: const Color(0xFF0A1F0A),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: const [
+          title: const Row(
+            children: [
               Icon(Icons.check_circle_rounded, color: Color(0xFF00E676), size: 28),
               SizedBox(width: 10),
               Text('Limpieza Completa', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),

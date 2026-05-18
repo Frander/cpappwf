@@ -25,14 +25,12 @@ import 'package:path_provider/path_provider.dart';
 import '/custom_code/actions/index.dart' as actions;
 import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
-import '/visits/do_activities_page/do_activities_page_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
@@ -418,15 +416,15 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     // Mostrar indicador
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(children: const [
+      const SnackBar(
+        content: Row(children: [
           SizedBox(width: 20, height: 20,
               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
           SizedBox(width: 12),
           Text('Imprimiendo...'),
         ]),
-        backgroundColor: const Color(0xFF1565C0),
-        duration: const Duration(seconds: 30),
+        backgroundColor: Color(0xFF1565C0),
+        duration: Duration(seconds: 30),
       ),
     );
 
@@ -6142,8 +6140,10 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   return;
                 }
 
+                if (!context.mounted) return;
                 // Abrir diálogo LoadCoordinatesVisit con contador de 5 segundos
                 await showDialog<bool>(
+                  // ignore: use_build_context_synchronously
                   context: context,
                   barrierDismissible: false,
                   barrierColor: Colors.black.withValues(alpha: 0.85),
@@ -6544,7 +6544,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     }
 
     // 2. Primera vez hoy → mostrar diálogo
-    if (!mounted) return null;
+    if (!context.mounted) return null;
     final selected = await _showSelectLotDialog(context, nearestList);
     if (selected != null) await _cacheLotForToday(selected);
     return selected;
@@ -6587,7 +6587,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: FlutterFlowTheme.of(context).primary.withOpacity(0.12),
+                  color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -6641,11 +6641,11 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
                         border: Border.all(
-                          color: color.withOpacity(0.4),
+                          color: color.withValues(alpha: 0.4),
                           width: 1.5,
                         ),
                         borderRadius: BorderRadius.circular(16),
-                        color: color.withOpacity(0.06),
+                        color: color.withValues(alpha: 0.06),
                       ),
                       child: Row(
                         children: [
@@ -6654,7 +6654,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                             height: 36,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: color.withOpacity(0.15),
+                              color: color.withValues(alpha: 0.15),
                             ),
                             child: Center(
                               child: Text(
@@ -8669,6 +8669,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
               '📄 HTML procesado (primeros 500 chars): ${processedHTML.substring(0, processedHTML.length > 500 ? 500 : processedHTML.length)}...');
 
           // Abrir el previsualizador HTML con opción de imprimir
+          if (!context.mounted) return;
           await actions.previewAndPrintHTML(
             context,
             processedHTML,
@@ -9392,6 +9393,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     if (!ok) return;
                   }
                   if (!mounted) return;
+                  if (!context.mounted) return;
                   await showDialog(
                     barrierDismissible: false,
                     context: context,
@@ -12167,9 +12169,9 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                               width: 1,
                             ),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisSize: MainAxisSize.min,
-                            children: const [
+                            children: [
                               Icon(Icons.edit_location_alt_outlined,
                                   color: Color(0xFF94A3B8), size: 14),
                               SizedBox(width: 6),

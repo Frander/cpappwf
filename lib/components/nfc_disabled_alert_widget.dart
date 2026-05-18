@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'dart:async';
 
 /// Diálogo elegante para alertar cuando NFC está desactivado
@@ -22,7 +21,7 @@ class NfcDisabledAlertWidget extends StatefulWidget {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'NFC Disabled Alert',
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
         return NfcDisabledAlertWidget(
@@ -95,17 +94,17 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
               ),
               borderRadius: BorderRadius.circular(24),
               border: Border.all(
-                color: const Color(0xFFFF6B6B).withOpacity(0.3),
+                color: const Color(0xFFFF6B6B).withValues(alpha: 0.3),
                 width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFFF6B6B).withOpacity(0.2),
+                  color: const Color(0xFFFF6B6B).withValues(alpha: 0.2),
                   blurRadius: 30,
                   spreadRadius: 5,
                 ),
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -128,12 +127,12 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            const Color(0xFFFF6B6B).withOpacity(0.2),
-                            const Color(0xFFFF8E8E).withOpacity(0.1),
+                            const Color(0xFFFF6B6B).withValues(alpha: 0.2),
+                            const Color(0xFFFF8E8E).withValues(alpha: 0.1),
                           ],
                         ),
                         border: Border.all(
-                          color: const Color(0xFFFF6B6B).withOpacity(0.5),
+                          color: const Color(0xFFFF6B6B).withValues(alpha: 0.5),
                           width: 2,
                         ),
                       ),
@@ -167,7 +166,7 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       height: 1.5,
                     ),
                     textAlign: TextAlign.center,
@@ -180,18 +179,18 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                     margin: const EdgeInsets.only(top: 8),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: Colors.white.withValues(alpha: 0.05),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.info_outline_rounded,
                           size: 20,
-                          color: const Color(0xFF4FC3F7),
+                          color: Color(0xFF4FC3F7),
                         ),
                         const SizedBox(width: 10),
                         Expanded(
@@ -200,7 +199,7 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
-                              color: Colors.white.withOpacity(0.6),
+                              color: Colors.white.withValues(alpha: 0.6),
                               fontFamily: 'monospace',
                             ),
                           ),
@@ -223,7 +222,7 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                               side: BorderSide(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                               ),
                             ),
                           ),
@@ -232,7 +231,7 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                             ),
                           ),
                         ),
@@ -254,9 +253,9 @@ class _NfcDisabledAlertWidgetState extends State<NfcDisabledAlertWidget>
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: Row(
+                          child: const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
+                            children: [
                               Icon(Icons.settings_rounded, size: 18),
                               SizedBox(width: 8),
                               Text(

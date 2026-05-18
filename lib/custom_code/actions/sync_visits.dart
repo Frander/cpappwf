@@ -1,20 +1,15 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
 import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
-import 'dart:io';
 
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 
 Future<bool> syncVisits(
   List<VisitsStruct> visitsAdd,
@@ -71,7 +66,7 @@ Future<bool> syncVisits(
 
     // Convertir a JSON
     final jsonBody = jsonEncode(syncData);
-    print('Request body: $jsonBody'); // Para depuración
+    debugPrint('Request body: $jsonBody'); // Para depuración
 
     final response = await http.post(
       Uri.parse(url),
@@ -96,9 +91,9 @@ Future<bool> syncVisits(
 
       // Verificar si hay registros para procesar
       if (geoRecords.isEmpty) {
-        print('No hay registros de geolocalización para sincronizar');
+        debugPrint('No hay registros de geolocalización para sincronizar');
       } else {
-        print('Procesando ${geoRecords.length} registros de geolocalización');
+        debugPrint('Procesando ${geoRecords.length} registros de geolocalización');
 
         // 2. CREAR CONTENIDO DEL ARCHIVO TXT (FORMATO CSV)
         StringBuffer csvContent = StringBuffer();
@@ -116,7 +111,7 @@ Future<bool> syncVisits(
 
         // Convertir a bytes
         List<int> csvBytes = utf8.encode(csvContent.toString());
-        print('CSV generado con ${geoRecords.length} registros');
+        debugPrint('CSV generado con ${geoRecords.length} registros');
 
         // 4. SUBIR ARCHIVO AL ENDPOINT
         const String endpointUrl =
@@ -150,17 +145,17 @@ Future<bool> syncVisits(
         var responseData = await response.stream.bytesToString();
 
         if (response.statusCode == 200) {
-          print('Archivo subido exitosamente');
-          print('Respuesta del servidor: $responseData');
+          debugPrint('Archivo subido exitosamente');
+          debugPrint('Respuesta del servidor: $responseData');
 
           // 5. BORRAR REGISTROS DE LA TABLA SOLO SI SE SUBIÓ EXITOSAMENTE
           int deletedCount = await db.delete('Location_tracking');
-          print('Eliminados $deletedCount registros de la tabla local');
+          debugPrint('Eliminados $deletedCount registros de la tabla local');
 
-          print('Archivo temporal eliminado');
+          debugPrint('Archivo temporal eliminado');
         } else {
-          print('Error al subir archivo. Código: ${response.statusCode}');
-          print('Respuesta: $responseData');
+          debugPrint('Error al subir archivo. Código: ${response.statusCode}');
+          debugPrint('Respuesta: $responseData');
 
           // Opcional: Lanzar error para manejarlo en el Action Flow
           throw Exception(
@@ -168,7 +163,7 @@ Future<bool> syncVisits(
         }
       }
     } catch (e) {
-      print('Error en sincronización de Location_tracking: $e');
+      debugPrint('Error en sincronización de Location_tracking: $e');
       // Opcional: propagar el error para manejarlo en FlutterFlow
       // throw e;
     }
@@ -176,16 +171,16 @@ Future<bool> syncVisits(
 // ========== FIN SECCIÓN SYNC LOCATION_TRACKING ==========
 
     if (response.statusCode == 200 || response.statusCode == 202) {
-      print(
+      debugPrint(
           '✅ Sincronización enviada; el servidor la procesará en segundo plano.');
       return true;
     } else {
-      print(
+      debugPrint(
           '❌ Failed to sync visits. Status: ${response.statusCode}. Response: ${response.body}');
       return false;
     }
   } catch (e) {
-    print('⚠️ Error syncing visits: $e');
+    debugPrint('⚠️ Error syncing visits: $e');
     return false;
   }
 }

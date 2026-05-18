@@ -1,5 +1,5 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
-import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -30,7 +30,7 @@ Future<String> getDeviceModel() async {
       return 'Unknown Device';
     }
   } catch (e) {
-    print('Error getting device model: $e');
+    debugPrint('Error getting device model: $e');
     return 'Unknown Device';
   }
 }

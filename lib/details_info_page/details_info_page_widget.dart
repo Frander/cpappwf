@@ -1,8 +1,5 @@
-﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +56,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: Color(0xFF101827),
           ),
           child: Column(
@@ -67,7 +64,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
             children: [
               Container(
                 width: double.infinity,
-                decoration: BoxDecoration(),
+                decoration: const BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -78,10 +75,10 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                       children: [
                         Container(
                           width: 180.7,
-                          decoration: BoxDecoration(),
-                          alignment: AlignmentDirectional(-1.0, -1.0),
+                          decoration: const BoxDecoration(),
+                          alignment: const AlignmentDirectional(-1.0, -1.0),
                           child: Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 0.0, 10.0, 0.0, 0.0),
                             child: InkWell(
                               splashColor: Colors.transparent,
@@ -103,13 +100,13 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                     ),
                     Container(
                       width: double.infinity,
-                      decoration: BoxDecoration(),
+                      decoration: const BoxDecoration(),
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 20.0, 0.0, 20.0, 0.0),
                             child: Text(
                               'Visitas pendientes por sincronizar',
@@ -133,7 +130,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                   ),
                             ),
                           ),
-                        ].divide(SizedBox(height: 5.0)),
+                        ].divide(const SizedBox(height: 5.0)),
                       ),
                     ),
                   ],
@@ -143,7 +140,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                 child: Column(
                   children: [
                     Align(
-                      alignment: Alignment(0.0, 0),
+                      alignment: const Alignment(0.0, 0),
                       child: TabBar(
                         labelColor: FlutterFlowTheme.of(context).info,
                         unselectedLabelColor:
@@ -185,7 +182,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                       .fontStyle,
                                 ),
                         indicatorColor: FlutterFlowTheme.of(context).primary,
-                        tabs: [
+                        tabs: const [
                           Tab(
                             text: 'Resumen',
                           ),
@@ -210,16 +207,16 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                 child: Container(
                                   width: double.infinity,
                                   height: 220.0,
-                                  decoration: BoxDecoration(),
+                                  decoration: const BoxDecoration(),
                                   child: Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
+                                    padding: const EdgeInsetsDirectional.fromSTEB(
                                         10.0, 0.0, 5.0, 0.0),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Expanded(
                                           child: Padding(
-                                            padding: EdgeInsets.all(8.0),
+                                            padding: const EdgeInsets.all(8.0),
                                             child: InkWell(
                                               splashColor: Colors.transparent,
                                               focusColor: Colors.transparent,
@@ -238,7 +235,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                   }.withoutNulls,
                                                   extra: <String, dynamic>{
                                                     kTransitionInfoKey:
-                                                        TransitionInfo(
+                                                        const TransitionInfo(
                                                       hasTransition: true,
                                                       transitionType:
                                                           PageTransitionType
@@ -254,7 +251,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                   color: FlutterFlowTheme.of(
                                                           context)
                                                       .secondaryBackground,
-                                                  boxShadow: [
+                                                  boxShadow: const [
                                                     BoxShadow(
                                                       blurRadius: 6.0,
                                                       color: Color(0x33000000),
@@ -269,7 +266,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                           16.0),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           15.0, 5.0, 15.0, 5.0),
                                                   child: Column(
@@ -284,7 +281,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                       Expanded(
                                                         child: Container(
                                                           decoration:
-                                                              BoxDecoration(),
+                                                              const BoxDecoration(),
                                                           child: Builder(
                                                             builder: (context) {
                                                               final resumenAddItem = functions
@@ -316,7 +313,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                           resumenAddItemIndex];
                                                                   return Padding(
                                                                     padding:
-                                                                        EdgeInsets.all(
+                                                                        const EdgeInsets.all(
                                                                             6.0),
                                                                     child:
                                                                         Container(
@@ -324,7 +321,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                           BoxDecoration(
                                                                         color: FlutterFlowTheme.of(context)
                                                                             .secondaryBackground,
-                                                                        boxShadow: [
+                                                                        boxShadow: const [
                                                                           BoxShadow(
                                                                             blurRadius:
                                                                                 4.0,
@@ -343,7 +340,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                       child:
                                                                           Padding(
                                                                         padding:
-                                                                            EdgeInsets.all(8.0),
+                                                                            const EdgeInsets.all(8.0),
                                                                         child:
                                                                             Row(
                                                                           mainAxisSize:
@@ -356,12 +353,12 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                 mainAxisSize: MainAxisSize.max,
                                                                                 children: [
                                                                                   Padding(
-                                                                                    padding: EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
+                                                                                    padding: const EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
                                                                                     child: Text(
-                                                                                      '${getJsonField(
+                                                                                      getJsonField(
                                                                                         resumenAddItemItem,
                                                                                         r'''$.name_activity''',
-                                                                                      ).toString()}',
+                                                                                      ).toString(),
                                                                                       textAlign: TextAlign.center,
                                                                                       style: FlutterFlowTheme.of(context).bodyMedium.override(
                                                                                             font: TextStyle(fontFamily: 'Roboto',
@@ -397,7 +394,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                         itemBuilder: (context, statusItemIndex) {
                                                                                           final statusItemItem = statusItem[statusItemIndex];
                                                                                           return Padding(
-                                                                                            padding: EdgeInsetsDirectional.fromSTEB(0.0, 5.0, 0.0, 0.0),
+                                                                                            padding: const EdgeInsetsDirectional.fromSTEB(0.0, 5.0, 0.0, 0.0),
                                                                                             child: Text(
                                                                                               '${getJsonField(
                                                                                                 statusItemItem,
@@ -438,7 +435,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                         ),
                                                       ),
                                                     ].divide(
-                                                        SizedBox(height: 5.0)),
+                                                        const SizedBox(height: 5.0)),
                                                   ),
                                                 ),
                                               ),
@@ -459,16 +456,16 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                 child: Container(
                                   width: double.infinity,
                                   height: 220.0,
-                                  decoration: BoxDecoration(),
+                                  decoration: const BoxDecoration(),
                                   child: Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
+                                    padding: const EdgeInsetsDirectional.fromSTEB(
                                         10.0, 0.0, 5.0, 0.0),
                                     child: Row(
                                       mainAxisSize: MainAxisSize.max,
                                       children: [
                                         Expanded(
                                           child: Padding(
-                                            padding: EdgeInsets.all(8.0),
+                                            padding: const EdgeInsets.all(8.0),
                                             child: InkWell(
                                               splashColor: Colors.transparent,
                                               focusColor: Colors.transparent,
@@ -487,7 +484,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                   }.withoutNulls,
                                                   extra: <String, dynamic>{
                                                     kTransitionInfoKey:
-                                                        TransitionInfo(
+                                                        const TransitionInfo(
                                                       hasTransition: true,
                                                       transitionType:
                                                           PageTransitionType
@@ -503,7 +500,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                   color: FlutterFlowTheme.of(
                                                           context)
                                                       .secondaryBackground,
-                                                  boxShadow: [
+                                                  boxShadow: const [
                                                     BoxShadow(
                                                       blurRadius: 6.0,
                                                       color: Color(0x33000000),
@@ -518,7 +515,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                           16.0),
                                                 ),
                                                 child: Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           15.0, 5.0, 15.0, 5.0),
                                                   child: Column(
@@ -532,7 +529,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                     children: [
                                                       Padding(
                                                         padding:
-                                                            EdgeInsetsDirectional
+                                                            const EdgeInsetsDirectional
                                                                 .fromSTEB(
                                                                     0.0,
                                                                     5.0,
@@ -573,7 +570,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                       Expanded(
                                                         child: Container(
                                                           decoration:
-                                                              BoxDecoration(),
+                                                              const BoxDecoration(),
                                                           child: Builder(
                                                             builder: (context) {
                                                               final visitAddItem =
@@ -601,7 +598,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                           visitAddItemIndex];
                                                                   return Padding(
                                                                     padding:
-                                                                        EdgeInsets.all(
+                                                                        const EdgeInsets.all(
                                                                             6.0),
                                                                     child:
                                                                         InkWell(
@@ -634,7 +631,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                           extra: <String,
                                                                               dynamic>{
                                                                             kTransitionInfoKey:
-                                                                                TransitionInfo(
+                                                                                const TransitionInfo(
                                                                               hasTransition: true,
                                                                               transitionType: PageTransitionType.fade,
                                                                               duration: Duration(milliseconds: 800),
@@ -648,7 +645,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                             BoxDecoration(
                                                                           color:
                                                                               FlutterFlowTheme.of(context).secondaryBackground,
-                                                                          boxShadow: [
+                                                                          boxShadow: const [
                                                                             BoxShadow(
                                                                               blurRadius: 4.0,
                                                                               color: Color(0x33000000),
@@ -664,7 +661,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                         child:
                                                                             Padding(
                                                                           padding:
-                                                                              EdgeInsets.all(8.0),
+                                                                              const EdgeInsets.all(8.0),
                                                                           child:
                                                                               Row(
                                                                             mainAxisSize:
@@ -677,7 +674,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                   mainAxisSize: MainAxisSize.max,
                                                                                   children: [
                                                                                     Padding(
-                                                                                      padding: EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
+                                                                                      padding: const EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
                                                                                       child: Text(
                                                                                         'a',
                                                                                         textAlign: TextAlign.center,
@@ -694,7 +691,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                       ),
                                                                                     ),
                                                                                     Padding(
-                                                                                      padding: EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
+                                                                                      padding: const EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
                                                                                       child: Text(
                                                                                         dateTimeFormat(
                                                                                           "M/d h:mm a",
@@ -722,7 +719,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                   mainAxisSize: MainAxisSize.max,
                                                                                   children: [
                                                                                     Padding(
-                                                                                      padding: EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
+                                                                                      padding: const EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
                                                                                       child: Text(
                                                                                         'a',
                                                                                         textAlign: TextAlign.center,
@@ -739,7 +736,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                                                       ),
                                                                                     ),
                                                                                     Padding(
-                                                                                      padding: EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
+                                                                                      padding: const EdgeInsetsDirectional.fromSTEB(0.0, 10.0, 0.0, 0.0),
                                                                                       child: Text(
                                                                                         'Coordenadas ${visitAddItemItem.locationsAdd.length.toString()}',
                                                                                         textAlign: TextAlign.center,
@@ -771,7 +768,7 @@ class _DetailsInfoPageWidgetState extends State<DetailsInfoPageWidget>
                                                         ),
                                                       ),
                                                     ].divide(
-                                                        SizedBox(height: 5.0)),
+                                                        const SizedBox(height: 5.0)),
                                                   ),
                                                 ),
                                               ),

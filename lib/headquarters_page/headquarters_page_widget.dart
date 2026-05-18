@@ -1,10 +1,8 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
-import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -113,7 +111,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
           child: Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -131,13 +129,13 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                 // Header moderno
                 Container(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 10.0),
+                      const EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 10.0),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Color(0xFF00a86b).withOpacity(0.15),
+                        const Color(0xFF00a86b).withValues(alpha: 0.15),
                         Colors.transparent,
                       ],
                     ),
@@ -163,17 +161,17 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.white.withOpacity(0.2),
-                                    Colors.white.withOpacity(0.1),
+                                    Colors.white.withValues(alpha: 0.2),
+                                    Colors.white.withValues(alpha: 0.1),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Color(0xFF00a86b).withOpacity(0.3),
+                                  color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.chevron_left_rounded,
                                 color: Color(0xFF00ff9f),
                                 size: 28,
@@ -181,7 +179,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             ),
                           ),
                           // Logo
-                          Container(
+                          SizedBox(
                             width: 140,
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8.0),
@@ -193,10 +191,10 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             ),
                           ),
                           // Espaciador para balance
-                          SizedBox(width: 44),
+                          const SizedBox(width: 44),
                         ],
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       // Título
                       Text(
                         'Lista de lotes',
@@ -214,7 +212,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                           ],
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       // Campo de búsqueda mejorado
                       Container(
                         decoration: BoxDecoration(
@@ -222,20 +220,20 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Colors.white.withOpacity(0.15),
-                              Colors.white.withOpacity(0.05),
+                              Colors.white.withValues(alpha: 0.15),
+                              Colors.white.withValues(alpha: 0.05),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Color(0xFF00a86b).withOpacity(0.3),
+                            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                             width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
                               blurRadius: 15,
-                              color: Color(0xFF00a86b).withOpacity(0.2),
-                              offset: Offset(0, 6),
+                              color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+                              offset: const Offset(0, 6),
                               spreadRadius: 0,
                             ),
                           ],
@@ -245,16 +243,16 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                             child: Padding(
-                              padding: EdgeInsets.symmetric(
+                              padding: const EdgeInsets.symmetric(
                                   horizontal: 12, vertical: 2),
                               child: Row(
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.search_rounded,
                                     color: Color(0xFF00ff9f),
                                     size: 20,
                                   ),
-                                  SizedBox(width: 10),
+                                  const SizedBox(width: 10),
                                   Expanded(
                                     child: TextFormField(
                                       controller: _model.textController,
@@ -268,7 +266,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         labelStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: TextStyle(fontFamily: 'Roboto',
+                                              font: const TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
                                               color: Colors.white.withValues(alpha: 0.7),
@@ -278,7 +276,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         hintStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: TextStyle(fontFamily: 'Roboto',),
+                                              font: const TextStyle(fontFamily: 'Roboto',),
                                               color: Colors.white.withValues(alpha: 0.5),
                                               letterSpacing: 0.0,
                                             ),
@@ -288,26 +286,26 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         focusedErrorBorder: InputBorder.none,
                                         filled: false,
                                         contentPadding:
-                                            EdgeInsets.symmetric(vertical: 8),
+                                            const EdgeInsets.symmetric(vertical: 8),
                                       ),
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: TextStyle(fontFamily: 'Roboto',
+                                            font: const TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.w600,
                                             ),
                                             color: Colors.white,
                                             fontSize: 15,
                                             letterSpacing: 0.3,
                                           ),
-                                      cursorColor: Color(0xFF00ff9f),
+                                      cursorColor: const Color(0xFF00ff9f),
                                       validator: _model.textControllerValidator
                                           .asValidator(context),
                                     ),
                                   ),
                                   if (_model.textController?.text.isNotEmpty ?? false)
                                     Padding(
-                                      padding: EdgeInsets.only(left: 4),
+                                      padding: const EdgeInsets.only(left: 4),
                                       child: InkWell(
                                         onTap: () {
                                           _model.textController?.clear();
@@ -315,8 +313,8 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                         },
                                         child: Icon(
                                           Icons.clear_rounded,
-                                          color: Color(0xFF00ff9f)
-                                              .withOpacity(0.7),
+                                          color: const Color(0xFF00ff9f)
+                                              .withValues(alpha: 0.7),
                                           size: 20,
                                         ),
                                       ),
@@ -331,7 +329,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                   ),
                 ),
 
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
 
                 // Banner de instrucciones contextual (solo cuando se abre desde NFC install)
                 if (widget.instructions != null)
@@ -372,38 +370,38 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
 
                 // Contador de lotes seleccionados
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Container(
                         padding:
-                            EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Color(0xFF00a86b).withOpacity(0.3),
-                              Color(0xFF00a86b).withOpacity(0.1),
+                              const Color(0xFF00a86b).withValues(alpha: 0.3),
+                              const Color(0xFF00a86b).withValues(alpha: 0.1),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Color(0xFF00a86b).withOpacity(0.3),
+                            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.grid_view_rounded,
                               color: Color(0xFF00ff9f),
                               size: 18,
                             ),
-                            SizedBox(width: 8),
+                            const SizedBox(width: 8),
                             Text(
                               '${filteredHeadquarters.length} lote${filteredHeadquarters.length != 1 ? 's' : ''}',
-                              style: TextStyle(fontFamily: 'Roboto',
+                              style: const TextStyle(fontFamily: 'Roboto',
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                                 color: Color(0xFF00ff9f),
@@ -415,7 +413,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       ),
                       if (selectedCount > 0)
                         Container(
-                          padding: EdgeInsets.symmetric(
+                          padding: const EdgeInsets.symmetric(
                               horizontal: 12, vertical: 6),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -423,7 +421,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                 FlutterFlowTheme.of(context).primary,
                                 FlutterFlowTheme.of(context)
                                     .primary
-                                    .withOpacity(0.7),
+                                    .withValues(alpha: 0.7),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
@@ -432,23 +430,23 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                 blurRadius: 8,
                                 color: FlutterFlowTheme.of(context)
                                     .primary
-                                    .withOpacity(0.4),
-                                offset: Offset(0, 4),
+                                    .withValues(alpha: 0.4),
+                                offset: const Offset(0, 4),
                               ),
                             ],
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.check_circle_rounded,
                                 color: Colors.white,
                                 size: 18,
                               ),
-                              SizedBox(width: 8),
+                              const SizedBox(width: 8),
                               Text(
                                 '$selectedCount seleccionado${selectedCount != 1 ? 's' : ''}',
-                                style: TextStyle(fontFamily: 'Roboto',
+                                style: const TextStyle(fontFamily: 'Roboto',
                                   fontSize: 13,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
@@ -462,7 +460,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                   ),
                 ),
 
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
 
                 // Grid de lotes
                 Expanded(
@@ -484,7 +482,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                 decoration: BoxDecoration(
                                   gradient: RadialGradient(
                                     colors: [
-                                      Color(0xFF00a86b).withOpacity(0.3),
+                                      const Color(0xFF00a86b).withValues(alpha: 0.3),
                                       Colors.transparent,
                                     ],
                                   ),
@@ -492,27 +490,27 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                                 ),
                                 child: Icon(
                                   Icons.search_off_rounded,
-                                  color: Color(0xFF00ff9f).withOpacity(0.5),
+                                  color: const Color(0xFF00ff9f).withValues(alpha: 0.5),
                                   size: 40,
                                 ),
                               ),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               Text(
                                 'No se encontraron lotes',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.7),
+                                  color: Colors.white.withValues(alpha: 0.7),
                                   letterSpacing: 0.5,
                                 ),
                               ),
-                              SizedBox(height: 8),
+                              const SizedBox(height: 8),
                               Text(
                                 'Intenta con otra búsqueda',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha: 0.5),
                                   letterSpacing: 0.3,
                                 ),
                               ),
@@ -520,9 +518,9 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                           ),
                         )
                       : GridView.builder(
-                          padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                           gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
+                              const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             crossAxisSpacing: 12.0,
                             mainAxisSpacing: 12.0,
@@ -547,7 +545,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
 
                 // Botón Continuar moderno
                 Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                   child: InkWell(
                     splashColor: Colors.transparent,
                     focusColor: Colors.transparent,
@@ -567,7 +565,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             FlutterFlowTheme.of(context).primary,
                             FlutterFlowTheme.of(context)
                                 .primary
-                                .withOpacity(0.8),
+                                .withValues(alpha: 0.8),
                           ],
                         ),
                         borderRadius: BorderRadius.circular(16),
@@ -576,8 +574,8 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                             blurRadius: 20,
                             color: FlutterFlowTheme.of(context)
                                 .primary
-                                .withOpacity(0.4),
-                            offset: Offset(0, 8),
+                                .withValues(alpha: 0.4),
+                            offset: const Offset(0, 8),
                             spreadRadius: 2,
                           ),
                         ],
@@ -585,12 +583,12 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.check_circle_rounded,
                             color: Colors.white,
                             size: 24,
                           ),
-                          SizedBox(width: 12),
+                          const SizedBox(width: 12),
                           Text(
                             'Continuar',
                             style: TextStyle(fontFamily: 'Roboto',
@@ -600,7 +598,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                               color: Colors.white,
                               shadows: [
                                 Shadow(
-                                  color: Colors.black.withOpacity(0.3),
+                                  color: Colors.black.withValues(alpha: 0.3),
                                   blurRadius: 8,
                                 ),
                               ],
@@ -651,27 +649,27 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
             colors: isSelected
                 ? [
                     FlutterFlowTheme.of(context).primary,
-                    FlutterFlowTheme.of(context).primary.withOpacity(0.7),
+                    FlutterFlowTheme.of(context).primary.withValues(alpha: 0.7),
                   ]
                 : [
-                    Colors.white.withOpacity(0.15),
-                    Colors.white.withOpacity(0.05),
+                    Colors.white.withValues(alpha: 0.15),
+                    Colors.white.withValues(alpha: 0.05),
                   ],
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isSelected
                 ? FlutterFlowTheme.of(context).primary
-                : Color(0xFF00a86b).withOpacity(0.3),
+                : const Color(0xFF00a86b).withValues(alpha: 0.3),
             width: isSelected ? 2 : 1.5,
           ),
           boxShadow: [
             BoxShadow(
               blurRadius: 15,
               color: isSelected
-                  ? FlutterFlowTheme.of(context).primary.withOpacity(0.4)
-                  : Color(0xFF00a86b).withOpacity(0.2),
-              offset: Offset(0, 6),
+                  ? FlutterFlowTheme.of(context).primary.withValues(alpha: 0.4)
+                  : const Color(0xFF00a86b).withValues(alpha: 0.2),
+              offset: const Offset(0, 6),
               spreadRadius: 0,
             ),
           ],
@@ -681,7 +679,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -693,11 +691,11 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                       gradient: RadialGradient(
                         colors: isSelected
                             ? [
-                                Colors.white.withOpacity(0.3),
+                                Colors.white.withValues(alpha: 0.3),
                                 Colors.transparent,
                               ]
                             : [
-                                Color(0xFF00a86b).withOpacity(0.3),
+                                const Color(0xFF00a86b).withValues(alpha: 0.3),
                                 Colors.transparent,
                               ],
                       ),
@@ -717,7 +715,7 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
                         textAlign: TextAlign.center,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,

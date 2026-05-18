@@ -1,12 +1,8 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -309,8 +305,8 @@ class _LoadResourcesMapTilesState extends State<LoadResourcesMapTiles>
       Wrap(spacing: 6, runSpacing: 6, children: [
         _Chip(Icons.storage_rounded,
             totalBytes > 0 ? _fmtBytes(totalBytes) : '— MB'),
-        _Chip(Icons.wifi_rounded, 'Recomendado WiFi'),
-        _Chip(Icons.place_rounded, 'Colombia'),
+        const _Chip(Icons.wifi_rounded, 'Recomendado WiFi'),
+        const _Chip(Icons.place_rounded, 'Colombia'),
       ]),
       const SizedBox(height: 14),
       if (isComplete) ...[
@@ -417,10 +413,15 @@ class _LoadResourcesMapTilesState extends State<LoadResourcesMapTiles>
 
     // Color de borde según estado
     Color borderColor;
-    if (isActive) borderColor = _greenLight.withValues(alpha: 0.5);
-    else if (isDownloaded) borderColor = _greenLight.withValues(alpha: 0.25);
-    else if (isError) borderColor = _errorColor.withValues(alpha: 0.35);
-    else borderColor = _cardBorder.withValues(alpha: 0.2);
+    if (isActive) {
+      borderColor = _greenLight.withValues(alpha: 0.5);
+    } else if (isDownloaded) {
+      borderColor = _greenLight.withValues(alpha: 0.25);
+    } else if (isError) {
+      borderColor = _errorColor.withValues(alpha: 0.35);
+    } else {
+      borderColor = _cardBorder.withValues(alpha: 0.2);
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),

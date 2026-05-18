@@ -1,11 +1,10 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:async';
 import 'dart:ui';
-import 'dart:math' as Math;
+import 'dart:math' as math;
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -54,7 +53,7 @@ class _CalculateCoordenatesComponentWidgetState
     // Animación de pulso para el círculo exterior
     _pulseController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
 
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
@@ -64,7 +63,7 @@ class _CalculateCoordenatesComponentWidgetState
     // Animación de rotación para decoración
     _rotationController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 10),
+      duration: const Duration(seconds: 10),
     )..repeat();
 
     _rotationAnimation = Tween<double>(begin: 0, end: 2 * 3.14159).animate(_rotationController);
@@ -72,7 +71,7 @@ class _CalculateCoordenatesComponentWidgetState
     // Animación de escala para entrada
     _scaleController = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 800),
     );
 
     _scaleAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
@@ -113,7 +112,7 @@ class _CalculateCoordenatesComponentWidgetState
     return Container(
       width: double.infinity,
       height: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -139,17 +138,17 @@ class _CalculateCoordenatesComponentWidgetState
                       final angle = _rotationAnimation.value + (index * 0.4);
                       final radius = 150.0 + (index * 15);
                       return Positioned(
-                        left: MediaQuery.of(context).size.width / 2 + radius * Math.cos(angle) - 4,
-                        top: MediaQuery.of(context).size.height / 2 + radius * Math.sin(angle) - 4,
+                        left: MediaQuery.of(context).size.width / 2 + radius * math.cos(angle) - 4,
+                        top: MediaQuery.of(context).size.height / 2 + radius * math.sin(angle) - 4,
                         child: Container(
                           width: 8,
                           height: 8,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: Color(0xFF00FF7F).withOpacity(0.3 - (index * 0.015)),
+                            color: const Color(0xFF00FF7F).withValues(alpha: 0.3 - (index * 0.015)),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFF00FF7F).withOpacity(0.4),
+                                color: const Color(0xFF00FF7F).withValues(alpha: 0.4),
                                 blurRadius: 8,
                                 spreadRadius: 2,
                               ),
@@ -168,12 +167,12 @@ class _CalculateCoordenatesComponentWidgetState
                     children: [
                       // Logo con efecto de brillo
                       Container(
-                        padding: EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           gradient: RadialGradient(
                             colors: [
-                              Color(0xFF00FF7F).withOpacity(0.2),
+                              const Color(0xFF00FF7F).withValues(alpha: 0.2),
                               Colors.transparent,
                             ],
                           ),
@@ -189,7 +188,7 @@ class _CalculateCoordenatesComponentWidgetState
                         ),
                       ),
 
-                      SizedBox(height: 40),
+                      const SizedBox(height: 40),
 
                       // Timer circular animado
                       AnimatedBuilder(
@@ -207,7 +206,7 @@ class _CalculateCoordenatesComponentWidgetState
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     border: Border.all(
-                                      color: Color(0xFF00FF7F).withOpacity(0.3),
+                                      color: const Color(0xFF00FF7F).withValues(alpha: 0.3),
                                       width: 2,
                                     ),
                                   ),
@@ -227,12 +226,12 @@ class _CalculateCoordenatesComponentWidgetState
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                           colors: [
-                                            Color(0xFF00FF7F).withOpacity(0.2),
-                                            Color(0xFF00B4D8).withOpacity(0.1),
+                                            const Color(0xFF00FF7F).withValues(alpha: 0.2),
+                                            const Color(0xFF00B4D8).withValues(alpha: 0.1),
                                           ],
                                         ),
                                         border: Border.all(
-                                          color: Colors.white.withOpacity(0.2),
+                                          color: Colors.white.withValues(alpha: 0.2),
                                           width: 1.5,
                                         ),
                                       ),
@@ -246,19 +245,23 @@ class _CalculateCoordenatesComponentWidgetState
                                             milliSecond: false,
                                           ),
                                           controller: _model.timerController,
-                                          updateStateInterval: Duration(milliseconds: 1000),
+                                          updateStateInterval: const Duration(milliseconds: 1000),
                                           onChanged: (value, displayTime, shouldUpdate) {
                                             _model.timerMilliseconds = value;
                                             _model.timerValue = displayTime;
                                             if (shouldUpdate) safeSetState(() {});
                                           },
                                           onEnded: () async {
-                var _shouldSetState = false;
+                var shouldSetState = false;
+                final routerBranch1 = GoRouter.of(context);
+                final navigatorBranch2 = Navigator.of(context);
                 if (functions.jsonDynamicToString(getJsonField(
                       FFAppState().activitySelectedJSON,
                       r'''$.type_activity''',
                     )) ==
                     'FORMULARIO') {
+                  final messengerBranch1 = ScaffoldMessenger.of(context);
+                  final themeBranch1 = FlutterFlowTheme.of(context);
                   _model.visitCreated = await actions.createVisit(
                     context,
                     0,
@@ -283,9 +286,13 @@ class _CalculateCoordenatesComponentWidgetState
                     ' ',
                     FFAppState().visitDetails.toList(),
                   );
-                  _shouldSetState = true;
+                  shouldSetState = true;
                   _model.countVisits = await actions.getVisitsCount();
-                  _shouldSetState = true;
+                  shouldSetState = true;
+                  if (!mounted) {
+                    if (shouldSetState) safeSetState(() {});
+                    return;
+                  }
                   FFAppState().visitCount = _model.countVisits!;
                   safeSetState(() {});
                   FFAppState().visitDetails = functions
@@ -293,44 +300,48 @@ class _CalculateCoordenatesComponentWidgetState
                       .toList()
                       .cast<VisitsDetailsStruct>();
                   safeSetState(() {});
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messengerBranch1.clearSnackBars();
+                  messengerBranch1.showSnackBar(
                     SnackBar(
                       content: Text(
                         'Visita registrada con éxito. Total visitas: ${FFAppState().visitCount.toString()}',
                         style:
-                            FlutterFlowTheme.of(context).titleMedium.override(
+                            themeBranch1.titleMedium.override(
                                   font: TextStyle(fontFamily: 'Roboto',
-                                    fontWeight: FlutterFlowTheme.of(context)
+                                    fontWeight: themeBranch1
                                         .titleMedium
                                         .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
+                                    fontStyle: themeBranch1
                                         .titleMedium
                                         .fontStyle,
                                   ),
-                                  color: FlutterFlowTheme.of(context)
+                                  color: themeBranch1
                                       .secondaryBackground,
                                   fontSize: 20.0,
                                   letterSpacing: 0.0,
-                                  fontWeight: FlutterFlowTheme.of(context)
+                                  fontWeight: themeBranch1
                                       .titleMedium
                                       .fontWeight,
-                                  fontStyle: FlutterFlowTheme.of(context)
+                                  fontStyle: themeBranch1
                                       .titleMedium
                                       .fontStyle,
                                 ),
                       ),
-                      duration: Duration(milliseconds: 2000),
-                      backgroundColor: FlutterFlowTheme.of(context).primary,
+                      duration: const Duration(milliseconds: 2000),
+                      backgroundColor: themeBranch1.primary,
                     ),
                   );
 
                   unawaited(actions.announceVisitVoice());
 
-                  context.pushNamed(
+                  if (!mounted) {
+                    if (shouldSetState) safeSetState(() {});
+                    return;
+                  }
+                  routerBranch1.pushNamed(
                     DoVisitsFormPageWidget.routeName,
                     extra: <String, dynamic>{
-                      kTransitionInfoKey: TransitionInfo(
+                      kTransitionInfoKey: const TransitionInfo(
                         hasTransition: true,
                         transitionType: PageTransitionType.fade,
                         duration: Duration(milliseconds: 500),
@@ -338,9 +349,11 @@ class _CalculateCoordenatesComponentWidgetState
                     },
                   );
 
-                  if (_shouldSetState) safeSetState(() {});
+                  if (shouldSetState) safeSetState(() {});
                   return;
                 } else {
+                  final messengerBranch2 = ScaffoldMessenger.of(context);
+                  final themeBranch2 = FlutterFlowTheme.of(context);
                   _model.visitCreated2 = await actions.createVisit(
                     context,
                     0,
@@ -365,63 +378,71 @@ class _CalculateCoordenatesComponentWidgetState
                     ' ',
                     FFAppState().visitDetails.toList(),
                   );
-                  _shouldSetState = true;
+                  shouldSetState = true;
                   _model.countVisits1 = await actions.getVisitsCount();
-                  _shouldSetState = true;
+                  shouldSetState = true;
+                  if (!mounted) {
+                    if (shouldSetState) safeSetState(() {});
+                    return;
+                  }
                   FFAppState().visitCount = _model.countVisits1!;
                   safeSetState(() {});
                   FFAppState().visitDetails = [];
-                  ScaffoldMessenger.of(context).clearSnackBars();
-                  ScaffoldMessenger.of(context).showSnackBar(
+                  messengerBranch2.clearSnackBars();
+                  messengerBranch2.showSnackBar(
                     SnackBar(
                       content: Text(
                         'Visita registrada con éxito. Total visitas: ${FFAppState().visitCount.toString()}',
                         style:
-                            FlutterFlowTheme.of(context).titleMedium.override(
+                            themeBranch2.titleMedium.override(
                                   font: TextStyle(fontFamily: 'Roboto',
-                                    fontWeight: FlutterFlowTheme.of(context)
+                                    fontWeight: themeBranch2
                                         .titleMedium
                                         .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
+                                    fontStyle: themeBranch2
                                         .titleMedium
                                         .fontStyle,
                                   ),
-                                  color: FlutterFlowTheme.of(context)
+                                  color: themeBranch2
                                       .secondaryBackground,
                                   fontSize: 20.0,
                                   letterSpacing: 0.0,
-                                  fontWeight: FlutterFlowTheme.of(context)
+                                  fontWeight: themeBranch2
                                       .titleMedium
                                       .fontWeight,
-                                  fontStyle: FlutterFlowTheme.of(context)
+                                  fontStyle: themeBranch2
                                       .titleMedium
                                       .fontStyle,
                                 ),
                       ),
-                      duration: Duration(milliseconds: 2000),
-                      backgroundColor: FlutterFlowTheme.of(context).primary,
+                      duration: const Duration(milliseconds: 2000),
+                      backgroundColor: themeBranch2.primary,
                     ),
                   );
                   unawaited(actions.announceVisitVoice());
-                  Navigator.pop(context);
-                  if (_shouldSetState) safeSetState(() {});
+                  if (!mounted) {
+                    if (shouldSetState) safeSetState(() {});
+                    return;
+                  }
+                  navigatorBranch2.pop();
+                  if (shouldSetState) safeSetState(() {});
                   return;
                 }
 
-                if (_shouldSetState) safeSetState(() {});
+                if (shouldSetState) safeSetState(() {});
               },
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 80,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF00FF7F),
+                color: const Color(0xFF00FF7F),
                 letterSpacing: 4,
                 shadows: [
                   Shadow(
-                    color: Color(0xFF00FF7F).withOpacity(0.5),
+                    color: const Color(0xFF00FF7F).withValues(alpha: 0.5),
                     blurRadius: 20,
                   ),
-                  Shadow(
+                  const Shadow(
                     color: Color(0xFF00FF7F),
                     blurRadius: 40,
                   ),
@@ -439,7 +460,7 @@ class _CalculateCoordenatesComponentWidgetState
                                   height: 60,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    gradient: LinearGradient(
+                                    gradient: const LinearGradient(
                                       colors: [
                                         Color(0xFF00FF7F),
                                         Color(0xFF00B4D8),
@@ -447,13 +468,13 @@ class _CalculateCoordenatesComponentWidgetState
                                     ),
                                     boxShadow: [
                                       BoxShadow(
-                                        color: Color(0xFF00FF7F).withOpacity(0.6),
+                                        color: const Color(0xFF00FF7F).withValues(alpha: 0.6),
                                         blurRadius: 20,
                                         spreadRadius: 5,
                                       ),
                                     ],
                                   ),
-                                  child: Icon(
+                                  child: const Icon(
                                     Icons.my_location_rounded,
                                     color: Colors.white,
                                     size: 30,
@@ -465,7 +486,7 @@ class _CalculateCoordenatesComponentWidgetState
                         },
                       ),
 
-                      SizedBox(height: 50),
+                      const SizedBox(height: 50),
 
                       // Texto principal con efecto glassmorphism
                       ClipRRect(
@@ -473,26 +494,26 @@ class _CalculateCoordenatesComponentWidgetState
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                           child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-                            margin: EdgeInsets.symmetric(horizontal: 30),
+                            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
+                            margin: const EdgeInsets.symmetric(horizontal: 30),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Colors.white.withOpacity(0.1),
-                                  Colors.white.withOpacity(0.05),
+                                  Colors.white.withValues(alpha: 0.1),
+                                  Colors.white.withValues(alpha: 0.05),
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 width: 1.5,
                               ),
                             ),
                             child: Column(
                               children: [
-                                Row(
+                                const Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
@@ -513,14 +534,14 @@ class _CalculateCoordenatesComponentWidgetState
                                     ),
                                   ],
                                 ),
-                                SizedBox(height: 12),
+                                const SizedBox(height: 12),
                                 Text(
                                   'Calculando ubicación exacta del dispositivo',
                                   textAlign: TextAlign.center,
                                   style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 15,
                                     fontWeight: FontWeight.w400,
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: Colors.white.withValues(alpha: 0.8),
                                     height: 1.4,
                                   ),
                                 ),
@@ -530,7 +551,7 @@ class _CalculateCoordenatesComponentWidgetState
                         ),
                       ),
 
-                      SizedBox(height: 30),
+                      const SizedBox(height: 30),
 
                       // Indicador de progreso
                       Row(
@@ -542,15 +563,15 @@ class _CalculateCoordenatesComponentWidgetState
                               final delay = index * 0.3;
                               final animation = (_pulseController.value + delay) % 1.0;
                               return Container(
-                                margin: EdgeInsets.symmetric(horizontal: 6),
+                                margin: const EdgeInsets.symmetric(horizontal: 6),
                                 width: 12,
                                 height: 12,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: Color(0xFF00FF7F).withOpacity(animation),
+                                  color: const Color(0xFF00FF7F).withValues(alpha: animation),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Color(0xFF00FF7F).withOpacity(animation * 0.6),
+                                      color: const Color(0xFF00FF7F).withValues(alpha: animation * 0.6),
                                       blurRadius: 8,
                                       spreadRadius: 2,
                                     ),

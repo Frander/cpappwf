@@ -2,7 +2,6 @@ import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -17,7 +16,7 @@ class ValidationSyncRouteWidget extends StatefulWidget {
     required this.idHeadquarter,
     required this.nameHeadquarter,
     bool? isTest,
-  }) : this.isTest = isTest ?? false;
+  }) : isTest = isTest ?? false;
 
   final int? idHeadquarter;
   final String? nameHeadquarter;
@@ -55,17 +54,17 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
     context.watch<FFAppState>();
 
     return Align(
-      alignment: AlignmentDirectional(0.0, 0.0),
+      alignment: const AlignmentDirectional(0.0, 0.0),
       child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
         child: Container(
           width: double.infinity,
-          constraints: BoxConstraints(
+          constraints: const BoxConstraints(
             maxWidth: 530.0,
           ),
           decoration: BoxDecoration(
             color: FlutterFlowTheme.of(context).primaryBackground,
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 blurRadius: 3.0,
                 color: Color(0x33000000),
@@ -82,7 +81,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
             ),
           ),
           child: Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
+            padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
             child: Column(
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,15 +89,15 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                 Expanded(
                   child: Padding(
                     padding:
-                        EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
+                        const EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
+                          alignment: const AlignmentDirectional(0.0, 0.0),
                           child: Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 16.0),
                             child: Icon(
                               Icons.map,
@@ -108,7 +107,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                           ),
                         ),
                         Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
+                          alignment: const AlignmentDirectional(0.0, 0.0),
                           child: Text(
                             '¿Desea ver la ruta ideal para la labor de hoy?',
                             textAlign: TextAlign.center,
@@ -137,9 +136,9 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                           ),
                         ),
                         Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
+                          alignment: const AlignmentDirectional(0.0, 0.0),
                           child: Text(
-                            'Lote seleccionado ${widget!.nameHeadquarter}',
+                            'Lote seleccionado ${widget.nameHeadquarter}',
                             textAlign: TextAlign.center,
                             style: FlutterFlowTheme.of(context)
                                 .headlineMedium
@@ -167,12 +166,12 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                         ),
                         Expanded(
                           child: Align(
-                            alignment: AlignmentDirectional(-1.0, -1.0),
+                            alignment: const AlignmentDirectional(-1.0, -1.0),
                             child: Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 12.0, 0.0, 0.0),
                               child: Text(
-                                'Si continúa con la sincronización se validará que tenga una conexión estable a internet y luego se cargará la información que le indicará la ruta que debe seguir para lograr un máximo rendimiento en la labor, la carga puede tardar entre 1 y 3 minutos... ${widget!.isTest ? 'Se cargará la información de prueba' : ' '}',
+                                'Si continúa con la sincronización se validará que tenga una conexión estable a internet y luego se cargará la información que le indicará la ruta que debe seguir para lograr un máximo rendimiento en la labor, la carga puede tardar entre 1 y 3 minutos... ${widget.isTest ? 'Se cargará la información de prueba' : ' '}',
                                 style: FlutterFlowTheme.of(context)
                                     .labelMedium
                                     .override(
@@ -202,7 +201,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                 ),
                 Padding(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 12.0),
+                      const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 12.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -212,10 +211,11 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                         child: Builder(
                           builder: (context) => FFButtonWidget(
                             onPressed: () async {
-                              var _shouldSetState = false;
+                              var shouldSetState = false;
                               _model.checkInternetConnectionJSON =
                                   await actions.checkInternetQuality();
-                              _shouldSetState = true;
+                              shouldSetState = true;
+                              if (!context.mounted) return;
                               if (functions.jsonDynamicToBool(getJsonField(
                                     _model.checkInternetConnectionJSON,
                                     r'''$.isGoodConnection''',
@@ -224,7 +224,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                 context.pushNamed(
                                   MapVisitsPageWidget.routeName,
                                   extra: <String, dynamic>{
-                                    kTransitionInfoKey: TransitionInfo(
+                                    kTransitionInfoKey: const TransitionInfo(
                                       hasTransition: true,
                                       transitionType: PageTransitionType.fade,
                                       duration: Duration(milliseconds: 1000),
@@ -232,7 +232,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                   },
                                 );
 
-                                if (_shouldSetState) safeSetState(() {});
+                                if (shouldSetState) safeSetState(() {});
                                 return;
                               } else {
                                 await showDialog(
@@ -242,9 +242,9 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
-                                      child: Container(
+                                      child: SizedBox(
                                         height:
                                             MediaQuery.sizeOf(context).height *
                                                 0.5,
@@ -263,18 +263,18 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                   },
                                 );
 
-                                if (_shouldSetState) safeSetState(() {});
+                                if (shouldSetState) safeSetState(() {});
                                 return;
                               }
 
-                              if (_shouldSetState) safeSetState(() {});
+                              if (shouldSetState) safeSetState(() {});
                             },
                             text: 'Sincronizar',
                             options: FFButtonOptions(
                               height: 40.0,
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   20.0, 0.0, 20.0, 0.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
+                              iconPadding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 0.0),
                               color: FlutterFlowTheme.of(context).error,
                               textStyle: FlutterFlowTheme.of(context)
@@ -299,7 +299,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                         .fontStyle,
                                   ),
                               elevation: 0.0,
-                              borderSide: BorderSide(
+                              borderSide: const BorderSide(
                                 color: Colors.transparent,
                               ),
                               borderRadius: BorderRadius.circular(40.0),
@@ -320,7 +320,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                   context.pushNamed(
                                     DoVisitsFormPageWidget.routeName,
                                     extra: <String, dynamic>{
-                                      kTransitionInfoKey: TransitionInfo(
+                                      kTransitionInfoKey: const TransitionInfo(
                                         hasTransition: true,
                                         transitionType: PageTransitionType.fade,
                                         duration: Duration(milliseconds: 1000),
@@ -337,7 +337,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                       ),
                                     }.withoutNulls,
                                     extra: <String, dynamic>{
-                                      kTransitionInfoKey: TransitionInfo(
+                                      kTransitionInfoKey: const TransitionInfo(
                                         hasTransition: true,
                                         transitionType: PageTransitionType.fade,
                                         duration: Duration(milliseconds: 1000),
@@ -355,16 +355,16 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
-                                      child: Container(
+                                      child: SizedBox(
                                         height:
                                             MediaQuery.sizeOf(context).height *
                                                 0.6,
                                         width:
                                             MediaQuery.sizeOf(context).width *
                                                 0.9,
-                                        child: InfoDialogWidget(
+                                        child: const InfoDialogWidget(
                                           info:
                                               'Espere unos segundos mientras se carga el sistema GPS',
                                         ),
@@ -379,9 +379,9 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                             text: 'Omitir',
                             options: FFButtonOptions(
                               height: 40.0,
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   20.0, 0.0, 20.0, 0.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
+                              iconPadding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 0.0),
                               color: FlutterFlowTheme.of(context).primary,
                               textStyle: FlutterFlowTheme.of(context)
@@ -406,7 +406,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                                         .fontStyle,
                                   ),
                               elevation: 0.0,
-                              borderSide: BorderSide(
+                              borderSide: const BorderSide(
                                 color: Colors.transparent,
                               ),
                               borderRadius: BorderRadius.circular(40.0),
@@ -414,7 +414,7 @@ class _ValidationSyncRouteWidgetState extends State<ValidationSyncRouteWidget> {
                           ),
                         ),
                       ),
-                    ].divide(SizedBox(width: 5.0)),
+                    ].divide(const SizedBox(width: 5.0)),
                   ),
                 ),
               ],

@@ -1,12 +1,9 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -14,7 +11,6 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
 
 // ============================================================================
 // NOTA IMPORTANTE: BLUETOOTH
@@ -25,7 +21,6 @@ import 'package:intl/intl.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'dart:typed_data';
 import 'package:flutter/services.dart'; // Para MethodChannel
 import 'package:share_plus/share_plus.dart'; // Para compartir archivos
 import '/custom_code/platform_utils.dart';
@@ -552,6 +547,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
       await device.disconnect();
       debugPrint('🔌 Conexión cerrada');
 
+      if (!mounted) return;
       // Cerrar diálogo de progreso y mostrar éxito
       Navigator.of(context).pop();
       _showSuccessDialog(selectedFiles.length);
@@ -572,6 +568,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
         debugPrint('⚠️ Error al desconectar: $closeError');
       }
 
+      if (!mounted) return;
       // Cerrar diálogo de progreso
       if (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
@@ -673,7 +670,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
               }).then((_) {
                 if (countdown == 0 && dialogResult) {
                   // Auto cerrar después de 10 segundos
-                  if (Navigator.of(dialogContext).canPop()) {
+                  if (dialogContext.mounted && Navigator.of(dialogContext).canPop()) {
                     Navigator.of(dialogContext).pop(true);
                   }
                 }

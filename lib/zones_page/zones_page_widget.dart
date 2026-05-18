@@ -1,8 +1,6 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/index.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -53,7 +51,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
         key: scaffoldKey,
         backgroundColor: FlutterFlowTheme.of(context).primaryBackground,
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: Color(0xFF101827),
           ),
           child: Column(
@@ -61,7 +59,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
             children: [
               Container(
                 width: double.infinity,
-                decoration: BoxDecoration(),
+                decoration: const BoxDecoration(),
                 child: Column(
                   mainAxisSize: MainAxisSize.max,
                   mainAxisAlignment: MainAxisAlignment.center,
@@ -87,7 +85,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                         Container(
                           width: 124.09,
                           height: 53.2,
-                          decoration: BoxDecoration(),
+                          decoration: const BoxDecoration(),
                           child: ClipRRect(
                             borderRadius: BorderRadius.circular(8.0),
                             child: Image.asset(
@@ -99,7 +97,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                       ],
                     ),
                     Container(
-                      decoration: BoxDecoration(),
+                      decoration: const BoxDecoration(),
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -127,12 +125,12 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                 ),
                           ),
                           Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 10.0, 0.0, 10.0, 0.0),
                             child: Container(
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                boxShadow: [
+                                boxShadow: const [
                                   BoxShadow(
                                     blurRadius: 4.0,
                                     color: Color(0x33000000),
@@ -145,8 +143,8 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                 borderRadius: BorderRadius.circular(16.0),
                               ),
                               child: Padding(
-                                padding: EdgeInsets.all(6.0),
-                                child: Container(
+                                padding: const EdgeInsets.all(6.0),
+                                child: SizedBox(
                                   width: 200.0,
                                   child: TextFormField(
                                     controller: _model.textController,
@@ -206,7 +204,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                                     .fontStyle,
                                           ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
+                                        borderSide: const BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -214,7 +212,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                             BorderRadius.circular(8.0),
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
+                                        borderSide: const BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -277,7 +275,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                               ),
                             ),
                           ),
-                        ].divide(SizedBox(height: 10.0)),
+                        ].divide(const SizedBox(height: 10.0)),
                       ),
                     ),
                   ],
@@ -287,9 +285,9 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                 child: Container(
                   width: double.infinity,
                   height: double.infinity,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: Padding(
-                    padding: EdgeInsets.all(10.0),
+                    padding: const EdgeInsets.all(10.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       children: [
@@ -301,7 +299,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                               return GridView.builder(
                                 padding: EdgeInsets.zero,
                                 gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                    const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   crossAxisSpacing: 10.0,
                                   mainAxisSpacing: 10.0,
@@ -312,7 +310,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                 itemBuilder: (context, zoneItemIndex) {
                                   final zoneItemItem = zoneItem[zoneItemIndex];
                                   return Padding(
-                                    padding: EdgeInsetsDirectional.fromSTEB(
+                                    padding: const EdgeInsetsDirectional.fromSTEB(
                                         0.0, 5.0, 0.0, 0.0),
                                     child: InkWell(
                                       splashColor: Colors.transparent,
@@ -334,7 +332,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                         context.pushNamed(
                                           HeadquartersPageWidget.routeName,
                                           extra: <String, dynamic>{
-                                            kTransitionInfoKey: TransitionInfo(
+                                            kTransitionInfoKey: const TransitionInfo(
                                               hasTransition: true,
                                               transitionType: PageTransitionType
                                                   .leftToRight,
@@ -350,7 +348,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                         decoration: BoxDecoration(
                                           color: FlutterFlowTheme.of(context)
                                               .primaryBackground,
-                                          boxShadow: [
+                                          boxShadow: const [
                                             BoxShadow(
                                               blurRadius: 10.0,
                                               color: Color(0x33000000),
@@ -364,12 +362,12 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                               BorderRadius.circular(12.0),
                                         ),
                                         child: Padding(
-                                          padding: EdgeInsets.all(10.0),
+                                          padding: const EdgeInsets.all(10.0),
                                           child: Column(
                                             mainAxisSize: MainAxisSize.max,
                                             children: [
                                               Container(
-                                                decoration: BoxDecoration(),
+                                                decoration: const BoxDecoration(),
                                                 child: ClipRRect(
                                                   borderRadius:
                                                       BorderRadius.circular(
@@ -384,11 +382,11 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                               Expanded(
                                                 child: Align(
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                           0.0, 0.0),
                                                   child: Padding(
                                                     padding:
-                                                        EdgeInsetsDirectional
+                                                        const EdgeInsetsDirectional
                                                             .fromSTEB(0.0, 5.0,
                                                                 5.0, 5.0),
                                                     child: Column(
@@ -398,10 +396,10 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                                                         Expanded(
                                                           child: Align(
                                                             alignment:
-                                                                AlignmentDirectional(
+                                                                const AlignmentDirectional(
                                                                     0.0, 0.0),
                                                             child: Text(
-                                                              '${zoneItemItem.nameZone}',
+                                                              zoneItemItem.nameZone,
                                                               textAlign:
                                                                   TextAlign
                                                                       .start,
@@ -450,7 +448,7 @@ class _ZonesPageWidgetState extends State<ZonesPageWidget> {
                             },
                           ),
                         ),
-                      ].divide(SizedBox(height: 10.0)),
+                      ].divide(const SizedBox(height: 10.0)),
                     ),
                   ),
                 ),

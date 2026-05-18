@@ -156,7 +156,7 @@ class AdbNfcBridgeService {
 
   Future<void> _handleRequest(HttpRequest request) async {
     debugPrint('📨 AdbNfcBridgeService: Incoming request ${request.method} ${request.uri}'
-        ' from ${request.connectionInfo?.remoteAddress?.address}');
+        ' from ${request.connectionInfo?.remoteAddress.address}');
 
     if (!WebSocketTransformer.isUpgradeRequest(request)) {
       debugPrint('⚠️ AdbNfcBridgeService: Not a WS upgrade — headers: ${request.headers}');

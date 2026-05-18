@@ -1,5 +1,3 @@
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
@@ -19,9 +17,9 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
       '{DH:2025_11_27_13:36:48;OP:4442;OP2:7859VISITS:30;RESULTS:120;HE:112}';
 
   // Capacidades de TAGs NFC (en bytes)
-  static const int NTAG213_CAPACITY = 144;
-  static const int NTAG215_CAPACITY = 504;
-  static const int NTAG216_CAPACITY = 888;
+  static const int ntag213Capacity = 144;
+  static const int ntag215Capacity = 504;
+  static const int ntag216Capacity = 888;
 
   // Estado de la prueba
   bool _isTestRunning = false;
@@ -98,7 +96,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
           }
 
           // Calcular máximo de registros
-          final recordSize = baseRecord.length + 1;
+          const recordSize = baseRecord.length + 1;
           _maxRecordsCalculated = (capacity / recordSize).floor();
 
           debugPrint('✅ PASO 1 COMPLETADO: Capacidad del TAG detectada: $capacity bytes ($_tagType)');
@@ -120,7 +118,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
 
   /// Verifica si el siguiente registro cabe en el TAG
   bool _canFitNextRecord() {
-    final recordSize = baseRecord.length;
+    const recordSize = baseRecord.length;
     final separatorSize = _recordsWritten > 0 ? 1 : 0; // Coma separadora
     final nextRecordSize = recordSize + separatorSize;
 
@@ -257,7 +255,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
     return Container(
       width: double.infinity,
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -266,7 +264,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
       ),
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -274,7 +272,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
+                  const Row(
                     children: [
                       Icon(
                         Icons.calculate_outlined,
@@ -294,7 +292,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                     ],
                   ),
                   IconButton(
-                    icon: Icon(Icons.close, color: Colors.white),
+                    icon: const Icon(Icons.close, color: Colors.white),
                     onPressed: () {
                       _writeTimer?.cancel();
                       Navigator.of(context).pop();
@@ -302,7 +300,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                   ),
                 ],
               ),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // Información del TAG
               if (!_isTestRunning && !_isDetecting && _recordsWritten == 0)
@@ -313,16 +311,16 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                       children: [
                         // Info del registro (siempre visible)
                         _buildInfoCard(),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // PASO 1: Capacidad detectada (solo si ya se detectó)
                         if (_capacityDetected) ...[
-                          _buildStepIndicator('PASO 1 COMPLETADO', Color(0xFF10B981), true),
-                          SizedBox(height: 12),
+                          _buildStepIndicator('PASO 1 COMPLETADO', const Color(0xFF10B981), true),
+                          const SizedBox(height: 12),
                           _buildCapacityCard(),
-                          SizedBox(height: 16),
-                          _buildStepIndicator('PASO 2', Color(0xFF8B5CF6), false),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 16),
+                          _buildStepIndicator('PASO 2', const Color(0xFF8B5CF6), false),
+                          const SizedBox(height: 12),
                           _buildRecordPreview(),
                         ],
                       ],
@@ -336,33 +334,33 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        _buildStepIndicator('PASO 1 - Detectando TAG', Color(0xFF3B82F6), false),
-                        SizedBox(height: 24),
+                        _buildStepIndicator('PASO 1 - Detectando TAG', const Color(0xFF3B82F6), false),
+                        const SizedBox(height: 24),
                         // Animación NFC
                         ScaleTransition(
                           scale: _pulseAnimation,
                           child: Container(
-                            padding: EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Color(0xFF3B82F6).withOpacity(0.2),
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.nfc,
                               color: Color(0xFF3B82F6),
                               size: 64,
                             ),
                           ),
                         ),
-                        SizedBox(height: 24),
+                        const SizedBox(height: 24),
                         Container(
-                          padding: EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Color(0xFF3B82F6).withOpacity(0.1),
+                            color: const Color(0xFF3B82F6).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Color(0xFF3B82F6)),
+                            border: Border.all(color: const Color(0xFF3B82F6)),
                           ),
-                          child: Column(
+                          child: const Column(
                             children: [
                               CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF3B82F6)),
@@ -402,40 +400,40 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                   child: SingleChildScrollView(
                     child: Column(
                       children: [
-                        _buildStepIndicator('PASO 2 - Escribiendo registros', Color(0xFF8B5CF6), false),
-                        SizedBox(height: 24),
+                        _buildStepIndicator('PASO 2 - Escribiendo registros', const Color(0xFF8B5CF6), false),
+                        const SizedBox(height: 24),
                         // Animación NFC
                         ScaleTransition(
                           scale: _pulseAnimation,
                           child: Container(
-                            padding: EdgeInsets.all(20),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Color(0xFF8B5CF6).withOpacity(0.2),
+                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.nfc,
                               color: Color(0xFF8B5CF6),
                               size: 64,
                             ),
                           ),
                         ),
-                        SizedBox(height: 24),
+                        const SizedBox(height: 24),
 
                         // Contador de registros
                         Container(
-                          padding: EdgeInsets.all(20),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Color(0xFF374151),
+                            color: const Color(0xFF374151),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Color(0xFF8B5CF6),
+                              color: const Color(0xFF8B5CF6),
                               width: 2,
                             ),
                           ),
                           child: Column(
                             children: [
-                              Text(
+                              const Text(
                                 'REGISTROS ESCRITOS',
                                 style: TextStyle(
                                   fontFamily: 'Roboto',
@@ -445,64 +443,64 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                                   letterSpacing: 1.2,
                                 ),
                               ),
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               Text(
                                 '$_recordsWritten',
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontFamily: 'Roboto',
                                   fontSize: 48,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFF8B5CF6),
                                 ),
                               ),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               _buildProgressBar(),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                                 children: [
                                   _buildStatItem(
                                     'Bytes usados',
                                     '$_bytesUsed',
-                                    Color(0xFF3B82F6),
+                                    const Color(0xFF3B82F6),
                                   ),
                                   _buildStatItem(
                                     'Disponibles',
                                     '$_bytesAvailable',
-                                    Color(0xFF10B981),
+                                    const Color(0xFF10B981),
                                   ),
                                 ],
                               ),
                             ],
                           ),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Status
                         Container(
-                          padding: EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Color(0xFF10B981).withOpacity(0.1),
+                            color: const Color(0xFF10B981).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Color(0xFF10B981),
+                              color: const Color(0xFF10B981),
                               width: 1,
                             ),
                           ),
                           child: Row(
                             children: [
-                              CircularProgressIndicator(
+                              const CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                     Color(0xFF10B981)),
                                 strokeWidth: 3,
                               ),
-                              SizedBox(width: 16),
+                              const SizedBox(width: 16),
                               Expanded(
                                 child: Text(
                                   _isSuccess
                                       ? '✅ Registro $_recordsWritten escrito exitosamente'
                                       : 'Acerque el TAG NFC al dispositivo...',
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontFamily: 'Roboto',
                                     fontSize: 13,
                                     color: Colors.white,
@@ -524,38 +522,38 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                     child: Column(
                       children: [
                         Container(
-                          padding: EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
-                            color: Color(0xFFEF4444).withOpacity(0.1),
+                            color: const Color(0xFFEF4444).withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: Color(0xFFEF4444),
+                              color: const Color(0xFFEF4444),
                               width: 2,
                             ),
                           ),
                           child: Column(
                             children: [
-                              Icon(
+                              const Icon(
                                 Icons.warning_rounded,
                                 color: Color(0xFFEF4444),
                                 size: 64,
                               ),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               Text(
                                 _errorMessage!,
                                 textAlign: TextAlign.center,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: Color(0xFFEF4444),
                                 ),
                               ),
-                              SizedBox(height: 24),
+                              const SizedBox(height: 24),
                               Container(
-                                padding: EdgeInsets.all(16),
+                                padding: const EdgeInsets.all(16),
                                 decoration: BoxDecoration(
-                                  color: Color(0xFF374151),
+                                  color: const Color(0xFF374151),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Column(
@@ -563,19 +561,19 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                                     _buildResultItem(
                                       'Registros escritos',
                                       '$_recordsWritten',
-                                      Color(0xFF10B981),
+                                      const Color(0xFF10B981),
                                     ),
-                                    Divider(color: Colors.white12),
+                                    const Divider(color: Colors.white12),
                                     _buildResultItem(
                                       'Bytes utilizados',
                                       '$_bytesUsed / $_totalCapacity bytes',
-                                      Color(0xFF3B82F6),
+                                      const Color(0xFF3B82F6),
                                     ),
-                                    Divider(color: Colors.white12),
+                                    const Divider(color: Colors.white12),
                                     _buildResultItem(
                                       'Espacio restante',
                                       '$_bytesAvailable bytes',
-                                      Color(0xFFF59E0B),
+                                      const Color(0xFFF59E0B),
                                     ),
                                   ],
                                 ),
@@ -591,22 +589,22 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
               if (!_isTestRunning && _isSuccess && _errorMessage == null)
                 Expanded(
                   child: Container(
-                    padding: EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Color(0xFF10B981).withOpacity(0.1),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Color(0xFF10B981), width: 2),
+                      border: Border.all(color: const Color(0xFF10B981), width: 2),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.check_circle_outline_rounded,
                           color: Color(0xFF10B981),
                           size: 64,
                         ),
-                        SizedBox(height: 16),
-                        Text(
+                        const SizedBox(height: 16),
+                        const Text(
                           '¡Test completado!',
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -616,11 +614,11 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                             color: Color(0xFF10B981),
                           ),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Text(
                           'Se escribieron $_recordsWritten registros exitosamente',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontFamily: 'Roboto',
                             fontSize: 14,
                             color: Colors.white70,
@@ -631,7 +629,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                   ),
                 ),
 
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
 
               // Botones de acción
               Row(
@@ -645,8 +643,8 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                       text: 'Cerrar',
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF374151),
-                        textStyle: TextStyle(
+                        color: const Color(0xFF374151),
+                        textStyle: const TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -656,7 +654,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                       ),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: FFButtonWidget(
                       onPressed: _isDetecting
@@ -692,15 +690,15 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                       options: FFButtonOptions(
                         height: 48,
                         color: _isDetecting
-                            ? Color(0xFF6B7280)
+                            ? const Color(0xFF6B7280)
                             : _isTestRunning
-                              ? Color(0xFFEF4444)
+                              ? const Color(0xFFEF4444)
                               : !_capacityDetected
-                                ? Color(0xFF3B82F6)
+                                ? const Color(0xFF3B82F6)
                                 : (_errorMessage != null && !_errorMessage!.contains('MÁXIMO') && _recordsWritten > 0)
-                                  ? Color(0xFFF59E0B)
-                                  : Color(0xFF8B5CF6),
-                        textStyle: TextStyle(
+                                  ? const Color(0xFFF59E0B)
+                                  : const Color(0xFF8B5CF6),
+                        textStyle: const TextStyle(
                           fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
@@ -721,13 +719,13 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
 
   Widget _buildInfoCard() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF8B5CF6).withOpacity(0.3)),
+        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.3)),
       ),
-      child: Column(
+      child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -764,34 +762,34 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
   }
 
   Widget _buildCapacityCard() {
-    final recordSize = baseRecord.length + 1; // +1 por separador
+    const recordSize = baseRecord.length + 1; // +1 por separador
     final percentage = _totalCapacity > 0
         ? ((_maxRecordsCalculated * recordSize) / _totalCapacity * 100)
         : 0.0;
 
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Color(0xFF10B981).withOpacity(0.2),
-            Color(0xFF3B82F6).withOpacity(0.2),
+            const Color(0xFF10B981).withValues(alpha: 0.2),
+            const Color(0xFF3B82F6).withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF10B981).withOpacity(0.5)),
+        border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
-              SizedBox(width: 8),
+              const Icon(Icons.check_circle, color: Color(0xFF10B981), size: 20),
+              const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'TAG Detectado: $_tagType',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
@@ -803,29 +801,29 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _buildCapacityItem(
             'Capacidad total',
             '$_totalCapacity bytes',
-            Color(0xFF3B82F6),
+            const Color(0xFF3B82F6),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           _buildCapacityItem(
             'Tamaño por registro',
             '$recordSize bytes',
-            Color(0xFFF59E0B),
+            const Color(0xFFF59E0B),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           _buildCapacityItem(
             'Registros máximos',
             '$_maxRecordsCalculated registros',
-            Color(0xFF10B981),
+            const Color(0xFF10B981),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           _buildCapacityItem(
             'Eficiencia',
             '${percentage.toStringAsFixed(1)}%',
-            Color(0xFF8B5CF6),
+            const Color(0xFF8B5CF6),
           ),
         ],
       ),
@@ -838,7 +836,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
       children: [
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 13,
             color: Colors.white60,
@@ -859,21 +857,21 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
 
   Widget _buildRecordPreview() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Color(0xFF8B5CF6).withOpacity(0.2),
-            Color(0xFF6366F1).withOpacity(0.2),
+            const Color(0xFF8B5CF6).withValues(alpha: 0.2),
+            const Color(0xFF6366F1).withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF8B5CF6).withOpacity(0.5)),
+        border: Border.all(color: const Color(0xFF8B5CF6).withValues(alpha: 0.5)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(Icons.edit_note, color: Color(0xFF8B5CF6), size: 20),
               SizedBox(width: 8),
@@ -888,8 +886,8 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
               ),
             ],
           ),
-          SizedBox(height: 8),
-          Text(
+          const SizedBox(height: 8),
+          const Text(
             'Este registro se escribirá repetidamente hasta llenar el TAG',
             style: TextStyle(
               fontFamily: 'Roboto',
@@ -897,18 +895,18 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
               color: Colors.white60,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Color(0xFF1F2937),
+              color: const Color(0xFF1F2937),
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: Color(0xFF8B5CF6).withOpacity(0.3),
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.3),
                 width: 1,
               ),
             ),
-            child: Text(
+            child: const Text(
               baseRecord,
               style: TextStyle(
                 fontFamily: 'Roboto Mono',
@@ -937,14 +935,14 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
           child: LinearProgressIndicator(
             value: progress,
             minHeight: 12,
-            backgroundColor: Color(0xFF1F2937),
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
+            backgroundColor: const Color(0xFF1F2937),
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
           '${(progress * 100).toStringAsFixed(1)}% del TAG utilizado',
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 12,
             color: Colors.white60,
@@ -966,10 +964,10 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
             color: color,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           label,
-          style: TextStyle(
+          style: const TextStyle(
             fontFamily: 'Roboto',
             fontSize: 11,
             color: Colors.white60,
@@ -981,13 +979,13 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
 
   Widget _buildResultItem(String label, String value, Color color) {
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Roboto',
               fontSize: 13,
               color: Colors.white70,
@@ -1009,9 +1007,9 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
 
   Widget _buildStepIndicator(String stepText, Color color, bool isCompleted) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color, width: 2),
       ),
@@ -1029,7 +1027,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
                 border: Border.all(color: color, width: 2),
               ),
             ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             stepText,
             style: TextStyle(

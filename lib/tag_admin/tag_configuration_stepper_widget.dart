@@ -1,11 +1,8 @@
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 
 class TagConfigurationStepperWidget extends StatefulWidget {
   const TagConfigurationStepperWidget({super.key});
@@ -37,7 +34,7 @@ class _TagConfigurationStepperWidgetState
       vsync: this,
     );
     _slideAnimation = Tween<Offset>(
-      begin: Offset(1.0, 0.0),
+      begin: const Offset(1.0, 0.0),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _slideController,
@@ -121,7 +118,7 @@ class _TagConfigurationStepperWidgetState
           _nextStep(); // Pasar automáticamente al paso 3 (resetea _tagContent)
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
+            const SnackBar(
               content: Text('No se pudo limpiar el TAG'),
               backgroundColor: Colors.red,
             ),
@@ -147,7 +144,7 @@ class _TagConfigurationStepperWidgetState
   Widget build(BuildContext context) {
     return Container(
       height: MediaQuery.of(context).size.height * 0.85,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -159,8 +156,8 @@ class _TagConfigurationStepperWidgetState
           children: [
           // Header
           Container(
-            padding: EdgeInsets.all(20),
-            decoration: BoxDecoration(
+            padding: const EdgeInsets.all(20),
+            decoration: const BoxDecoration(
               color: Color(0xFF374151),
               borderRadius: BorderRadius.only(
                 topLeft: Radius.circular(24),
@@ -172,7 +169,7 @@ class _TagConfigurationStepperWidgetState
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
+                    const Row(
                       children: [
                         Icon(Icons.settings_suggest,
                             color: Color(0xFF3B82F6), size: 28),
@@ -188,12 +185,12 @@ class _TagConfigurationStepperWidgetState
                       ],
                     ),
                     IconButton(
-                      icon: Icon(Icons.close, color: Colors.white),
+                      icon: const Icon(Icons.close, color: Colors.white),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 // Progress indicator
                 _buildProgressIndicator(),
               ],
@@ -226,13 +223,13 @@ class _TagConfigurationStepperWidgetState
                   height: 4,
                   decoration: BoxDecoration(
                     color: isActive
-                        ? Color(0xFF3B82F6)
-                        : Color(0xFF4B5563),
+                        ? const Color(0xFF3B82F6)
+                        : const Color(0xFF4B5563),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              if (index < 2) SizedBox(width: 4),
+              if (index < 2) const SizedBox(width: 4),
             ],
           ),
         );
@@ -259,7 +256,7 @@ class _TagConfigurationStepperWidgetState
     final isUnreadable = scanned && _tagContent!.isEmpty;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -267,16 +264,16 @@ class _TagConfigurationStepperWidgetState
             icon: Icons.visibility,
             title: 'Paso 1: Verificar Contenido',
             subtitle: 'Revise el contenido actual del TAG antes de limpiarlo',
-            color: Color(0xFF3B82F6),
+            color: const Color(0xFF3B82F6),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           if (!_isReading && !scanned)
             _buildReadyToScanCard(
               icon: Icons.nfc,
               title: 'Acerque el TAG para leer',
               subtitle: 'Presione el botón y acerque el TAG NFC',
-              color: Color(0xFF3B82F6),
+              color: const Color(0xFF3B82F6),
             ),
 
           if (_isReading) _buildScanningCard(),
@@ -290,12 +287,12 @@ class _TagConfigurationStepperWidgetState
             Column(
               children: [
                 _buildContentPreview(),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _buildRawContentToggle(),
               ],
             ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -304,11 +301,11 @@ class _TagConfigurationStepperWidgetState
                 child: FFButtonWidget(
                   onPressed: _readTag,
                   text: !scanned ? 'Leer TAG' : 'Leer Nuevamente',
-                  icon: Icon(Icons.nfc, size: 20),
+                  icon: const Icon(Icons.nfc, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF3B82F6),
-                    textStyle: TextStyle(fontFamily: 'Roboto',
+                    color: const Color(0xFF3B82F6),
+                    textStyle: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -319,16 +316,16 @@ class _TagConfigurationStepperWidgetState
               ),
               // Mostrar "Continuar" siempre que se haya escaneado (con o sin contenido)
               if (scanned) ...[
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: FFButtonWidget(
                     onPressed: _nextStep,
                     text: 'Continuar',
-                    icon: Icon(Icons.arrow_forward, size: 20),
+                    icon: const Icon(Icons.arrow_forward, size: 20),
                     options: FFButtonOptions(
                       height: 50,
-                      color: Color(0xFF10B981),
-                      textStyle: TextStyle(fontFamily: 'Roboto',
+                      color: const Color(0xFF10B981),
+                      textStyle: const TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -347,7 +344,7 @@ class _TagConfigurationStepperWidgetState
 
   Widget _buildStep2ClearTag() {
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -355,18 +352,18 @@ class _TagConfigurationStepperWidgetState
             icon: Icons.cleaning_services,
             title: 'Paso 2: Limpiar TAG',
             subtitle: 'Borre el contenido actual del TAG',
-            color: Color(0xFFEF4444),
+            color: const Color(0xFFEF4444),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Color(0xFFFBBF24).withOpacity(0.1),
+              color: const Color(0xFFFBBF24).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Color(0xFFFBBF24)),
+              border: Border.all(color: const Color(0xFFFBBF24)),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 Icon(Icons.warning_amber_rounded,
                     color: Color(0xFFFBBF24), size: 32),
@@ -384,7 +381,7 @@ class _TagConfigurationStepperWidgetState
               ],
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           if (_isClearing)
             _buildScanningCard(message: 'Limpiando TAG...'),
@@ -394,10 +391,10 @@ class _TagConfigurationStepperWidgetState
               icon: Icons.cleaning_services,
               title: 'Acerque el TAG para limpiar',
               subtitle: 'Mantenga el TAG cerca hasta que finalice',
-              color: Color(0xFFEF4444),
+              color: const Color(0xFFEF4444),
             ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -406,11 +403,11 @@ class _TagConfigurationStepperWidgetState
                 child: FFButtonWidget(
                   onPressed: _previousStep,
                   text: 'Atrás',
-                  icon: Icon(Icons.arrow_back, size: 20),
+                  icon: const Icon(Icons.arrow_back, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF374151),
-                    textStyle: TextStyle(fontFamily: 'Roboto',
+                    color: const Color(0xFF374151),
+                    textStyle: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -419,17 +416,17 @@ class _TagConfigurationStepperWidgetState
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _isClearing ? null : _clearTag,
                   text: 'Limpiar TAG',
-                  icon: Icon(Icons.cleaning_services, size: 20),
+                  icon: const Icon(Icons.cleaning_services, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFFEF4444),
-                    disabledColor: Color(0xFF4B5563),
-                    textStyle: TextStyle(fontFamily: 'Roboto',
+                    color: const Color(0xFFEF4444),
+                    disabledColor: const Color(0xFF4B5563),
+                    textStyle: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -449,7 +446,7 @@ class _TagConfigurationStepperWidgetState
     final scanned = _tagContent != null;
 
     return SingleChildScrollView(
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -457,16 +454,16 @@ class _TagConfigurationStepperWidgetState
             icon: Icons.check_circle,
             title: 'Paso 3: Verificar Limpieza',
             subtitle: 'Confirme que el TAG contiene solo "0"',
-            color: Color(0xFF10B981),
+            color: const Color(0xFF10B981),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           if (!_isReading && !scanned)
             _buildReadyToScanCard(
               icon: Icons.verified,
               title: 'Acerque el TAG para verificar',
               subtitle: 'Confirme que solo contiene "0"',
-              color: Color(0xFF10B981),
+              color: const Color(0xFF10B981),
             ),
 
           if (_isReading) _buildScanningCard(),
@@ -477,12 +474,12 @@ class _TagConfigurationStepperWidgetState
                 _tagContent == '0'
                     ? _buildSuccessCard()
                     : _buildErrorCard(),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _buildContentPreview(),
               ],
             ),
 
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
 
           // Buttons
           Row(
@@ -491,11 +488,11 @@ class _TagConfigurationStepperWidgetState
                 child: FFButtonWidget(
                   onPressed: _previousStep,
                   text: 'Atrás',
-                  icon: Icon(Icons.arrow_back, size: 20),
+                  icon: const Icon(Icons.arrow_back, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF374151),
-                    textStyle: TextStyle(fontFamily: 'Roboto',
+                    color: const Color(0xFF374151),
+                    textStyle: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -504,16 +501,16 @@ class _TagConfigurationStepperWidgetState
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: FFButtonWidget(
                   onPressed: _readTag,
                   text: !scanned ? 'Verificar' : 'Verificar Nuevamente',
-                  icon: Icon(Icons.check, size: 20),
+                  icon: const Icon(Icons.check, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF10B981),
-                    textStyle: TextStyle(fontFamily: 'Roboto',
+                    color: const Color(0xFF10B981),
+                    textStyle: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -527,25 +524,25 @@ class _TagConfigurationStepperWidgetState
 
           if (_tagContent == '0')
             Padding(
-              padding: EdgeInsets.only(top: 16),
+              padding: const EdgeInsets.only(top: 16),
               child: SizedBox(
                 width: double.infinity,
                 child: FFButtonWidget(
                   onPressed: () {
                     Navigator.of(context).pop();
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
+                      const SnackBar(
                         content: Text('✅ TAG configurado exitosamente'),
                         backgroundColor: Color(0xFF10B981),
                       ),
                     );
                   },
                   text: 'Finalizar',
-                  icon: Icon(Icons.done_all, size: 20),
+                  icon: const Icon(Icons.done_all, size: 20),
                   options: FFButtonOptions(
                     height: 50,
-                    color: Color(0xFF8B5CF6),
-                    textStyle: TextStyle(fontFamily: 'Roboto',
+                    color: const Color(0xFF8B5CF6),
+                    textStyle: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -569,30 +566,30 @@ class _TagConfigurationStepperWidgetState
     return Row(
       children: [
         Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.2),
+            color: color.withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, color: color, size: 32),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: const TextStyle(fontFamily: 'Roboto',
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 subtitle,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: const TextStyle(fontFamily: 'Roboto',
                   fontSize: 13,
                   color: Colors.white60,
                 ),
@@ -612,37 +609,37 @@ class _TagConfigurationStepperWidgetState
   }) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
           Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
+              color: color.withValues(alpha: 0.2),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, color: color, size: 48),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 16,
               fontWeight: FontWeight.w600,
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 13,
               color: Colors.white60,
             ),
@@ -655,18 +652,18 @@ class _TagConfigurationStepperWidgetState
   Widget _buildScanningCard({String message = 'Leyendo TAG...'}) {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(24),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
-          CircularProgressIndicator(color: Color(0xFF3B82F6)),
-          SizedBox(height: 16),
+          const CircularProgressIndicator(color: Color(0xFF3B82F6)),
+          const SizedBox(height: 16),
           Text(
             message,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 15,
               color: Colors.white,
             ),
@@ -680,13 +677,13 @@ class _TagConfigurationStepperWidgetState
   Widget _buildUnreadableWarningCard() {
     return Container(
       width: double.infinity,
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Color(0xFFF59E0B).withOpacity(0.1),
+        color: const Color(0xFFF59E0B).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFFF59E0B)),
+        border: Border.all(color: const Color(0xFFF59E0B)),
       ),
-      child: Row(
+      child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 28),
@@ -722,15 +719,15 @@ class _TagConfigurationStepperWidgetState
 
   Widget _buildContentPreview() {
     return Container(
-      padding: EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          const Row(
             children: [
               Icon(Icons.article, color: Color(0xFF3B82F6), size: 20),
               SizedBox(width: 8),
@@ -744,17 +741,17 @@ class _TagConfigurationStepperWidgetState
               ),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Color(0xFF1F2937),
+              color: const Color(0xFF1F2937),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
               _showRaw ? (_rawContent ?? '') : (_tagContent ?? ''),
-              style: TextStyle(fontFamily: 'Roboto Mono',
+              style: const TextStyle(fontFamily: 'Roboto Mono',
                 fontSize: 12,
                 color: Color(0xFF10B981),
               ),
@@ -769,12 +766,12 @@ class _TagConfigurationStepperWidgetState
     return InkWell(
       onTap: () => setState(() => _showRaw = !_showRaw),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: Color(0xFF374151),
+          color: const Color(0xFF374151),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: _showRaw ? Color(0xFFF59E0B) : Color(0xFF4B5563),
+            color: _showRaw ? const Color(0xFFF59E0B) : const Color(0xFF4B5563),
           ),
         ),
         child: Row(
@@ -782,15 +779,15 @@ class _TagConfigurationStepperWidgetState
           children: [
             Icon(
               _showRaw ? Icons.visibility_off : Icons.code,
-              color: _showRaw ? Color(0xFFF59E0B) : Colors.white60,
+              color: _showRaw ? const Color(0xFFF59E0B) : Colors.white60,
               size: 18,
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(
               _showRaw ? 'Ocultar Raw' : 'Ver Raw',
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
-                color: _showRaw ? Color(0xFFF59E0B) : Colors.white60,
+                color: _showRaw ? const Color(0xFFF59E0B) : Colors.white60,
               ),
             ),
           ],
@@ -801,13 +798,13 @@ class _TagConfigurationStepperWidgetState
 
   Widget _buildSuccessCard() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Color(0xFF10B981).withOpacity(0.1),
+        color: const Color(0xFF10B981).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFF10B981)),
+        border: Border.all(color: const Color(0xFF10B981)),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Icon(Icons.check_circle, color: Color(0xFF10B981), size: 32),
           SizedBox(width: 16),
@@ -840,13 +837,13 @@ class _TagConfigurationStepperWidgetState
 
   Widget _buildErrorCard() {
     return Container(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Color(0xFFEF4444).withOpacity(0.1),
+        color: const Color(0xFFEF4444).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Color(0xFFEF4444)),
+        border: Border.all(color: const Color(0xFFEF4444)),
       ),
-      child: Row(
+      child: const Row(
         children: [
           Icon(Icons.error, color: Color(0xFFEF4444), size: 32),
           SizedBox(width: 16),

@@ -44,7 +44,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
 
-  bool _isExpanded = false;
+  final bool _isExpanded = false;
   bool _isMinimized = false;
 
   @override
@@ -143,7 +143,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
-              color: FlutterFlowTheme.of(context).primary.withOpacity(0.4),
+              color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.4),
               blurRadius: 20,
               offset: const Offset(0, 8),
             ),
@@ -161,7 +161,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
                   CircularProgressIndicator(
                     value: progress,
                     strokeWidth: 3,
-                    backgroundColor: Colors.white.withOpacity(0.3),
+                    backgroundColor: Colors.white.withValues(alpha: 0.3),
                     valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                   ),
                   Text(
@@ -176,7 +176,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
               ),
             ),
             const SizedBox(width: 12),
-            Expanded(
+            const Expanded(
               child: Text(
                 'Descargando mapa...',
                 style: TextStyle(
@@ -186,7 +186,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
                 ),
               ),
             ),
-            Icon(Icons.expand_less, color: Colors.white),
+            const Icon(Icons.expand_less, color: Colors.white),
             const SizedBox(width: 16),
           ],
         ),
@@ -207,7 +207,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.15),
+            color: Colors.black.withValues(alpha: 0.15),
             blurRadius: 30,
             offset: const Offset(0, 10),
           ),
@@ -228,12 +228,12 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
                 colors: isComplete
                     ? [
                         FlutterFlowTheme.of(context).success,
-                        FlutterFlowTheme.of(context).success.withOpacity(0.8),
+                        FlutterFlowTheme.of(context).success.withValues(alpha: 0.8),
                       ]
                     : hasError
                         ? [
                             FlutterFlowTheme.of(context).error,
-                            FlutterFlowTheme.of(context).error.withOpacity(0.8),
+                            FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
                           ]
                         : [
                             FlutterFlowTheme.of(context).primary,
@@ -250,7 +250,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(
@@ -285,7 +285,7 @@ class _DownloadProgressOverlayState extends State<DownloadProgressOverlay>
                       Text(
                         'Colombia - PMTiles',
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                           fontSize: 12,
                         ),
                       ),

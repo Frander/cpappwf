@@ -1,12 +1,9 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import 'package:provider/provider.dart';
 import 'read_n_f_c_component_model.dart';
 export 'read_n_f_c_component_model.dart';
 
@@ -50,16 +47,16 @@ class _ReadNFCComponentWidgetState extends State<ReadNFCComponentWidget> {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF101827),
       ),
       child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
         child: Column(
           mainAxisSize: MainAxisSize.max,
           children: [
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(30.0, 5.0, 30.0, 0.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(30.0, 5.0, 30.0, 0.0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
                 child: Image.asset(
@@ -70,7 +67,7 @@ class _ReadNFCComponentWidgetState extends State<ReadNFCComponentWidget> {
               ),
             ),
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
               child: Text(
                 'Acerque el CTR al TAG NFC',
                 textAlign: TextAlign.center,
@@ -98,7 +95,7 @@ class _ReadNFCComponentWidgetState extends State<ReadNFCComponentWidget> {
                 fit: BoxFit.cover,
               ),
             ),
-          ].divide(SizedBox(height: 15.0)),
+          ].divide(const SizedBox(height: 15.0)),
         ),
       ),
     );

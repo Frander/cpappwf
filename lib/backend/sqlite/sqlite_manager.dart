@@ -5,7 +5,6 @@ import '/custom_code/platform_utils.dart';
 import 'queries/read.dart';
 import 'queries/update.dart';
 
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 // Empaqueta libsqlite3 nativa para desktop (Linux/Windows/macOS) para que
 // sqflite_common_ffi no dependa de que el sistema tenga libsqlite3 instalado.

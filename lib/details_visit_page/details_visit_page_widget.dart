@@ -1,14 +1,11 @@
-﻿import '/components/calculate_coordenates_component_widget.dart';
+import '/components/calculate_coordenates_component_widget.dart';
 import '/components/read_n_f_c_component_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 import 'details_visit_page_model.dart';
 export 'details_visit_page_model.dart';
 
@@ -17,7 +14,7 @@ class DetailsVisitPageWidget extends StatefulWidget {
     super.key,
     required this.jsonSummary,
     String? typeRead,
-  }) : this.typeRead = typeRead ?? 'GPS';
+  }) : typeRead = typeRead ?? 'GPS';
 
   final dynamic jsonSummary;
   final String typeRead;
@@ -62,7 +59,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
           body: SafeArea(
             top: true,
             child: Container(
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: Color(0xFF101827),
               ),
               child: Column(
@@ -77,13 +74,13 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                       ),
                       child: Padding(
                         padding:
-                            EdgeInsetsDirectional.fromSTEB(8.0, 20.0, 8.0, 8.0),
+                            const EdgeInsetsDirectional.fromSTEB(8.0, 20.0, 8.0, 8.0),
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           children: [
                             Text(
                               getJsonField(
-                                widget!.jsonSummary,
+                                widget.jsonSummary,
                                 r'''$.Form''',
                               ).toString(),
                               style: FlutterFlowTheme.of(context)
@@ -106,7 +103,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                             ),
                             Text(
                               getJsonField(
-                                widget!.jsonSummary,
+                                widget.jsonSummary,
                                 r'''$.DateHour''',
                               ).toString(),
                               style: FlutterFlowTheme.of(context)
@@ -129,11 +126,11 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                             ),
                             Expanded(
                               child: Container(
-                                decoration: BoxDecoration(),
+                                decoration: const BoxDecoration(),
                                 child: Builder(
                                   builder: (context) {
                                     final summaryItem = getJsonField(
-                                      widget!.jsonSummary,
+                                      widget.jsonSummary,
                                       r'''$.Results''',
                                     ).toList();
 
@@ -143,13 +140,13 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                       scrollDirection: Axis.vertical,
                                       itemCount: summaryItem.length,
                                       separatorBuilder: (_, __) =>
-                                          SizedBox(height: 10.0),
+                                          const SizedBox(height: 10.0),
                                       itemBuilder: (context, summaryItemIndex) {
                                         final summaryItemItem =
                                             summaryItem[summaryItemIndex];
                                         return Padding(
                                           padding:
-                                              EdgeInsetsDirectional.fromSTEB(
+                                              const EdgeInsetsDirectional.fromSTEB(
                                                   5.0, 0.0, 5.0, 0.0),
                                           child: Container(
                                             height: 70.0,
@@ -157,7 +154,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                               color:
                                                   FlutterFlowTheme.of(context)
                                                       .primary,
-                                              boxShadow: [
+                                              boxShadow: const [
                                                 BoxShadow(
                                                   blurRadius: 4.0,
                                                   color: Color(0x33000000),
@@ -171,7 +168,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                   BorderRadius.circular(12.0),
                                             ),
                                             child: Padding(
-                                              padding: EdgeInsets.all(8.0),
+                                              padding: const EdgeInsets.all(8.0),
                                               child: Column(
                                                 mainAxisSize: MainAxisSize.max,
                                                 crossAxisAlignment:
@@ -252,7 +249,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                     ),
                                                   ),
                                                 ].divide(
-                                                    SizedBox(height: 10.0)),
+                                                    const SizedBox(height: 10.0)),
                                               ),
                                             ),
                                           ),
@@ -265,7 +262,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                             ),
                             Container(
                               width: MediaQuery.sizeOf(context).width * 1.0,
-                              decoration: BoxDecoration(),
+                              decoration: const BoxDecoration(),
                               child: Row(
                                 mainAxisSize: MainAxisSize.max,
                                 children: [
@@ -287,7 +284,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                         ),
                                         child: Padding(
                                           padding:
-                                              EdgeInsetsDirectional.fromSTEB(
+                                              const EdgeInsetsDirectional.fromSTEB(
                                                   10.0, 0.0, 10.0, 0.0),
                                           child: Row(
                                             mainAxisSize: MainAxisSize.max,
@@ -297,7 +294,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                               Container(
                                                 width: 50.0,
                                                 height: 50.0,
-                                                decoration: BoxDecoration(),
+                                                decoration: const BoxDecoration(),
                                                 child: Icon(
                                                   Icons.chevron_left,
                                                   color: FlutterFlowTheme.of(
@@ -338,7 +335,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                       ),
                                                 ),
                                               ),
-                                            ].divide(SizedBox(width: 10.0)),
+                                            ].divide(const SizedBox(width: 10.0)),
                                           ),
                                         ),
                                       ),
@@ -352,9 +349,9 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                         hoverColor: Colors.transparent,
                                         highlightColor: Colors.transparent,
                                         onTap: () async {
-                                          var _shouldSetState = false;
+                                          var shouldSetState = false;
                                           HapticFeedback.vibrate();
-                                          if (widget!.typeRead == 'GPS') {
+                                          if (widget.typeRead == 'GPS') {
                                             await showDialog(
                                               barrierDismissible: false,
                                               context: context,
@@ -365,7 +362,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                   backgroundColor:
                                                       Colors.transparent,
                                                   alignment:
-                                                      AlignmentDirectional(
+                                                      const AlignmentDirectional(
                                                               0.0, 0.0)
                                                           .resolve(
                                                               Directionality.of(
@@ -379,7 +376,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                           .instance.primaryFocus
                                                           ?.unfocus();
                                                     },
-                                                    child: Container(
+                                                    child: SizedBox(
                                                       height: MediaQuery.sizeOf(
                                                                   context)
                                                               .height *
@@ -389,18 +386,19 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                               .width *
                                                           0.9,
                                                       child:
-                                                          CalculateCoordenatesComponentWidget(),
+                                                          const CalculateCoordenatesComponentWidget(),
                                                     ),
                                                   ),
                                                 );
                                               },
                                             );
 
-                                            if (_shouldSetState)
+                                            if (shouldSetState) {
                                               safeSetState(() {});
+                                            }
                                             return;
                                           } else {
-                                            if (widget!.typeRead == 'NFC') {
+                                            if (widget.typeRead == 'NFC') {
                                               await showDialog(
                                                 barrierDismissible: false,
                                                 context: context,
@@ -412,7 +410,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                     backgroundColor:
                                                         Colors.transparent,
                                                     alignment:
-                                                        AlignmentDirectional(
+                                                        const AlignmentDirectional(
                                                                 0.0, 0.0)
                                                             .resolve(
                                                                 Directionality.of(
@@ -426,7 +424,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                             .primaryFocus
                                                             ?.unfocus();
                                                       },
-                                                      child: Container(
+                                                      child: SizedBox(
                                                         height:
                                                             MediaQuery.sizeOf(
                                                                         context)
@@ -438,30 +436,33 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                                     .width *
                                                                 0.9,
                                                         child:
-                                                            ReadNFCComponentWidget(),
+                                                            const ReadNFCComponentWidget(),
                                                       ),
                                                     ),
                                                   );
                                                 },
                                               );
 
-                                              if (_shouldSetState)
+                                              if (shouldSetState) {
                                                 safeSetState(() {});
+                                              }
                                               return;
                                             } else {
                                               _model.qrRead =
                                                   await actions.readQR(
                                                 context,
                                               );
-                                              _shouldSetState = true;
-                                              if (_shouldSetState)
+                                              shouldSetState = true;
+                                              if (shouldSetState) {
                                                 safeSetState(() {});
+                                              }
                                               return;
                                             }
                                           }
 
-                                          if (_shouldSetState)
+                                          if (shouldSetState) {
                                             safeSetState(() {});
+                                          }
                                         },
                                         child: Container(
                                           decoration: BoxDecoration(
@@ -472,7 +473,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                           ),
                                           child: Padding(
                                             padding:
-                                                EdgeInsetsDirectional.fromSTEB(
+                                                const EdgeInsetsDirectional.fromSTEB(
                                                     10.0, 0.0, 10.0, 0.0),
                                             child: Row(
                                               mainAxisSize: MainAxisSize.max,
@@ -480,7 +481,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                   MainAxisAlignment.spaceEvenly,
                                               children: [
                                                 Padding(
-                                                  padding: EdgeInsetsDirectional
+                                                  padding: const EdgeInsetsDirectional
                                                       .fromSTEB(
                                                           10.0, 0.0, 0.0, 0.0),
                                                   child: Text(
@@ -519,7 +520,7 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                   child: Container(
                                                     width: 50.0,
                                                     height: 50.0,
-                                                    decoration: BoxDecoration(),
+                                                    decoration: const BoxDecoration(),
                                                     child: Icon(
                                                       Icons.navigate_next_sharp,
                                                       color: FlutterFlowTheme
@@ -529,17 +530,17 @@ class _DetailsVisitPageWidgetState extends State<DetailsVisitPageWidget> {
                                                     ),
                                                   ),
                                                 ),
-                                              ].divide(SizedBox(width: 10.0)),
+                                              ].divide(const SizedBox(width: 10.0)),
                                             ),
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ].divide(SizedBox(width: 10.0)),
+                                ].divide(const SizedBox(width: 10.0)),
                               ),
                             ),
-                          ].divide(SizedBox(height: 10.0)),
+                          ].divide(const SizedBox(height: 10.0)),
                         ),
                       ),
                     ),

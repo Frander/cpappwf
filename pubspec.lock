@@ -258,7 +258,7 @@ packages:
     source: hosted
     version: "4.11.0"
   collection:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       name: collection
       sha256: "2f5709ae4d3d59dd8f7cd309b4e023046b57d8a6c82130785d2b0e5868084e76"
@@ -910,7 +910,7 @@ packages:
     source: hosted
     version: "3.2.2"
   http_parser:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: http_parser
       sha256: "178d74305e7866013777bab2c3d8726205dc5a4dd935297175b19a23a2e66571"
@@ -1238,7 +1238,7 @@ packages:
     source: hosted
     version: "0.4.0"
   ndef_record:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: ndef_record
       sha256: "0c72dfac0d5c16fc264846d103ee5d8249cd3858261a5a537b455a24c1bd5857"
@@ -2003,7 +2003,7 @@ packages:
     source: hosted
     version: "2.0.1"
   vector_tile_renderer:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: vector_tile_renderer
       sha256: "89746f1108eccbc0b6f33fbbef3fcf394cda3733fc0d5064ea03d53a459b56d3"

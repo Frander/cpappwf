@@ -419,15 +419,15 @@ class _AdbTransferServerPageWidgetState
               border: Border.all(
                   color: const Color(0xFF42A5F5).withValues(alpha: 0.2)),
             ),
-            child: Row(
+            child: const Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
+                Icon(Icons.info_outline_rounded,
                     color: Color(0xFF42A5F5), size: 16),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Esta página puede dejarse abierta. La transferencia se activará automáticamente cuando el Android la solicite.',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontFamily: 'Roboto',
                         color: Color(0xFF90CAF9),
                         fontSize: 12),

@@ -1,4 +1,3 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
@@ -123,9 +122,9 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           child: Dialog(
             backgroundColor: Colors.transparent,
             child: Container(
-              padding: EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
@@ -135,7 +134,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                 ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: Colors.orange.withOpacity(0.3),
+                  color: Colors.orange.withValues(alpha: 0.3),
                   width: 2,
                 ),
               ),
@@ -146,17 +145,17 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                     width: 80,
                     height: 80,
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.2),
+                      color: Colors.orange.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(
+                    child: const Icon(
                       Icons.warning_amber_rounded,
                       color: Colors.orange,
                       size: 50,
                     ),
                   ),
-                  SizedBox(height: 20),
-                  Text(
+                  const SizedBox(height: 20),
+                  const Text(
                     'Tag Inválido',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 22,
@@ -164,29 +163,29 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                       color: Colors.white,
                     ),
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Text(
                     message,
                     textAlign: TextAlign.center,
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
-                      color: Colors.white.withOpacity(0.8),
+                      color: Colors.white.withValues(alpha: 0.8),
                       height: 1.5,
                     ),
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   InkWell(
                     onTap: () => Navigator.pop(context),
                     child: Container(
                       width: double.infinity,
-                      padding: EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [Colors.orange, Colors.deepOrange],
                         ),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Text(
+                      child: const Text(
                         'Entendido',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontFamily: 'Roboto',
@@ -224,7 +223,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
 
       debugPrint('📦 TAG-TRANSFER: readNFC retornó, validando contenido');
 
-      if (nfcData == null || nfcData.isEmpty) {
+      if (nfcData.isEmpty) {
         debugPrint('❌ TAG-TRANSFER: Contenido vacío o null');
         FFAppState().nfcRead = 'ERROR: Tag vacío';
         return;
@@ -272,7 +271,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
       HapticFeedback.heavyImpact();
 
       // Esperar 2 segundos antes de pasar automáticamente al paso 2
-      await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
         _startStep2();
       }
@@ -357,7 +356,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
       HapticFeedback.heavyImpact();
 
       // Esperar un momento y cerrar el diálogo
-      await Future.delayed(Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
         Navigator.pop(context, true);
       }
@@ -510,7 +509,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -526,7 +525,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           children: [
             // Header
             Padding(
-              padding: EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(20.0),
               child: Row(
                 children: [
                   InkWell(
@@ -538,17 +537,17 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.close, color: Colors.white),
+                      child: const Icon(Icons.close, color: Colors.white),
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       children: [
-                        Text(
+                        const Text(
                           'TRANSFERIR TAG NFC',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 20,
@@ -556,12 +555,12 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Container(
                           padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(colors: [
+                            gradient: const LinearGradient(colors: [
                               Color(0xFF00a86b),
                               Color(0xFF003420),
                             ]),
@@ -569,7 +568,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                           ),
                           child: Text(
                             'PASO ${_model.currentStep} DE 2',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
@@ -579,7 +578,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                       ],
                     ),
                   ),
-                  SizedBox(width: 60),
+                  const SizedBox(width: 60),
                 ],
               ),
             ),
@@ -612,17 +611,17 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               child: Container(
                 width: 120,
                 height: 120,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   gradient: LinearGradient(
                     colors: [Color(0xFF00a86b), Color(0xFF003420)],
                   ),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(Icons.nfc, color: Colors.white, size: 60),
+                child: const Icon(Icons.nfc, color: Colors.white, size: 60),
               ),
             ),
-            SizedBox(height: 30),
-            Text(
+            const SizedBox(height: 30),
+            const Text(
               'ACERQUE EL TAG DE ORIGEN',
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 20,
@@ -630,13 +629,13 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text(
               'Mantenga el dispositivo cerca del tag\\npara leer su contenido',
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 height: 1.5,
               ),
             ),
@@ -660,17 +659,17 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
             child: Container(
               width: 120,
               height: 120,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   colors: [Colors.orange, Colors.deepOrange],
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.nfc, color: Colors.white, size: 60),
+              child: const Icon(Icons.nfc, color: Colors.white, size: 60),
             ),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             'ACERQUE EL TAG DE DESTINO',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
@@ -678,13 +677,13 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             'Se leerá el tag de destino y se agregarán\\nlas visitas del tag de origen',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               height: 1.5,
             ),
           ),
@@ -696,7 +695,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
   /// Mostrar resumen del contenido leído del tag de origen
   Widget _buildSourceSummary() {
     final parsedData = _model.parsedData;
-    if (parsedData.isEmpty) return SizedBox.shrink();
+    if (parsedData.isEmpty) return const SizedBox.shrink();
 
     // Calcular totales generales
     int totalVisits = 0;
@@ -707,12 +706,12 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
     }
 
     return Padding(
-      padding: EdgeInsets.all(20),
+      padding: const EdgeInsets.all(20),
       child: Column(
         children: [
-          Icon(Icons.check_circle, color: Color(0xFF00a86b), size: 80),
-          SizedBox(height: 20),
-          Text(
+          const Icon(Icons.check_circle, color: Color(0xFF00a86b), size: 80),
+          const SizedBox(height: 20),
+          const Text(
             'Contenido Leído',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -720,15 +719,15 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
           Container(
             width: double.infinity,
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 2,
               ),
             ),
@@ -740,24 +739,24 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
                   style: TextStyle(fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     letterSpacing: 1.5,
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _buildDataRow('Total Visitas', totalVisits.toString()),
                 _buildDataRow('Total Resultados', totalResults.toString()),
                 _buildDataRow('Lotes', parsedData.length.toString()),
               ],
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Text(
             'Preparando transferencia al tag de destino...',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -767,7 +766,7 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
 
   Widget _buildDataRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -775,12 +774,12 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
             label,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
           Text(
             value,
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -799,16 +798,16 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
           Container(
             width: 120,
             height: 120,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF00a86b), Color(0xFF003420)],
               ),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.check_circle, color: Colors.white, size: 64),
+            child: const Icon(Icons.check_circle, color: Colors.white, size: 64),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             '¡Transferencia Exitosa!',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -816,13 +815,13 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             'El contenido se ha transferido\\ncorrectamente al tag de destino',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
         ],
@@ -835,9 +834,9 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, color: Colors.red, size: 80),
-          SizedBox(height: 20),
-          Text(
+          const Icon(Icons.error_outline, color: Colors.red, size: 80),
+          const SizedBox(height: 20),
+          const Text(
             'Error',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -845,33 +844,33 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
               ),
             ),
           ),
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
           InkWell(
             onTap: () {
               // Reintentar desde el paso 1
               _startStep1();
             },
             child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
               decoration: BoxDecoration(
-                gradient: LinearGradient(
+                gradient: const LinearGradient(
                   colors: [Color(0xFF00a86b), Color(0xFF003420)],
                 ),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
+              child: const Text(
                 'Reintentar',
                 style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 16,

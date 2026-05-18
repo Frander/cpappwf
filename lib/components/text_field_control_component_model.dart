@@ -1,10 +1,7 @@
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'text_field_control_component_widget.dart'
     show TextFieldControlComponentWidget;
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
 class TextFieldControlComponentModel
     extends FlutterFlowModel<TextFieldControlComponentWidget> {

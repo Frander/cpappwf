@@ -1,18 +1,13 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:io';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
@@ -184,6 +179,7 @@ Future<VisitsStruct?> createVisit(
     );
 
     // 9. Actualizar la lista visitsAdd en el AppState con la lista limpia
+    if (!context.mounted) return null;
     await _updateVisitsAddInAppState(context, cleanedVisitsStruct);
 
     debugPrint('=== Visita creada exitosamente ===');
@@ -317,7 +313,7 @@ Future<void> _insertVisitDetailsToDatabase({
   try {
     // Filtrar registros de tipo STEP (aquellos con idActivityStatus == 0)
     final detailsToInsert = visitsDetails
-        .where((detail) => detail.idActivityStatus != null && detail.idActivityStatus! > 0)
+        .where((detail) => detail.idActivityStatus > 0)
         .toList();
 
     debugPrint(

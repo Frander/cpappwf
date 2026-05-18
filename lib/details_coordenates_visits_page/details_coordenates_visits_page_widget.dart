@@ -1,8 +1,6 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
@@ -57,9 +55,9 @@ class _DetailsCoordenatesVisitsPageWidgetState
       },
       child: Scaffold(
         key: scaffoldKey,
-        backgroundColor: Color(0xFF101827),
+        backgroundColor: const Color(0xFF101827),
         body: Container(
-          decoration: BoxDecoration(
+          decoration: const BoxDecoration(
             color: Color(0xFF101827),
           ),
           child: Column(
@@ -71,11 +69,11 @@ class _DetailsCoordenatesVisitsPageWidgetState
                 children: [
                   Container(
                     width: 180.7,
-                    decoration: BoxDecoration(),
-                    alignment: AlignmentDirectional(-1.0, -1.0),
+                    decoration: const BoxDecoration(),
+                    alignment: const AlignmentDirectional(-1.0, -1.0),
                     child: Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(0.0, 20.0, 0.0, 0.0),
+                          const EdgeInsetsDirectional.fromSTEB(0.0, 20.0, 0.0, 0.0),
                       child: InkWell(
                         splashColor: Colors.transparent,
                         focusColor: Colors.transparent,
@@ -94,7 +92,7 @@ class _DetailsCoordenatesVisitsPageWidgetState
                   ),
                   Padding(
                     padding:
-                        EdgeInsetsDirectional.fromSTEB(0.0, 20.0, 20.0, 0.0),
+                        const EdgeInsetsDirectional.fromSTEB(0.0, 20.0, 20.0, 0.0),
                     child: InkWell(
                       splashColor: Colors.transparent,
                       focusColor: Colors.transparent,
@@ -117,13 +115,13 @@ class _DetailsCoordenatesVisitsPageWidgetState
               Expanded(
                 child: Padding(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(10.0, 0.0, 10.0, 10.0),
+                      const EdgeInsetsDirectional.fromSTEB(10.0, 0.0, 10.0, 10.0),
                   child: Container(
                     width: double.infinity,
                     height: double.infinity,
                     decoration: BoxDecoration(
                       color: FlutterFlowTheme.of(context).secondaryBackground,
-                      boxShadow: [
+                      boxShadow: const [
                         BoxShadow(
                           blurRadius: 4.0,
                           color: Color(0x33000000),
@@ -140,10 +138,10 @@ class _DetailsCoordenatesVisitsPageWidgetState
                         mainAxisSize: MainAxisSize.max,
                         children: [
                           Padding(
-                            padding: EdgeInsets.all(14.0),
+                            padding: const EdgeInsets.all(14.0),
                             child: MarkdownBody(
                               data: functions.convertToMarkdown('Coordenadas',
-                                  widget!.visitSelected!.locationsAdd.toList()),
+                                  widget.visitSelected!.locationsAdd.toList()),
                               selectable: true,
                               onTapLink: (_, url, __) => launchURL(url!),
                             ),

@@ -1,11 +1,8 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -180,9 +177,9 @@ class Quaternion {
   /// Convertir a ángulos de Euler (para compatibilidad)
   Map<String, double> toEuler() {
     // Roll (rotación en X)
-    final sinr_cosp = 2 * (w * x + y * z);
-    final cosr_cosp = 1 - 2 * (x * x + y * y);
-    final roll = atan2(sinr_cosp, cosr_cosp);
+    final sinrCosp = 2 * (w * x + y * z);
+    final cosrCosp = 1 - 2 * (x * x + y * y);
+    final roll = atan2(sinrCosp, cosrCosp);
 
     // Pitch (rotación en Y)
     final sinp = 2 * (w * y - z * x);
@@ -191,9 +188,9 @@ class Quaternion {
         : asin(sinp);
 
     // Yaw (rotación en Z / heading)
-    final siny_cosp = 2 * (w * z + x * y);
-    final cosy_cosp = 1 - 2 * (y * y + z * z);
-    final yaw = atan2(siny_cosp, cosy_cosp);
+    final sinyCosp = 2 * (w * z + x * y);
+    final cosyCosp = 1 - 2 * (y * y + z * z);
+    final yaw = atan2(sinyCosp, cosyCosp);
 
     return {'roll': roll, 'pitch': pitch, 'yaw': yaw};
   }
@@ -1402,8 +1399,8 @@ Future<void> getLocationList(BuildContext context) async {
       }
 
       lastSensorUpdate = now;
-    } else if (lastSensorUpdate == null) {
-      lastSensorUpdate = DateTime.now();
+    } else {
+      lastSensorUpdate ??= DateTime.now();
     }
   });
 

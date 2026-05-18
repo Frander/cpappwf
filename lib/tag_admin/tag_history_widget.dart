@@ -1,6 +1,4 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'package:flutter/material.dart';
 
 import 'package:sqflite/sqflite.dart';
@@ -118,9 +116,9 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Color(0xFF1F2937),
+        backgroundColor: const Color(0xFF1F2937),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
+        title: const Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Color(0xFFFBBF24)),
             SizedBox(width: 12),
@@ -130,14 +128,14 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
             ),
           ],
         ),
-        content: Text(
+        content: const Text(
           'Se eliminarán todos los registros de TAGs leídos. Esta acción no se puede deshacer.',
           style: TextStyle(fontFamily: 'Roboto',color: Colors.white70, fontSize: 14),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(
+            child: const Text(
               'Cancelar',
               style: TextStyle(fontFamily: 'Roboto',color: Colors.white60),
             ),
@@ -145,12 +143,12 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFFEF4444),
+              backgroundColor: const Color(0xFFEF4444),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Text(
+            child: const Text(
               'Borrar',
               style: TextStyle(fontFamily: 'Roboto',color: Colors.white, fontWeight: FontWeight.bold),
             ),
@@ -200,13 +198,13 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
 
   Color _getTagColor(String tagType) {
     if (tagType.contains('DESFire')) {
-      return Color(0xFF8B5CF6); // Púrpura para DESFire
+      return const Color(0xFF8B5CF6); // Púrpura para DESFire
     } else if (tagType.contains('4K')) {
-      return Color(0xFF3B82F6); // Azul para 4K
+      return const Color(0xFF3B82F6); // Azul para 4K
     } else if (tagType.contains('1K')) {
-      return Color(0xFF10B981); // Verde para 1K
+      return const Color(0xFF10B981); // Verde para 1K
     }
-    return Color(0xFF6B7280); // Gris para desconocido
+    return const Color(0xFF6B7280); // Gris para desconocido
   }
 
   IconData _getTagIcon(String tagType) {
@@ -223,26 +221,26 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF0F172A),
+      backgroundColor: const Color(0xFF0F172A),
       appBar: AppBar(
-        backgroundColor: Color(0xFF1E293B),
+        backgroundColor: const Color(0xFF1E293B),
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios, color: Colors.white),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(8),
+              padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Color(0xFF8B5CF6).withOpacity(0.2),
+                color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.history, color: Color(0xFF8B5CF6), size: 24),
+              child: const Icon(Icons.history, color: Color(0xFF8B5CF6), size: 24),
             ),
-            SizedBox(width: 12),
-            Text(
+            const SizedBox(width: 12),
+            const Text(
               'Historial de TAGs NFC',
               style: TextStyle(fontFamily: 'Roboto',
                 fontSize: 18,
@@ -255,14 +253,14 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
         actions: [
           if (_tagHistory.isNotEmpty)
             IconButton(
-              icon: Icon(Icons.delete_sweep, color: Color(0xFFEF4444)),
+              icon: const Icon(Icons.delete_sweep, color: Color(0xFFEF4444)),
               onPressed: _clearHistory,
               tooltip: 'Borrar historial',
             ),
         ],
       ),
       body: _isLoading
-          ? Center(
+          ? const Center(
               child: CircularProgressIndicator(
                 valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF8B5CF6)),
               ),
@@ -271,37 +269,37 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _loadHistory,
-                  color: Color(0xFF8B5CF6),
+                  color: const Color(0xFF8B5CF6),
                   child: SingleChildScrollView(
-                    physics: AlwaysScrollableScrollPhysics(),
-                    padding: EdgeInsets.all(20),
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(20),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // Header info
                         Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               colors: [
-                                Color(0xFF8B5CF6).withOpacity(0.08),
-                                Color(0xFF3B82F6).withOpacity(0.08),
+                                const Color(0xFF8B5CF6).withValues(alpha: 0.08),
+                                const Color(0xFF3B82F6).withValues(alpha: 0.08),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: Color(0xFF8B5CF6).withOpacity(0.2),
+                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
                             ),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.info_outline,
+                              const Icon(Icons.info_outline,
                                   color: Color(0xFF8B5CF6), size: 18),
-                              SizedBox(width: 10),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   '${_filteredTags.length} de ${_tagHistory.length} TAG${_tagHistory.length == 1 ? '' : 's'}',
-                                  style: TextStyle(fontFamily: 'Roboto',
+                                  style: const TextStyle(fontFamily: 'Roboto',
                                     fontSize: 12,
                                     color: Colors.white60,
                                   ),
@@ -310,26 +308,26 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                             ],
                           ),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         // Filtros
                         _buildFilterChips(),
-                        SizedBox(height: 20),
+                        const SizedBox(height: 20),
 
                         // Grid de TAGs
                         _filteredTags.isEmpty
                             ? Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(40),
+                                  padding: const EdgeInsets.all(40),
                                   child: Column(
                                     children: [
                                       Icon(
                                         Icons.filter_alt_off,
                                         size: 60,
-                                        color: Color(0xFF8B5CF6).withOpacity(0.5),
+                                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.5),
                                       ),
-                                      SizedBox(height: 16),
-                                      Text(
+                                      const SizedBox(height: 16),
+                                      const Text(
                                         'No hay TAGs de este tipo',
                                         style: TextStyle(fontFamily: 'Roboto',
                                           fontSize: 16,
@@ -343,8 +341,8 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                               )
                             : GridView.builder(
                                 shrinkWrap: true,
-                                physics: NeverScrollableScrollPhysics(),
-                                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                                   crossAxisCount: 2,
                                   crossAxisSpacing: 16,
                                   mainAxisSpacing: 16,
@@ -379,17 +377,17 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
           Color chipColor;
 
           if (filter['key'] == 'Todos') {
-            chipColor = Color(0xFF8B5CF6);
+            chipColor = const Color(0xFF8B5CF6);
           } else if (filter['key'] == 'DESFire') {
-            chipColor = Color(0xFF8B5CF6);
+            chipColor = const Color(0xFF8B5CF6);
           } else if (filter['key'] == '4K') {
-            chipColor = Color(0xFF3B82F6);
+            chipColor = const Color(0xFF3B82F6);
           } else {
-            chipColor = Color(0xFF10B981);
+            chipColor = const Color(0xFF10B981);
           }
 
           return Padding(
-            padding: EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.only(right: 8),
             child: InkWell(
               onTap: () {
                 setState(() {
@@ -398,11 +396,11 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               },
               borderRadius: BorderRadius.circular(20),
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   color: isSelected
                       ? chipColor
-                      : chipColor.withOpacity(0.2),
+                      : chipColor.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: chipColor,
@@ -419,7 +417,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                           ? Colors.white
                           : chipColor,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       filter['label'] as String,
                       style: TextStyle(fontFamily: 'Roboto',
@@ -446,19 +444,19 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: EdgeInsets.all(32),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: Color(0xFF1E293B).withOpacity(0.5),
+              color: const Color(0xFF1E293B).withValues(alpha: 0.5),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.nfc_outlined,
               size: 80,
-              color: Color(0xFF8B5CF6).withOpacity(0.5),
+              color: const Color(0xFF8B5CF6).withValues(alpha: 0.5),
             ),
           ),
-          SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 24),
+          const Text(
             'Sin TAGs leídos',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 24,
@@ -466,8 +464,8 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
-          Padding(
+          const SizedBox(height: 12),
+          const Padding(
             padding: EdgeInsets.symmetric(horizontal: 60),
             child: Text(
               'Lee tu primer TAG NFC para ver el historial aquí',
@@ -485,23 +483,23 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
 
   Widget _buildPieChart(int usedSpace, int totalSpace) {
     if (totalSpace == 0) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     final percentage = (usedSpace / totalSpace * 100).clamp(0.0, 100.0);
     final freeSpace = totalSpace - usedSpace;
 
-    return Container(
+    return SizedBox(
       width: 100,
       height: 100,
       child: Stack(
         children: [
           CustomPaint(
-            size: Size(100, 100),
+            size: const Size(100, 100),
             painter: PieChartPainter(
               usedPercentage: percentage / 100,
-              usedColor: Color(0xFF3B82F6),
-              freeColor: Color(0xFF1E293B),
+              usedColor: const Color(0xFF3B82F6),
+              freeColor: const Color(0xFF1E293B),
             ),
           ),
           Center(
@@ -510,7 +508,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               children: [
                 Text(
                   '${percentage.toStringAsFixed(1)}%',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(fontFamily: 'Roboto',
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -518,7 +516,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                 ),
                 Text(
                   '${usedSpace}B',
-                  style: TextStyle(fontFamily: 'Roboto',
+                  style: const TextStyle(fontFamily: 'Roboto',
                     fontSize: 9,
                     color: Colors.white70,
                   ),
@@ -558,24 +556,24 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Color(0xFF1E293B),
+        color: const Color(0xFF1E293B),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             blurRadius: 8,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(14),
         child: SingleChildScrollView(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -584,24 +582,24 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
               Row(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.2),
+                      color: color.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(icon, color: color, size: 24),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   if (readCount > 1)
                     Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
                         '×$readCount',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: Colors.white70,
@@ -610,7 +608,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                     ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
 
               // Tipo de TAG
               Text(
@@ -623,18 +621,18 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
 
               // ID del TAG
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.3),
+                  color: Colors.black.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   tagId,
-                  style: TextStyle(fontFamily: 'Roboto Mono',
+                  style: const TextStyle(fontFamily: 'Roboto Mono',
                     fontSize: 10,
                     color: Colors.white,
                     fontWeight: FontWeight.w500,
@@ -646,16 +644,16 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
 
               // Gráfico de pie de espacio
               if (totalSpace > 0) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _buildPieChart(usedSpace, totalSpace),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
-                        'Espacio: ${usedSpace}/${totalSpace} bytes',
-                        style: TextStyle(fontFamily: 'Roboto',
+                        'Espacio: $usedSpace/$totalSpace bytes',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 10,
                           color: Colors.white60,
                         ),
@@ -665,14 +663,14 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                 ),
               ],
 
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
 
               // Última lectura
-              Divider(color: Colors.white.withOpacity(0.1), height: 16),
+              Divider(color: Colors.white.withValues(alpha: 0.1), height: 16),
               Row(
                 children: [
-                  Icon(Icons.access_time, color: Colors.white60, size: 14),
-                  SizedBox(width: 6),
+                  const Icon(Icons.access_time, color: Colors.white60, size: 14),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -680,7 +678,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                       children: [
                         Text(
                           formattedDate,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
                             color: Colors.white70,
                             fontWeight: FontWeight.w600,
@@ -688,7 +686,7 @@ class _TagHistoryWidgetState extends State<TagHistoryWidget> {
                         ),
                         Text(
                           formattedTime,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             color: Colors.white60,
                           ),
@@ -747,7 +745,7 @@ class PieChartPainter extends CustomPainter {
 
     // Dibujar un círculo blanco en el centro para efecto de dona
     final innerPaint = Paint()
-      ..color = Color(0xFF1E293B)
+      ..color = const Color(0xFF1E293B)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, radius * 0.6, innerPaint);
   }

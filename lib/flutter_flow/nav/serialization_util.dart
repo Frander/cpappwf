@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:from_css_color/from_css_color.dart';
 
 import '/backend/schema/structs/index.dart';
 import '/backend/schema/enums/enums.dart';
@@ -89,7 +88,7 @@ String? serializeParam(
     }
     return data;
   } catch (e) {
-    print('Error serializing parameter: $e');
+    debugPrint('Error serializing parameter: $e');
     return null;
   }
 }
@@ -147,22 +146,34 @@ FFPlace placeFromString(String placeStr) {
 FFUploadedFile uploadedFileFromString(String uploadedFileStr) =>
     FFUploadedFile.deserialize(uploadedFileStr);
 
+// ignore: constant_identifier_names
 enum ParamType {
   int,
   double,
+  // ignore: constant_identifier_names
   String,
   bool,
+  // ignore: constant_identifier_names
   DateTime,
+  // ignore: constant_identifier_names
   DateTimeRange,
+  // ignore: constant_identifier_names
   LatLng,
+  // ignore: constant_identifier_names
   Color,
+  // ignore: constant_identifier_names
   FFPlace,
+  // ignore: constant_identifier_names
   FFUploadedFile,
+  // ignore: constant_identifier_names
   JSON,
 
+  // ignore: constant_identifier_names
   DataStruct,
+  // ignore: constant_identifier_names
   Enum,
 
+  // ignore: constant_identifier_names
   SqliteRow,
 }
 
@@ -182,8 +193,8 @@ dynamic deserializeParam<T>(
         return null;
       }
       return paramValues
-          .where((p) => p is String)
-          .map((p) => p as String)
+          .whereType<String>()
+          .map((p) => p)
           .map((p) => deserializeParam<T>(
                 p,
                 paramType,
@@ -231,11 +242,11 @@ dynamic deserializeParam<T>(
       case ParamType.SqliteRow:
         final data = json.decode(param) as Map<String, dynamic>;
         switch (T) {
-          case GetAllUsersRow:
+          case GetAllUsersRow _:
             return GetAllUsersRow(data);
-          case SelectAllGeoRow:
+          case SelectAllGeoRow _:
             return SelectAllGeoRow(data);
-          case GetCountVisitRow:
+          case GetCountVisitRow _:
             return GetCountVisitRow(data);
           default:
             return null;
@@ -245,7 +256,7 @@ dynamic deserializeParam<T>(
         return null;
     }
   } catch (e) {
-    print('Error deserializing parameter: $e');
+    debugPrint('Error deserializing parameter: $e');
     return null;
   }
 }

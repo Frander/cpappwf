@@ -7,7 +7,6 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
@@ -25,11 +24,11 @@ class ModernSyncPageWidget extends StatefulWidget {
     String? idsHeadquarters,
     String? imei,
     String? authToken,
-  })  : this.newsAdd = newsAdd ?? const [],
-        this.idCompany = idCompany ?? 0,
-        this.idsHeadquarters = idsHeadquarters ?? '',
-        this.imei = imei ?? '',
-        this.authToken = authToken ?? '';
+  })  : newsAdd = newsAdd ?? const [],
+        idCompany = idCompany ?? 0,
+        idsHeadquarters = idsHeadquarters ?? '',
+        imei = imei ?? '',
+        authToken = authToken ?? '';
 
   final List<VisitsNewsStruct> newsAdd;
   final int idCompany;
@@ -83,10 +82,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   int _totalVisits = 0;
   int _totalProducts = 0;
   int _totalExclusions = 0;
-  int _syncedItems = 0;
+  final int _syncedItems = 0;
 
   // Archivos de media para envío multipart
-  Map<String, String> _mediaFilesToUpload = {};
+  final Map<String, String> _mediaFilesToUpload = {};
   int _mediaFileCounter = 0;
 
   // Token mutable: se renueva proactivamente antes de cada sync
@@ -228,14 +227,14 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   /// Pantalla de selección de modo de sincronización
   Widget _buildModeSelectionScreen() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF0F172A),
-            const Color(0xFF1E293B),
-            const Color(0xFF0F172A),
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
+            Color(0xFF0F172A),
           ],
         ),
       ),
@@ -270,7 +269,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF00a86b).withOpacity(0.15),
+            const Color(0xFF00a86b).withValues(alpha: 0.15),
             Colors.transparent,
           ],
         ),
@@ -278,7 +277,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       child: Row(
         children: [
           IconButton(
-            icon: Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 28),
             onPressed: () => Navigator.pop(context, false),
           ),
           const SizedBox(width: 12),
@@ -286,7 +285,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Sincronización',
                   style: TextStyle(
                     fontSize: 24,
@@ -299,7 +298,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                   'Enviar información al servidor',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.7),
+                    color: Colors.white.withValues(alpha: 0.7),
                   ),
                 ),
               ],
@@ -318,13 +317,13 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.1),
-            Colors.white.withOpacity(0.05),
+            Colors.white.withValues(alpha: 0.1),
+            Colors.white.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Color(0xFF00a86b).withOpacity(0.3),
+          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
           width: 1.5,
         ),
       ),
@@ -336,17 +335,17 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Color(0xFF00a86b).withOpacity(0.2),
+                  color: const Color(0xFF00a86b).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.analytics_rounded,
                   color: Color(0xFF00ff9f),
                   size: 28,
                 ),
               ),
               const SizedBox(width: 16),
-              Text(
+              const Text(
                 'Información pendiente',
                 style: TextStyle(
                   fontSize: 18,
@@ -371,26 +370,26 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   Widget _buildStatRow(String label, int count, IconData icon) {
     return Row(
       children: [
-        Icon(icon, color: Color(0xFF00ff9f).withOpacity(0.7), size: 20),
+        Icon(icon, color: const Color(0xFF00ff9f).withValues(alpha: 0.7), size: 20),
         const SizedBox(width: 12),
         Expanded(
           child: Text(
             label,
             style: TextStyle(
               fontSize: 15,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
             ),
           ),
         ),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           decoration: BoxDecoration(
-            color: Color(0xFF00a86b).withOpacity(0.2),
+            color: const Color(0xFF00a86b).withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             count.toString(),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w700,
               color: Color(0xFF00ff9f),
@@ -416,7 +415,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
+        const Text(
           'Sincronización',
           style: TextStyle(
             fontSize: 20,
@@ -437,13 +436,13 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: hasPending
-                    ? [Color(0xFF00a86b), Color(0xFF00c07a)]
-                    : [Color(0xFF374151), Color(0xFF4B5563)],
+                    ? [const Color(0xFF00a86b), const Color(0xFF00c07a)]
+                    : [const Color(0xFF374151), const Color(0xFF4B5563)],
               ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: (hasPending ? Color(0xFF00a86b) : Color(0xFF374151)).withOpacity(0.35),
+                  color: (hasPending ? const Color(0xFF00a86b) : const Color(0xFF374151)).withValues(alpha: 0.35),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -457,10 +456,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
+                        color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.sync_rounded,
                         color: Colors.white,
                         size: 32,
@@ -471,7 +470,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Sincronizar Ahora',
                             style: TextStyle(
                               fontSize: 20,
@@ -484,10 +483,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: Colors.white.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(6),
                             ),
-                            child: Text(
+                            child: const Text(
                               'INTELIGENTE',
                               style: TextStyle(
                                 fontSize: 10,
@@ -502,7 +501,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                     ),
                     Icon(
                       Icons.arrow_forward_ios_rounded,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       size: 22,
                     ),
                   ],
@@ -512,7 +511,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                   description,
                   style: TextStyle(
                     fontSize: 14,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     height: 1.5,
                   ),
                 ),
@@ -520,14 +519,14 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.15),
+                    color: Colors.black.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.white.withOpacity(0.2)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
                   ),
-                  child: Row(
+                  child: const Row(
                     children: [
                       Icon(Icons.info_outline_rounded, color: Colors.white70, size: 18),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           'Al finalizar se refrescarán los datos base y deberás iniciar sesión nuevamente.',
@@ -580,13 +579,13 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: hasSync
-                ? [Color(0xFF1E3A5F), Color(0xFF2563EB)]
-                : [Color(0xFF3B1F6B), Color(0xFF7C3AED)],
+                ? [const Color(0xFF1E3A5F), const Color(0xFF2563EB)]
+                : [const Color(0xFF3B1F6B), const Color(0xFF7C3AED)],
           ),
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: (hasSync ? Color(0xFF2563EB) : Color(0xFF7C3AED)).withOpacity(0.35),
+              color: (hasSync ? const Color(0xFF2563EB) : const Color(0xFF7C3AED)).withValues(alpha: 0.35),
               blurRadius: 24,
               offset: const Offset(0, 12),
             ),
@@ -600,10 +599,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
+                    color: Colors.white.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.cloud_download_rounded,
                     color: Colors.white,
                     size: 32,
@@ -614,7 +613,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      const Text(
                         'Sincronizar Datos Base',
                         style: TextStyle(
                           fontSize: 18,
@@ -627,10 +626,10 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
+                        child: const Text(
                           'DATOS BASE',
                           style: TextStyle(
                             fontSize: 10,
@@ -645,7 +644,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 ),
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   size: 22,
                 ),
               ],
@@ -655,7 +654,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
               'Descarga completa de lotes, productos, actividades, zonas, puntos virtuales y zonas de exclusión. Ejecuta en lotes de 3 endpoints en paralelo.',
               style: TextStyle(
                 fontSize: 13,
-                color: Colors.white.withOpacity(0.88),
+                color: Colors.white.withValues(alpha: 0.88),
                 height: 1.5,
               ),
             ),
@@ -663,9 +662,9 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withOpacity(0.2)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
               ),
               child: Row(
                 children: [
@@ -678,7 +677,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                   Expanded(
                     child: Text(
                       lastSyncLabel,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
                         color: Colors.white70,
                         height: 1.4,
@@ -697,14 +696,14 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   /// Pantalla de progreso de sincronización
   Widget _buildSyncProgressScreen() {
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF0F172A),
-            const Color(0xFF1E293B),
-            const Color(0xFF0F172A),
+            Color(0xFF0F172A),
+            Color(0xFF1E293B),
+            Color(0xFF0F172A),
           ],
         ),
       ),
@@ -747,8 +746,8 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 colors: [
-                  Color(0xFF00a86b).withOpacity(0.3),
-                  Color(0xFF00a86b).withOpacity(0.1),
+                  const Color(0xFF00a86b).withValues(alpha: 0.3),
+                  const Color(0xFF00a86b).withValues(alpha: 0.1),
                   Colors.transparent,
                 ],
               ),
@@ -759,17 +758,17 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 width: 80,
                 height: 80,
                 decoration: BoxDecoration(
-                  color: Color(0xFF00a86b),
+                  color: const Color(0xFF00a86b),
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Color(0xFF00a86b).withOpacity(0.5),
+                      color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                       blurRadius: 30,
                       spreadRadius: 5,
                     ),
                   ],
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.cloud_upload_rounded,
                   color: Colors.white,
                   size: 40,
@@ -799,7 +798,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                   value: 1.0,
                   strokeWidth: 12,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withOpacity(0.1),
+                    Colors.white.withValues(alpha: 0.1),
                   ),
                 ),
               ),
@@ -810,7 +809,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 child: CircularProgressIndicator(
                   value: _progress,
                   strokeWidth: 12,
-                  valueColor: AlwaysStoppedAnimation<Color>(
+                  valueColor: const AlwaysStoppedAnimation<Color>(
                     Color(0xFF00a86b),
                   ),
                   backgroundColor: Colors.transparent,
@@ -822,7 +821,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 children: [
                   Text(
                     '${(_progress * 100).toInt()}%',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 56,
                       fontWeight: FontWeight.w900,
                       color: Colors.white,
@@ -834,7 +833,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                     'Sincronizando...',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.white.withOpacity(0.7),
+                      color: Colors.white.withValues(alpha: 0.7),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -851,17 +850,17 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Color(0xFF00a86b).withOpacity(0.3),
+          color: const Color(0xFF00a86b).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
+          const SizedBox(
             width: 20,
             height: 20,
             child: CircularProgressIndicator(
@@ -874,7 +873,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             child: Text(
               _currentMessage,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 15,
                 color: Colors.white,
                 fontWeight: FontWeight.w500,
@@ -977,15 +976,15 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
         color: isCurrent
-            ? Color(0xFF00a86b).withOpacity(0.2)
-            : Colors.white.withOpacity(0.05),
+            ? const Color(0xFF00a86b).withValues(alpha: 0.2)
+            : Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isCurrent
-              ? Color(0xFF00a86b)
+              ? const Color(0xFF00a86b)
               : isCompleted
-                  ? Color(0xFF00a86b).withOpacity(0.3)
-                  : Colors.white.withOpacity(0.1),
+                  ? const Color(0xFF00a86b).withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.1),
           width: 1,
         ),
       ),
@@ -996,8 +995,8 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             height: 36,
             decoration: BoxDecoration(
               color: isCompleted || isCurrent
-                  ? Color(0xFF00a86b)
-                  : Colors.white.withOpacity(0.1),
+                  ? const Color(0xFF00a86b)
+                  : Colors.white.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: Icon(
@@ -1015,14 +1014,14 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 color: isCurrent
                     ? Colors.white
                     : isCompleted
-                        ? Colors.white.withOpacity(0.9)
-                        : Colors.white.withOpacity(0.5),
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.5),
                 fontWeight: isCurrent ? FontWeight.w600 : FontWeight.w500,
               ),
             ),
           ),
           if (isCurrent)
-            SizedBox(
+            const SizedBox(
               width: 16,
               height: 16,
               child: CircularProgressIndicator(
@@ -1042,24 +1041,24 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           width: 120,
           height: 120,
           decoration: BoxDecoration(
-            color: Color(0xFF00a86b),
+            color: const Color(0xFF00a86b),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Color(0xFF00a86b).withOpacity(0.4),
+                color: const Color(0xFF00a86b).withValues(alpha: 0.4),
                 blurRadius: 40,
                 spreadRadius: 10,
               ),
             ],
           ),
-          child: Icon(
+          child: const Icon(
             Icons.check_circle_outline_rounded,
             color: Colors.white,
             size: 64,
           ),
         ),
         const SizedBox(height: 32),
-        Text(
+        const Text(
           '¡Sincronización Exitosa!',
           style: TextStyle(
             fontSize: 28,
@@ -1073,20 +1072,20 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 16,
-            color: Colors.white.withOpacity(0.7),
+            color: Colors.white.withValues(alpha: 0.7),
           ),
         ),
         const SizedBox(height: 48),
         ElevatedButton(
           onPressed: () => Navigator.pop(context, true),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF00a86b),
+            backgroundColor: const Color(0xFF00a86b),
             padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16),
             ),
           ),
-          child: Text(
+          child: const Text(
             'Continuar',
             style: TextStyle(
               fontSize: 18,
@@ -1106,24 +1105,24 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           width: 120,
           height: 120,
           decoration: BoxDecoration(
-            color: Color(0xFFEF4444),
+            color: const Color(0xFFEF4444),
             shape: BoxShape.circle,
             boxShadow: [
               BoxShadow(
-                color: Color(0xFFEF4444).withOpacity(0.4),
+                color: const Color(0xFFEF4444).withValues(alpha: 0.4),
                 blurRadius: 40,
                 spreadRadius: 10,
               ),
             ],
           ),
-          child: Icon(
+          child: const Icon(
             Icons.error_outline_rounded,
             color: Colors.white,
             size: 64,
           ),
         ),
         const SizedBox(height: 32),
-        Text(
+        const Text(
           'Error de Sincronización',
           style: TextStyle(
             fontSize: 28,
@@ -1136,7 +1135,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           margin: const EdgeInsets.symmetric(horizontal: 32),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
@@ -1144,7 +1143,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
             ),
           ),
         ),
@@ -1162,14 +1161,14 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                 });
               },
               style: OutlinedButton.styleFrom(
-                side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.3)),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: Text(
+              child: const Text(
                 'Volver',
                 style: TextStyle(
                   fontSize: 16,
@@ -1181,18 +1180,18 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
             ElevatedButton(
               onPressed: () => _retrySync(),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFF00a86b),
+                backgroundColor: const Color(0xFF00a86b),
                 padding:
                     const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.refresh_rounded, color: Colors.white),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Text(
                     'Reintentar',
                     style: TextStyle(
@@ -1272,22 +1271,22 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
 
     switch (mode) {
       case SyncMode.fullSync:
-        _performFullSync();
+        await _performFullSync();
         break;
       case SyncMode.optimizedSync:
-        _performOptimizedSync();
+        await _performOptimizedSync();
         break;
       case SyncMode.visitsOnly:
-        _performVisitsOnlySync();
+        await _performVisitsOnlySync();
         break;
       case SyncMode.basicSync:
-        _performBasicSync();
+        await _performBasicSync();
         break;
       case SyncMode.smartSync:
-        _performSmartSync();
+        await _performSmartSync();
         break;
       case SyncMode.baseDataSync:
-        _performBaseDataSync();
+        await _performBaseDataSync();
         break;
       default:
         break;
@@ -1308,20 +1307,20 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         throw Exception('No hay conexión a Internet disponible');
       }
 
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 2. Recolectar datos y estadísticas
       await _updateProgress(0.2, 'Preparando información para enviar');
 
       final syncStats = SyncStats();
       await _collectSyncData(syncStats);
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 3. Analizar zonas de exclusión modificadas
       await _updateProgress(0.4, 'Verificando cambios en zonas de exclusión');
 
       await _analyzeExclusionZones(syncStats);
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 4. Sincronizar zonas de exclusión si hay cambios
       if (syncStats.hasPendingExclusions) {
@@ -1331,7 +1330,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         );
 
         await _syncExclusionZones(syncStats);
-        await Future.delayed(Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 800));
       }
 
       // 4.5. Recolectar y sincronizar productos pendientes
@@ -1344,7 +1343,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         );
 
         await _syncProducts(syncStats);
-        await Future.delayed(Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 800));
       }
 
       // 5. Guardar backup JSON y sincronizar visitas
@@ -1380,7 +1379,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           _currentStep = SyncStep.completed;
         });
 
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
       } else {
         throw Exception('Error al sincronizar las visitas');
       }
@@ -1404,20 +1403,20 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         throw Exception('No hay conexión a Internet disponible');
       }
 
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 2. Recolectar datos y estadísticas
       await _updateProgress(0.2, 'Preparando información para enviar');
 
       final syncStats = SyncStats();
       await _collectSyncData(syncStats);
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 3. Analizar zonas de exclusión modificadas
       await _updateProgress(0.4, 'Verificando cambios en zonas de exclusión');
 
       await _analyzeExclusionZones(syncStats);
-      await Future.delayed(Duration(milliseconds: 800));
+      await Future.delayed(const Duration(milliseconds: 800));
 
       // 4. Sincronizar zonas de exclusión si hay cambios
       if (syncStats.hasPendingExclusions) {
@@ -1427,7 +1426,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         );
 
         await _syncExclusionZones(syncStats);
-        await Future.delayed(Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 800));
       }
 
       // 4.5. Recolectar y sincronizar productos pendientes
@@ -1440,7 +1439,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         );
 
         await _syncProducts(syncStats);
-        await Future.delayed(Duration(milliseconds: 800));
+        await Future.delayed(const Duration(milliseconds: 800));
       }
 
       // 5. Guardar backup JSON y sincronizar visitas SIN COMPRIMIR (modo optimizado para redes lentas)
@@ -1477,7 +1476,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
           _currentStep = SyncStep.completed;
         });
 
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
       } else {
         throw Exception('Error al sincronizar las visitas');
       }
@@ -1592,6 +1591,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       // 2. Llamar syncBaseData con callback de progreso en tiempo real
       await _updateProgress(0.04, 'Iniciando descarga de datos base...');
 
+      if (!mounted) return;
       final success = await actions.syncBaseData(
         context,
         widget.imei,
@@ -1705,7 +1705,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       // 7. Limpiar solo los datos de visitas enviadas (sin tocar la sesión)
       debugPrint('🧹 [SmartSync] Paso 7: Limpiando datos de visitas del AppState...');
       FFAppState().newsAdd = [];
-      FFAppState().StatusAdd = [];
+      FFAppState().statusAdd = [];
       FFAppState().productsAdd = [];
       FFAppState().visitsAdd = [];
       FFAppState().visitDetails = [];
@@ -1736,7 +1736,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
   Future<void> _performBasicSync() async {
     try {
       await _updateProgress(0.2, 'Preparando limpieza de datos...');
-      await Future.delayed(Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 500));
 
       await _updateProgress(0.4, 'Limpiando tablas base...');
 
@@ -1797,7 +1797,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
       FFAppState().newsSelected = [];
       FFAppState().activitiesStatusSelected = [];
       FFAppState().newsAdd = [];
-      FFAppState().StatusAdd = [];
+      FFAppState().statusAdd = [];
       // CRÍTICO: Mantener al menos la última ubicación en geoLocationsList
       final currentGeoLocations = FFAppState().geoLocationsList;
       if (currentGeoLocations.isNotEmpty) {
@@ -1994,7 +1994,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
 
       // Crear request multipart
       final request = http.MultipartRequest('POST', Uri.parse(url));
-      request.headers['Authorization'] = 'Bearer ${_activeAuthToken}';
+      request.headers['Authorization'] = 'Bearer $_activeAuthToken';
 
       // Agregar JSON como campo de texto (nombre esperado por el backend)
       request.fields['SyncModelJson'] = jsonEncode(payload);
@@ -2315,6 +2315,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
 
         await Future.delayed(const Duration(milliseconds: 500));
 
+        if (!mounted) return false;
         final shouldContinue = await showDialog<bool>(
           context: context,
           barrierDismissible: false,
@@ -2360,11 +2361,11 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                       style: TextStyle(fontSize: 14),
                     ),
                     const SizedBox(height: 12),
-                    Row(
+                    const Row(
                       children: [
-                        const Icon(Icons.wifi, size: 16),
-                        const SizedBox(width: 8),
-                        const Expanded(
+                        Icon(Icons.wifi, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
                           child: Text(
                             '• Conectarte a una red WiFi',
                             style: TextStyle(fontSize: 14),
@@ -2373,11 +2374,11 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
                       ],
                     ),
                     const SizedBox(height: 8),
-                    Row(
+                    const Row(
                       children: [
-                        const Icon(Icons.location_on, size: 16),
-                        const SizedBox(width: 8),
-                        const Expanded(
+                        Icon(Icons.location_on, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
                           child: Text(
                             '• Moverte a una zona con mejor señal',
                             style: TextStyle(fontSize: 14),
@@ -2674,7 +2675,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
         Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer ${_activeAuthToken}',
+          'Authorization': 'Bearer $_activeAuthToken',
         },
         body: jsonBody,
       );
@@ -2878,7 +2879,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
               Uri.parse(url),
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ${_activeAuthToken}',
+                'Authorization': 'Bearer $_activeAuthToken',
               },
               body: jsonBody,
             );
@@ -2892,7 +2893,7 @@ class _ModernSyncPageWidgetState extends State<ModernSyncPageWidget>
               Uri.parse(url),
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer ${_activeAuthToken}',
+                'Authorization': 'Bearer $_activeAuthToken',
               },
               body: jsonBody,
             );

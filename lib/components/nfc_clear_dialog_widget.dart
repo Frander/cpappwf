@@ -1,10 +1,8 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'nfc_clear_dialog_model.dart';
 export 'nfc_clear_dialog_model.dart';
 
@@ -76,7 +74,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -84,7 +82,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
         ),
       ),
       child: Padding(
-        padding: EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -93,7 +91,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.cleaning_services_rounded,
@@ -112,25 +110,25 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                   ],
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Advertencia inicial
             if (!_model.isClearing && !_model.isSuccess && _model.errorMessage.isEmpty)
               Column(
                 children: [
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Color(0xFFFBBF24).withOpacity(0.1),
+                      color: const Color(0xFFFBBF24).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Color(0xFFFBBF24), width: 1),
+                      border: Border.all(color: const Color(0xFFFBBF24), width: 1),
                     ),
-                    child: Row(
+                    child: const Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Icon(Icons.warning_amber_rounded, color: Color(0xFFFBBF24), size: 24),
@@ -162,17 +160,17 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                       ],
                     ),
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
                   Container(
-                    padding: EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Color(0xFF374151),
+                      color: const Color(0xFF374151),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
+                        const Text(
                           'Antes de continuar:',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
@@ -180,7 +178,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
                         _buildCheckItem('Asegúrese de que desea borrar este TAG'),
                         _buildCheckItem('Verifique que el TAG no contiene datos importantes'),
                         _buildCheckItem('Tenga el TAG NFC listo para acercarlo al dispositivo'),
@@ -193,12 +191,12 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
             // Estado de limpieza
             if (_model.isClearing)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF374151),
+                  color: const Color(0xFF374151),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Color(0xFFEF4444),
+                    color: const Color(0xFFEF4444),
                     width: 2,
                   ),
                 ),
@@ -206,19 +204,19 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                   children: [
                     // Icono animado
                     Container(
-                      padding: EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Color(0xFFEF4444).withOpacity(0.2),
+                        color: const Color(0xFFEF4444).withValues(alpha: 0.2),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.nfc,
                         color: Color(0xFFEF4444),
                         size: 48,
                       ),
                     ),
-                    SizedBox(height: 20),
-                    Text(
+                    const SizedBox(height: 20),
+                    const Text(
                       '⚠️ MANTENGA EL TAG CERCA',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Roboto',
@@ -228,14 +226,14 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                         letterSpacing: 0.5,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Container(
-                      padding: EdgeInsets.all(12),
+                      padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Color(0xFFFBBF24).withOpacity(0.1),
+                        color: const Color(0xFFFBBF24).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Column(
+                      child: const Column(
                         children: [
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -261,8 +259,8 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                         ],
                       ),
                     ),
-                    SizedBox(height: 12),
-                    Text(
+                    const SizedBox(height: 12),
+                    const Text(
                       'Esto puede tomar unos segundos',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Roboto',
@@ -278,13 +276,13 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
             // Éxito
             if (_model.isSuccess)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF10B981).withOpacity(0.1),
+                  color: const Color(0xFF10B981).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFF10B981), width: 1),
+                  border: Border.all(color: const Color(0xFF10B981), width: 1),
                 ),
-                child: Column(
+                child: const Column(
                   children: [
                     Icon(
                       Icons.check_circle_outline_rounded,
@@ -317,20 +315,20 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
             // Error
             if (!_model.isClearing && _model.errorMessage.isNotEmpty)
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Color(0xFFDC2626).withOpacity(0.1),
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFDC2626), width: 1),
+                  border: Border.all(color: const Color(0xFFDC2626), width: 1),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Color(0xFFDC2626)),
-                    SizedBox(width: 12),
+                    const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _model.errorMessage,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -340,7 +338,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                 ),
               ),
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Botones de acción
             if (!_model.isClearing)
@@ -352,8 +350,8 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                       text: _model.isSuccess ? 'Cerrar' : 'Cancelar',
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF374151),
-                        textStyle: TextStyle(fontFamily: 'Roboto',
+                        color: const Color(0xFF374151),
+                        textStyle: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -363,7 +361,7 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                     ),
                   ),
                   if (!_model.isSuccess)
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                   if (!_model.isSuccess)
                     Expanded(
                       child: FFButtonWidget(
@@ -375,8 +373,8 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
                         ),
                         options: FFButtonOptions(
                           height: 48,
-                          color: Color(0xFFEF4444),
-                          textStyle: TextStyle(fontFamily: 'Roboto',
+                          color: const Color(0xFFEF4444),
+                          textStyle: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -395,20 +393,20 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
 
   Widget _buildCheckItem(String text) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
+          const Icon(
             Icons.check_circle,
             color: Color(0xFF10B981),
             size: 20,
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(fontFamily: 'Roboto',
                 fontSize: 13,
                 color: Colors.white70,
               ),

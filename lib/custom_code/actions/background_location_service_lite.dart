@@ -64,7 +64,7 @@ class LiteGPSFilter {
     final medLat = lats[lats.length ~/ 2];
     final medLon = lons[lons.length ~/ 2];
 
-    final metersPerDegLat = 111320.0;
+    const metersPerDegLat = 111320.0;
     final metersPerDegLon = 111320.0 * cos(medLat * pi / 180.0);
 
     final validPoints = _window.where((pt) {

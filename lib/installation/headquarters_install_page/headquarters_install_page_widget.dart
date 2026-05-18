@@ -1,10 +1,7 @@
-﻿import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_radio_button.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import '/flutter_flow/form_field_controller.dart';
-import 'dart:ui';
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
@@ -61,7 +58,7 @@ class _HeadquartersInstallPageWidgetState
         body: SafeArea(
           top: true,
           child: Container(
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: Color(0xFF101827),
             ),
             child: Column(
@@ -69,14 +66,14 @@ class _HeadquartersInstallPageWidgetState
               children: [
                 Container(
                   width: double.infinity,
-                  decoration: BoxDecoration(),
+                  decoration: const BoxDecoration(),
                   child: Column(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       Container(
                         width: double.infinity,
-                        decoration: BoxDecoration(),
+                        decoration: const BoxDecoration(),
                         child: Column(
                           mainAxisSize: MainAxisSize.max,
                           mainAxisAlignment: MainAxisAlignment.start,
@@ -102,7 +99,7 @@ class _HeadquartersInstallPageWidgetState
                                 Container(
                                   width: 124.09,
                                   height: 53.2,
-                                  decoration: BoxDecoration(),
+                                  decoration: const BoxDecoration(),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(8.0),
                                     child: Image.asset(
@@ -170,7 +167,7 @@ class _HeadquartersInstallPageWidgetState
                                   direction: Axis.horizontal,
                                   radioButtonColor:
                                       FlutterFlowTheme.of(context).primary,
-                                  inactiveRadioButtonColor: Color(0xFF2E363C),
+                                  inactiveRadioButtonColor: const Color(0xFF2E363C),
                                   toggleable: false,
                                   horizontalAlignment: WrapAlignment.center,
                                   verticalAlignment: WrapCrossAlignment.start,
@@ -199,12 +196,12 @@ class _HeadquartersInstallPageWidgetState
                                   ),
                             ),
                             Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   10.0, 0.0, 10.0, 0.0),
                               child: Container(
                                 width: double.infinity,
                                 decoration: BoxDecoration(
-                                  boxShadow: [
+                                  boxShadow: const [
                                     BoxShadow(
                                       blurRadius: 4.0,
                                       color: Color(0x33000000),
@@ -216,7 +213,7 @@ class _HeadquartersInstallPageWidgetState
                                   ],
                                   borderRadius: BorderRadius.circular(16.0),
                                 ),
-                                child: Container(
+                                child: SizedBox(
                                   width: 200.0,
                                   child: TextFormField(
                                     controller: _model.textController,
@@ -274,7 +271,7 @@ class _HeadquartersInstallPageWidgetState
                                                     .fontStyle,
                                           ),
                                       enabledBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
+                                        borderSide: const BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -282,7 +279,7 @@ class _HeadquartersInstallPageWidgetState
                                             BorderRadius.circular(8.0),
                                       ),
                                       focusedBorder: OutlineInputBorder(
-                                        borderSide: BorderSide(
+                                        borderSide: const BorderSide(
                                           color: Color(0x00000000),
                                           width: 1.0,
                                         ),
@@ -343,7 +340,7 @@ class _HeadquartersInstallPageWidgetState
                                 ),
                               ),
                             ),
-                          ].divide(SizedBox(height: 10.0)),
+                          ].divide(const SizedBox(height: 10.0)),
                         ),
                       ),
                     ],
@@ -353,9 +350,9 @@ class _HeadquartersInstallPageWidgetState
                   child: Container(
                     width: double.infinity,
                     height: double.infinity,
-                    decoration: BoxDecoration(),
+                    decoration: const BoxDecoration(),
                     child: Padding(
-                      padding: EdgeInsets.all(10.0),
+                      padding: const EdgeInsets.all(10.0),
                       child: Column(
                         mainAxisSize: MainAxisSize.max,
                         children: [
@@ -371,7 +368,7 @@ class _HeadquartersInstallPageWidgetState
                                 return GridView.builder(
                                   padding: EdgeInsets.zero,
                                   gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
                                     crossAxisCount: 2,
                                     crossAxisSpacing: 10.0,
                                     mainAxisSpacing: 10.0,
@@ -383,7 +380,7 @@ class _HeadquartersInstallPageWidgetState
                                     final headquarterItemItem =
                                         headquarterItem[headquarterItemIndex];
                                     return Padding(
-                                      padding: EdgeInsetsDirectional.fromSTEB(
+                                      padding: const EdgeInsetsDirectional.fromSTEB(
                                           0.0, 5.0, 0.0, 0.0),
                                       child: InkWell(
                                         splashColor: Colors.transparent,
@@ -406,7 +403,7 @@ class _HeadquartersInstallPageWidgetState
                                             }.withoutNulls,
                                             extra: <String, dynamic>{
                                               kTransitionInfoKey:
-                                                  TransitionInfo(
+                                                  const TransitionInfo(
                                                 hasTransition: true,
                                                 transitionType:
                                                     PageTransitionType.fade,
@@ -432,7 +429,7 @@ class _HeadquartersInstallPageWidgetState
                                             }.withoutNulls,
                                             extra: <String, dynamic>{
                                               kTransitionInfoKey:
-                                                  TransitionInfo(
+                                                  const TransitionInfo(
                                                 hasTransition: true,
                                                 transitionType:
                                                     PageTransitionType.fade,
@@ -447,7 +444,7 @@ class _HeadquartersInstallPageWidgetState
                                           decoration: BoxDecoration(
                                             color: FlutterFlowTheme.of(context)
                                                 .primaryBackground,
-                                            boxShadow: [
+                                            boxShadow: const [
                                               BoxShadow(
                                                 blurRadius: 10.0,
                                                 color: Color(0x33000000),
@@ -461,7 +458,7 @@ class _HeadquartersInstallPageWidgetState
                                                 BorderRadius.circular(12.0),
                                           ),
                                           child: Padding(
-                                            padding: EdgeInsets.all(10.0),
+                                            padding: const EdgeInsets.all(10.0),
                                             child: Column(
                                               mainAxisSize: MainAxisSize.max,
                                               children: [
@@ -473,10 +470,10 @@ class _HeadquartersInstallPageWidgetState
                                                       Expanded(
                                                         child: Align(
                                                           alignment:
-                                                              AlignmentDirectional(
+                                                              const AlignmentDirectional(
                                                                   0.0, 0.0),
                                                           child: Text(
-                                                            '${headquarterItemItem.nameHeadquarter}',
+                                                            headquarterItemItem.nameHeadquarter,
                                                             textAlign: TextAlign
                                                                 .center,
                                                             style: FlutterFlowTheme
@@ -523,7 +520,7 @@ class _HeadquartersInstallPageWidgetState
                               },
                             ),
                           ),
-                        ].divide(SizedBox(height: 10.0)),
+                        ].divide(const SizedBox(height: 10.0)),
                       ),
                     ),
                   ),

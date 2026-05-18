@@ -1,12 +1,9 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
 import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -48,7 +45,7 @@ Future updateVisitSQLite(VisitsStruct visitsStruct) async {
     visitData['locationDefault'],
   ]);
 
-  print('Visit insertado con ID autogenerado: $generatedId');
+  debugPrint('Visit insertado con ID autogenerado: $generatedId');
 
   // 2. INSERTAR VISIT DETAILS SI EXISTEN
   if (visitsStruct.visitsDetails.isNotEmpty) {
@@ -61,24 +58,23 @@ Future updateVisitSQLite(VisitsStruct visitsStruct) async {
       ''', [
         generatedId, // Usar el idVisit del struct principal
         detail.idActivityStatus,
-        detail.statusOption?.trim() ?? '',
-        detail.statusResponse?.trim() ?? '',
+        detail.statusOption.trim() ?? '',
+        detail.statusResponse.trim() ?? '',
         detail.idStepParent,
         detail.rememberStatus,
-        detail.defaultStatus?.trim() ?? '',
+        detail.defaultStatus.trim() ?? '',
       ]);
     }
-    print(
+    debugPrint(
         '${visitsStruct.visitsDetails.length} VisitDetails insertados para idVisit: ${visitsStruct.idVisit}');
   }
 
   // Procesar locationsAdd si existe
-  if (visitsStruct.locationsAdd != null &&
-      visitsStruct.locationsAdd!.isNotEmpty) {
+  if (visitsStruct.locationsAdd.isNotEmpty) {
     String dateHour = visitsStruct.createdAt?.toIso8601String() ??
         DateTime.now().toIso8601String();
 
-    for (String locationStr in visitsStruct.locationsAdd!) {
+    for (String locationStr in visitsStruct.locationsAdd) {
       // Variables con valores por defecto
       double lat = 0.0;
       double lon = 0.0;
@@ -128,6 +124,6 @@ Future updateVisitSQLite(VisitsStruct visitsStruct) async {
       ]);
     }
 
-    print('${visitsStruct.locationsAdd!.length} VisitLocations insertadas');
+    debugPrint('${visitsStruct.locationsAdd.length} VisitLocations insertadas');
   }
 }

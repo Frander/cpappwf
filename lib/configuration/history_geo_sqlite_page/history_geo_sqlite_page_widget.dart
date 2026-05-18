@@ -1,18 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart' as latlong;
 import 'package:pmtiles/pmtiles.dart';
 import 'package:vector_map_tiles/vector_map_tiles.dart';
 import 'package:vector_tile_renderer/vector_tile_renderer.dart' as vtr;
-import 'package:intl/intl.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/app_state.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import 'history_geo_sqlite_page_model.dart';
 export 'history_geo_sqlite_page_model.dart';
@@ -223,7 +219,7 @@ class _HistoryGeoSqlitePageWidgetState
       builder: (ctx, child) {
         return Theme(
           data: ThemeData.dark().copyWith(
-            colorScheme: ColorScheme.dark(
+            colorScheme: const ColorScheme.dark(
               primary: _accentBlue,
               surface: _bgCard,
             ),
@@ -334,10 +330,10 @@ class _HistoryGeoSqlitePageWidgetState
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               child: Row(
                 children: [
-                  Icon(Icons.tune, size: 14, color: _accentBlue),
+                  const Icon(Icons.tune, size: 14, color: _accentBlue),
                   const SizedBox(width: 6),
-                  Text('Filtros',
-                      style: const TextStyle(
+                  const Text('Filtros',
+                      style: TextStyle(
                           color: _textPrimary, fontSize: 12, fontWeight: FontWeight.w700)),
                   const SizedBox(width: 8),
                   Container(
@@ -347,7 +343,7 @@ class _HistoryGeoSqlitePageWidgetState
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(summaryText,
-                        style: TextStyle(color: _accentBlue, fontSize: 9, fontWeight: FontWeight.w700)),
+                        style: const TextStyle(color: _accentBlue, fontSize: 9, fontWeight: FontWeight.w700)),
                   ),
                   if (_methodFilter != 'ALL') ...[
                     const SizedBox(width: 4),
@@ -366,7 +362,7 @@ class _HistoryGeoSqlitePageWidgetState
                   AnimatedRotation(
                     turns: _filtersExpanded ? 0.5 : 0.0,
                     duration: const Duration(milliseconds: 200),
-                    child: Icon(Icons.expand_more, size: 18, color: _textSecondary),
+                    child: const Icon(Icons.expand_more, size: 18, color: _textSecondary),
                   ),
                 ],
               ),
@@ -422,7 +418,7 @@ class _HistoryGeoSqlitePageWidgetState
                   ] else ...[
                     Row(
                       children: [
-                        Icon(Icons.date_range, size: 14, color: _accentBlue),
+                        const Icon(Icons.date_range, size: 14, color: _accentBlue),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
@@ -750,7 +746,7 @@ class _HistoryGeoSqlitePageWidgetState
 
 class GpsMapBottomSheet extends StatefulWidget {
   final List<GpsLocationRecord> records;
-  const GpsMapBottomSheet({required this.records});
+  const GpsMapBottomSheet({super.key, required this.records});
 
   @override
   State<GpsMapBottomSheet> createState() => GpsMapBottomSheetState();
@@ -831,13 +827,13 @@ class GpsMapBottomSheetState extends State<GpsMapBottomSheet> {
   Widget build(BuildContext context) {
     final center = widget.records.isNotEmpty
         ? latlong.LatLng(widget.records.first.lat, widget.records.first.lon)
-        : latlong.LatLng(4.6, -74.1);
+        : const latlong.LatLng(4.6, -74.1);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.92,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: _bgDeep,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Column(
         children: [

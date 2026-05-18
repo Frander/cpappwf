@@ -1,23 +1,16 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
-import 'package:nfc_manager/nfc_manager_android.dart'
-    show IsoDepAndroid, NfcAAndroid, MifareClassicAndroid, NfcTagAndroid;
 import 'package:ndef_record/ndef_record.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;

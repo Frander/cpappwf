@@ -1,15 +1,12 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'dart:math' as math;
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 import 'time_picker_component_model.dart';
 export 'time_picker_component_model.dart';
 
@@ -21,8 +18,8 @@ class TimePickerComponentWidget extends StatefulWidget {
     required this.statusName,
     required this.statusJSON,
     int? idStepParent,
-  })  : this.tittle = tittle ?? 'Seleccionar Hora',
-        this.idStepParent = idStepParent ?? 0;
+  })  : tittle = tittle ?? 'Seleccionar Hora',
+        idStepParent = idStepParent ?? 0;
 
   final String tittle;
   final int idStatus;
@@ -112,7 +109,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
     final TimeOfDay? picked = await showDialog<TimeOfDay>(
       context: context,
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.7),
+      barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (context) => _ModernTimePickerDialog(
         initialTime: _model.selectedTime ?? TimeOfDay.now(),
         primaryColor: FlutterFlowTheme.of(context).primary,
@@ -148,7 +145,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
     );
 
     FFAppState().visitDetails =
-        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+        visitDetailsCopy.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
   }
 
@@ -160,7 +157,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
       _model.isTimeSelected = false;
     });
 
-    await _saveTime(TimeOfDay(hour: 0, minute: 0));
+    await _saveTime(const TimeOfDay(hour: 0, minute: 0));
   }
 
   String _formatTime(TimeOfDay time) {
@@ -184,7 +181,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -200,7 +197,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
           children: [
             // Header
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -214,14 +211,14 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.chevron_left,
                         color: Colors.white,
                         size: 28,
@@ -231,11 +228,11 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                   Expanded(
                     child: Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                          const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
                       child: Text(
                         widget.tittle,
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -256,7 +253,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                               FlutterFlowTheme.of(context).error,
                               FlutterFlowTheme.of(context)
                                   .error
-                                  .withOpacity(0.8),
+                                  .withValues(alpha: 0.8),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -264,13 +261,13 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                             BoxShadow(
                               color: FlutterFlowTheme.of(context)
                                   .error
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               blurRadius: 8,
-                              offset: Offset(0, 4),
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.clear,
                           color: Colors.white,
                           size: 22,
@@ -278,7 +275,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                       ),
                     )
                   else
-                    SizedBox(width: 44),
+                    const SizedBox(width: 44),
                 ],
               ),
             ),
@@ -286,7 +283,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
             // Visualización de hora
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(20.0),
                 child: _model.isTimeSelected && _model.selectedTime != null
                     ? _buildTimeDisplay()
                     : _buildEmptyState(),
@@ -295,7 +292,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
 
             // Botón de selección
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
               child: InkWell(
                 onTap: _selectTime,
                 child: Container(
@@ -315,26 +312,26 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                       BoxShadow(
                         color: FlutterFlowTheme.of(context)
                             .primary
-                            .withOpacity(0.5),
+                            .withValues(alpha: 0.5),
                         blurRadius: 20,
-                        offset: Offset(0, 8),
+                        offset: const Offset(0, 8),
                       ),
                     ],
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.access_time_rounded,
                         color: Colors.white,
                         size: 24,
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Text(
                         _model.isTimeSelected
                             ? 'Cambiar Hora'
                             : 'Seleccionar Hora',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
@@ -361,20 +358,20 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-            FlutterFlowTheme.of(context).secondary.withOpacity(0.2),
+            FlutterFlowTheme.of(context).primary.withValues(alpha: 0.2),
+            FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: FlutterFlowTheme.of(context).primary.withOpacity(0.3),
+            color: FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
             blurRadius: 30,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -403,9 +400,9 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                     BoxShadow(
                       color: FlutterFlowTheme.of(context)
                           .primary
-                          .withOpacity(0.5),
+                          .withValues(alpha: 0.5),
                       blurRadius: 30,
-                      offset: Offset(0, 10),
+                      offset: const Offset(0, 10),
                     ),
                   ],
                 ),
@@ -415,7 +412,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
               Container(
                 width: 180,
                 height: 180,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   shape: BoxShape.circle,
                   color: Color(0xFF1E293B),
                 ),
@@ -433,7 +430,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                     width: index % 3 == 0 ? 4 : 2,
                     height: index % 3 == 0 ? 12 : 8,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.5),
+                      color: Colors.white.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -448,7 +445,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                 child: Container(
                   width: 4,
                   height: 50,
-                  margin: EdgeInsets.only(bottom: 50),
+                  margin: const EdgeInsets.only(bottom: 50),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(2),
@@ -462,7 +459,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                 child: Container(
                   width: 3,
                   height: 70,
-                  margin: EdgeInsets.only(bottom: 70),
+                  margin: const EdgeInsets.only(bottom: 70),
                   decoration: BoxDecoration(
                     color: FlutterFlowTheme.of(context).primary,
                     borderRadius: BorderRadius.circular(2),
@@ -474,7 +471,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
               Container(
                 width: 12,
                 height: 12,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: Colors.white,
                   shape: BoxShape.circle,
                 ),
@@ -482,12 +479,12 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
             ],
           ),
 
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
 
           // Hora digital (24h)
           Text(
             _formatTime(time),
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 64,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -496,16 +493,16 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
             ),
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Hora formato 12h
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -514,7 +511,7 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: Colors.white.withOpacity(0.9),
+                color: Colors.white.withValues(alpha: 0.9),
                 letterSpacing: 1,
               ),
             ),
@@ -527,10 +524,10 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
   Widget _buildEmptyState() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 2,
         ),
       ),
@@ -548,37 +545,37 @@ class _TimePickerComponentWidgetState extends State<TimePickerComponentWidget>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                    FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                    FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+                    FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.3),
                   ],
                 ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.schedule_rounded,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 size: 56,
               ),
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Text(
             'Sin hora seleccionada',
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               'Toca el botón de abajo para\nseleccionar una hora',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 height: 1.5,
               ),
             ),
@@ -611,7 +608,7 @@ class _ModernTimePickerDialog extends StatefulWidget {
 class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
   late int _selectedHour;
   late int _selectedMinute;
-  bool _is24HourFormat = true;
+  final bool _is24HourFormat = true;
 
   @override
   void initState() {
@@ -661,22 +658,22 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: EdgeInsets.all(16),
+      insetPadding: const EdgeInsets.all(16),
       child: Container(
-        constraints: BoxConstraints(maxWidth: 380, maxHeight: 550),
+        constraints: const BoxConstraints(maxWidth: 380, maxHeight: 550),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
+          gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
           ),
           borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               blurRadius: 40,
-              offset: Offset(0, 20),
+              offset: const Offset(0, 20),
             ),
           ],
         ),
@@ -687,7 +684,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
             children: [
               // Header
               Container(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [widget.primaryColor, widget.secondaryColor],
@@ -695,7 +692,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                 ),
                 child: Column(
                   children: [
-                    Row(
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.access_time_rounded, color: Colors.white, size: 28),
@@ -710,18 +707,18 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                         ),
                       ],
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     // Botón AHORA
                     InkWell(
                       onTap: _setCurrentTime,
                       child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3)),
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
                         ),
-                        child: Text(
+                        child: const Text(
                           'AHORA',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 12,
@@ -739,7 +736,7 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
               // Selector de tiempo
               Expanded(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+                  padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -750,17 +747,17 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                         onDecrement: _decrementHour,
                         label: 'HORA',
                       ),
-                      SizedBox(width: 20),
+                      const SizedBox(width: 20),
                       // Separador
                       Text(
                         ':',
                         style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 48,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white.withOpacity(0.8),
+                          color: Colors.white.withValues(alpha: 0.8),
                         ),
                       ),
-                      SizedBox(width: 20),
+                      const SizedBox(width: 20),
                       // Minutos
                       _buildTimeColumn(
                         value: _selectedMinute,
@@ -775,15 +772,15 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
 
               // Botones de acción
               Padding(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     Expanded(
                       child: TextButton(
                         onPressed: () => Navigator.pop(context),
                         style: TextButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          backgroundColor: Colors.white.withOpacity(0.1),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.white.withValues(alpha: 0.1),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -793,12 +790,12 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () {
@@ -809,14 +806,14 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          padding: EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
                           backgroundColor: widget.primaryColor,
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
                           elevation: 8,
                         ),
-                        child: Text(
+                        child: const Text(
                           'Confirmar',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
@@ -854,25 +851,25 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  widget.primaryColor.withOpacity(0.3),
-                  widget.secondaryColor.withOpacity(0.3),
+                  widget.primaryColor.withValues(alpha: 0.3),
+                  widget.secondaryColor.withValues(alpha: 0.3),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.keyboard_arrow_up_rounded,
               color: Colors.white,
               size: 32,
             ),
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         // Valor
         Container(
           width: 100,
-          padding: EdgeInsets.symmetric(vertical: 20),
+          padding: const EdgeInsets.symmetric(vertical: 20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [widget.primaryColor, widget.secondaryColor],
@@ -880,9 +877,9 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
             borderRadius: BorderRadius.circular(20),
             boxShadow: [
               BoxShadow(
-                color: widget.primaryColor.withOpacity(0.5),
+                color: widget.primaryColor.withValues(alpha: 0.5),
                 blurRadius: 20,
-                offset: Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -890,27 +887,27 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
             children: [
               Text(
                 value.toString().padLeft(2, '0'),
-                style: TextStyle(fontFamily: 'Roboto',
+                style: const TextStyle(fontFamily: 'Roboto',
                   fontSize: 56,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   height: 1,
                 ),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.8),
+                  color: Colors.white.withValues(alpha: 0.8),
                   letterSpacing: 1,
                 ),
               ),
             ],
           ),
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         // Botón decrementar
         InkWell(
           onTap: onDecrement,
@@ -920,14 +917,14 @@ class _ModernTimePickerDialogState extends State<_ModernTimePickerDialog> {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  widget.primaryColor.withOpacity(0.3),
-                  widget.secondaryColor.withOpacity(0.3),
+                  widget.primaryColor.withValues(alpha: 0.3),
+                  widget.secondaryColor.withValues(alpha: 0.3),
                 ],
               ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.keyboard_arrow_down_rounded,
               color: Colors.white,
               size: 32,

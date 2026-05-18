@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -10,8 +11,8 @@ import 'package:geolocator/geolocator.dart';
 // SISTEMA DE CACHÉ PARA RESULTADOS DE CALIDAD DE INTERNET
 DateTime? _lastCheckTime;
 Map<String, dynamic>? _cachedResult;
-final Duration _cacheDuration = Duration(minutes: 2);
-final Duration _negativeCacheDuration = Duration(seconds: 15);
+const Duration _cacheDuration = Duration(minutes: 2);
+const Duration _negativeCacheDuration = Duration(seconds: 15);
 
 class ServerConfig {
   final String url;
@@ -41,37 +42,39 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
 
     if (timeSinceLastCheck < effectiveCacheDuration) {
       final secondsSinceCheck = timeSinceLastCheck.inSeconds;
-      print('📦 ✅ Usando resultado en caché (${secondsSinceCheck}s desde último chequeo, válido por ${effectiveCacheDuration.inSeconds}s)');
-      print('⏱️ Próximo chequeo en: ${(effectiveCacheDuration.inSeconds - secondsSinceCheck)}s');
+      debugPrint('📦 ✅ Usando resultado en caché (${secondsSinceCheck}s desde último chequeo, válido por ${effectiveCacheDuration.inSeconds}s)');
+      debugPrint('⏱️ Próximo chequeo en: ${(effectiveCacheDuration.inSeconds - secondsSinceCheck)}s');
       return _cachedResult;
     } else {
-      print('⏰ Caché expirado (${timeSinceLastCheck.inSeconds}s), realizando nuevo chequeo...');
+      debugPrint('⏰ Caché expirado (${timeSinceLastCheck.inSeconds}s), realizando nuevo chequeo...');
     }
   } else if (forceRefresh) {
-    print('🔄 Force refresh solicitado, omitiendo caché...');
+    debugPrint('🔄 Force refresh solicitado, omitiendo caché...');
   } else {
-    print('🔍 Primera ejecución o caché vacío, realizando chequeo completo...');
+    debugPrint('🔍 Primera ejecución o caché vacío, realizando chequeo completo...');
   }
 
   Dio? dio;
   double? downloadSpeed;
 
   try {
-    print(
+    debugPrint(
         '🚀 Iniciando diagnóstico avanzado con selección inteligente de servidores...');
 
     // 1. DETECTAR UBICACIÓN ACTUAL
     Position? currentPosition;
     try {
-      print('📍 Detectando ubicación actual...');
+      debugPrint('📍 Detectando ubicación actual...');
       currentPosition = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-      ).timeout(Duration(seconds: 10));
-      print(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+        ),
+      ).timeout(const Duration(seconds: 10));
+      debugPrint(
           '✅ Ubicación detectada: ${currentPosition.latitude}, ${currentPosition.longitude}');
     } catch (e) {
-      print('⚠️ No se pudo obtener ubicación GPS: $e');
-      print('📍 Usando ubicación por defecto (Manizales)');
+      debugPrint('⚠️ No se pudo obtener ubicación GPS: $e');
+      debugPrint('📍 Usando ubicación por defecto (Manizales)');
       currentPosition = Position(
         latitude: 5.0703,
         longitude: -75.5138,
@@ -87,7 +90,7 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
     }
 
     // 2. VERIFICAR TIPO DE CONECTIVIDAD
-    print('📱 Verificando tipo de conexión...');
+    debugPrint('📱 Verificando tipo de conexión...');
     final connectivityResults = await Connectivity().checkConnectivity();
 
     String connectionType = 'Desconocido';
@@ -115,7 +118,7 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
       }
     }
 
-    print('✅ Tipo de conexión detectado: $connectionType');
+    debugPrint('✅ Tipo de conexión detectado: $connectionType');
 
     if (connectionType == 'Sin conexión') {
       final result = {
@@ -127,25 +130,25 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
       // CACHEAR RESULTADO DE SIN CONEXIÓN (para evitar chequeos repetitivos)
       _cachedResult = result;
       _lastCheckTime = DateTime.now();
-      print('💾 Sin conexión - resultado cacheado');
+      debugPrint('💾 Sin conexión - resultado cacheado');
 
       return result;
     }
 
     // 3. OBTENER SERVIDORES ÓPTIMOS SEGÚN UBICACIÓN
     List<ServerConfig> optimalServers = _getOptimalServers(currentPosition);
-    print('🎯 Servidores seleccionados para ubicación actual:');
+    debugPrint('🎯 Servidores seleccionados para ubicación actual:');
     for (var server in optimalServers.take(3)) {
-      print('   📡 ${server.name} (${server.city}) - ${server.type}');
+      debugPrint('   📡 ${server.name} (${server.city}) - ${server.type}');
     }
 
     // 4. VERIFICAR CONECTIVIDAD CON HTTP DIRECTO (más confiable que internet_connection_checker_plus)
-    print('🌐 Verificando acceso real a internet...');
+    debugPrint('🌐 Verificando acceso real a internet...');
 
     bool hasInternet = false;
     final checkDio = Dio(BaseOptions(
-      connectTimeout: Duration(seconds: 5),
-      receiveTimeout: Duration(seconds: 5),
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 5),
       followRedirects: true,
       validateStatus: (status) => status! < 500,
     ));
@@ -156,14 +159,14 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
         _quickHttpCheck(checkDio, 'https://www.google.com/generate_204'),
         _quickHttpCheck(checkDio, 'https://connectivitycheck.gstatic.com/generate_204'),
         _quickHttpCheck(checkDio, 'https://1.1.1.1/cdn-cgi/trace'),
-      ]).timeout(Duration(seconds: 8), onTimeout: () => [false, false, false]);
+      ]).timeout(const Duration(seconds: 8), onTimeout: () => [false, false, false]);
 
       hasInternet = results.any((r) => r);
-      print('✅ Acceso a internet confirmado: $hasInternet (${results.where((r) => r).length}/3 endpoints OK)');
+      debugPrint('✅ Acceso a internet confirmado: $hasInternet (${results.where((r) => r).length}/3 endpoints OK)');
 
       checkDio.close();
     } catch (e) {
-      print('❌ Error verificando internet: $e');
+      debugPrint('❌ Error verificando internet: $e');
       hasInternet = false;
       checkDio.close();
     }
@@ -178,18 +181,18 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
       // CACHEAR RESULTADO DE SIN INTERNET (para evitar chequeos repetitivos)
       _cachedResult = result;
       _lastCheckTime = DateTime.now();
-      print('💾 Sin internet - resultado cacheado');
+      debugPrint('💾 Sin internet - resultado cacheado');
 
       return result;
     }
 
     // 5. CONFIGURAR DIO OPTIMIZADO
-    print('⚙️ Configurando cliente HTTP optimizado...');
+    debugPrint('⚙️ Configurando cliente HTTP optimizado...');
 
     dio = Dio(BaseOptions(
-      connectTimeout: Duration(seconds: 5),
-      receiveTimeout: Duration(seconds: 8),
-      sendTimeout: Duration(seconds: 5),
+      connectTimeout: const Duration(seconds: 5),
+      receiveTimeout: const Duration(seconds: 8),
+      sendTimeout: const Duration(seconds: 5),
       followRedirects: true,
       validateStatus: (status) => status! < 500,
       headers: {
@@ -203,7 +206,7 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
     ));
 
     // 6. PING TEST SIMPLIFICADO - SOLO 3 SERVIDORES
-    print('📡 Ejecutando ping test (API + 2 locales)...');
+    debugPrint('📡 Ejecutando ping test (API + 2 locales)...');
 
     Map<String, int> serverPings = {};
     int? apiPing;
@@ -214,7 +217,7 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
     for (var server in optimalServers) {
       List<int> pings = [];
       try {
-        print('   🔍 ${server.name}...');
+        debugPrint('   🔍 ${server.name}...');
 
         for (int attempt = 0; attempt < 2; attempt++) {
           final stopwatch = Stopwatch()..start();
@@ -229,7 +232,7 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
         if (pings.isNotEmpty) {
           int avgPing = (pings.reduce((a, b) => a + b) / pings.length).round();
           serverPings[server.name] = avgPing;
-          print('   ✅ ${server.name}: ${avgPing}ms');
+          debugPrint('   ✅ ${server.name}: ${avgPing}ms');
 
           if (server.type == 'api') {
             apiPing = avgPing;
@@ -239,38 +242,38 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
           }
         }
       } catch (e) {
-        print('   ❌ ${server.name}: Error');
+        debugPrint('   ❌ ${server.name}: Error');
         continue;
       }
     }
 
     // Mostrar resumen
     if (serverPings.isNotEmpty) {
-      print('📊 Resumen: API=${apiPing ?? 'N/A'}ms, Local=${bestLocalPing ?? 'N/A'}ms');
+      debugPrint('📊 Resumen: API=${apiPing ?? 'N/A'}ms, Local=${bestLocalPing ?? 'N/A'}ms');
     }
 
     // 7. SPEED TEST SOLO CON CDNs PÚBLICOS (SIN PLUGIN PROBLEMÁTICO)
-    print('⚡ Midiendo velocidad con CDNs públicos verificados...');
+    debugPrint('⚡ Midiendo velocidad con CDNs públicos verificados...');
     downloadSpeed = await _fallbackSpeedTestPublic(dio, optimalServers);
 
-    print(
+    debugPrint(
         '🏆 Velocidad final: ${downloadSpeed?.toStringAsFixed(2) ?? 'No medida'} Mbps');
 
     // 8. CÁLCULO DE CALIDAD PONDERADO (API + LOCAL + VELOCIDAD) - SISTEMA NUEVO
-    print('🧮 Calculando calidad con ponderación inteligente...');
+    debugPrint('🧮 Calculando calidad con ponderación inteligente...');
 
     int score = 0;
 
     // Bonus por tipo de conexión (10% del score)
     if (connectionType == 'Ethernet') {
       score += 10;
-      print('📊 Bonus Ethernet: +10 puntos');
+      debugPrint('📊 Bonus Ethernet: +10 puntos');
     } else if (connectionType == 'WiFi') {
       score += 8;
-      print('📊 Bonus WiFi: +8 puntos');
+      debugPrint('📊 Bonus WiFi: +8 puntos');
     } else if (connectionType == 'Datos móviles') {
       score += 5;
-      print('📊 Bonus móvil: +5 puntos');
+      debugPrint('📊 Bonus móvil: +5 puntos');
     }
 
     // PING SCORING PONDERADO (30% total): 60% API + 40% Local
@@ -281,40 +284,42 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
       int apiPingScore = 0;
       if (isHighSpeedConnection) {
         // Expectativas para conectividad internacional (Colombia -> Oregon)
-        if (apiPing < 180)
+        if (apiPing < 180) {
           apiPingScore = 18; // Excelente (fibra directa)
-        else if (apiPing < 220)
+        } else if (apiPing < 220) {
           apiPingScore = 16; // Muy bueno (fibra estándar)
-        else if (apiPing < 280)
+        } else if (apiPing < 280) {
           apiPingScore = 14; // Bueno (conexión premium)
-        else if (apiPing < 350)
+        } else if (apiPing < 350) {
           apiPingScore = 12; // Regular (ADSL+)
-        else if (apiPing < 450)
+        } else if (apiPing < 450) {
           apiPingScore = 8; // Deficiente (ADSL)
-        else if (apiPing < 600)
+        } else if (apiPing < 600) {
           apiPingScore = 4; // Malo
-        else
+        } else {
           apiPingScore = 2; // Muy malo
+        }
       } else {
         // Expectativas móviles a Oregon
-        if (apiPing < 250)
+        if (apiPing < 250) {
           apiPingScore = 18;
-        else if (apiPing < 300)
+        } else if (apiPing < 300) {
           apiPingScore = 16;
-        else if (apiPing < 400)
+        } else if (apiPing < 400) {
           apiPingScore = 14;
-        else if (apiPing < 500)
+        } else if (apiPing < 500) {
           apiPingScore = 10;
-        else if (apiPing < 700)
+        } else if (apiPing < 700) {
           apiPingScore = 6;
-        else
+        } else {
           apiPingScore = 3;
+        }
       }
       totalPingScore += apiPingScore;
-      print('📊 Score ping API: ${apiPingScore}/18 (${apiPing}ms a Oregon)');
+      debugPrint('📊 Score ping API: $apiPingScore/18 (${apiPing}ms a Oregon)');
     } else {
       totalPingScore += 9; // Score neutro para API
-      print('📊 Score neutro ping API: 9/18');
+      debugPrint('📊 Score neutro ping API: 9/18');
     }
 
     // Evaluar ping local (12% del score total - 40% del ping scoring)
@@ -322,41 +327,43 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
       int localPingScore = 0;
       if (isHighSpeedConnection) {
         // Expectativas MUY REALISTAS para servidores locales colombianos
-        if (bestLocalPing < 80)
+        if (bestLocalPing < 80) {
           localPingScore = 12; // Excelente (fibra local)
-        else if (bestLocalPing < 120)
+        } else if (bestLocalPing < 120) {
           localPingScore = 11; // Muy bueno (conexión premium)
-        else if (bestLocalPing < 160)
+        } else if (bestLocalPing < 160) {
           localPingScore = 10; // Bueno (conexión estándar)
-        else if (bestLocalPing < 220)
+        } else if (bestLocalPing < 220) {
           localPingScore = 9; // Regular superior
-        else if (bestLocalPing < 300)
+        } else if (bestLocalPing < 300) {
           localPingScore = 7; // Regular
-        else if (bestLocalPing < 450)
+        } else if (bestLocalPing < 450) {
           localPingScore = 5; // Deficiente
-        else
+        } else {
           localPingScore = 2; // Malo
+        }
       } else {
         // Móvil local con expectativas ajustadas
-        if (bestLocalPing < 100)
+        if (bestLocalPing < 100) {
           localPingScore = 12;
-        else if (bestLocalPing < 150)
+        } else if (bestLocalPing < 150) {
           localPingScore = 11;
-        else if (bestLocalPing < 200)
+        } else if (bestLocalPing < 200) {
           localPingScore = 10;
-        else if (bestLocalPing < 280)
+        } else if (bestLocalPing < 280) {
           localPingScore = 8;
-        else if (bestLocalPing < 400)
+        } else if (bestLocalPing < 400) {
           localPingScore = 6;
-        else
+        } else {
           localPingScore = 3;
+        }
       }
       totalPingScore += localPingScore;
-      print(
-          '📊 Score ping local: ${localPingScore}/12 (${bestLocalPing}ms a $bestLocalServer - EXCELENTE)');
+      debugPrint(
+          '📊 Score ping local: $localPingScore/12 (${bestLocalPing}ms a $bestLocalServer - EXCELENTE)');
     } else {
       totalPingScore += 6; // Score neutro para local
-      print('📊 Score neutro ping local: 6/12');
+      debugPrint('📊 Score neutro ping local: 6/12');
     }
 
     score += totalPingScore;
@@ -366,62 +373,65 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
       int speedScore = 0;
       if (isHighSpeedConnection) {
         // Expectativas MUY REALISTAS para WiFi/Ethernet medido con CDNs públicos
-        if (downloadSpeed >= 10)
+        if (downloadSpeed >= 10) {
           speedScore = 60; // Excelente (fibra óptica premium)
-        else if (downloadSpeed >= 7)
+        } else if (downloadSpeed >= 7) {
           speedScore = 55; // Muy bueno (fibra óptica estándar)
-        else if (downloadSpeed >= 5)
+        } else if (downloadSpeed >= 5) {
           speedScore = 50; // Bueno (fibra/cable detectado)
-        else if (downloadSpeed >= 3)
+        } else if (downloadSpeed >= 3) {
           speedScore = 40; // Regular superior (ADSL+)
-        else if (downloadSpeed >= 2)
+        } else if (downloadSpeed >= 2) {
           speedScore = 30; // Regular (ADSL estándar)
-        else if (downloadSpeed >= 1)
+        } else if (downloadSpeed >= 1) {
           speedScore = 20; // Deficiente (ADSL básico)
-        else if (downloadSpeed >= 0.5)
+        } else if (downloadSpeed >= 0.5) {
           speedScore = 10; // Muy deficiente
-        else
+        } else {
           speedScore = 5; // Extremadamente lenta
+        }
       } else {
         // Expectativas MUY REALISTAS para datos móviles con CDNs
-        if (downloadSpeed >= 8)
+        if (downloadSpeed >= 8) {
           speedScore = 60; // Excelente (5G premium)
-        else if (downloadSpeed >= 5)
+        } else if (downloadSpeed >= 5) {
           speedScore = 55; // Muy bueno (5G/4G+)
-        else if (downloadSpeed >= 3)
+        } else if (downloadSpeed >= 3) {
           speedScore = 50; // Bueno (4G estándar)
-        else if (downloadSpeed >= 2)
+        } else if (downloadSpeed >= 2) {
           speedScore = 40; // Regular (4G básico)
-        else if (downloadSpeed >= 1)
+        } else if (downloadSpeed >= 1) {
           speedScore = 30; // Regular (3G+)
-        else if (downloadSpeed >= 0.5)
+        } else if (downloadSpeed >= 0.5) {
           speedScore = 20; // Deficiente (3G)
-        else
+        } else {
           speedScore = 10; // 2G/Edge
+        }
       }
 
       score += speedScore;
-      print(
-          '📊 Score por velocidad: ${speedScore}/60 (${downloadSpeed.toStringAsFixed(2)} Mbps vía CDNs - indica fibra)');
+      debugPrint(
+          '📊 Score por velocidad: $speedScore/60 (${downloadSpeed.toStringAsFixed(2)} Mbps vía CDNs - indica fibra)');
     } else {
       score += 25;
-      print('📊 Score neutro por velocidad: 25/60');
+      debugPrint('📊 Score neutro por velocidad: 25/60');
     }
 
-    print('📊 Score total: ${score}/100');
+    debugPrint('📊 Score total: $score/100');
 
     // 9. DETERMINAR CALIDAD CON UMBRALES MUY REALISTAS PARA COLOMBIA
     String quality;
-    if (score >= 70)
+    if (score >= 70) {
       quality = 'excellent'; // 70+ puntos (conexión premium)
-    else if (score >= 55)
+    } else if (score >= 55) {
       quality = 'good'; // 55-69 puntos (buena conexión)
-    else if (score >= 40)
+    } else if (score >= 40) {
       quality = 'fair'; // 40-54 puntos (conexión regular)
-    else if (score >= 25)
+    } else if (score >= 25) {
       quality = 'poor'; // 25-39 puntos (conexión deficiente)
-    else
+    } else {
       quality = 'none'; // <25 puntos (muy mala conexión)
+    }
 
     // 10. MENSAJE CONTEXTUAL FINAL
     String baseMessage;
@@ -455,13 +465,13 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
     bool isGoodConnection =
         (quality == 'excellent' || quality == 'good' || quality == 'fair');
 
-    print('🎉 Resultado final: $finalMessage');
-    print('📊 Es buena conexión: $isGoodConnection');
+    debugPrint('🎉 Resultado final: $finalMessage');
+    debugPrint('📊 Es buena conexión: $isGoodConnection');
     if (apiPing != null) {
-      print('🌍 Ping a tu API (Oregon): ${apiPing}ms');
+      debugPrint('🌍 Ping a tu API (Oregon): ${apiPing}ms');
     }
     if (bestLocalServer != null) {
-      print('🇨🇴 Mejor servidor local: $bestLocalServer (${bestLocalPing}ms)');
+      debugPrint('🇨🇴 Mejor servidor local: $bestLocalServer (${bestLocalPing}ms)');
     }
 
     // PREPARAR RESULTADO
@@ -474,11 +484,11 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
     // ACTUALIZAR CACHÉ
     _cachedResult = result;
     _lastCheckTime = DateTime.now();
-    print('💾 Resultado guardado en caché (válido por ${_cacheDuration.inMinutes} minutos)');
+    debugPrint('💾 Resultado guardado en caché (válido por ${_cacheDuration.inMinutes} minutos)');
 
     return result;
   } catch (e) {
-    print('💥 Error general: $e');
+    debugPrint('💥 Error general: $e');
 
     final result = {
       'message': 'Error al verificar la conexión',
@@ -489,16 +499,16 @@ Future<dynamic> checkInternetQuality({bool forceRefresh = false}) async {
     // CACHEAR RESULTADO DE ERROR (para evitar chequeos repetitivos cuando hay problemas)
     _cachedResult = result;
     _lastCheckTime = DateTime.now();
-    print('💾 Error - resultado cacheado (evita reintentos inmediatos)');
+    debugPrint('💾 Error - resultado cacheado (evita reintentos inmediatos)');
 
     return result;
   } finally {
     // Limpiar recursos
     try {
       dio?.close();
-      print('🔒 Recursos liberados correctamente');
+      debugPrint('🔒 Recursos liberados correctamente');
     } catch (e) {
-      print('⚠️ Error liberando recursos: $e');
+      debugPrint('⚠️ Error liberando recursos: $e');
     }
   }
 }
@@ -548,9 +558,9 @@ List<ServerConfig> _getOptimalServers(Position position) {
     ),
   ];
 
-  print('📡 Servidores de verificación:');
+  debugPrint('📡 Servidores de verificación:');
   for (var server in servers) {
-    print('   - ${server.name} (${server.type})');
+    debugPrint('   - ${server.name} (${server.type})');
   }
 
   return servers;
@@ -575,7 +585,7 @@ Future<double?> _fallbackSpeedTestPublic(
   List<double> speeds = [];
 
   try {
-    print('⚡ Midiendo velocidad con ${speedServer.name}...');
+    debugPrint('⚡ Midiendo velocidad con ${speedServer.name}...');
 
     // Solo 2 intentos
     for (int attempt = 0; attempt < 2; attempt++) {
@@ -604,18 +614,18 @@ Future<double?> _fallbackSpeedTestPublic(
           final mbps = (bytes * 8) / (1024 * 1024 * seconds);
           double speed = double.parse(mbps.toStringAsFixed(2));
           speeds.add(speed);
-          print('   Intento ${attempt + 1}: ${speed} Mbps');
+          debugPrint('   Intento ${attempt + 1}: $speed Mbps');
         }
       }
     }
 
     if (speeds.isNotEmpty) {
       double avgSpeed = speeds.reduce((a, b) => a + b) / speeds.length;
-      print('🏆 Velocidad promedio: ${avgSpeed.toStringAsFixed(2)} Mbps');
+      debugPrint('🏆 Velocidad promedio: ${avgSpeed.toStringAsFixed(2)} Mbps');
       return double.parse(avgSpeed.toStringAsFixed(2));
     }
   } catch (e) {
-    print('❌ Error midiendo velocidad: $e');
+    debugPrint('❌ Error midiendo velocidad: $e');
   }
 
   return null;

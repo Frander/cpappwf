@@ -1,13 +1,9 @@
-﻿import '/backend/schema/structs/index.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'dart:convert';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 import 'package:sqflite/sqflite.dart';
 import 'nfc_write_dialog_model.dart';
 export 'nfc_write_dialog_model.dart';
@@ -569,7 +565,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         HapticFeedback.heavyImpact();
 
         // Esperar un momento y cerrar
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
         if (mounted) {
           Navigator.pop(context, true);
         }
@@ -641,7 +637,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
   // Polling para detectar cambios en el estado de NFC
   void _startNfcStatePolling() {
     Future.doWhile(() async {
-      await Future.delayed(Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       if (!mounted || !_model.isWriting) {
         return false; // Detener el polling
@@ -652,7 +648,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       // Actualizar UI cuando cambia el estado
       if (nfcReadState == 'SOLICITAR_OTRO_TAG' ||
           nfcReadState.startsWith('ERROR:') ||
-          !nfcReadState.isEmpty && nfcReadState != 'SOLICITAR_OTRO_TAG') {
+          nfcReadState.isNotEmpty && nfcReadState != 'SOLICITAR_OTRO_TAG') {
         setState(() {}); // Forzar rebuild
       }
 
@@ -665,7 +661,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -681,7 +677,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           children: [
             // Header
             Padding(
-              padding: EdgeInsets.all(20.0),
+              padding: const EdgeInsets.all(20.0),
               child: Row(
                 children: [
                   InkWell(
@@ -693,17 +689,17 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.close, color: Colors.white),
+                      child: const Icon(Icons.close, color: Colors.white),
                     ),
                   ),
-                  SizedBox(width: 16),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       children: [
-                        Text(
+                        const Text(
                           'ESCRIBIR TAG NFC',
                           style: TextStyle(
                             fontFamily: 'Roboto',
@@ -712,18 +708,18 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Container(
                           padding:
-                              EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                           decoration: BoxDecoration(
                             gradient: LinearGradient(colors: [
                               Colors.orange,
-                              Colors.orange.withOpacity(0.7),
+                              Colors.orange.withValues(alpha: 0.7),
                             ]),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: Text(
+                          child: const Text(
                             'ESCRITURA',
                             style: TextStyle(
                               fontSize: 11,
@@ -735,7 +731,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                       ],
                     ),
                   ),
-                  SizedBox(width: 60),
+                  const SizedBox(width: 60),
                 ],
               ),
             ),
@@ -759,26 +755,26 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 !_model.isSuccess &&
                 _model.errorMessage == null)
               Padding(
-                padding: EdgeInsets.fromLTRB(20, 0, 20, 30),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 30),
                 child: InkWell(
                   onTap: _startWriting,
                   child: Container(
                     width: double.infinity,
                     height: 64,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
+                      gradient: const LinearGradient(
                         colors: [Colors.orange, Colors.deepOrange],
                       ),
                       borderRadius: BorderRadius.circular(20),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.orange.withOpacity(0.5),
+                          color: Colors.orange.withValues(alpha: 0.5),
                           blurRadius: 20,
-                          offset: Offset(0, 8),
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.nfc, color: Colors.white, size: 28),
@@ -804,7 +800,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
   }
 
   Widget _buildCalculatingState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -827,7 +823,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
   Widget _buildPreviewState() {
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
         children: [
           // Icono compacto
@@ -839,27 +835,27 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                   width: 56,
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       colors: [Colors.orange, Colors.deepOrange],
                     ),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.orange.withOpacity(0.4),
+                        color: Colors.orange.withValues(alpha: 0.4),
                         blurRadius: 16,
                         spreadRadius: 2,
                       ),
                     ],
                   ),
-                  child: Icon(Icons.edit, color: Colors.white, size: 28),
+                  child: const Icon(Icons.edit, color: Colors.white, size: 28),
                 ),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
+                    const Text(
                       'Listo para escribir',
                       style: TextStyle(
                         fontFamily: 'Roboto',
@@ -868,13 +864,13 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                         color: Colors.white,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       '${_model.totalVisits} visitas · ${_model.totalResults} ${_getUnityLabel()}',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 13,
-                        color: Colors.orange.withOpacity(0.9),
+                        color: Colors.orange.withValues(alpha: 0.9),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -884,23 +880,23 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             ],
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // Preview de datos con scroll
           Expanded(
             child: Container(
               width: double.infinity,
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   width: 1.5,
                 ),
               ),
               child: SingleChildScrollView(
-                physics: BouncingScrollPhysics(),
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -910,11 +906,11 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                         fontFamily: 'Roboto',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white.withOpacity(0.5),
+                        color: Colors.white.withValues(alpha: 0.5),
                         letterSpacing: 1.2,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     _buildDataRow(
                         'Fecha/Hora', _formatDateTime(_model.dateHour)),
                     _buildDataRow(
@@ -931,12 +927,12 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     // Mostrar visitas y resultados discriminados por lote
                     if (_model.visitsByHeadquarter.isNotEmpty) ...[
                       Container(
-                        padding: EdgeInsets.all(10),
+                        padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.03),
+                          color: Colors.white.withValues(alpha: 0.03),
                           borderRadius: BorderRadius.circular(8),
                           border:
-                              Border.all(color: Colors.white.withOpacity(0.08)),
+                              Border.all(color: Colors.white.withValues(alpha: 0.08)),
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -947,20 +943,20 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                                 fontFamily: 'Roboto',
                                 fontSize: 9,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white.withOpacity(0.4),
+                                color: Colors.white.withValues(alpha: 0.4),
                                 letterSpacing: 1,
                               ),
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             ..._model.visitsByHeadquarter
                                 .map((hqData) => _buildHeadquarterRow(hqData))
-                                .toList(),
+                                ,
                           ],
                         ),
                       ),
-                      SizedBox(height: 10),
-                      Divider(color: Colors.white.withOpacity(0.15), height: 1),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
+                      Divider(color: Colors.white.withValues(alpha: 0.15), height: 1),
+                      const SizedBox(height: 10),
                     ],
                     _buildDataRow(
                         'Total Visitas', _model.totalVisits.toString()),
@@ -968,30 +964,30 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                         'Total ${_getUnityLabel(capitalize: true)}', _model.totalResults.toString()),
                     _buildDataRow('Lote Destino',
                         '${_model.headquarterName} (#${_model.headquarterId})'),
-                    SizedBox(height: 12),
-                    Divider(color: Colors.white.withOpacity(0.15)),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
+                    Divider(color: Colors.white.withValues(alpha: 0.15)),
+                    const SizedBox(height: 12),
                     Text(
                       'FORMATO TAG:',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 9,
-                        color: Colors.white.withOpacity(0.4),
+                        color: Colors.white.withValues(alpha: 0.4),
                       ),
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Container(
                       width: double.infinity,
-                      padding: EdgeInsets.all(10),
+                      padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: Color(0xFF00a86b).withOpacity(0.1),
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                            color: Color(0xFF00a86b).withOpacity(0.3)),
+                            color: const Color(0xFF00a86b).withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         _model.dataToWrite,
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Roboto Mono',
                           fontSize: 10,
                           color: Color(0xFF00a86b),
@@ -1010,7 +1006,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
 
   Widget _buildDataRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1019,14 +1015,14 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withValues(alpha: 0.7),
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Flexible(
             child: Text(
               value,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
@@ -1044,10 +1040,10 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
   /// Widget para mostrar fila de datos de un lote específico
   Widget _buildHeadquarterRow(HeadquarterVisitData hqData) {
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
-      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: Color(0xFF374151),
+        color: const Color(0xFF374151),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -1057,16 +1053,16 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             flex: 2,
             child: Row(
               children: [
-                Icon(
+                const Icon(
                   Icons.location_on,
                   color: Color(0xFF10B981),
                   size: 16,
                 ),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     hqData.headquarterName,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontFamily: 'Roboto',
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1080,15 +1076,15 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           ),
           // Visitas
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Color(0xFF3B82F6).withOpacity(0.2),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                const Text(
                   'V:',
                   style: TextStyle(
                     fontFamily: 'Roboto',
@@ -1096,10 +1092,10 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     color: Color(0xFF3B82F6),
                   ),
                 ),
-                SizedBox(width: 2),
+                const SizedBox(width: 2),
                 Text(
                   '${hqData.visits}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -1109,18 +1105,18 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               ],
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           // Resultados
           Container(
-            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: Color(0xFF10B981).withOpacity(0.2),
+              color: const Color(0xFF10B981).withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
+                const Text(
                   'R:',
                   style: TextStyle(
                     fontFamily: 'Roboto',
@@ -1128,10 +1124,10 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     color: Color(0xFF10B981),
                   ),
                 ),
-                SizedBox(width: 2),
+                const SizedBox(width: 2),
                 Text(
                   '${hqData.results}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontFamily: 'Roboto',
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -1168,22 +1164,22 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                 ),
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.nfc, color: Colors.white, size: 60),
+              child: const Icon(Icons.nfc, color: Colors.white, size: 60),
             ),
           ),
-          SizedBox(height: 30),
+          const SizedBox(height: 30),
           Text(
             needsAnotherTag
                 ? '⚠️ Acerque OTRO tag'
                 : 'Acerque el tag para escribir',
-            style: TextStyle(
+            style: const TextStyle(
               fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             needsAnotherTag
                 ? 'El contenido no cabe en el tag actual.\n\nEl contenido existente se conservará.\n\nAcerque un NUEVO tag para escribir.'
@@ -1192,23 +1188,23 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 14,
-              color: Colors.white.withOpacity(0.8),
+              color: Colors.white.withValues(alpha: 0.8),
               height: 1.5,
             ),
           ),
           if (needsAnotherTag) ...[
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.2),
+                color: Colors.amber.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: Colors.amber,
                   width: 1,
                 ),
               ),
-              child: Row(
+              child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.info_outline, color: Colors.amber, size: 20),
@@ -1239,16 +1235,16 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
           Container(
             width: 120,
             height: 120,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 colors: [Color(0xFF00a86b), Color(0xFF003420)],
               ),
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.check_circle, color: Colors.white, size: 64),
+            child: const Icon(Icons.check_circle, color: Colors.white, size: 64),
           ),
-          SizedBox(height: 30),
-          Text(
+          const SizedBox(height: 30),
+          const Text(
             '¡Tag Escrito Exitosamente!',
             style: TextStyle(
               fontFamily: 'Roboto',
@@ -1268,21 +1264,21 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
                 colors: [
-                  Colors.red.withOpacity(0.3),
-                  Colors.red.withOpacity(0.1),
+                  Colors.red.withValues(alpha: 0.3),
+                  Colors.red.withValues(alpha: 0.1),
                   Colors.transparent,
                 ],
               ),
             ),
-            child: Icon(Icons.warning_amber_rounded, color: Colors.red, size: 80),
+            child: const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 80),
           ),
-          SizedBox(height: 24),
-          Text(
+          const SizedBox(height: 24),
+          const Text(
             'Alerta',
             style: TextStyle(
               fontFamily: 'Roboto',
@@ -1291,22 +1287,22 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Container(
-            margin: EdgeInsets.symmetric(horizontal: 32),
-            padding: EdgeInsets.all(20),
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.15),
+              color: Colors.red.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: Colors.red.withOpacity(0.4),
+                color: Colors.red.withValues(alpha: 0.4),
                 width: 2,
               ),
             ),
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: const TextStyle(
                 fontFamily: 'Roboto',
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -1315,10 +1311,10 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               ),
             ),
           ),
-          SizedBox(height: 32),
+          const SizedBox(height: 32),
           // Botones de acción
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Row(
               children: [
                 // Botón Cancelar
@@ -1326,14 +1322,14 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                   child: ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF374151),
+                      backgroundColor: const Color(0xFF374151),
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    child: Text(
+                    child: const Text(
                       'Cancelar',
                       style: TextStyle(
                         fontFamily: 'Roboto',
@@ -1343,7 +1339,7 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 // Botón Reintentar
                 Expanded(
                   child: ElevatedButton.icon(
@@ -1356,15 +1352,15 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
                       _startWriting();
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Color(0xFF10B981),
+                      backgroundColor: const Color(0xFF10B981),
                       foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                    icon: Icon(Icons.refresh, size: 20),
-                    label: Text(
+                    icon: const Icon(Icons.refresh, size: 20),
+                    label: const Text(
                       'Reintentar',
                       style: TextStyle(
                         fontFamily: 'Roboto',

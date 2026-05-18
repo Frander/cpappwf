@@ -1,11 +1,6 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -49,7 +44,7 @@ Future<String> getSp3NavFile(BuildContext context) async {
   final gpsWeek = nowUtc.difference(gpsEpoch).inSeconds ~/ 604800;
 
   const maxRetroceso = 6;
-  const String _earthdataToken =
+  const String earthdataToken =
       'eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImpkaWVnbzk3MDgiLCJleHAiOjE3NTI0MjgxMTgsImlhdCI6MTc0NzI0NDExOCwiaXNzIjoiaHR0cHM6Ly91cnMuZWFydGhkYXRhLm5hc2EuZ292IiwiaWRlbnRpdHlfcHJvdmlkZXIiOiJlZGxfb3BzIiwiYWNyIjoiZWRsIiwiYXNzdXJhbmNlX2xldmVsIjozfQ.wRnvqTgJdImbLNhZfiAfePQ3ySq5B6rGAk7R1mxBWcbardUTroCfcZKAsL38T6Qk1qtxDPxrXKTfIAaGBA2ymikwCRJB1xcInyocgnXBuWqvCNFor95-gPPRuwG9yppwkiUZz9ADwLmL1bM3rOGtEL4JOBDBUAaTQqDpuGpvwaw_zobpZ0DUc1usmruMxALKHJYi_AmovdczLKccJHqibQSfkG0PXQiCuifVpkn7V9kkG6xOjDEl26zFeC7Uuy0NWLmQeiRRYeJRgCppp0eGJ5tQN2BDHpwuk5oBM4E9PWKukR6AnlXVAD7sAziTwNGNaLz1R9tR8ZE9Artjt-i6kA';
 
   // 5) Bucle de descarga/descompresión
@@ -61,17 +56,17 @@ Future<String> getSp3NavFile(BuildContext context) async {
             .padLeft(3, '0');
     final year = targetDate.year.toString();
 
-    final gzName = 'COD0OPSRAP_${year}${doy}0000_01D_05M_ORB.SP3.gz';
+    final gzName = 'COD0OPSRAP_$year${doy}0000_01D_05M_ORB.SP3.gz';
     final sp3Name = gzName.replaceAll('.gz', '');
     final url = Uri.parse('https://cddis.nasa.gov/archive/gnss/products/'
         '$gpsWeek/$gzName');
 
-    print('🔗 Intentando descargar ($offset): $url');
+    debugPrint('🔗 Intentando descargar ($offset): $url');
     final resp = await http.get(url, headers: {
-      'Authorization': 'Bearer $_earthdataToken',
+      'Authorization': 'Bearer $earthdataToken',
     });
     if (resp.statusCode != 200) {
-      print('⚠️ Código ${resp.statusCode}, probando día anterior...');
+      debugPrint('⚠️ Código ${resp.statusCode}, probando día anterior...');
       continue;
     }
 
@@ -85,7 +80,7 @@ Future<String> getSp3NavFile(BuildContext context) async {
       decompressed = GZipCodec().decode(await gzFile.readAsBytes());
     } catch (e) {
       await gzFile.delete();
-      print('❌ Error al descomprimir: $e');
+      debugPrint('❌ Error al descomprimir: $e');
       continue;
     }
 
@@ -98,7 +93,7 @@ Future<String> getSp3NavFile(BuildContext context) async {
       await gzFile.delete();
     } catch (_) {}
 
-    print('✅ Archivo SP3 listo en: ${sp3File.path}');
+    debugPrint('✅ Archivo SP3 listo en: ${sp3File.path}');
     return sp3File.path;
   }
 

@@ -1,12 +1,9 @@
-﻿import '/backend/schema/structs/index.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
+import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'tag_test_reader_dialog_model.dart';
 export 'tag_test_reader_dialog_model.dart';
 
@@ -66,7 +63,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
       // Usar readNFCBasic para Centro de Administración (sin validación de tipo)
       final nfcData = await actions.readNFCBasic(context, autoClose: false);
 
-      if (nfcData != null && nfcData.isNotEmpty) {
+      if (nfcData.isNotEmpty) {
         // Parsear el contenido del tag
         final records = _parseNfcContent(nfcData);
 
@@ -183,7 +180,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -192,7 +189,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
       ),
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -201,7 +198,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.visibility_rounded,
@@ -220,22 +217,22 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   ],
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Estado de lectura
             if (_model.isReading)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF374151),
+                  color: const Color(0xFF374151),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Color(0xFF3B82F6),
+                    color: const Color(0xFF3B82F6),
                     width: 2,
                   ),
                 ),
@@ -244,20 +241,20 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     ScaleTransition(
                       scale: _pulseAnimation,
                       child: Container(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Color(0xFF3B82F6).withOpacity(0.2),
+                          color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.nfc,
                           color: Color(0xFF3B82F6),
                           size: 48,
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
-                    Text(
+                    const SizedBox(height: 20),
+                    const Text(
                       'ACERQUE EL TAG',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Roboto',
@@ -267,8 +264,8 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                         letterSpacing: 0.5,
                       ),
                     ),
-                    SizedBox(height: 12),
-                    Row(
+                    const SizedBox(height: 12),
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
@@ -296,20 +293,20 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
             // Error
             if (!_model.isReading && _model.errorMessage != null)
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Color(0xFFDC2626).withOpacity(0.1),
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFDC2626), width: 1),
+                  border: Border.all(color: const Color(0xFFDC2626), width: 1),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Color(0xFFDC2626)),
-                    SizedBox(width: 12),
+                    const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _model.errorMessage!,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -319,7 +316,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                 ),
               ),
 
-            if (!_model.isReading) SizedBox(height: 24),
+            if (!_model.isReading) const SizedBox(height: 24),
 
             // Botones de acción
             if (!_model.isReading)
@@ -331,8 +328,8 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                       text: 'Cerrar',
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF374151),
-                        textStyle: TextStyle(fontFamily: 'Roboto',
+                        color: const Color(0xFF374151),
+                        textStyle: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -342,17 +339,17 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     ),
                   ),
                   if (_model.errorMessage != null)
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                   if (_model.errorMessage != null)
                     Expanded(
                       child: FFButtonWidget(
                         onPressed: _startReading,
                         text: 'Reintentar',
-                        icon: Icon(Icons.refresh, size: 20),
+                        icon: const Icon(Icons.refresh, size: 20),
                         options: FFButtonOptions(
                           height: 48,
-                          color: Color(0xFF3B82F6),
-                          textStyle: TextStyle(fontFamily: 'Roboto',
+                          color: const Color(0xFF3B82F6),
+                          textStyle: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -372,7 +369,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
 
   Widget _buildTagReaderSummary() {
     final tagData = _model.parsedRecords;
-    if (tagData.isEmpty) return SizedBox.shrink();
+    if (tagData.isEmpty) return const SizedBox.shrink();
 
     // Agrupar por lote (headquarterId)
     final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
@@ -385,15 +382,15 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     }
 
     return Container(
-      constraints: BoxConstraints(maxHeight: 500),
+      constraints: const BoxConstraints(maxHeight: 500),
       child: SingleChildScrollView(
         child: Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Color(0xFF1B4332), // Verde oscuro
+            color: const Color(0xFF1B4332), // Verde oscuro
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               width: 1,
             ),
           ),
@@ -402,13 +399,13 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
             children: [
               Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.summarize_rounded,
                     color: Colors.white,
                     size: 18,
                   ),
-                  SizedBox(width: 6),
-                  Text(
+                  const SizedBox(width: 6),
+                  const Text(
                     'Resumen del TAG',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
@@ -416,16 +413,16 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                       color: Colors.white,
                     ),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Color(0xFF3B82F6),
+                      color: const Color(0xFF3B82F6),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${tagData.length} ${tagData.length == 1 ? 'registro' : 'registros'}',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(fontFamily: 'Roboto',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -434,12 +431,12 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               ...groupedByHeadquarter.entries.map((entry) {
                 final headquarterId = entry.key;
                 final records = entry.value;
                 return _buildHeadquarterGroup(headquarterId, records);
-              }).toList(),
+              }),
             ],
           ),
         ),
@@ -515,13 +512,13 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     }
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
         color:
-            Color(0xFF2D6A4F).withOpacity(0.3), // Verde medio con transparencia
+            const Color(0xFF2D6A4F).withValues(alpha: 0.3), // Verde medio con transparencia
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 1,
         ),
       ),
@@ -534,7 +531,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
@@ -543,40 +540,40 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     size: 32,
                     weight: 700,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           loteName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white.withOpacity(0.85),
+                            color: Colors.white.withValues(alpha: 0.85),
                           ),
                         ),
                       ],
                     ),
                   ),
                   Container(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.2),
+                      color: Colors.white.withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${operatorGroups.length}',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(fontFamily: 'Roboto',
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
@@ -589,7 +586,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
           ),
           if (isExpanded)
             Container(
-              padding: EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
+              padding: const EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: operatorGroups.entries.map((entry) {
                   final operatorId = entry.key;
@@ -616,12 +613,12 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     return Container(
-      margin: EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Color(0xFF2D6A4F).withOpacity(0.3),
+        color: const Color(0xFF2D6A4F).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Color(0xFF52B788).withOpacity(0.4),
+          color: const Color(0xFF52B788).withValues(alpha: 0.4),
           width: 1,
         ),
       ),
@@ -634,39 +631,39 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
               });
             },
             child: Container(
-              padding: EdgeInsets.all(10),
+              padding: const EdgeInsets.all(10),
               child: Row(
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Color(0xFF74C69D),
+                    color: const Color(0xFF74C69D),
                     size: 24,
                   ),
-                  SizedBox(width: 8),
-                  Icon(
+                  const SizedBox(width: 8),
+                  const Icon(
                     Icons.person_outline_rounded,
                     color: Color(0xFF74C69D),
                     size: 18,
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           operatorName,
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 11,
-                            color: Colors.white.withOpacity(0.7),
+                            color: Colors.white.withValues(alpha: 0.7),
                           ),
                         ),
                       ],
@@ -674,7 +671,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   ),
                   Text(
                     '${records.length}',
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF74C69D),
@@ -686,7 +683,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
           ),
           if (isExpanded)
             Container(
-              padding: EdgeInsets.only(left: 24, right: 10, bottom: 10),
+              padding: const EdgeInsets.only(left: 24, right: 10, bottom: 10),
               child: Column(
                 children: records.map((record) {
                   final dateTime = record['dateTime'] as DateTime?;
@@ -701,45 +698,45 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   }
 
                   return Container(
-                    margin: EdgeInsets.only(bottom: 6),
-                    padding: EdgeInsets.all(8),
+                    margin: const EdgeInsets.only(bottom: 6),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Color(0xFF1B4332).withOpacity(0.4),
+                      color: const Color(0xFF1B4332).withValues(alpha: 0.4),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: Color(0xFF74C69D).withOpacity(0.2),
+                        color: const Color(0xFF74C69D).withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(
+                        const Icon(
                           Icons.access_time_rounded,
                           color: Color(0xFF95D5B2),
                           size: 14,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             formattedDate,
                             style: TextStyle(fontFamily: 'Roboto',
                               fontSize: 11,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
                         ),
                         Text(
                           '$visits V',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF95D5B2),
                           ),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Text(
                           '$results R',
-                          style: TextStyle(fontFamily: 'Roboto',
+                          style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
                             color: Color(0xFF95D5B2),

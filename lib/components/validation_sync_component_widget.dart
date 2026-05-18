@@ -1,9 +1,8 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
@@ -18,7 +17,7 @@ class ValidationSyncComponentWidget extends StatefulWidget {
     super.key,
     String? title,
     this.info,
-  }) : this.title = title ?? 'Información';
+  }) : title = title ?? 'Información';
 
   final String title;
   final String? info;
@@ -56,17 +55,17 @@ class _ValidationSyncComponentWidgetState
     context.watch<FFAppState>();
 
     return Align(
-      alignment: AlignmentDirectional(0.0, 0.0),
+      alignment: const AlignmentDirectional(0.0, 0.0),
       child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
         child: Container(
           width: double.infinity,
-          constraints: BoxConstraints(
+          constraints: const BoxConstraints(
             maxWidth: 530.0,
           ),
           decoration: BoxDecoration(
             color: FlutterFlowTheme.of(context).primaryBackground,
-            boxShadow: [
+            boxShadow: const [
               BoxShadow(
                 blurRadius: 3.0,
                 color: Color(0x33000000),
@@ -83,7 +82,7 @@ class _ValidationSyncComponentWidgetState
             ),
           ),
           child: Padding(
-            padding: EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
+            padding: const EdgeInsetsDirectional.fromSTEB(0.0, 0.0, 0.0, 12.0),
             child: Column(
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -91,15 +90,15 @@ class _ValidationSyncComponentWidgetState
                 Expanded(
                   child: Padding(
                     padding:
-                        EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
+                        const EdgeInsetsDirectional.fromSTEB(24.0, 16.0, 24.0, 16.0),
                     child: Column(
                       mainAxisSize: MainAxisSize.max,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
+                          alignment: const AlignmentDirectional(0.0, 0.0),
                           child: Padding(
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 16.0),
                             child: Icon(
                               Icons.phone_iphone_outlined,
@@ -109,7 +108,7 @@ class _ValidationSyncComponentWidgetState
                           ),
                         ),
                         Align(
-                          alignment: AlignmentDirectional(0.0, 0.0),
+                          alignment: const AlignmentDirectional(0.0, 0.0),
                           child: Text(
                             '¿Está seguro que desea realizar la sincronización?',
                             textAlign: TextAlign.center,
@@ -138,9 +137,9 @@ class _ValidationSyncComponentWidgetState
                         ),
                         Expanded(
                           child: Align(
-                            alignment: AlignmentDirectional(-1.0, -1.0),
+                            alignment: const AlignmentDirectional(-1.0, -1.0),
                             child: Padding(
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 12.0, 0.0, 0.0),
                               child: Text(
                                 'Si continúa con la sincronización se validará que tenga una conexión estable a internet esto puede tardar hasta 10 segundos.',
@@ -172,7 +171,7 @@ class _ValidationSyncComponentWidgetState
                 ),
                 Padding(
                   padding:
-                      EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 12.0),
+                      const EdgeInsetsDirectional.fromSTEB(24.0, 0.0, 24.0, 12.0),
                   child: Row(
                     mainAxisSize: MainAxisSize.max,
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -186,9 +185,9 @@ class _ValidationSyncComponentWidgetState
                           text: 'Cancelar',
                           options: FFButtonOptions(
                             height: 40.0,
-                            padding: EdgeInsetsDirectional.fromSTEB(
+                            padding: const EdgeInsetsDirectional.fromSTEB(
                                 20.0, 0.0, 20.0, 0.0),
-                            iconPadding: EdgeInsetsDirectional.fromSTEB(
+                            iconPadding: const EdgeInsetsDirectional.fromSTEB(
                                 0.0, 0.0, 0.0, 0.0),
                             color: FlutterFlowTheme.of(context).error,
                             textStyle: FlutterFlowTheme.of(context)
@@ -212,7 +211,7 @@ class _ValidationSyncComponentWidgetState
                                       .fontStyle,
                                 ),
                             elevation: 0.0,
-                            borderSide: BorderSide(
+                            borderSide: const BorderSide(
                               color: Colors.transparent,
                             ),
                             borderRadius: BorderRadius.circular(40.0),
@@ -223,17 +222,18 @@ class _ValidationSyncComponentWidgetState
                         child: Builder(
                           builder: (context) => FFButtonWidget(
                             onPressed: () async {
-                              var _shouldSetState = false;
+                              var shouldSetState = false;
                               _model.checkInternetConnectionJSON =
                                   await actions.checkInternetQuality();
-                              _shouldSetState = true;
+                              shouldSetState = true;
                               if (functions.jsonDynamicToBool(getJsonField(
                                     _model.checkInternetConnectionJSON,
                                     r'''$.isGoodConnection''',
                                   )) ==
                                   true) {
-                                if ((FFAppState().visitsAdd.length > 0) ||
-                                    (FFAppState().newsAdd.length > 0)) {
+                                if ((FFAppState().visitsAdd.isNotEmpty) ||
+                                    (FFAppState().newsAdd.isNotEmpty)) {
+                                  if (!context.mounted) return;
                                   _model.syncAddResult =
                                       await actions.syncVisitsv2(
                                     context,
@@ -249,7 +249,7 @@ class _ValidationSyncComponentWidgetState
                                       r'''$.token''',
                                     ).toString(),
                                   );
-                                  _shouldSetState = true;
+                                  shouldSetState = true;
                                   FFAppState().loginResponse = null;
                                   // userSelected NO se limpia después de sync — debe persistir para el próximo ciclo
                                   FFAppState().companyDefault =
@@ -275,10 +275,11 @@ class _ValidationSyncComponentWidgetState
                                   FFAppState().newsList = [];
                                   FFAppState().newsSelected = [];
 
+                                  if (!context.mounted) return;
                                   context.pushNamed(
                                     StartPageWidget.routeName,
                                     extra: <String, dynamic>{
-                                      kTransitionInfoKey: TransitionInfo(
+                                      kTransitionInfoKey: const TransitionInfo(
                                         hasTransition: true,
                                         transitionType: PageTransitionType.fade,
                                         duration: Duration(milliseconds: 1000),
@@ -286,7 +287,7 @@ class _ValidationSyncComponentWidgetState
                                     },
                                   );
 
-                                  if (_shouldSetState) safeSetState(() {});
+                                  if (shouldSetState) safeSetState(() {});
                                   return;
                                 } else {
                                   FFAppState().loginResponse = null;
@@ -314,10 +315,11 @@ class _ValidationSyncComponentWidgetState
                                   FFAppState().newsList = [];
                                   FFAppState().newsSelected = [];
 
+                                  if (!context.mounted) return;
                                   context.pushNamed(
                                     StartPageWidget.routeName,
                                     extra: <String, dynamic>{
-                                      kTransitionInfoKey: TransitionInfo(
+                                      kTransitionInfoKey: const TransitionInfo(
                                         hasTransition: true,
                                         transitionType: PageTransitionType.fade,
                                         duration: Duration(milliseconds: 1000),
@@ -325,10 +327,11 @@ class _ValidationSyncComponentWidgetState
                                     },
                                   );
 
-                                  if (_shouldSetState) safeSetState(() {});
+                                  if (shouldSetState) safeSetState(() {});
                                   return;
                                 }
                               } else {
+                                if (!context.mounted) return;
                                 await showDialog(
                                   context: context,
                                   builder: (dialogContext) {
@@ -336,9 +339,9 @@ class _ValidationSyncComponentWidgetState
                                       elevation: 0,
                                       insetPadding: EdgeInsets.zero,
                                       backgroundColor: Colors.transparent,
-                                      alignment: AlignmentDirectional(0.0, 0.0)
+                                      alignment: const AlignmentDirectional(0.0, 0.0)
                                           .resolve(Directionality.of(context)),
-                                      child: Container(
+                                      child: SizedBox(
                                         height:
                                             MediaQuery.sizeOf(context).height *
                                                 0.5,
@@ -356,18 +359,18 @@ class _ValidationSyncComponentWidgetState
                                   },
                                 );
 
-                                if (_shouldSetState) safeSetState(() {});
+                                if (shouldSetState) safeSetState(() {});
                                 return;
                               }
 
-                              if (_shouldSetState) safeSetState(() {});
+                              if (shouldSetState) safeSetState(() {});
                             },
                             text: 'Sincronizar ahora',
                             options: FFButtonOptions(
                               height: 40.0,
-                              padding: EdgeInsetsDirectional.fromSTEB(
+                              padding: const EdgeInsetsDirectional.fromSTEB(
                                   20.0, 0.0, 20.0, 0.0),
-                              iconPadding: EdgeInsetsDirectional.fromSTEB(
+                              iconPadding: const EdgeInsetsDirectional.fromSTEB(
                                   0.0, 0.0, 0.0, 0.0),
                               color: FlutterFlowTheme.of(context).primary,
                               textStyle: FlutterFlowTheme.of(context)
@@ -391,7 +394,7 @@ class _ValidationSyncComponentWidgetState
                                         .fontStyle,
                                   ),
                               elevation: 0.0,
-                              borderSide: BorderSide(
+                              borderSide: const BorderSide(
                                 color: Colors.transparent,
                               ),
                               borderRadius: BorderRadius.circular(40.0),
@@ -399,7 +402,7 @@ class _ValidationSyncComponentWidgetState
                           ),
                         ),
                       ),
-                    ].divide(SizedBox(width: 5.0)),
+                    ].divide(const SizedBox(width: 5.0)),
                   ),
                 ),
               ],

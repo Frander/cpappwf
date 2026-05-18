@@ -1,10 +1,7 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
-import 'package:provider/provider.dart';
 import 'surveys_dynamic_component_model.dart';
 export 'surveys_dynamic_component_model.dart';
 
@@ -57,7 +54,7 @@ class _SurveysDynamicComponentWidgetState
               'assets/images/Fondoo56_Mesa-de-trabajo-1.jpg',
             ).image,
           ),
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
               blurRadius: 4.0,
               color: Color(0x33000000),
@@ -70,7 +67,7 @@ class _SurveysDynamicComponentWidgetState
           borderRadius: BorderRadius.circular(18.0),
         ),
         child: Padding(
-          padding: EdgeInsetsDirectional.fromSTEB(5.0, 8.0, 5.0, 8.0),
+          padding: const EdgeInsetsDirectional.fromSTEB(5.0, 8.0, 5.0, 8.0),
           child: Column(
             mainAxisSize: MainAxisSize.max,
             children: [

@@ -1,18 +1,12 @@
-﻿// Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
-import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Automatic FlutterFlow imports
+// Imports other custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
@@ -113,8 +107,9 @@ Future<String> exportThermalPDF(
 
       // Calcular líneas adicionales por texto largo
       int extraLines = 0;
-      if (recolector.length > 35)
+      if (recolector.length > 35) {
         extraLines += (recolector.length / 35).ceil() - 1;
+      }
       if (cortero.length > 35) extraLines += (cortero.length / 35).ceil() - 1;
       if (cajas.length > 35) extraLines += (cajas.length / 35).ceil() - 1;
       if (lotes.length > 35) extraLines += (lotes.length / 35).ceil() - 1;
@@ -223,6 +218,7 @@ Future<String> exportThermalPDF(
     final String filePath = await _savePDFFile(pdf, data['Form'] ?? 'reporte');
 
     // 5. Abrir el PDF con el context correcto
+    if (!context.mounted) return filePath;
     await _openPDF(filePath, context);
 
     return filePath;
@@ -468,6 +464,7 @@ Future<void> _openPDF(String filePath, BuildContext context) async {
     final File file = File(filePath);
     if (await file.exists()) {
       // Usar flutter_pdfview para mejor control de la visualización
+      if (!context.mounted) return;
       await Navigator.push(
         context,
         MaterialPageRoute(
@@ -518,6 +515,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
 
       if (photosStatus.isGranted && videosStatus.isGranted) return true;
 
+      if (!context.mounted) return false;
       final shouldContinue = await _showPermissionExplanationDialog(
         context,
         'La aplicación necesita acceso a tus archivos para guardar el PDF.',
@@ -537,6 +535,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
       final manageStatus = await Permission.manageExternalStorage.status;
       if (manageStatus.isGranted) return true;
 
+      if (!context.mounted) return false;
       final shouldContinue = await _showPermissionExplanationDialog(
         context,
         'Para guardar el PDF, se requiere permiso para gestionar el almacenamiento.',
@@ -551,6 +550,7 @@ Future<bool> _checkAndRequestStoragePermissions(BuildContext context) async {
     final storageStatus = await Permission.storage.status;
     if (storageStatus.isGranted) return true;
 
+    if (!context.mounted) return false;
     await _showPermissionExplanationDialog(
       context,
       'Se necesita permiso para guardar el PDF en el almacenamiento.',
@@ -593,10 +593,10 @@ class PDFViewerScreen extends StatefulWidget {
   final String title;
 
   const PDFViewerScreen({
-    Key? key,
+    super.key,
     required this.filePath,
     required this.title,
-  }) : super(key: key);
+  });
 
   @override
   State<PDFViewerScreen> createState() => _PDFViewerScreenState();
@@ -716,7 +716,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       bottomNavigationBar: isReady && errorMessage.isEmpty
           ? Container(
               padding: const EdgeInsets.all(16),
-              color: Theme.of(context).primaryColor.withOpacity(0.1),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.1),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -780,6 +780,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
       // Leer el archivo PDF
       final File file = File(widget.filePath);
       if (!await file.exists()) {
+        if (!mounted) return;
         Navigator.pop(context);
         _showErrorDialog('El archivo PDF no existe');
         return;
@@ -789,6 +790,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
 
       // MÉTODO 1: Intentar con share en lugar de print
       try {
+        if (!mounted) return;
         // Cerrar dialog de carga
         Navigator.pop(context);
 
@@ -798,6 +800,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
           filename: '${widget.title}_termica.pdf',
         );
 
+        if (!mounted) return;
         // Mostrar mensaje de éxito
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -819,6 +822,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         await _tryDirectPrint(pdfBytes);
       }
     } catch (e) {
+      if (!mounted) return;
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -837,6 +841,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
         name: widget.title,
       );
 
+      if (!mounted) return;
       // Cerrar loading si está abierto
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
@@ -859,6 +864,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     } catch (directError) {
       debugPrint('Error impresión directa: $directError');
 
+      if (!mounted) return;
       // Cerrar loading si está abierto
       if (Navigator.canPop(context)) {
         Navigator.pop(context);
@@ -908,13 +914,14 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
           return pdfBytes;
         },
         name: widget.title,
-        format: PdfPageFormat(
+        format: const PdfPageFormat(
           58 * PdfPageFormat.mm, // Ancho térmico 58mm
           double.infinity, // Alto automático
           marginAll: 1 * PdfPageFormat.mm, // Márgenes mínimos
         ),
       );
 
+      if (!mounted) return;
       // Mostrar confirmación de éxito
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -941,12 +948,13 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
     try {
       debugPrint('Usando método alternativo de impresión térmica');
 
+      final messenger = ScaffoldMessenger.of(context);
       // Mostrar el dialog de impresión del sistema pero con configuración térmica
       await Printing.layoutPdf(
         onLayout: (PdfPageFormat format) async {
           // Mostrar mensaje sobre configuración térmica
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            ScaffoldMessenger.of(context).showSnackBar(
+            messenger.showSnackBar(
               const SnackBar(
                 content: Text(
                   '🎫 Configuración automática: 58mm ancho - Presione IMPRIMIR',
@@ -961,7 +969,7 @@ class _PDFViewerScreenState extends State<PDFViewerScreen> {
           return pdfBytes;
         },
         name: '${widget.title} (TERMICA)',
-        format: PdfPageFormat(
+        format: const PdfPageFormat(
           58 * PdfPageFormat.mm,
           double.infinity,
           marginAll: 1 * PdfPageFormat.mm,

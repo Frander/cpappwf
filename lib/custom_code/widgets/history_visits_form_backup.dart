@@ -1,12 +1,9 @@
 // Automatic FlutterFlow imports
-import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom widgets
-import '/custom_code/actions/index.dart'; // Imports custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports other custom widgets
+// Imports custom actions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -17,7 +14,6 @@ import 'dart:math' as math;
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import 'package:intl/intl.dart';
 
 // ============================================================================
 // ENUMS Y CLASES DE DATOS
@@ -301,7 +297,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
   List<StateStats> _stateStats = [];
 
   // Filtros
-  TimeFilterRange _selectedTimeFilter = TimeFilterRange.day1;
+  final TimeFilterRange _selectedTimeFilter = TimeFilterRange.day1;
   int? _selectedStateFilter; // null = todos
   int? _selectedHeadquarterFilter; // null = todos
   int?
@@ -319,12 +315,12 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
   late PageController _pageController;
   List<DateTime> _uniqueDates = [];
   int _currentDateIndex = 0;
-  Map<DateTime, List<VisitRecord>> _visitsByDate = {};
+  final Map<DateTime, List<VisitRecord>> _visitsByDate = {};
 
   // Historial de zonas de exclusión
   List<ExclusionZoneHistoryRecord> _allExclusionHistory = [];
   List<ExclusionZoneHistoryRecord> _exclusionHistoryForCurrentDate = [];
-  Map<DateTime, List<ExclusionZoneHistoryRecord>> _exclusionHistoryByDate = {};
+  final Map<DateTime, List<ExclusionZoneHistoryRecord>> _exclusionHistoryByDate = {};
   bool _hasExclusionData = false;
 
   @override
@@ -1360,9 +1356,9 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                     ),
                   ),
                   const SizedBox(height: 24),
-                  Text(
+                  const Text(
                     'Una vez que registres visitas, aquí podrás\nver todas tus métricas de productividad',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       color: Color(0xFF6B7280),
                       height: 1.5,
@@ -1550,11 +1546,11 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
             // Mostrar mensaje
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
-                content: Row(
+                content: const Row(
                   children: [
-                    const Icon(Icons.info_outline, color: Colors.white),
-                    const SizedBox(width: 12),
-                    const Expanded(
+                    Icon(Icons.info_outline, color: Colors.white),
+                    SizedBox(width: 12),
+                    Expanded(
                       child:
                           Text('No hay visitas para ver detalles en este día'),
                     ),
@@ -1583,11 +1579,11 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
               size: 18,
               color: hasVisitsForCurrentDay ? null : Colors.grey.shade300,
             ),
+            iconMargin: const EdgeInsets.only(bottom: 2),
             child: Opacity(
               opacity: hasVisitsForCurrentDay ? 1.0 : 0.4,
               child: const Text('Detalle'),
             ),
-            iconMargin: const EdgeInsets.only(bottom: 2),
           ),
           const Tab(
             icon: Icon(Icons.not_listed_location, size: 18),
@@ -1903,7 +1899,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );
@@ -2072,7 +2068,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: iconColor.withOpacity(0.1),
+                    color: iconColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(icon, color: iconColor, size: 20),
@@ -3164,12 +3160,12 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Row(
+                                    content: const Row(
                                       children: [
-                                        const Icon(Icons.error_outline,
+                                        Icon(Icons.error_outline,
                                             color: Colors.white),
-                                        const SizedBox(width: 12),
-                                        const Expanded(
+                                        SizedBox(width: 12),
+                                        Expanded(
                                             child: Text(
                                                 'Código de seguridad incorrecto')),
                                       ],
@@ -3627,12 +3623,12 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Row(
+                                    content: const Row(
                                       children: [
-                                        const Icon(Icons.error_outline,
+                                        Icon(Icons.error_outline,
                                             color: Colors.white),
-                                        const SizedBox(width: 12),
-                                        const Expanded(
+                                        SizedBox(width: 12),
+                                        Expanded(
                                             child: Text(
                                                 'Código de seguridad incorrecto')),
                                       ],
@@ -4123,12 +4119,12 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                               } else {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Row(
+                                    content: const Row(
                                       children: [
-                                        const Icon(Icons.error_outline,
+                                        Icon(Icons.error_outline,
                                             color: Colors.white),
-                                        const SizedBox(width: 12),
-                                        const Expanded(
+                                        SizedBox(width: 12),
+                                        Expanded(
                                             child: Text(
                                                 'Código de seguridad incorrecto')),
                                       ],
@@ -4894,7 +4890,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                   setState(() => _isLoading = true);
                   await _cleanupSQLiteVisits();
                   await _loadAllData();
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('✅ SQLite limpiado exitosamente'),
@@ -4903,7 +4899,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                     );
                   }
                 } catch (e) {
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('❌ Error: $e'),
@@ -4974,7 +4970,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                 try {
                   setState(() => _isLoading = true);
                   await _cleanupAppState();
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('✅ AppState limpiado exitosamente'),
@@ -4983,7 +4979,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                     );
                   }
                 } catch (e) {
-                  if (mounted) {
+                  if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('❌ Error: $e'),
@@ -5974,7 +5970,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                       const SizedBox(height: 24),
                     ],
                     // GPS Info - TODOS LOS PUNTOS
@@ -6199,7 +6195,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm>
                             ],
                           ),
                         );
-                      }).toList(),
+                      }),
                     ],
                   ],
                 ),

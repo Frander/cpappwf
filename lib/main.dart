@@ -1,25 +1,13 @@
 import 'package:provider/provider.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import 'flutter_flow/flutter_flow_util.dart';
 import 'flutter_flow/internationalization.dart';
-import 'flutter_flow/nav/nav.dart';
-import 'index.dart';
 
-import 'package:provider/provider.dart';
-import 'package:flutter/gestures.dart';
 
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_web_plugins/url_strategy.dart';
-import 'flutter_flow/flutter_flow_util.dart';
-import 'flutter_flow/internationalization.dart';
-import 'flutter_flow/nav/nav.dart';
-import 'index.dart';
 
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -115,7 +103,7 @@ void main() async {
     releaseLog('Step 5: runApp()');
     runApp(ChangeNotifierProvider(
       create: (context) => appState,
-      child: MyApp(),
+      child: const MyApp(),
     ));
     releaseLog('Step 6: runApp() completed');
   } catch (e, stack) {
@@ -125,10 +113,10 @@ void main() async {
       home: Scaffold(
         body: Center(
           child: Padding(
-            padding: EdgeInsets.all(24),
+            padding: const EdgeInsets.all(24),
             child: SelectableText(
               'Error al iniciar ClickPalm:\n\n$e\n\n$stack',
-              style: TextStyle(fontSize: 12, color: Colors.red),
+              style: const TextStyle(fontSize: 12, color: Colors.red),
             ),
           ),
         ),
@@ -138,10 +126,13 @@ void main() async {
 }
 
 class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
   // This widget is the root of your application.
   @override
   State<MyApp> createState() => _MyAppState();
 
+  // ignore: library_private_types_in_public_api
   static _MyAppState of(BuildContext context) =>
       context.findAncestorStateOfType<_MyAppState>()!;
 }
@@ -452,9 +443,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     safeSetState(() {
       _showAnimatedSplash = false;
     });
-    // Stop showing FlutterFlow splash image after animated splash completes
-    Future.delayed(Duration(milliseconds: 100),
-        () => safeSetState(() => _appStateNotifier.stopShowingSplashImage()));
+    WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _appStateNotifier.stopShowingSplashImage());
   }
 
   void setLocale(String language) {
@@ -471,7 +461,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       scaffoldMessengerKey: rootScaffoldMessengerKey,
       debugShowCheckedModeBanner: false,
       title: 'ClickPalm APP',
-      localizationsDelegates: [
+      localizationsDelegates: const [
         FFLocalizationsDelegate(),
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,

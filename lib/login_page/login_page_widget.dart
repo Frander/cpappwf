@@ -3,7 +3,6 @@ import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/actions/device_transfer_service.dart';
 import '/adb_install_page/adb_install_page_widget.dart';
-import 'dart:ui';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -200,8 +199,7 @@ class _LoginPageWidgetState extends State<LoginPageWidget> {
   Future<void> _checkAndNavigateIfUserSelected() async {
     try {
       final userSelected = FFAppState().userSelected;
-      if (userSelected.idUser != null && userSelected.idUser! > 0 &&
-          userSelected.nameUser != null && userSelected.nameUser!.isNotEmpty) {
+      if (userSelected.idUser > 0 && userSelected.nameUser.isNotEmpty) {
         debugPrint('✅ Usuario persistente detectado: ${userSelected.nameUser}');
         if (mounted) {
           if (Navigator.of(context).canPop()) context.pop();

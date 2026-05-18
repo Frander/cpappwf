@@ -1,8 +1,6 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
+import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:ui';
-import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -327,7 +325,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
           child: Container(
             width: double.infinity,
             height: double.infinity,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -344,13 +342,13 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
               children: [
                 // Header moderno
                 Container(
-                  padding: EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
+                  padding: const EdgeInsetsDirectional.fromSTEB(12.0, 8.0, 12.0, 8.0),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Color(0xFF00a86b).withOpacity(0.15),
+                        const Color(0xFF00a86b).withValues(alpha: 0.15),
                         Colors.transparent,
                       ],
                     ),
@@ -376,17 +374,17 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.white.withOpacity(0.2),
-                                    Colors.white.withOpacity(0.1),
+                                    Colors.white.withValues(alpha: 0.2),
+                                    Colors.white.withValues(alpha: 0.1),
                                   ],
                                 ),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Color(0xFF00a86b).withOpacity(0.3),
+                                  color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                                   width: 1,
                                 ),
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.chevron_left_rounded,
                                 color: Color(0xFF00ff9f),
                                 size: 28,
@@ -394,7 +392,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             ),
                           ),
                           // Logo
-                          Container(
+                          SizedBox(
                             width: 140,
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8.0),
@@ -406,14 +404,14 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             ),
                           ),
                           // Espaciador para balance
-                          SizedBox(width: 44),
+                          const SizedBox(width: 44),
                         ],
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       // Título con efecto brillante
                       ShaderMask(
                         shaderCallback: (bounds) {
-                          return LinearGradient(
+                          return const LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
@@ -432,14 +430,14 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             color: Colors.white,
                             shadows: [
                               Shadow(
-                                color: Color(0xFF00a86b).withOpacity(0.5),
+                                color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                                 blurRadius: 12,
                               ),
                             ],
                           ),
                         ),
                       ),
-                      SizedBox(height: 8),
+                      const SizedBox(height: 8),
                       // Búsqueda + contador en la misma fila
                       Row(
                         children: [
@@ -449,20 +447,20 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Colors.white.withOpacity(0.15),
-                              Colors.white.withOpacity(0.05),
+                              Colors.white.withValues(alpha: 0.15),
+                              Colors.white.withValues(alpha: 0.05),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
-                            color: Color(0xFF00a86b).withOpacity(0.3),
+                            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                             width: 1.5,
                           ),
                           boxShadow: [
                             BoxShadow(
                               blurRadius: 15,
-                              color: Color(0xFF00a86b).withOpacity(0.2),
-                              offset: Offset(0, 6),
+                              color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+                              offset: const Offset(0, 6),
                               spreadRadius: 0,
                             ),
                           ],
@@ -472,15 +470,15 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
                             child: Padding(
-                              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                               child: Row(
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.search_rounded,
                                     color: Color(0xFF00ff9f),
                                     size: 24,
                                   ),
-                                  SizedBox(width: 12),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: TextFormField(
                                       controller: _model.textController,
@@ -494,17 +492,17 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                         labelStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: TextStyle(fontFamily: 'Roboto',
+                                              font: const TextStyle(fontFamily: 'Roboto',
                                                 fontWeight: FontWeight.w500,
                                               ),
-                                              color: Color(0xFF00ff9f).withOpacity(0.7),
+                                              color: const Color(0xFF00ff9f).withValues(alpha: 0.7),
                                               letterSpacing: 0.5,
                                             ),
                                         hintStyle: FlutterFlowTheme.of(context)
                                             .labelMedium
                                             .override(
-                                              font: TextStyle(fontFamily: 'Roboto',),
-                                              color: Colors.white.withOpacity(0.5),
+                                              font: const TextStyle(fontFamily: 'Roboto',),
+                                              color: Colors.white.withValues(alpha: 0.5),
                                               letterSpacing: 0.0,
                                             ),
                                         enabledBorder: InputBorder.none,
@@ -512,26 +510,26 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                         errorBorder: InputBorder.none,
                                         focusedErrorBorder: InputBorder.none,
                                         filled: false,
-                                        contentPadding: EdgeInsets.symmetric(vertical: 12),
+                                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
                                       ),
                                       style: FlutterFlowTheme.of(context)
                                           .bodyMedium
                                           .override(
-                                            font: TextStyle(fontFamily: 'Roboto',
+                                            font: const TextStyle(fontFamily: 'Roboto',
                                               fontWeight: FontWeight.w600,
                                             ),
                                             color: Colors.white,
                                             fontSize: 15,
                                             letterSpacing: 0.3,
                                           ),
-                                      cursorColor: Color(0xFF00ff9f),
+                                      cursorColor: const Color(0xFF00ff9f),
                                       validator: _model.textControllerValidator
                                           .asValidator(context),
                                     ),
                                   ),
                                   if (_model.textController?.text.isNotEmpty ?? false)
                                     Padding(
-                                      padding: EdgeInsets.only(left: 4),
+                                      padding: const EdgeInsets.only(left: 4),
                                       child: InkWell(
                                         onTap: () {
                                           _model.textController?.clear();
@@ -539,7 +537,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                         },
                                         child: Icon(
                                           Icons.clear_rounded,
-                                          color: Color(0xFF00ff9f).withOpacity(0.7),
+                                          color: const Color(0xFF00ff9f).withValues(alpha: 0.7),
                                           size: 20,
                                         ),
                                       ),
@@ -550,35 +548,35 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                           ),
                         ),
                       )),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       // Contador al lado del buscador
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Color(0xFF00a86b).withOpacity(0.3),
-                              Color(0xFF00a86b).withOpacity(0.1),
+                              const Color(0xFF00a86b).withValues(alpha: 0.3),
+                              const Color(0xFF00a86b).withValues(alpha: 0.1),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Color(0xFF00a86b).withOpacity(0.3),
+                            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
+                            const Icon(
                               Icons.list_alt_rounded,
                               color: Color(0xFF00ff9f),
                               size: 16,
                             ),
-                            SizedBox(height: 2),
+                            const SizedBox(height: 2),
                             Text(
                               '${filteredActivities.length}',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontFamily: 'Roboto',
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -594,7 +592,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
               ),
             ),
 
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
 
                 // Lista de actividades
                 Expanded(
@@ -603,18 +601,18 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              CircularProgressIndicator(
+                              const CircularProgressIndicator(
                                 valueColor: AlwaysStoppedAnimation<Color>(
                                   Color(0xFF00ff9f),
                                 ),
                               ),
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               Text(
                                 'Cargando actividades...',
                                 style: TextStyle(fontFamily: 'Roboto',
                                   fontSize: 16,
                                   fontWeight: FontWeight.w600,
-                                  color: Colors.white.withOpacity(0.7),
+                                  color: Colors.white.withValues(alpha: 0.7),
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -632,7 +630,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                     decoration: BoxDecoration(
                                       gradient: RadialGradient(
                                         colors: [
-                                          Color(0xFF00a86b).withOpacity(0.3),
+                                          const Color(0xFF00a86b).withValues(alpha: 0.3),
                                           Colors.transparent,
                                         ],
                                       ),
@@ -640,27 +638,27 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                     ),
                                     child: Icon(
                                       Icons.search_off_rounded,
-                                      color: Color(0xFF00ff9f).withOpacity(0.5),
+                                      color: const Color(0xFF00ff9f).withValues(alpha: 0.5),
                                       size: 40,
                                     ),
                                   ),
-                                  SizedBox(height: 16),
+                                  const SizedBox(height: 16),
                                   Text(
                                     'No se encontraron actividades',
                                     style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 16,
                                       fontWeight: FontWeight.w600,
-                                      color: Colors.white.withOpacity(0.7),
+                                      color: Colors.white.withValues(alpha: 0.7),
                                       letterSpacing: 0.5,
                                     ),
                                   ),
-                                  SizedBox(height: 8),
+                                  const SizedBox(height: 8),
                                   Text(
                                     'Intenta con otra búsqueda',
                                     style: TextStyle(fontFamily: 'Roboto',
                                       fontSize: 14,
                                       fontWeight: FontWeight.w500,
-                                      color: Colors.white.withOpacity(0.5),
+                                      color: Colors.white.withValues(alpha: 0.5),
                                       letterSpacing: 0.3,
                                     ),
                                   ),
@@ -668,11 +666,11 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                               ),
                             )
                           : ListView.separated(
-                              padding: EdgeInsets.fromLTRB(16, 0, 16, 16),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                               shrinkWrap: true,
                               scrollDirection: Axis.vertical,
                               itemCount: filteredActivities.length,
-                              separatorBuilder: (_, __) => SizedBox(height: 12),
+                              separatorBuilder: (_, __) => const SizedBox(height: 12),
                               itemBuilder: (context, index) {
                                 final activityItem = filteredActivities[index];
                                 return _buildActivityCard(
@@ -762,26 +760,26 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
       },
       child: Container(
         width: double.infinity,
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withOpacity(0.15),
-              Colors.white.withOpacity(0.05),
+              Colors.white.withValues(alpha: 0.15),
+              Colors.white.withValues(alpha: 0.05),
             ],
           ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: Color(0xFF00a86b).withOpacity(0.3),
+            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
               blurRadius: 15,
-              color: Color(0xFF00a86b).withOpacity(0.2),
-              offset: Offset(0, 6),
+              color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+              offset: const Offset(0, 6),
               spreadRadius: 0,
             ),
           ],
@@ -797,7 +795,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
+                    gradient: const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
@@ -809,15 +807,15 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                     boxShadow: [
                       BoxShadow(
                         blurRadius: 8,
-                        color: Color(0xFF00a86b).withOpacity(0.4),
-                        offset: Offset(0, 4),
+                        color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                        offset: const Offset(0, 4),
                       ),
                     ],
                   ),
                   child: Center(
                     child: Text(
                       '${index + 1}',
-                      style: TextStyle(fontFamily: 'Roboto',
+                      style: const TextStyle(fontFamily: 'Roboto',
                         fontSize: 16,
                         fontWeight: FontWeight.w900,
                         color: Colors.white,
@@ -826,7 +824,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                     ),
                   ),
                 ),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 // Icono de actividad
                 Container(
                   width: 44,
@@ -834,25 +832,25 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                   decoration: BoxDecoration(
                     gradient: RadialGradient(
                       colors: [
-                        Color(0xFF00a86b).withOpacity(0.3),
+                        const Color(0xFF00a86b).withValues(alpha: 0.3),
                         Colors.transparent,
                       ],
                     ),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.task_alt_rounded,
                     color: Color(0xFF00ff9f),
                     size: 24,
                   ),
                 ),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 // Nombre de la actividad
                 Expanded(
                   child: Text(
                     activityName,
                     style: FlutterFlowTheme.of(context).bodyMedium.override(
-                          font: TextStyle(fontFamily: 'Roboto',
+                          font: const TextStyle(fontFamily: 'Roboto',
                             fontWeight: FontWeight.bold,
                           ),
                           color: Colors.white,
@@ -863,16 +861,16 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 // Icono de flecha
                 Container(
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.chevron_right_rounded,
                     color: Color(0xFF00ff9f),
                     size: 20,

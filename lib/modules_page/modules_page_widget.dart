@@ -1,21 +1,17 @@
-﻿import '/components/calibrate_compass_component_widget.dart';
 import '/components/calibration_required_dialog_widget.dart';
 import '/components/modern_calibrate_compass_widget.dart';
 import '/components/info_dialog_widget.dart';
 import '/components/gps_quality_indicator_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:async';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/index.dart';
-import 'package:auto_size_text/auto_size_text.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import 'package:provider/provider.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import '/custom_code/platform_utils.dart';
 import 'modules_page_model.dart';
 export 'modules_page_model.dart';
@@ -45,10 +41,11 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
         Future(() async {
           if (Platforms.isMobile && FFAppState().calibrateCompass == false) {
             // Mostrar nuevo diálogo moderno de calibración requerida
+            if (!mounted) return;
             final bool? shouldCalibrate = await showDialog<bool>(
               context: context,
               barrierDismissible: false,
-              barrierColor: Colors.black.withOpacity(0.85),
+              barrierColor: Colors.black.withValues(alpha: 0.85),
               builder: (dialogContext) {
                 return CalibrationRequiredDialogWidget(
                   onCalibrateNow: () {
@@ -61,20 +58,21 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
 
             // Si el usuario presionó "INICIAR CALIBRACIÓN"
             if (shouldCalibrate == true) {
+              if (!mounted) return;
               // Mostrar pantalla de calibración moderna
               await showDialog(
                 context: context,
                 barrierDismissible: false,
-                barrierColor: Colors.black.withOpacity(0.9),
+                barrierColor: Colors.black.withValues(alpha: 0.9),
                 builder: (calibrationContext) {
                   return Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
-                    child: Container(
+                    child: SizedBox(
                       height: MediaQuery.sizeOf(context).height * 0.95,
                       width: MediaQuery.sizeOf(context).width * 0.95,
-                      child: ModernCalibrateCompassWidget(),
+                      child: const ModernCalibrateCompassWidget(),
                     ),
                   );
                 },
@@ -126,7 +124,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
             child: Container(
               width: double.infinity,
               height: double.infinity,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -143,13 +141,13 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                 children: [
                   // Header moderno con efecto glassmorphism
                   Container(
-                    padding: EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
+                    padding: const EdgeInsetsDirectional.fromSTEB(16.0, 12.0, 16.0, 12.0),
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Color(0xFF00a86b).withOpacity(0.15),
+                          const Color(0xFF00a86b).withValues(alpha: 0.15),
                           Colors.transparent,
                         ],
                       ),
@@ -162,7 +160,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             // Logo
-                            Container(
+                            SizedBox(
                               width: 160,
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(8.0),
@@ -175,11 +173,11 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                             ),
                           ],
                         ),
-                        SizedBox(height: 20),
+                        const SizedBox(height: 20),
                         // Título "Módulos" con efecto brillante
                         ShaderMask(
                           shaderCallback: (bounds) {
-                            return LinearGradient(
+                            return const LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
                               colors: [
@@ -197,7 +195,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                               color: Colors.white,
                               shadows: [
                                 Shadow(
-                                  color: Color(0xFF00a86b).withOpacity(0.5),
+                                  color: const Color(0xFF00a86b).withValues(alpha: 0.5),
                                   blurRadius: 15,
                                 ),
                               ],
@@ -208,11 +206,11 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                     ),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   // Tarjeta de sincronización mejorada
                   Padding(
-                    padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
+                    padding: const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
                     child: InkWell(
                       splashColor: Colors.transparent,
                       focusColor: Colors.transparent,
@@ -222,7 +220,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                         context.pushNamed(
                           'HistoryVisitsPage',
                           extra: <String, dynamic>{
-                            kTransitionInfoKey: TransitionInfo(
+                            kTransitionInfoKey: const TransitionInfo(
                               hasTransition: true,
                               transitionType: PageTransitionType.bottomToTop,
                               duration: Duration(milliseconds: 1000),
@@ -232,38 +230,38 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                       },
                       child: Container(
                         width: double.infinity,
-                        padding: EdgeInsetsDirectional.fromSTEB(
+                        padding: const EdgeInsetsDirectional.fromSTEB(
                             16.0, 16.0, 16.0, 16.0),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: (FFAppState().visitsAdd.length > 0) ||
-                                    (FFAppState().productsAdd.length > 0) ||
-                                    (FFAppState().newsSelected.length > 0)
+                            colors: (FFAppState().visitsAdd.isNotEmpty) ||
+                                    (FFAppState().productsAdd.isNotEmpty) ||
+                                    (FFAppState().newsSelected.isNotEmpty)
                                 ? [
                                     FlutterFlowTheme.of(context).primary,
                                     FlutterFlowTheme.of(context)
                                         .primary
-                                        .withOpacity(0.7),
+                                        .withValues(alpha: 0.7),
                                   ]
                                 : [
                                     FlutterFlowTheme.of(context).orange,
                                     FlutterFlowTheme.of(context)
                                         .orange
-                                        .withOpacity(0.7),
+                                        .withValues(alpha: 0.7),
                                   ],
                           ),
                           boxShadow: [
                             BoxShadow(
                               blurRadius: 20,
-                              color: ((FFAppState().visitsAdd.length > 0) ||
-                                      (FFAppState().productsAdd.length > 0) ||
-                                      (FFAppState().newsSelected.length > 0)
+                              color: ((FFAppState().visitsAdd.isNotEmpty) ||
+                                      (FFAppState().productsAdd.isNotEmpty) ||
+                                      (FFAppState().newsSelected.isNotEmpty)
                                   ? FlutterFlowTheme.of(context).primary
                                   : FlutterFlowTheme.of(context).orange)
-                                  .withOpacity(0.4),
-                              offset: Offset(0, 8),
+                                  .withValues(alpha: 0.4),
+                              offset: const Offset(0, 8),
                               spreadRadius: 2,
                             )
                           ],
@@ -276,16 +274,16 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                               width: 60,
                               height: 60,
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 shape: BoxShape.circle,
                               ),
-                              child: Icon(
+                              child: const Icon(
                                 Icons.sync_rounded,
                                 color: Colors.white,
                                 size: 32,
                               ),
                             ),
-                            SizedBox(width: 16),
+                            const SizedBox(width: 16),
                             Expanded(
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
@@ -296,7 +294,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: TextStyle(fontFamily: 'Roboto',
+                                          font: const TextStyle(fontFamily: 'Roboto',
                                             fontWeight: FontWeight.bold,
                                           ),
                                           color: Colors.white,
@@ -304,19 +302,19 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                           letterSpacing: 0.5,
                                         ),
                                   ),
-                                  SizedBox(height: 4),
+                                  const SizedBox(height: 4),
                                   Text(
-                                    (FFAppState().visitsAdd.length > 0) ||
-                                            (FFAppState().productsAdd.length > 0)
+                                    (FFAppState().visitsAdd.isNotEmpty) ||
+                                            (FFAppState().productsAdd.isNotEmpty)
                                         ? 'Hay información pendiente por sincronizar'
                                         : 'Sin información pendiente por sincronizar',
                                     style: FlutterFlowTheme.of(context)
                                         .bodyMedium
                                         .override(
-                                          font: TextStyle(fontFamily: 'Roboto',
+                                          font: const TextStyle(fontFamily: 'Roboto',
                                             fontWeight: FontWeight.w500,
                                           ),
-                                          color: Colors.white.withOpacity(0.9),
+                                          color: Colors.white.withValues(alpha: 0.9),
                                           fontSize: 13,
                                           letterSpacing: 0.3,
                                         ),
@@ -330,12 +328,12 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                     ),
                   ),
 
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   // Grid de módulos con scroll
                   Expanded(
                     child: SingleChildScrollView(
-                      padding: EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 16.0),
+                      padding: const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 16.0),
                       child: Column(
                         children: [
                           // Fila 1: Polinización y Cosecha
@@ -356,7 +354,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -379,7 +377,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -389,7 +387,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                             },
                           ),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // Fila 2: Sanidad y Mantenimiento
                           _buildModuleRow(
@@ -408,7 +406,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -431,7 +429,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -441,7 +439,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                             },
                           ),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // Fila 3: CTC y Fertilización
                           _buildModuleRow(
@@ -460,7 +458,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -482,7 +480,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -492,7 +490,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                             },
                           ),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // Fila 4: Vigilancia y Otros
                           _buildModuleRow(
@@ -511,7 +509,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -534,7 +532,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                   ),
                                 }.withoutNulls,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.bottomToTop,
                                     duration: Duration(milliseconds: 1000),
@@ -544,7 +542,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                             },
                           ),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           // Fila 5: Instalación y Asistencia de personal
                           _buildModuleRow(
@@ -564,7 +562,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                               context.pushNamed(
                                 HeadquartersInstallPageWidget.routeName,
                                 extra: <String, dynamic>{
-                                  kTransitionInfoKey: TransitionInfo(
+                                  kTransitionInfoKey: const TransitionInfo(
                                     hasTransition: true,
                                     transitionType: PageTransitionType.fade,
                                     duration: Duration(milliseconds: 1000),
@@ -584,7 +582,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                     elevation: 0,
                                     insetPadding: EdgeInsets.zero,
                                     backgroundColor: Colors.transparent,
-                                    alignment: AlignmentDirectional(0.0, 0.0)
+                                    alignment: const AlignmentDirectional(0.0, 0.0)
                                         .resolve(Directionality.of(context)),
                                     child: GestureDetector(
                                       onTap: () {
@@ -592,7 +590,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                                         FocusManager.instance.primaryFocus
                                             ?.unfocus();
                                       },
-                                      child: InfoDialogWidget(
+                                      child: const InfoDialogWidget(
                                         info:
                                             'Este módulo se encuentra en mantenimiento, pronto estarán disponibles todas las funciones para ti!',
                                       ),
@@ -638,7 +636,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
             textColor: module1TextColor,
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           child: _buildModuleCard(
             context,
@@ -672,20 +670,20 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Colors.white.withOpacity(0.15),
-              Colors.white.withOpacity(0.05),
+              Colors.white.withValues(alpha: 0.15),
+              Colors.white.withValues(alpha: 0.05),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: Color(0xFF00a86b).withOpacity(0.3),
+            color: const Color(0xFF00a86b).withValues(alpha: 0.3),
             width: 1.5,
           ),
           boxShadow: [
             BoxShadow(
               blurRadius: 15,
-              color: Color(0xFF00a86b).withOpacity(0.2),
-              offset: Offset(0, 8),
+              color: const Color(0xFF00a86b).withValues(alpha: 0.2),
+              offset: const Offset(0, 8),
               spreadRadius: 0,
             ),
           ],
@@ -695,7 +693,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 2, sigmaY: 2),
             child: Padding(
-              padding: EdgeInsets.all(12.0),
+              padding: const EdgeInsets.all(12.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 mainAxisSize: MainAxisSize.min,
@@ -708,7 +706,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
                         colors: [
-                          Colors.white.withOpacity(0.2),
+                          Colors.white.withValues(alpha: 0.2),
                           Colors.transparent,
                         ],
                       ),
@@ -726,7 +724,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                       ),
                     ),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   // Texto del módulo
                   Flexible(
                     child: Text(
@@ -735,7 +733,7 @@ class _ModulesPageWidgetState extends State<ModulesPageWidget> {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: FlutterFlowTheme.of(context).bodyMedium.override(
-                            font: TextStyle(fontFamily: 'Roboto',
+                            font: const TextStyle(fontFamily: 'Roboto',
                               fontWeight: FontWeight.bold,
                             ),
                             color: textColor ?? Colors.white,

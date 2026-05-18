@@ -1,4 +1,4 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
@@ -15,13 +15,10 @@ import 'dart:async';
 import 'dart:ui';
 import 'dart:io';
 import '/custom_code/platform_utils.dart';
-import 'package:nfc_manager/nfc_manager.dart';
 import '/custom_code/actions/adb_nfc_bridge_service.dart';
 import '/custom_code/actions/adb_nfc_client_service.dart';
-import 'package:nfc_manager/nfc_manager_android.dart';
 import 'dart:math' as math;
 import '/custom_code/actions/index.dart' as actions;
-import '/custom_code/widgets/index.dart' as custom_widgets;
 import '/flutter_flow/custom_functions.dart' as functions;
 import '/index.dart';
 import 'package:flutter/material.dart';
@@ -9454,10 +9451,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 if (_isRestartingAdb) return;
                 if (mounted) { setState(() => _isRestartingAdb = true); }
                 await AdbNfcBridgeService.instance.restart();
-                if (mounted) setState(() {
+                if (mounted) {
+                  setState(() {
                   _adbServerStatus = AdbNfcBridgeService.instance.currentStatus;
                   _isRestartingAdb = false;
                 });
+                }
               },
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),

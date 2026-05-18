@@ -1,6 +1,6 @@
 // Automatic FlutterFlow imports
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
+// Imports custom functions
 import 'package:flutter/material.dart';
 // Begin custom widget code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
@@ -970,6 +970,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
       debugPrint('♻️ Lote recordado del día: ${cached.nameHeadquarter} (ID: ${cached.idHeadquarter})');
       return cached;
     }
+    if (!context.mounted) return nearestList.first.headquarter;
     final selected = await _showSelectLotDialog(context, nearestList);
     await _cacheLotForToday(selected);
     return selected;
@@ -2359,7 +2360,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(
+                      const Icon(
                         Icons.gps_fixed,
                         color: _brightGreen,
                         size: 20,

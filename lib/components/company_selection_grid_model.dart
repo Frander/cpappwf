@@ -1,5 +1,4 @@
 import '/backend/api_requests/api_calls.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'company_selection_grid_widget.dart' show CompanySelectionGridWidget;
 import 'package:flutter/material.dart';

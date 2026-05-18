@@ -1,12 +1,9 @@
+import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -23,14 +20,14 @@ Future<void> saveVisitsToDownloads(List<VisitsStruct> visits) async {
       // Solicitar permiso básico de almacenamiento
       var storageStatus = await Permission.storage.request();
       if (!storageStatus.isGranted) {
-        print("🚫 Permiso de almacenamiento denegado.");
+        debugPrint("🚫 Permiso de almacenamiento denegado.");
         return;
       }
 
       // En Android 11+ puede requerirse el permiso de manejo de almacenamiento
       var manageStatus = await Permission.manageExternalStorage.request();
       if (!manageStatus.isGranted) {
-        print("🚫 Permiso de manejo de almacenamiento denegado.");
+        debugPrint("🚫 Permiso de manejo de almacenamiento denegado.");
         return;
       }
     }
@@ -49,7 +46,7 @@ Future<void> saveVisitsToDownloads(List<VisitsStruct> visits) async {
         // Si no existe, se utiliza la carpeta de almacenamiento externo
         downloadsDir = await getExternalStorageDirectory();
         if (downloadsDir == null) {
-          print(
+          debugPrint(
               "🚫 No se pudo obtener el directorio de almacenamiento externo.");
           return;
         }
@@ -66,9 +63,9 @@ Future<void> saveVisitsToDownloads(List<VisitsStruct> visits) async {
     // 🔹 Guardar el archivo
     File file = File(filePath);
     await file.writeAsString(jsonContent);
-    print("✅ Archivo guardado en: $filePath");
+    debugPrint("✅ Archivo guardado en: $filePath");
   } catch (e) {
-    print("❌ Error al guardar el archivo: $e");
+    debugPrint("❌ Error al guardar el archivo: $e");
   }
 }
 

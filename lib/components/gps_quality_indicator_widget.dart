@@ -33,8 +33,8 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
 
   // Estado de calidad baja post-estabilización
   double? _lowQualityError; // null = calidad OK, double = error actual malo
-  int _consecutiveBadReadings = 0;
-  int _consecutiveGoodReadings = 0;
+  final int _consecutiveBadReadings = 0;
+  final int _consecutiveGoodReadings = 0;
   static const int _thresholdToShow = 3;  // lecturas malas consecutivas para mostrar
   static const int _thresholdToHide = 3;  // lecturas buenas consecutivas para ocultar
   static const double _qualityThreshold = 10.0; // metros

@@ -1,11 +1,9 @@
-﻿import '/backend/schema/structs/index.dart';
+import '/backend/schema/structs/index.dart';
 import '/components/info_dialog_widget.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_timer.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
 import 'dart:async';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:stop_watch_timer/stop_watch_timer.dart';
 import 'package:flutter/material.dart';
@@ -81,16 +79,16 @@ class _CalculateCoordenatesInstallComponentWidgetState
 
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF101827),
       ),
       child: Padding(
-        padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
+        padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 0.0),
         child: Column(
           mainAxisSize: MainAxisSize.max,
           children: [
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(30.0, 5.0, 30.0, 0.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(30.0, 5.0, 30.0, 0.0),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8.0),
                 child: Image.asset(
@@ -101,7 +99,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
               ),
             ),
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
               child: Text(
                 'Quedese cerca a la palma',
                 textAlign: TextAlign.center,
@@ -121,7 +119,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
               ),
             ),
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 0.0),
               child: Text(
                 'Estamos calculando la ubicación exacta del dispositivo',
                 textAlign: TextAlign.center,
@@ -176,7 +174,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                   milliSecond: false,
                 ),
                 controller: _model.timerController,
-                updateStateInterval: Duration(milliseconds: 1000),
+                updateStateInterval: const Duration(milliseconds: 1000),
                 onChanged: (value, displayTime, shouldUpdate) {
                   _model.timerMilliseconds = value;
                   _model.timerValue = displayTime;
@@ -184,32 +182,38 @@ class _CalculateCoordenatesInstallComponentWidgetState
                 },
                 onEnded: () async {
                   if ((FFAppState().geoLocationsList.length != null) &&
-                      (FFAppState().geoLocationsList.length > 0)) {
+                      (FFAppState().geoLocationsList.isNotEmpty)) {
                     FFAppState().addToProductsAdd(ProductsStruct(
                       idProduct: 0,
                       rfid: ' ',
                       stateProduct: 'ACTIVE',
                       descriptionProduct: ' ',
-                      line: widget!.line,
-                      palm: widget!.palm,
+                      line: widget.line,
+                      palm: widget.palm,
                     ));
                     _model.updatePage(() {});
+                    final messengerIf = ScaffoldMessenger.of(context);
+                    final themeIf = FlutterFlowTheme.of(context);
+                    final navigatorIf = Navigator.of(context);
+                    final directionality = Directionality.of(context);
+                    final screenSize = MediaQuery.sizeOf(context);
                     await actions.speakText(
-                      'Se registró Linea ${widget!.line?.toString()}, Palma ${widget!.palm?.toString()}',
+                      'Se registró Linea ${widget.line?.toString()}, Palma ${widget.palm?.toString()}',
                     );
+                    if (!mounted) return;
                     await showDialog(
-                      context: context,
+                      context: navigatorIf.context,
                       builder: (dialogContext) {
                         return Dialog(
                           elevation: 0,
                           insetPadding: EdgeInsets.zero,
                           backgroundColor: Colors.transparent,
-                          alignment: AlignmentDirectional(0.0, 0.0)
-                              .resolve(Directionality.of(context)),
-                          child: Container(
-                            height: MediaQuery.sizeOf(context).height * 0.9,
-                            width: MediaQuery.sizeOf(context).width * 0.9,
-                            child: InfoDialogWidget(
+                          alignment: const AlignmentDirectional(0.0, 0.0)
+                              .resolve(directionality),
+                          child: SizedBox(
+                            height: screenSize.height * 0.9,
+                            width: screenSize.width * 0.9,
+                            child: const InfoDialogWidget(
                               info: 'Prueba',
                             ),
                           ),
@@ -217,36 +221,37 @@ class _CalculateCoordenatesInstallComponentWidgetState
                       },
                     );
 
-                    Navigator.pop(context);
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    if (!mounted) return;
+                    navigatorIf.pop();
+                    messengerIf.clearSnackBars();
+                    messengerIf.showSnackBar(
                       SnackBar(
                         content: Text(
                           'Palma registrada con éxito. Total palmas: ${FFAppState().productsAdd.length.toString()}',
                           style:
-                              FlutterFlowTheme.of(context).titleMedium.override(
+                              themeIf.titleMedium.override(
                                     font: TextStyle(fontFamily: 'Roboto',
-                                      fontWeight: FlutterFlowTheme.of(context)
+                                      fontWeight: themeIf
                                           .titleMedium
                                           .fontWeight,
-                                      fontStyle: FlutterFlowTheme.of(context)
+                                      fontStyle: themeIf
                                           .titleMedium
                                           .fontStyle,
                                     ),
-                                    color: FlutterFlowTheme.of(context)
+                                    color: themeIf
                                         .secondaryBackground,
                                     fontSize: 20.0,
                                     letterSpacing: 0.0,
-                                    fontWeight: FlutterFlowTheme.of(context)
+                                    fontWeight: themeIf
                                         .titleMedium
                                         .fontWeight,
-                                    fontStyle: FlutterFlowTheme.of(context)
+                                    fontStyle: themeIf
                                         .titleMedium
                                         .fontStyle,
                                   ),
                         ),
-                        duration: Duration(milliseconds: 2000),
-                        backgroundColor: FlutterFlowTheme.of(context).primary,
+                        duration: const Duration(milliseconds: 2000),
+                        backgroundColor: themeIf.primary,
                       ),
                     );
                     return;
@@ -278,7 +283,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                                         .fontStyle,
                                   ),
                         ),
-                        duration: Duration(milliseconds: 1050),
+                        duration: const Duration(milliseconds: 1050),
                         backgroundColor: FlutterFlowTheme.of(context).alternate,
                       ),
                     );
@@ -308,7 +313,7 @@ class _CalculateCoordenatesInstallComponentWidgetState
                     ),
               ),
             ),
-          ].divide(SizedBox(height: 15.0)),
+          ].divide(const SizedBox(height: 15.0)),
         ),
       ),
     );

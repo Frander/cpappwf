@@ -1,11 +1,9 @@
-﻿import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:provider/provider.dart';
 import 'tag_raw_reader_dialog_model.dart';
 export 'tag_raw_reader_dialog_model.dart';
 
@@ -182,7 +180,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
   void _copyToClipboard() {
     Clipboard.setData(ClipboardData(text: _model.rawContent));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
+      const SnackBar(
         content: Row(
           children: [
             Icon(Icons.check_circle, color: Colors.white),
@@ -207,7 +205,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Color(0xFF1F2937),
         borderRadius: BorderRadius.only(
           topLeft: Radius.circular(24),
@@ -216,7 +214,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
       ),
       child: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,7 +223,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(
                       Icons.code_rounded,
@@ -244,22 +242,22 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                   ],
                 ),
                 IconButton(
-                  icon: Icon(Icons.close, color: Colors.white),
+                  icon: const Icon(Icons.close, color: Colors.white),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Estado de lectura
             if (_model.isReading)
               Container(
-                padding: EdgeInsets.all(20),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Color(0xFF374151),
+                  color: const Color(0xFF374151),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Color(0xFFF59E0B),
+                    color: const Color(0xFFF59E0B),
                     width: 2,
                   ),
                 ),
@@ -268,20 +266,20 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                     ScaleTransition(
                       scale: _pulseAnimation,
                       child: Container(
-                        padding: EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Color(0xFFF59E0B).withOpacity(0.2),
+                          color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                           shape: BoxShape.circle,
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.nfc,
                           color: Color(0xFFF59E0B),
                           size: 48,
                         ),
                       ),
                     ),
-                    SizedBox(height: 20),
-                    Text(
+                    const SizedBox(height: 20),
+                    const Text(
                       'ACERQUE EL TAG',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontFamily: 'Roboto',
@@ -291,8 +289,8 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                         letterSpacing: 0.5,
                       ),
                     ),
-                    SizedBox(height: 12),
-                    Row(
+                    const SizedBox(height: 12),
+                    const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         CircularProgressIndicator(
@@ -317,23 +315,23 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
             // Contenido Raw (cuando se ha leído exitosamente)
             if (_model.isSuccess)
               Container(
-                constraints: BoxConstraints(maxHeight: 500),
+                constraints: const BoxConstraints(maxHeight: 500),
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Información técnica
                       if (_model.tagInfo != null) _buildTagInfoSection(),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Contenido raw
                       Container(
-                        padding: EdgeInsets.all(12),
+                        padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Color(0xFF1F2937),
+                          color: const Color(0xFF1F2937),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Color(0xFFF59E0B).withOpacity(0.3),
+                            color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
                             width: 1,
                           ),
                         ),
@@ -343,7 +341,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
+                                const Text(
                                   'Contenido Raw',
                                   style: TextStyle(fontFamily: 'Roboto',
                                     fontSize: 14,
@@ -354,17 +352,17 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                                 InkWell(
                                   onTap: _copyToClipboard,
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(
+                                    padding: const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 6),
                                     decoration: BoxDecoration(
-                                      color: Color(0xFFF59E0B).withOpacity(0.2),
+                                      color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                                       borderRadius: BorderRadius.circular(8),
                                       border: Border.all(
-                                        color: Color(0xFFF59E0B),
+                                        color: const Color(0xFFF59E0B),
                                         width: 1,
                                       ),
                                     ),
-                                    child: Row(
+                                    child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
@@ -387,16 +385,16 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                                 ),
                               ],
                             ),
-                            SizedBox(height: 12),
+                            const SizedBox(height: 12),
                             Container(
-                              padding: EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: Color(0xFF0F172A),
+                                color: const Color(0xFF0F172A),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: SelectableText(
                                 _model.rawContent,
-                                style: TextStyle(fontFamily: 'Roboto Mono',
+                                style: const TextStyle(fontFamily: 'Roboto Mono',
                                   fontSize: 11,
                                   color: Color(0xFFF59E0B),
                                   height: 1.6,
@@ -407,7 +405,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                         ),
                       ),
 
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       // Decodificación del contenido
                       _buildDecodedContent(),
@@ -419,20 +417,20 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
             // Error
             if (!_model.isReading && _model.errorMessage != null)
               Container(
-                padding: EdgeInsets.all(16),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Color(0xFFDC2626).withOpacity(0.1),
+                  color: const Color(0xFFDC2626).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Color(0xFFDC2626), width: 1),
+                  border: Border.all(color: const Color(0xFFDC2626), width: 1),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Color(0xFFDC2626)),
-                    SizedBox(width: 12),
+                    const Icon(Icons.error_outline, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         _model.errorMessage!,
-                        style: TextStyle(fontFamily: 'Roboto',
+                        style: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           color: Color(0xFFDC2626),
                         ),
@@ -442,7 +440,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                 ),
               ),
 
-            if (!_model.isReading) SizedBox(height: 24),
+            if (!_model.isReading) const SizedBox(height: 24),
 
             // Botones de acción
             if (!_model.isReading)
@@ -454,8 +452,8 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                       text: 'Cerrar',
                       options: FFButtonOptions(
                         height: 48,
-                        color: Color(0xFF374151),
-                        textStyle: TextStyle(fontFamily: 'Roboto',
+                        color: const Color(0xFF374151),
+                        textStyle: const TextStyle(fontFamily: 'Roboto',
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -464,17 +462,17 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                       ),
                     ),
                   ),
-                  if (_model.errorMessage != null) SizedBox(width: 12),
+                  if (_model.errorMessage != null) const SizedBox(width: 12),
                   if (_model.errorMessage != null)
                     Expanded(
                       child: FFButtonWidget(
                         onPressed: _startReading,
                         text: 'Reintentar',
-                        icon: Icon(Icons.refresh, size: 20),
+                        icon: const Icon(Icons.refresh, size: 20),
                         options: FFButtonOptions(
                           height: 48,
-                          color: Color(0xFFF59E0B),
-                          textStyle: TextStyle(fontFamily: 'Roboto',
+                          color: const Color(0xFFF59E0B),
+                          textStyle: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
@@ -522,24 +520,24 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
       children: [
         // Información del TAG (Hardware)
         Container(
-          padding: EdgeInsets.all(12),
+          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Color(0xFF3B82F6).withOpacity(0.2),
-                Color(0xFF8B5CF6).withOpacity(0.2),
+                const Color(0xFF3B82F6).withValues(alpha: 0.2),
+                const Color(0xFF8B5CF6).withValues(alpha: 0.2),
               ],
             ),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: Color(0xFF3B82F6).withOpacity(0.5),
+              color: const Color(0xFF3B82F6).withValues(alpha: 0.5),
               width: 1,
             ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
+              const Row(
                 children: [
                   Icon(Icons.nfc, color: Color(0xFF3B82F6), size: 18),
                   SizedBox(width: 8),
@@ -554,7 +552,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                   ),
                 ],
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _buildInfoRow('ID', tagId),
               _buildInfoRow('Tipo', tagType),
               _buildInfoRow('Capacidad Total', '$maxSize bytes'),
@@ -563,20 +561,20 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
             ],
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
 
         // Información del Contenido
         if (recordCount > 0)
           Container(
-            padding: EdgeInsets.all(12),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Color(0xFF374151),
+              color: const Color(0xFF374151),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                const Row(
                   children: [
                     Icon(Icons.info_outline, color: Color(0xFFF59E0B), size: 18),
                     SizedBox(width: 8),
@@ -591,7 +589,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                     ),
                   ],
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 _buildInfoRow('Registros', '$recordCount'),
                 _buildInfoRow('Tamaño', '$sizeBytes bytes ($sizeKB KB)'),
                 if (fields.isNotEmpty) _buildInfoRow('Campos detectados', fields.join(', ')),
@@ -604,15 +602,15 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.chevron_right, color: Color(0xFFF59E0B), size: 16),
-          SizedBox(width: 6),
+          const Icon(Icons.chevron_right, color: Color(0xFFF59E0B), size: 16),
+          const SizedBox(width: 6),
           Text(
             '$label: ',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 12,
               color: Colors.white60,
             ),
@@ -620,7 +618,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
           Expanded(
             child: Text(
               value,
-              style: TextStyle(fontFamily: 'Roboto',
+              style: const TextStyle(fontFamily: 'Roboto',
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -638,23 +636,23 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
     final matches = regexRecords.allMatches(_model.rawContent);
 
     if (matches.isEmpty) {
-      return SizedBox.shrink();
+      return const SizedBox.shrink();
     }
 
     return Container(
-      padding: EdgeInsets.all(12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Color(0xFF1F2937),
+        color: const Color(0xFF1F2937),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Color(0xFFF59E0B).withOpacity(0.3),
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'Registros Decodificados',
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
@@ -662,20 +660,20 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
               color: Colors.white,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           ...matches.map((match) {
             final index = matches.toList().indexOf(match) + 1;
             final recordContent = match.group(1) ?? '';
             final fields = recordContent.split(';');
 
             return Container(
-              margin: EdgeInsets.only(bottom: 12),
-              padding: EdgeInsets.all(10),
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: Color(0xFF0F172A),
+                color: const Color(0xFF0F172A),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: Color(0xFFF59E0B).withOpacity(0.2),
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
                   width: 1,
                 ),
               ),
@@ -684,26 +682,26 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                 children: [
                   Text(
                     'Registro #$index',
-                    style: TextStyle(fontFamily: 'Roboto',
+                    style: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFF59E0B),
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   ...fields.map((field) {
                     final parts = field.split(':');
                     if (parts.length >= 2) {
                       final key = parts[0].trim();
                       final value = parts.sublist(1).join(':').trim();
                       return Padding(
-                        padding: EdgeInsets.only(left: 12, bottom: 4),
+                        padding: const EdgeInsets.only(left: 12, bottom: 4),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
                               '$key: ',
-                              style: TextStyle(fontFamily: 'Roboto Mono',
+                              style: const TextStyle(fontFamily: 'Roboto Mono',
                                 fontSize: 10,
                                 color: Color(0xFFA78BFA),
                               ),
@@ -711,7 +709,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                             Expanded(
                               child: Text(
                                 value,
-                                style: TextStyle(fontFamily: 'Roboto Mono',
+                                style: const TextStyle(fontFamily: 'Roboto Mono',
                                   fontSize: 10,
                                   color: Color(0xFF10B981),
                                 ),
@@ -721,12 +719,12 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                         ),
                       );
                     }
-                    return SizedBox.shrink();
-                  }).toList(),
+                    return const SizedBox.shrink();
+                  }),
                 ],
               ),
             );
-          }).toList(),
+          }),
         ],
       ),
     );

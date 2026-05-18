@@ -1,4 +1,4 @@
-﻿import '/flutter_flow/flutter_flow_util.dart';
+import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 
@@ -44,7 +44,7 @@ class _CalibrationRequiredDialogWidgetState
     // Animación de pulso para el ícono
     _pulseController = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
 
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
@@ -73,10 +73,10 @@ class _CalibrationRequiredDialogWidgetState
           borderRadius: BorderRadius.circular(32),
           boxShadow: [
             BoxShadow(
-              color: Color(0xFFFFA726).withOpacity(0.5),
+              color: const Color(0xFFFFA726).withValues(alpha: 0.5),
               blurRadius: 60,
               spreadRadius: 10,
-              offset: Offset(0, 25),
+              offset: const Offset(0, 25),
             ),
           ],
         ),
@@ -90,15 +90,15 @@ class _CalibrationRequiredDialogWidgetState
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFF1F2937).withOpacity(0.98),
-                    Color(0xFF111827).withOpacity(0.98),
-                    Color(0xFF0F172A).withOpacity(0.98),
+                    const Color(0xFF1F2937).withValues(alpha: 0.98),
+                    const Color(0xFF111827).withValues(alpha: 0.98),
+                    const Color(0xFF0F172A).withValues(alpha: 0.98),
                   ],
-                  stops: [0.0, 0.5, 1.0],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
                 borderRadius: BorderRadius.circular(32),
                 border: Border.all(
-                  color: Color(0xFFFFA726).withOpacity(0.3),
+                  color: const Color(0xFFFFA726).withValues(alpha: 0.3),
                   width: 2,
                 ),
               ),
@@ -109,7 +109,7 @@ class _CalibrationRequiredDialogWidgetState
                     // Header decorativo brillante naranja
                     Container(
                       height: 6,
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.centerLeft,
                           end: Alignment.centerRight,
@@ -128,7 +128,7 @@ class _CalibrationRequiredDialogWidgetState
                       ),
                     ),
 
-                    SizedBox(height: 36),
+                    const SizedBox(height: 36),
 
                     // Ícono principal animado
                     ScaleTransition(
@@ -144,11 +144,11 @@ class _CalibrationRequiredDialogWidgetState
                               shape: BoxShape.circle,
                               gradient: RadialGradient(
                                 colors: [
-                                  Color(0xFFFFA726).withOpacity(0.4),
-                                  Color(0xFFFFA726).withOpacity(0.15),
+                                  const Color(0xFFFFA726).withValues(alpha: 0.4),
+                                  const Color(0xFFFFA726).withValues(alpha: 0.15),
                                   Colors.transparent,
                                 ],
-                                stops: [0.0, 0.6, 1.0],
+                                stops: const [0.0, 0.6, 1.0],
                               ),
                             ),
                           ),
@@ -162,23 +162,23 @@ class _CalibrationRequiredDialogWidgetState
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Color(0xFFFFA726).withOpacity(0.35),
-                                  Color(0xFFFF9800).withOpacity(0.2),
+                                  const Color(0xFFFFA726).withValues(alpha: 0.35),
+                                  const Color(0xFFFF9800).withValues(alpha: 0.2),
                                 ],
                               ),
                               border: Border.all(
-                                color: Color(0xFFFFA726).withOpacity(0.6),
+                                color: const Color(0xFFFFA726).withValues(alpha: 0.6),
                                 width: 3,
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Color(0xFFFFA726).withOpacity(0.4),
+                                  color: const Color(0xFFFFA726).withValues(alpha: 0.4),
                                   blurRadius: 20,
                                   spreadRadius: 5,
                                 ),
                               ],
                             ),
-                            child: Icon(
+                            child: const Icon(
                               Icons.sensors_rounded,
                               size: 56,
                               color: Color(0xFFFFA726),
@@ -188,14 +188,14 @@ class _CalibrationRequiredDialogWidgetState
                       ),
                     ),
 
-                    SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
                     // Título principal
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
                       child: ShaderMask(
                         shaderCallback: (bounds) {
-                          return LinearGradient(
+                          return const LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
@@ -204,7 +204,7 @@ class _CalibrationRequiredDialogWidgetState
                             ],
                           ).createShader(bounds);
                         },
-                        child: Text(
+                        child: const Text(
                           'Calibración Requerida',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontFamily: 'Roboto',
@@ -218,43 +218,43 @@ class _CalibrationRequiredDialogWidgetState
                       ),
                     ),
 
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
 
                     // Subtítulo
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 32),
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
                       child: Text(
                         'Sensores GPS y Brújula',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontFamily: 'Roboto',
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFFFFA726).withOpacity(0.8),
+                          color: const Color(0xFFFFA726).withValues(alpha: 0.8),
                           letterSpacing: 1.2,
                           height: 1.3,
                         ),
                       ),
                     ),
 
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
                     // Mensaje principal
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 28),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: Container(
-                        padding: EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Colors.white.withOpacity(0.08),
-                              Colors.white.withOpacity(0.03),
+                              Colors.white.withValues(alpha: 0.08),
+                              Colors.white.withValues(alpha: 0.03),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.15),
+                            color: Colors.white.withValues(alpha: 0.15),
                             width: 1.5,
                           ),
                         ),
@@ -264,7 +264,7 @@ class _CalibrationRequiredDialogWidgetState
                           style: TextStyle(fontFamily: 'Roboto',
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             letterSpacing: 0.3,
                             height: 1.6,
                           ),
@@ -272,11 +272,11 @@ class _CalibrationRequiredDialogWidgetState
                       ),
                     ),
 
-                    SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
                     // Características de la calibración
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 28),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: Column(
                         children: [
                           _buildFeatureItem(
@@ -284,13 +284,13 @@ class _CalibrationRequiredDialogWidgetState
                             title: 'GPS de Alta Precisión',
                             description: 'Localización exacta para registros',
                           ),
-                          SizedBox(height: 14),
+                          const SizedBox(height: 14),
                           _buildFeatureItem(
                             icon: Icons.explore_rounded,
                             title: 'Brújula Magnética',
                             description: 'Orientación precisa del dispositivo',
                           ),
-                          SizedBox(height: 14),
+                          const SizedBox(height: 14),
                           _buildFeatureItem(
                             icon: Icons.timer_rounded,
                             title: 'Calibración Rápida',
@@ -300,11 +300,11 @@ class _CalibrationRequiredDialogWidgetState
                       ),
                     ),
 
-                    SizedBox(height: 32),
+                    const SizedBox(height: 32),
 
                     // Botón de calibrar
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 28),
+                      padding: const EdgeInsets.symmetric(horizontal: 28),
                       child: InkWell(
                         onTap: () {
                           widget.onCalibrateNow();
@@ -312,7 +312,7 @@ class _CalibrationRequiredDialogWidgetState
                         child: Container(
                           height: 62,
                           decoration: BoxDecoration(
-                            gradient: LinearGradient(
+                            gradient: const LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
                               colors: [
@@ -323,14 +323,14 @@ class _CalibrationRequiredDialogWidgetState
                             borderRadius: BorderRadius.circular(18),
                             boxShadow: [
                               BoxShadow(
-                                color: Color(0xFFFFA726).withOpacity(0.5),
+                                color: const Color(0xFFFFA726).withValues(alpha: 0.5),
                                 blurRadius: 20,
-                                offset: Offset(0, 10),
+                                offset: const Offset(0, 10),
                                 spreadRadius: 2,
                               ),
                             ],
                           ),
-                          child: Center(
+                          child: const Center(
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
@@ -360,7 +360,7 @@ class _CalibrationRequiredDialogWidgetState
                       ),
                     ),
 
-                    SizedBox(height: 28),
+                    const SizedBox(height: 28),
                   ],
                 ),
               ),
@@ -385,30 +385,30 @@ class _CalibrationRequiredDialogWidgetState
           decoration: BoxDecoration(
             gradient: RadialGradient(
               colors: [
-                Color(0xFFFFA726).withOpacity(0.3),
-                Color(0xFFFFA726).withOpacity(0.15),
+                const Color(0xFFFFA726).withValues(alpha: 0.3),
+                const Color(0xFFFFA726).withValues(alpha: 0.15),
               ],
             ),
             shape: BoxShape.circle,
             border: Border.all(
-              color: Color(0xFFFFA726).withOpacity(0.5),
+              color: const Color(0xFFFFA726).withValues(alpha: 0.5),
               width: 1.8,
             ),
           ),
           child: Icon(
             icon,
-            color: Color(0xFFFFA726),
+            color: const Color(0xFFFFA726),
             size: 22,
           ),
         ),
-        SizedBox(width: 14),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
-                style: TextStyle(fontFamily: 'Roboto',
+                style: const TextStyle(fontFamily: 'Roboto',
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
@@ -416,13 +416,13 @@ class _CalibrationRequiredDialogWidgetState
                   height: 1.3,
                 ),
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 3),
               Text(
                 description,
                 style: TextStyle(fontFamily: 'Roboto',
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Colors.white.withOpacity(0.7),
+                  color: Colors.white.withValues(alpha: 0.7),
                   letterSpacing: 0.2,
                   height: 1.4,
                 ),

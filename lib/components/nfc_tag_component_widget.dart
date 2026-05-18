@@ -1,13 +1,10 @@
 import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import '/flutter_flow/flutter_flow_widgets.dart';
-import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'nfc_tag_component_model.dart';
 export 'nfc_tag_component_model.dart';
 
@@ -20,9 +17,9 @@ class NfcTagComponentWidget extends StatefulWidget {
     required this.statusJSON,
     int? idStepParent,
     bool? isWriter,
-  })  : this.tittle = tittle ?? 'NFC Tag',
-        this.idStepParent = idStepParent ?? 0,
-        this.isWriter = isWriter ?? false;
+  })  : tittle = tittle ?? 'NFC Tag',
+        idStepParent = idStepParent ?? 0,
+        isWriter = isWriter ?? false;
 
   final String tittle;
   final int idStatus;
@@ -117,7 +114,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
         final dataToWrite = widget.statusName; // O cualquier dato que quieras escribir
 
         // Por ahora simulamos escritura exitosa
-        await Future.delayed(Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 2));
 
         setState(() {
           _model.nfcData = dataToWrite;
@@ -131,7 +128,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
         // Lectura NFC - usar action readNFC
         final nfcResult = await actions.readNFC(context);
 
-        if (nfcResult != null && nfcResult.isNotEmpty) {
+        if (nfcResult.isNotEmpty) {
           setState(() {
             _model.nfcData = nfcResult;
             _model.isSuccess = true;
@@ -169,7 +166,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
     );
 
     FFAppState().visitDetails =
-        visitDetailsCopy!.toList().cast<VisitsDetailsStruct>();
+        visitDetailsCopy.toList().cast<VisitsDetailsStruct>();
     FFAppState().update(() {});
   }
 
@@ -190,7 +187,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
     return Container(
       width: MediaQuery.sizeOf(context).width,
       height: MediaQuery.sizeOf(context).height,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -206,7 +203,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
           children: [
             // Header
             Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
+              padding: const EdgeInsetsDirectional.fromSTEB(20.0, 20.0, 20.0, 10.0),
               child: Row(
                 mainAxisSize: MainAxisSize.max,
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -220,14 +217,14 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha: 0.2),
                           width: 1,
                         ),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.chevron_left,
                         color: Colors.white,
                         size: 28,
@@ -237,22 +234,22 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                   Expanded(
                     child: Padding(
                       padding:
-                          EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
+                          const EdgeInsetsDirectional.fromSTEB(16.0, 0.0, 16.0, 0.0),
                       child: Column(
                         children: [
                           Text(
                             widget.tittle,
                             textAlign: TextAlign.center,
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                               letterSpacing: 0.5,
                             ),
                           ),
-                          SizedBox(height: 4),
+                          const SizedBox(height: 4),
                           Container(
-                            padding: EdgeInsets.symmetric(
+                            padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 4),
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
@@ -263,17 +260,17 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                                   widget.isWriter
                                       ? FlutterFlowTheme.of(context)
                                           .warning
-                                          .withOpacity(0.7)
+                                          .withValues(alpha: 0.7)
                                       : FlutterFlowTheme.of(context)
                                           .info
-                                          .withOpacity(0.7),
+                                          .withValues(alpha: 0.7),
                                 ],
                               ),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Text(
                               widget.isWriter ? 'ESCRITURA' : 'LECTURA',
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
@@ -297,7 +294,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                               FlutterFlowTheme.of(context).error,
                               FlutterFlowTheme.of(context)
                                   .error
-                                  .withOpacity(0.8),
+                                  .withValues(alpha: 0.8),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -305,13 +302,13 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                             BoxShadow(
                               color: FlutterFlowTheme.of(context)
                                   .error
-                                  .withOpacity(0.4),
+                                  .withValues(alpha: 0.4),
                               blurRadius: 8,
-                              offset: Offset(0, 4),
+                              offset: const Offset(0, 4),
                             ),
                           ],
                         ),
-                        child: Icon(
+                        child: const Icon(
                           Icons.clear,
                           color: Colors.white,
                           size: 22,
@@ -319,7 +316,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                       ),
                     )
                   else
-                    SizedBox(width: 44),
+                    const SizedBox(width: 44),
                 ],
               ),
             ),
@@ -327,7 +324,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
             // Área de visualización
             Expanded(
               child: Padding(
-                padding: EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(20.0),
                 child: _buildNfcDisplay(),
               ),
             ),
@@ -336,7 +333,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
             if (!_model.isScanning)
               Padding(
                 padding:
-                    EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
+                    const EdgeInsetsDirectional.fromSTEB(20.0, 0.0, 20.0, 30.0),
                 child: InkWell(
                   onTap: _startNfcOperation,
                   child: Container(
@@ -356,9 +353,9 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                         BoxShadow(
                           color: FlutterFlowTheme.of(context)
                               .primary
-                              .withOpacity(0.5),
+                              .withValues(alpha: 0.5),
                           blurRadius: 20,
-                          offset: Offset(0, 8),
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
@@ -370,10 +367,10 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                           color: Colors.white,
                           size: 28,
                         ),
-                        SizedBox(width: 12),
+                        const SizedBox(width: 12),
                         Text(
                           widget.isWriter ? 'Escribir Tag' : 'Leer Tag',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -410,13 +407,13 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            FlutterFlowTheme.of(context).primary.withOpacity(0.2),
-            FlutterFlowTheme.of(context).secondary.withOpacity(0.2),
+            FlutterFlowTheme.of(context).primary.withValues(alpha: 0.2),
+            FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.2),
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withOpacity(0.2),
+          color: Colors.white.withValues(alpha: 0.2),
           width: 2,
         ),
       ),
@@ -442,7 +439,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                         border: Border.all(
                           color: FlutterFlowTheme.of(context)
                               .primary
-                              .withOpacity((1 - progress) * 0.5),
+                              .withValues(alpha: (1 - progress) * 0.5),
                           width: 3,
                         ),
                       ),
@@ -469,13 +466,13 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                       BoxShadow(
                         color: FlutterFlowTheme.of(context)
                             .primary
-                            .withOpacity(0.5),
+                            .withValues(alpha: 0.5),
                         blurRadius: 30,
                         spreadRadius: 5,
                       ),
                     ],
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.nfc,
                     color: Colors.white,
                     size: 48,
@@ -485,27 +482,27 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
             ],
           ),
 
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
 
           Text(
             widget.isWriter
                 ? 'Acerque el tag para escribir'
                 : 'Acerque el tag para leer',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
 
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
 
           Text(
             'Mantenga el dispositivo cerca del tag NFC',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Colors.white.withOpacity(0.6),
+              color: Colors.white.withValues(alpha: 0.6),
             ),
           ),
         ],
@@ -520,20 +517,20 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            FlutterFlowTheme.of(context).success.withOpacity(0.2),
-            FlutterFlowTheme.of(context).success.withOpacity(0.1),
+            FlutterFlowTheme.of(context).success.withValues(alpha: 0.2),
+            FlutterFlowTheme.of(context).success.withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: FlutterFlowTheme.of(context).success.withOpacity(0.3),
+          color: FlutterFlowTheme.of(context).success.withValues(alpha: 0.3),
           width: 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: FlutterFlowTheme.of(context).success.withOpacity(0.2),
+            color: FlutterFlowTheme.of(context).success.withValues(alpha: 0.2),
             blurRadius: 30,
-            offset: Offset(0, 10),
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -547,47 +544,47 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
               gradient: LinearGradient(
                 colors: [
                   FlutterFlowTheme.of(context).success,
-                  FlutterFlowTheme.of(context).success.withOpacity(0.8),
+                  FlutterFlowTheme.of(context).success.withValues(alpha: 0.8),
                 ],
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
                   color:
-                      FlutterFlowTheme.of(context).success.withOpacity(0.5),
+                      FlutterFlowTheme.of(context).success.withValues(alpha: 0.5),
                   blurRadius: 30,
-                  offset: Offset(0, 10),
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-            child: Icon(
+            child: const Icon(
               Icons.check_circle_rounded,
               color: Colors.white,
               size: 64,
             ),
           ),
 
-          SizedBox(height: 32),
+          const SizedBox(height: 32),
 
           Text(
             widget.isWriter ? '¡Tag Escrito!' : '¡Tag Leído!',
-            style: TextStyle(
+            style: const TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           Container(
-            margin: EdgeInsets.symmetric(horizontal: 40),
-            padding: EdgeInsets.all(20),
+            margin: const EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.1),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withOpacity(0.2),
+                color: Colors.white.withValues(alpha: 0.2),
                 width: 1,
               ),
             ),
@@ -598,15 +595,15 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withValues(alpha: 0.6),
                     letterSpacing: 1.5,
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   _model.nfcData ?? 'N/A',
                   textAlign: TextAlign.center,
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
@@ -628,13 +625,13 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            FlutterFlowTheme.of(context).error.withOpacity(0.2),
-            FlutterFlowTheme.of(context).error.withOpacity(0.1),
+            FlutterFlowTheme.of(context).error.withValues(alpha: 0.2),
+            FlutterFlowTheme.of(context).error.withValues(alpha: 0.1),
           ],
         ),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: FlutterFlowTheme.of(context).error.withOpacity(0.3),
+          color: FlutterFlowTheme.of(context).error.withValues(alpha: 0.3),
           width: 2,
         ),
       ),
@@ -648,21 +645,21 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
               gradient: LinearGradient(
                 colors: [
                   FlutterFlowTheme.of(context).error,
-                  FlutterFlowTheme.of(context).error.withOpacity(0.8),
+                  FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
                 ],
               ),
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.error_outline_rounded,
               color: Colors.white,
               size: 64,
             ),
           ),
 
-          SizedBox(height: 32),
+          const SizedBox(height: 32),
 
-          Text(
+          const Text(
             'Error en operación',
             style: TextStyle(
               fontSize: 24,
@@ -671,16 +668,16 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
             ),
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               _model.errorMessage ?? 'Error desconocido',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 height: 1.5,
               ),
             ),
@@ -693,10 +690,10 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
   Widget _buildEmptyState() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(32),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           width: 2,
         ),
       ),
@@ -713,35 +710,35 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    FlutterFlowTheme.of(context).primary.withOpacity(0.3),
-                    FlutterFlowTheme.of(context).secondary.withOpacity(0.3),
+                    FlutterFlowTheme.of(context).primary.withValues(alpha: 0.3),
+                    FlutterFlowTheme.of(context).secondary.withValues(alpha: 0.3),
                   ],
                 ),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.contactless_rounded,
-                color: Colors.white.withOpacity(0.7),
+                color: Colors.white.withValues(alpha: 0.7),
                 size: 72,
               ),
             ),
           ),
 
-          SizedBox(height: 32),
+          const SizedBox(height: 32),
 
           Text(
             widget.isWriter ? 'Listo para escribir' : 'Listo para leer',
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
-              color: Colors.white.withOpacity(0.9),
+              color: Colors.white.withValues(alpha: 0.9),
             ),
           ),
 
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
 
           Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40),
+            padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
               widget.isWriter
                   ? 'Toca el botón de abajo y acerca el tag NFC para escribir los datos'
@@ -749,7 +746,7 @@ class _NfcTagComponentWidgetState extends State<NfcTagComponentWidget>
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.white.withOpacity(0.6),
+                color: Colors.white.withValues(alpha: 0.6),
                 height: 1.6,
               ),
             ),

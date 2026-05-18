@@ -1,12 +1,8 @@
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/schema/enums/enums.dart';
-import '/backend/sqlite/sqlite_manager.dart';
-import '/flutter_flow/flutter_flow_theme.dart';
 import '/flutter_flow/flutter_flow_util.dart';
-import 'index.dart'; // Imports other custom actions
-import '/flutter_flow/custom_functions.dart'; // Imports custom functions
-import 'package:flutter/material.dart';
+// Imports other custom actions
+// Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
@@ -62,7 +58,7 @@ _LatLng? _getWeightedAverageLocation(List<ReadGeoStruct> geoLocationsList) {
   }
 
   final now = DateTime.now();
-  final twelveSecondsAgo = now.subtract(Duration(seconds: 12));
+  final twelveSecondsAgo = now.subtract(const Duration(seconds: 12));
 
   // Filtrar puntos de últimos 12 segundos
   final recentPoints = geoLocationsList.where((point) {
