@@ -5348,6 +5348,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             } else {
               // No está seleccionado, SELECCIONAR
               debugPrint('✅ Seleccionando Root Status Child...');
+              // Si tiene hijos, expandir en la misma pulsación (sin esperar 2 taps)
+              if (hasChildren) {
+                for (var sibling in parentStatusChildsList) {
+                  final sibId = getJsonField(sibling, r'''$.id_activity_status''');
+                  if (sibId != statusId) {
+                    _statusExpansionState['root_${parentStatusId}_$sibId'] = false;
+                  }
+                }
+                _statusExpansionState[expansionKey] = true;
+                _rootStatusExpansionState[parentStatusId] = true;
+              }
               await _onRootStatusSelected(
                 childStatus,
                 allRootStatus: parentStatusChildsList,
@@ -6431,11 +6442,25 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       _clearFormState();
       await _hydrateVisitInForm(nextVisitId);
     } else {
+      // No quedan visitas pendientes: devolver el formulario al estado de
+      // "primer ingreso" (overlay "Lea un tag para empezar"). Limpiamos también
+      // los maps de tarjetas ADB para que el siguiente tag arranque en frío,
+      // sin restos de la visita recién eliminada.
       _clearFormState();
       if (mounted) {
         setState(() {
           _activeVisitId = null;
           _formLocked = true;
+          _animatingOutTagIndex = null;
+          _selectedAdbTagIndex = 0;
+          _pendingTagIndexToVisitId.clear();
+          _adbTagTimestamps.clear();
+          _adbServerCardsRawJson.clear();
+          _adbServerCardsData.clear();
+          _adbServerCardsProductName.clear();
+          _tagReaderData.clear();
+          _tagReaderRawJsons.clear();
+          _tagReaderProductName.clear();
         });
       }
     }

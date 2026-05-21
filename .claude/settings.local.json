@@ -134,7 +134,9 @@
       "PowerShell(\\(Get-Content \"e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\visits\\\\do_visits_form_page\\\\do_visits_form_page_widget.dart\" | Measure-Object -Line\\).Lines)",
       "Bash(powershell -NoProfile -Command \"\\(Get-Content 'e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\visits\\\\formulario_extractora_form_page\\\\formulario_extractora_form_page_widget.dart' | Measure-Object -Line\\).Lines\")",
       "Bash(powershell -NoProfile -Command \"@\\(Get-Content 'e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\visits\\\\formulario_extractora_form_page\\\\formulario_extractora_form_page_widget.dart'\\).Length\")",
-      "PowerShell(flutter analyze lib/visits/formulario_extractora_form_page/formulario_extractora_form_page_widget.dart)"
+      "PowerShell(flutter analyze lib/visits/formulario_extractora_form_page/formulario_extractora_form_page_widget.dart)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Read(//c/Program Files/**)"
     ],
     "deny": [],
     "ask": [],

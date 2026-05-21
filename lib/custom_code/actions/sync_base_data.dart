@@ -132,7 +132,7 @@ Future<bool> syncBaseData(
       return false;
     }
 
-    onProgress?.call(0.18, 'Descargando noticias, empresa, pesos y tipos de puntos...');
+    onProgress?.call(0.18, 'Descargando noticias, empresa, pesos, tipos de puntos, usuarios y dispositivos...');
     final prevMonth = DateTime(syncNow.year, syncNow.month - 1);
     final batch2 = await Future.wait([
       _sbFetchList('news',                 currentToken, {'idCompany': '$idCompany'}, imei: imei),
@@ -144,17 +144,26 @@ Future<bool> syncBaseData(
       }, imei: imei),
       _sbFetchList('types-points',         currentToken, {'idCompany': '$idCompany'}, imei: imei),
       _sbFetchList('headquarters-coordinates', currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('users',       currentToken, {'idCompany': '$idCompany', 'idDevice': '$idDevice'}, imei: imei),
+      _sbFetchList('devices',     currentToken, {'idCompany': '$idCompany'}, imei: imei),
+      _sbFetchList('permissions', currentToken, {'idCompany': '$idCompany'}, imei: imei),
     ]);
     List<dynamic>? newsData            = batch2[0];
     List<dynamic>? companiesData       = batch2[1];
     List<dynamic>? hqWeightsData       = batch2[2];
     List<dynamic>? typesPointsData     = batch2[3];
     List<dynamic>? hqCoordinatesData   = batch2[4];
+    List<dynamic>? usersData           = batch2[5];
+    List<dynamic>? devicesData         = batch2[6];
+    List<dynamic>? permissionsData     = batch2[7];
     debugPrint('   news:           ${newsData?.length ?? "❌ Error"}');
     debugPrint('   companies:      ${companiesData?.length ?? "❌ Error"}');
     debugPrint('   hq-weights:     ${hqWeightsData?.length ?? "❌ Error"}');
     debugPrint('   types-points:   ${typesPointsData?.length ?? "❌ Error"}');
     debugPrint('   hq-coordinates: ${hqCoordinatesData?.length ?? "❌ Error"}');
+    debugPrint('   users:          ${usersData?.length ?? "❌ Error"}');
+    debugPrint('   devices:        ${devicesData?.length ?? "❌ Error"}');
+    debugPrint('   permissions:    ${permissionsData?.length ?? "❌ Error"}');
     if (typesPointsData == null) {
       debugPrint('❌ [SyncBase] Endpoint crítico types-points falló → abortando');
       return false;
@@ -171,6 +180,9 @@ Future<bool> syncBaseData(
       hqWeightsData:     hqWeightsData,
       typesPointsData:   typesPointsData,
       hqCoordinatesData: hqCoordinatesData,
+      usersData:         usersData,
+      devicesData:       devicesData,
+      permissionsData:   permissionsData,
       onProgress:        onProgress,
     );
     // Liberar inmediatamente para que el GC reclame antes de descargar products
@@ -182,6 +194,9 @@ Future<bool> syncBaseData(
     hqWeightsData     = null;
     typesPointsData   = null;
     hqCoordinatesData = null;
+    usersData         = null;
+    devicesData       = null;
+    permissionsData   = null;
     if (!savedBase) {
       FFAppState().lastSyncBase = null;
       debugPrint('❌ [SyncBase] Falló bloque BASE en SQLite');
@@ -454,6 +469,9 @@ Future<bool> _sbSyncBaseToSQLite({
   List<dynamic>? hqWeightsData,
   List<dynamic>? typesPointsData,
   List<dynamic>? hqCoordinatesData,
+  List<dynamic>? usersData,
+  List<dynamic>? devicesData,
+  List<dynamic>? permissionsData,
   void Function(double, String)? onProgress,
 }) async {
   Database? db;
@@ -504,6 +522,21 @@ Future<bool> _sbSyncBaseToSQLite({
       if (hqCoordinatesData != null && hqCoordinatesData.isNotEmpty) {
         onProgress?.call(0.48, 'Guardando zonas de exclusión...');
         await _sbInsertHeadquartersCoordinates(txn, hqCoordinatesData);
+      }
+
+      if (usersData != null && usersData.isNotEmpty) {
+        onProgress?.call(0.485, 'Guardando usuarios...');
+        await _sbInsertUsers(txn, usersData);
+      }
+
+      if (devicesData != null && devicesData.isNotEmpty) {
+        onProgress?.call(0.490, 'Guardando dispositivos...');
+        await _sbInsertDevices(txn, devicesData);
+      }
+
+      if (permissionsData != null && permissionsData.isNotEmpty) {
+        onProgress?.call(0.495, 'Guardando permisos de usuarios...');
+        await _sbInsertUsersPermissions(txn, permissionsData);
       }
 
       debugPrint('✅ [SyncBase/BASE] Transacción completada');
@@ -633,6 +666,9 @@ Future<void> _sbCleanAllBaseTables(Transaction txn) async {
   await txn.delete('Zones');
   await txn.delete('Companies');
   await txn.delete('Types_points');
+  await txn.delete('Users_permissions');
+  await txn.delete('Users');
+  await txn.delete('Devices');
   debugPrint('   ✅ Tablas limpiadas');
 }
 
@@ -1099,6 +1135,75 @@ Future<void> _sbInsertHeadquartersCoordinates(Transaction txn, List<dynamic> coo
     await Future.delayed(Duration.zero);
   }
   debugPrint('   ✅ ${coords.length} coordenadas de exclusión insertadas');
+}
+
+Future<void> _sbInsertUsers(Transaction txn, List<dynamic> users) async {
+  debugPrint('📝 [SyncBase] Insertando ${users.length} Users...');
+  final int defaultUserId = FFAppState().userSelected.idUser;
+  final batch = txn.batch();
+  for (final u in users) {
+    final bool isDefault = defaultUserId > 0 && (u['id_user'] == defaultUserId);
+    batch.insert('Users', {
+      'Id_user':            u['id_user'],
+      'Id_company':         u['id_company'],
+      'Oper_id':            u['oper_id'],
+      'Name_user':          u['name_user'],
+      'Email':              u['email'],
+      'Code_user':          u['code_user'],
+      'State_user':         u['state_user'],
+      'Rol_user':           u['rol_user'],
+      'Created_at':         u['created_at'],
+      'Modified_at':        u['modified_at'],
+      'Is_default':         isDefault ? 1 : 0,
+      'Is_active':          (u['is_active'] == true || u['is_active'] == 1) ? 1 : 0,
+      'Phone_country_code': u['phone_country_code'],
+      'Phone_number':       u['phone_number'],
+      'User_name_login':    u['user_name_login'],
+      'Identificacion':     u['identificacion'],
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+  await batch.commit(noResult: true);
+  debugPrint('   ✅ ${users.length} usuarios insertados');
+}
+
+Future<void> _sbInsertDevices(Transaction txn, List<dynamic> devices) async {
+  debugPrint('📝 [SyncBase] Insertando ${devices.length} Devices...');
+  final int defaultDeviceId = FFAppState().deviceDefault.idDevice;
+  final batch = txn.batch();
+  for (final d in devices) {
+    final bool isDefault = defaultDeviceId > 0 && (d['id_device'] == defaultDeviceId);
+    batch.insert('Devices', {
+      'Id_device':   d['id_device'],
+      'Id_company':  d['id_company'],
+      'Device_name': d['device_name'],
+      'Cell_phone':  d['cell_phone'],
+      'Serial_id':   d['serial_id'],
+      'Imei1':       d['imei1'],
+      'Imei2':       d['imei2'],
+      'Model':       d['model'],
+      'State':       d['state'],
+      'Is_default':  isDefault ? 1 : 0,
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+  await batch.commit(noResult: true);
+  debugPrint('   ✅ ${devices.length} dispositivos insertados');
+}
+
+Future<void> _sbInsertUsersPermissions(Transaction txn, List<dynamic> perms) async {
+  debugPrint('📝 [SyncBase] Insertando ${perms.length} Users_permissions...');
+  final batch = txn.batch();
+  for (final p in perms) {
+    batch.insert('Users_permissions', {
+      'Id_user_permission': p['id_user_permission'],
+      'Id_user':            p['id_user'],
+      'Name_permission':    p['name_permission'],
+      'Status_permission':  p['status_permission'],
+      'Created_at':         p['created_at'],
+      'Modified_at':        p['modified_at'],
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
+  }
+  await batch.commit(noResult: true);
+  debugPrint('   ✅ ${perms.length} permisos de usuarios insertados');
 }
 
 // ============================================================================

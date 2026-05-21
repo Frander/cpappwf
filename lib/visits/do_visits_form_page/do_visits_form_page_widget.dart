@@ -655,7 +655,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         _cachedActivityStatus = _cachedActivityStatus.where((s) {
           final sActivityId = getJsonField(s, r'''$.id_activity''');
           final sStatus = getJsonField(s, r'''$.status''')?.toString().toUpperCase() ?? 'A';
-          return sActivityId == currentActivityId && sStatus == 'A';
+          final isActive = sStatus == 'A' || sStatus == 'ACTIVE';
+          return sActivityId == currentActivityId && isActive;
         }).toList();
       }
       _cachedActivityStatus.sort((a, b) {
@@ -5224,6 +5225,17 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             } else {
               // No está seleccionado, SELECCIONAR
               debugPrint('✅ Seleccionando Root Status Child...');
+              // Si tiene hijos, expandir en la misma pulsación (sin esperar 2 taps)
+              if (hasChildren) {
+                for (var sibling in parentStatusChildsList) {
+                  final sibId = getJsonField(sibling, r'''$.id_activity_status''');
+                  if (sibId != statusId) {
+                    _statusExpansionState['root_${parentStatusId}_$sibId'] = false;
+                  }
+                }
+                _statusExpansionState[expansionKey] = true;
+                _rootStatusExpansionState[parentStatusId] = true;
+              }
               await _onRootStatusSelected(
                 childStatus,
                 allRootStatus: parentStatusChildsList,

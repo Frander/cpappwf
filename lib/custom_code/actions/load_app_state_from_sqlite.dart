@@ -144,13 +144,17 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
       stepsByActivity.putIfAbsent(actId, () => []).add(Map<String, dynamic>.from(s));
     }
 
-    // 5. Indexar status por Id_activity_step_parent
+    // 5. Indexar status por Id_activity_step_parent, por Id_activity_status_parent y por actividad
     final Map<int?, List<Map<String, dynamic>>> statusByStep = {};
-    // También indexar por Id_activity para reference-list
+    final Map<int?, List<Map<String, dynamic>>> statusByStatusParent = {};
     final Map<int, List<Map<String, dynamic>>> statusByActivity = {};
     for (final st in statusRows) {
       final stepId = st['Id_activity_step_parent'] as int?;
       statusByStep.putIfAbsent(stepId, () => []).add(Map<String, dynamic>.from(st));
+      final statusParentId = st['Id_activity_status_parent'] as int?;
+      if (statusParentId != null && statusParentId != 0) {
+        statusByStatusParent.putIfAbsent(statusParentId, () => []).add(Map<String, dynamic>.from(st));
+      }
       final actId = st['Id_activity'] as int? ?? 0;
       statusByActivity.putIfAbsent(actId, () => []).add(Map<String, dynamic>.from(st));
     }
@@ -173,13 +177,13 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
               final sap = st['Id_activity_status_parent'];
               return (sp == null || sp == 0) && (sap == null || sap == 0);
             }).toList();
-            normalizedStatus = refStatus.map((st) => _lsBuildStatus(st, statusByStep)).toList();
+            normalizedStatus = refStatus.map((st) => _lsBuildStatus(st, statusByStep, statusByStatusParent)).toList();
           } else {
             normalizedStatus = [];
           }
         } else {
           final rawStatus = statusByStep[stepId] ?? [];
-          normalizedStatus = rawStatus.map((st) => _lsBuildStatus(st, statusByStep)).toList();
+          normalizedStatus = rawStatus.map((st) => _lsBuildStatus(st, statusByStep, statusByStatusParent)).toList();
         }
 
         return {
@@ -223,7 +227,7 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
           final sp  = st['Id_activity_step_parent'];
           final sap = st['Id_activity_status_parent'];
           return (sp == null || sp == 0) && (sap == null || sap == 0);
-        }).map((st) => _lsBuildStatus(st, statusByStep)).toList(),
+        }).map((st) => _lsBuildStatus(st, statusByStep, statusByStatusParent)).toList(),
       };
     }).toList();
 
@@ -238,10 +242,11 @@ Future<void> _lsLoadActivitiesJson(Database db) async {
 Map<String, dynamic> _lsBuildStatus(
   Map<String, dynamic> st,
   Map<int?, List<Map<String, dynamic>>> statusByStep,
+  Map<int?, List<Map<String, dynamic>>> statusByStatusParent,
 ) {
   final statusId = st['Id_activity_status'] as int?;
-  final children = (statusByStep[statusId] ?? [])
-      .map((c) => _lsBuildStatus(Map<String, dynamic>.from(c), statusByStep))
+  final children = (statusByStatusParent[statusId] ?? [])
+      .map((c) => _lsBuildStatus(Map<String, dynamic>.from(c), statusByStep, statusByStatusParent))
       .toList();
 
   return {

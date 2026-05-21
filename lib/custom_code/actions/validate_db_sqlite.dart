@@ -42,7 +42,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          28, // v28: columna Identificacion en Users
+          29, // v29: tabla Users_permissions
       onCreate: (Database db, int version) async {
         await createClickPalmTables(db);
       },
@@ -179,6 +179,21 @@ Future<void> createClickPalmTables(Database db) async {
       'CREATE INDEX IF NOT EXISTS IX_Devices_imei1 ON Devices(Imei1);');
   // Sin UNIQUE INDEX en (Imei1, Imei2): muchos dispositivos tienen Imei2 vacío
   // lo que causaría UNIQUE constraint failures. La PK Id_device garantiza unicidad real.
+
+  // Tabla Users_permissions
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS Users_permissions (
+        Id_user_permission INTEGER PRIMARY KEY,
+        Id_user INTEGER NOT NULL,
+        Name_permission TEXT,
+        Status_permission TEXT,
+        Created_at TEXT,
+        Modified_at TEXT,
+        FOREIGN KEY (Id_user) REFERENCES Users(Id_user)
+    );
+  ''');
+  await db.execute(
+      'CREATE INDEX IF NOT EXISTS IX_Users_permissions_user ON Users_permissions(Id_user);');
 
   // Tabla Activities
   await db.execute('''
@@ -2314,6 +2329,29 @@ Future<void> upgradeClickPalmDatabase(
         debugPrint('✅ Migración a versión 28 completada');
       } catch (e) {
         debugPrint('❌ Error en migración a versión 28: $e');
+      }
+    }
+
+    // Migración v28 a v29: tabla Users_permissions
+    if (oldVersion < 29) {
+      debugPrint('📦 Aplicando migración a versión 29...');
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS Users_permissions (
+              Id_user_permission INTEGER PRIMARY KEY,
+              Id_user INTEGER NOT NULL,
+              Name_permission TEXT,
+              Status_permission TEXT,
+              Created_at TEXT,
+              Modified_at TEXT,
+              FOREIGN KEY (Id_user) REFERENCES Users(Id_user)
+          );
+        ''');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS IX_Users_permissions_user ON Users_permissions(Id_user);');
+        debugPrint('✅ Migración a versión 29 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 29: $e');
       }
     }
   } catch (e) {

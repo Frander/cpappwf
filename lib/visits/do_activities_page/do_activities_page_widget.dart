@@ -463,17 +463,9 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
                                       }
                                     }
                                     if (activityJSON != null) {
-                                      // Solo actualizar si el currentActivity actual es de otra actividad
-                                      // o está vacío. Si ya es la misma actividad, no reemplazar para
-                                      // preservar activities_status embebidos en los steps.
-                                      final currentId = getJsonField(FFAppState().currentActivity, r'''$.id_activity''');
-                                      if (currentId != activityId) {
-                                        FFAppState().currentActivity = activityJSON;
-                                        FFAppState().activitySelectedJSON = activityJSON;
-                                        debugPrint('✅ currentActivity refrescado desde activitiesJSON: id=$activityId');
-                                      } else {
-                                        debugPrint('✅ currentActivity ya es correcto (id=$activityId), no reemplazar');
-                                      }
+                                      FFAppState().currentActivity = activityJSON;
+                                      FFAppState().activitySelectedJSON = activityJSON;
+                                      debugPrint('✅ currentActivity refrescado desde activitiesJSON: id=$activityId');
                                     } else {
                                       debugPrint('⚠️ Actividad $activityId no encontrada en activitiesJSON');
                                     }
