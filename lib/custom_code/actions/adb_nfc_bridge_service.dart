@@ -334,6 +334,14 @@ class AdbNfcBridgeService {
     await Future.delayed(const Duration(milliseconds: 500));
     return start();
   }
+
+  /// Re-ejecuta solo `adb reverse tcp:8080 tcp:8080` sin reiniciar el servidor.
+  /// Útil cuando el server ya está corriendo pero el móvil no se ha conectado.
+  /// Retorna true si el comando se ejecutó sin error.
+  Future<bool> retryAdbReverse() async {
+    await _setupAdbReverse();
+    return adbError == null;
+  }
 }
 
 enum AdbBridgeStatus {

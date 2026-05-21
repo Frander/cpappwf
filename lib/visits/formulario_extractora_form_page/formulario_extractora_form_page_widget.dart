@@ -113,6 +113,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   // Checkboxes para tags ADB acumulados (statusId → Set de índices marcados)
   final Map<int, Set<int>> _adbTagChecked = {};
 
+  // Código de supervisor requerido para confirmar la eliminación de una visita
+  // pendiente desde el botón ELIMINAR del bottom bar.
+  // TODO: mover a configuración remota / FFAppState cuando se defina el flujo
+  //       de gestión de códigos de supervisor.
+  static const String _kSupervisorDeleteCode = '9229';
+
   // ── Persistencia incremental de Visits_details en SQLite ─────────────────
   // _activeVisitId: Id_visit de la última visita creada por _autoSaveVisitFromAdbTag.
   // Los UPDATEs incrementales (number, date, time, etc.) apuntan a esta visita.
@@ -322,10 +328,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         if (mounted) setState(() => _adbServerStatus = status);
       });
       _adbTagSub = AdbNfcBridgeService.instance.onTagReceived.listen((payload) {
-        if (!mounted) return;
+        if (!mounted) {
+          debugPrint('🟡 ADB-TAG listener: widget NO mounted, ignorando tag');
+          return;
+        }
+        debugPrint(
+            '🟢 ADB-TAG listener: tag recibido — payload keys=${payload.keys.toList()}');
 
         // Lista de (statusId, statusName) para los que hay que recalcular
         final List<({int id, String name})> toRecalc = [];
+
+        // Sets recolectados durante el setState para warm-up de cachés
+        // (nombres de cargueros, pesos de lotes, identificaciones).
+        final Set<int> heIdsToWarm = {};
+        final Set<int> usIdsToWarm = {};
+        final Set<String> opIdsToWarm = {};
 
         setState(() {
           final serverStatuses = allStatuses.where((s) =>
@@ -358,12 +375,46 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             _tagReaderData[id] = parsed;
             _tagReaderProductName[id] = productName;
             _tagReaderRawJsons.remove(id);
+            debugPrint(
+                '🟢 ADB-TAG: actualizando caches para statusId=$id — '
+                'parsed.length=${parsed.length} '
+                'rawJsons.length=${_adbServerCardsRawJson[id]?.length ?? 0}');
+
+            // Recolectar IDs para warm-up de cachés (US, OP, HE).
+            try {
+              final decoded = jsonDecode(tagContent) as Map<String, dynamic>;
+              final us = (decoded['Read_info'] as Map?)?['US'];
+              if (us is int) usIdsToWarm.add(us);
+            } catch (_) {}
+            for (final r in parsed) {
+              final op = (r['operatorId'] as String?) ?? '';
+              if (op.isNotEmpty) opIdsToWarm.add(op);
+              final he = (r['headquarterId'] as int?) ?? 0;
+              if (he > 0) heIdsToWarm.add(he);
+            }
 
             // Registrar para recalcular headquarter-weight después del setState
             final sName = getJsonField(s, r'''$.status_name''')?.toString() ?? '';
             toRecalc.add((id: id, name: sName));
           }
         });
+
+        // Warm-up de cachés que la UI del card ADB necesita. Cada lookup
+        // dispara una carga async desde SQLite + setState al completar; la
+        // siguiente rebuild mostrará nombres/pesos resueltos en lugar del
+        // fallback (ej. "Carguero #293").
+        for (final usId in usIdsToWarm) {
+          _getUserName(usId.toString());
+          _getUserIdentificacion(usId);
+        }
+        for (final opId in opIdsToWarm) {
+          _getUserName(opId);
+          final asInt = int.tryParse(opId);
+          if (asInt != null) _getUserIdentificacion(asInt);
+        }
+        if (heIdsToWarm.isNotEmpty) {
+          unawaited(_loadHeadquarterWeights(heIdsToWarm.toList()));
+        }
 
         // Disparar cálculos fuera del setState (son async)
         for (final entry in toRecalc) {
@@ -1754,28 +1805,58 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final firstStep = activitySteps.first;
     final remainingSteps = activitySteps.skip(1).toList();
 
+    // El primer step ensancha el panel izquierdo cuando contiene un
+    // tag-transfer-adb-server, para acomodar el layout en dos columnas
+    // (controles a la izquierda, info + tabla del ADB a la derecha).
+    final firstStepStatuses = getJsonField(firstStep, r'''$.activities_status''');
+    final firstStepHasAdb = firstStepStatuses is List &&
+        firstStepStatuses.any((s) =>
+            (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                .toLowerCase() ==
+            'tag-transfer-adb-server');
+
+    if (firstStepHasAdb) {
+      // Cuando el primer step contiene un tag-transfer-adb-server,
+      // DATOS PRINCIPALES ocupa la fila 1 a todo ancho (con dos columnas
+      // internas) y los demás steps fusionados ocupan la fila 2 abajo.
+      // Como la altura ya no está limitada por un Row con stretch, los
+      // hijos se renderizan con altura intrínseca y el scroll lo lleva
+      // un SingleChildScrollView envolvente.
+      return SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildPanelForStep(firstStep, unboundedHeight: true),
+            const SizedBox(height: 10),
+            _buildMergedPanel(remainingSteps, unboundedHeight: true),
+          ],
+        ),
+      );
+    }
+
+    // Layout clásico: dos paneles lado a lado (izq 340px, der expanded).
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Panel izquierdo — primer step (ancho fijo, llena el alto disponible)
           SizedBox(
             width: 340,
             child: _buildPanelForStep(firstStep),
           ),
           const SizedBox(width: 8),
-          // Panel derecho — steps restantes fusionados (llena el alto disponible)
-          Expanded(
-            child: _buildMergedPanel(remainingSteps),
-          ),
+          Expanded(child: _buildMergedPanel(remainingSteps)),
         ],
       ),
     );
   }
 
   /// Panel izquierdo: statuses normales en grid 2 columnas; tag-transfer-adb-server en full-width.
-  Widget _buildPanelForStep(dynamic step) {
+  /// Cuando [unboundedHeight] es true, el panel renderiza su contenido con altura
+  /// intrínseca (sin `Expanded` ni `SingleChildScrollView` interno), apropiado
+  /// para apilarse dentro de otro scroll vertical.
+  Widget _buildPanelForStep(dynamic step, {bool unboundedHeight = false}) {
     final stepName = getJsonField(step, r'''$.unity''')?.toString() ??
         getJsonField(step, r'''$.name_step''')?.toString() ?? '';
     final statusesRaw = getJsonField(step, r'''$.activities_status''');
@@ -1796,6 +1877,125 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       if (_isRandomNumberStatus(s)) return false;
       return true;
     }).toList();
+
+    final Widget contentBody = LayoutBuilder(builder: (context, constraints) {
+      // Cuando el panel tiene un status ADB, el layout pasa a DOS FILAS:
+      //   Fila 1: controles (date / time / random / normales) en una sola
+      //           Row horizontal de igual ancho.
+      //   Fila 2: card ADB en modo tabla, a todo el ancho del panel.
+      // Esto le da al control de tabla todo el ancho útil que necesita.
+      final hasAdb = adbStatuses.isNotEmpty;
+
+      Widget adbStack({required AdbCardDisplayMode mode}) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (final adbStatus in adbStatuses)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildStatusOption(
+                  step,
+                  adbStatus,
+                  level: 0,
+                  adbDisplayModeOverride: mode,
+                ),
+              ),
+          ],
+        );
+      }
+
+      if (hasAdb) {
+        // Concatenar todos los controles que no son ADB, preservando el orden
+        // original (date → time → random → normales).
+        final topControls = <dynamic>[
+          ...dateStatuses,
+          ...timeStatuses,
+          ...randomNumStatuses,
+          ...normalStatuses,
+        ];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (topControls.isNotEmpty)
+              // Sin IntrinsicHeight: el control number tiene un Stack interno
+              // que no soporta intrinsic dimensions y causa el error
+              // "RenderBox was not laid out: hasSize". Las celdas toman
+              // altura natural y se alinean al tope.
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (int i = 0; i < topControls.length; i++) ...[
+                    if (i > 0) const SizedBox(width: 10),
+                    Expanded(
+                      child: _buildStatusOption(step, topControls[i],
+                          level: 0),
+                    ),
+                  ],
+                ],
+              ),
+            if (topControls.isNotEmpty) const SizedBox(height: 10),
+            adbStack(mode: AdbCardDisplayMode.table),
+          ],
+        );
+      }
+
+      // Sin ADB → layout legacy: date / time / random a full width, normales
+      // en grid de 2 columnas.
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final s in dateStatuses)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildStatusOption(step, s, level: 0),
+            ),
+          for (final s in timeStatuses)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildStatusOption(step, s, level: 0),
+            ),
+          for (final s in randomNumStatuses)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildStatusOption(step, s, level: 0),
+            ),
+          if (normalStatuses.isNotEmpty)
+            Column(
+              children: List.generate(
+                (normalStatuses.length / 2).ceil(),
+                (rowIndex) {
+                  final leftIndex = rowIndex * 2;
+                  final rightIndex = leftIndex + 1;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: _buildStatusOption(
+                                step, normalStatuses[leftIndex],
+                                level: 0),
+                          ),
+                          const SizedBox(width: 10),
+                          if (rightIndex < normalStatuses.length)
+                            Expanded(
+                              child: _buildStatusOption(
+                                  step, normalStatuses[rightIndex],
+                                  level: 0),
+                            )
+                          else
+                            const Expanded(child: SizedBox()),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      );
+    });
 
     return Container(
       decoration: BoxDecoration(
@@ -1824,74 +2024,20 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 ),
               ),
             ),
-          // Contenido scrollable que llena el espacio restante
-          Expanded(
-            child: SingleChildScrollView(
+          // Contenido — flujo natural si se apila dentro de otro scroll,
+          // o scroll interno cuando el panel tiene altura acotada.
+          if (unboundedHeight)
+            Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Date — fila individual (full-width)
-                  for (final s in dateStatuses)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildStatusOption(step, s, level: 0),
-                    ),
-                  // Time — fila individual (full-width)
-                  for (final s in timeStatuses)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildStatusOption(step, s, level: 0),
-                    ),
-                  // RANDOM number — fila individual (full-width)
-                  for (final s in randomNumStatuses)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildStatusOption(step, s, level: 0),
-                    ),
-                  // Grid 2 columnas para statuses normales
-                  if (normalStatuses.isNotEmpty)
-                    Column(
-                      children: List.generate(
-                        (normalStatuses.length / 2).ceil(),
-                        (rowIndex) {
-                          final leftIndex = rowIndex * 2;
-                          final rightIndex = leftIndex + 1;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: IntrinsicHeight(
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  Expanded(
-                                    child: _buildStatusOption(
-                                        step, normalStatuses[leftIndex], level: 0),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  if (rightIndex < normalStatuses.length)
-                                    Expanded(
-                                      child: _buildStatusOption(
-                                          step, normalStatuses[rightIndex], level: 0),
-                                    )
-                                  else
-                                    const Expanded(child: SizedBox()),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  // ADB statuses en full-width
-                  for (final adbStatus in adbStatuses)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildStatusOption(step, adbStatus, level: 0),
-                    ),
-                ],
+              child: contentBody,
+            )
+          else
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                child: contentBody,
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1909,7 +2055,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   }
 
   /// Panel derecho: fusiona statuses de todos los steps restantes en grid de 2 columnas.
-  Widget _buildMergedPanel(List<dynamic> steps) {
+  /// Cuando [unboundedHeight] es true, el panel renderiza su contenido con altura
+  /// intrínseca (sin `Expanded` ni `SingleChildScrollView` interno), apropiado
+  /// para apilarse dentro de otro scroll vertical.
+  Widget _buildMergedPanel(List<dynamic> steps,
+      {bool unboundedHeight = false}) {
     if (steps.isEmpty) return const SizedBox.shrink();
 
     // Recopilar todos los statuses y ordenar por order_status
@@ -1963,59 +2113,72 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 ),
               ),
             ),
-          // Contenido scrollable que llena el espacio restante
-          Expanded(
-            child: SingleChildScrollView(
+          // Contenido — scroll interno cuando hay altura acotada, flujo
+          // natural cuando se apila dentro de otro scroll.
+          if (unboundedHeight)
+            Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
-              child: Column(
-                children: [
-                  // RANDOM number — fila individual (full-width)
-                  for (final s in randomNumStatuses)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: _buildStatusOption(
-                          _findStepForStatus(steps, s), s, level: 0),
-                    ),
-                  // Resto en grid 2 columnas
-                  ...List.generate(
-                    (gridStatuses.length / 2).ceil(),
-                    (rowIndex) {
-                      final leftIndex = rowIndex * 2;
-                      final rightIndex = leftIndex + 1;
-                      final leftStep =
-                          _findStepForStatus(steps, gridStatuses[leftIndex]);
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: IntrinsicHeight(
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Expanded(
-                                child: _buildStatusOption(
-                                    leftStep, gridStatuses[leftIndex], level: 0),
-                              ),
-                              const SizedBox(width: 10),
-                              if (rightIndex < gridStatuses.length)
-                                Expanded(
-                                  child: _buildStatusOption(
-                                      _findStepForStatus(steps, gridStatuses[rightIndex]),
-                                      gridStatuses[rightIndex],
-                                      level: 0),
-                                )
-                              else
-                                const Expanded(child: SizedBox()),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                ],
+              child: _mergedPanelBody(
+                  steps, randomNumStatuses, gridStatuses),
+            )
+          else
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+                child: _mergedPanelBody(
+                    steps, randomNumStatuses, gridStatuses),
               ),
             ),
-          ),
         ],
       ),
+    );
+  }
+
+  Widget _mergedPanelBody(List<dynamic> steps,
+      List<dynamic> randomNumStatuses, List<dynamic> gridStatuses) {
+    return Column(
+      children: [
+        // RANDOM number — fila individual (full-width)
+        for (final s in randomNumStatuses)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _buildStatusOption(
+                _findStepForStatus(steps, s), s, level: 0),
+          ),
+        // Resto en grid 2 columnas
+        ...List.generate(
+          (gridStatuses.length / 2).ceil(),
+          (rowIndex) {
+            final leftIndex = rowIndex * 2;
+            final rightIndex = leftIndex + 1;
+            final leftStep =
+                _findStepForStatus(steps, gridStatuses[leftIndex]);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _buildStatusOption(
+                        leftStep, gridStatuses[leftIndex], level: 0),
+                  ),
+                  const SizedBox(width: 10),
+                  if (rightIndex < gridStatuses.length)
+                    Expanded(
+                      child: _buildStatusOption(
+                          _findStepForStatus(
+                              steps, gridStatuses[rightIndex]),
+                          gridStatuses[rightIndex],
+                          level: 0),
+                    )
+                  else
+                    const Expanded(child: SizedBox()),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 
@@ -2317,7 +2480,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   }
 
   Widget _buildStatusOption(dynamic parentStep, dynamic status,
-      {required int level, int? parentMultipleOptionId}) {
+      {required int level,
+      int? parentMultipleOptionId,
+      AdbCardDisplayMode? adbDisplayModeOverride}) {
     final statusId = getJsonField(status, r'''$.id_activity_status''');
     final statusName = getJsonField(status, r'''$.status_name''').toString();
     final typeStatus = getJsonField(status, r'''$.type_status''').toString();
@@ -3439,7 +3604,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                           if (isTagTransferAdbServerType && _tagReaderData.containsKey(statusId))
                             Padding(
                               padding: const EdgeInsets.only(top: 8),
-                              child: _buildAdbServerTagInlineSummary(statusId: statusId),
+                              child: _buildAdbServerTagInlineSummary(
+                                statusId: statusId,
+                                displayMode: adbDisplayModeOverride ??
+                                    AdbCardDisplayMode.tree,
+                              ),
                             ),
                           // Resumen del tag-writer (solo para tipo tag-writer) - DEBAJO
                           if (isTagWriterType &&
@@ -5797,50 +5966,46 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   // ──────────────────────────────────────────────────────────────────────────
   Widget _buildNavigationButtons() {
     final canSave = _activeVisitId != null;
+    final canDelete = _activeVisitId != null;
 
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          // ── CANCELAR ───────────────────────────────────────────────────
+          // ── ELIMINAR ───────────────────────────────────────────────────
           Expanded(
             child: GestureDetector(
-              onTap: () => context.pushNamed(
-                DoActivitiesPageWidget.routeName,
-                extra: <String, dynamic>{
-                  kTransitionInfoKey: const TransitionInfo(
-                    hasTransition: true,
-                    transitionType: PageTransitionType.fade,
-                    duration: Duration(milliseconds: 500),
-                  ),
-                },
-              ),
+              onTap: canDelete ? _confirmAndDeletePendingVisit : null,
               child: Container(
                 height: 50,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: [
-                      FlutterFlowTheme.of(context).error,
-                      FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
-                    ],
+                    colors: canDelete
+                        ? [
+                            FlutterFlowTheme.of(context).error,
+                            FlutterFlowTheme.of(context).error.withValues(alpha: 0.8),
+                          ]
+                        : const [Color(0xFF616161), Color(0xFF424242)],
                   ),
                   borderRadius: BorderRadius.circular(14),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 12,
-                      color: FlutterFlowTheme.of(context).error.withValues(alpha: 0.4),
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+                  boxShadow: canDelete
+                      ? [
+                          BoxShadow(
+                            blurRadius: 12,
+                            color: FlutterFlowTheme.of(context).error.withValues(alpha: 0.4),
+                            offset: const Offset(0, 6),
+                          ),
+                        ]
+                      : const [],
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.chevron_left_rounded,
+                    Icon(Icons.delete_forever_rounded,
                         color: Colors.white, size: 22),
                     SizedBox(width: 6),
                     Text(
-                      'Cancelar',
+                      'Eliminar',
                       style: TextStyle(
                         fontFamily: 'Roboto',
                         fontSize: 14,
@@ -5992,6 +6157,251 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
 
     // Auto-seleccionar la siguiente pendiente (la primera del map).
+    if (_pendingTagIndexToVisitId.isNotEmpty) {
+      final nextIdx = _pendingTagIndexToVisitId.keys.reduce(
+          (a, b) => a < b ? a : b);
+      final nextVisitId = _pendingTagIndexToVisitId[nextIdx]!;
+      setState(() => _selectedAdbTagIndex = nextIdx);
+      _clearFormState();
+      await _hydrateVisitInForm(nextVisitId);
+    } else {
+      _clearFormState();
+      if (mounted) {
+        setState(() {
+          _activeVisitId = null;
+          _formLocked = true;
+        });
+      }
+    }
+  }
+
+  /// Muestra un diálogo modal pidiendo el código de supervisor para confirmar
+  /// la eliminación de la visita activa. Si el código es correcto, dispara
+  /// [_deletePendingVisit]; de lo contrario reintenta sin cerrar el diálogo.
+  Future<void> _confirmAndDeletePendingVisit() async {
+    if (_activeVisitId == null) return;
+
+    final codeController = TextEditingController();
+    final focusNode = FocusNode();
+    String? errorText;
+    bool confirmed = false;
+
+    await showDialog<void>(
+      barrierDismissible: false,
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void validateAndClose() {
+              final entered = codeController.text.trim();
+              if (entered == _kSupervisorDeleteCode) {
+                confirmed = true;
+                Navigator.of(dialogContext).pop();
+              } else {
+                setDialogState(() {
+                  errorText = 'Código incorrecto';
+                  codeController.clear();
+                });
+                focusNode.requestFocus();
+              }
+            }
+
+            return Dialog(
+              backgroundColor: const Color(0xFF1A1A2E),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(22, 24, 22, 18),
+                width: 380,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded,
+                            color: Color(0xFFEF4444), size: 22),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Eliminar visita',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Esta acción borrará permanentemente la visita seleccionada '
+                      'y todos sus detalles y ubicaciones asociadas.\n\n'
+                      'Digita el código de supervisor para continuar:',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 13,
+                        color: Colors.white70,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextField(
+                      controller: codeController,
+                      focusNode: focusNode,
+                      autofocus: true,
+                      obscureText: true,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      onSubmitted: (_) => validateAndClose(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        letterSpacing: 6,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      textAlign: TextAlign.center,
+                      decoration: InputDecoration(
+                        hintText: '••••',
+                        hintStyle: const TextStyle(
+                          color: Colors.white24,
+                          letterSpacing: 6,
+                          fontSize: 16,
+                        ),
+                        errorText: errorText,
+                        filled: true,
+                        fillColor: Colors.white.withValues(alpha: 0.06),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                            color: Color(0xFFEF4444),
+                            width: 1.5,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: const Text(
+                              'Cancelar',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: validateAndClose,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFEF4444),
+                              foregroundColor: Colors.white,
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: const Text(
+                              'Eliminar',
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    codeController.dispose();
+    focusNode.dispose();
+
+    if (!confirmed || !mounted) return;
+    await _deletePendingVisit();
+  }
+
+  /// Borra de SQLite la visita activa (Visits + Visits_details + Visits_locations),
+  /// anima la salida de la tarjeta del panel izquierdo, reindexa
+  /// [_pendingTagIndexToVisitId] y auto-selecciona la siguiente pendiente.
+  /// Imita la mecánica de [_onSavePendingVisit] sustituyendo el UPDATE por DELETE.
+  Future<void> _deletePendingVisit() async {
+    if (_activeVisitId == null) return;
+    final deletedVisitId = _activeVisitId!;
+
+    try {
+      final db = await GlobalDbSingleton().database;
+      // Orden importante: hijos primero, padre al final.
+      await db.rawDelete(
+        'DELETE FROM Visits_locations WHERE Id_visit = ?',
+        [deletedVisitId],
+      );
+      await db.rawDelete(
+        'DELETE FROM Visits_details WHERE Id_visit = ?',
+        [deletedVisitId],
+      );
+      final deletedRows = await db.delete(
+        'Visits',
+        where: 'Id_visit = ?',
+        whereArgs: [deletedVisitId],
+      );
+      debugPrint(
+          '🗑️ _deletePendingVisit: borradas $deletedRows fila(s) de Visits para Id_visit=$deletedVisitId');
+    } catch (e) {
+      debugPrint('❌ _deletePendingVisit error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error al eliminar la visita. Inténtalo de nuevo.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+      return;
+    }
+
+    int closedIdx = -1;
+    _pendingTagIndexToVisitId.forEach((k, v) {
+      if (v == deletedVisitId) closedIdx = k;
+    });
+
+    if (closedIdx >= 0) {
+      setState(() => _animatingOutTagIndex = closedIdx);
+      await Future.delayed(const Duration(milliseconds: 350));
+      if (!mounted) return;
+      setState(() {
+        _removeTagCardAt(closedIdx);
+        _pendingTagIndexToVisitId.remove(closedIdx);
+        _reindexPendingTagMap(closedIdx);
+        _animatingOutTagIndex = null;
+      });
+    }
+
     if (_pendingTagIndexToVisitId.isNotEmpty) {
       final nextIdx = _pendingTagIndexToVisitId.keys.reduce(
           (a, b) => a < b ? a : b);
@@ -9167,8 +9577,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // ===== ADB SERVER INLINE SUMMARY (enriquecido con SQLite) =====
 
-  Widget _buildAdbServerTagInlineSummary({required int statusId}) {
+  Widget _buildAdbServerTagInlineSummary({
+    required int statusId,
+    AdbCardDisplayMode displayMode = AdbCardDisplayMode.tree,
+  }) {
     final rawJsons = _adbServerCardsRawJson[statusId];
+    debugPrint(
+        '🔵 _buildAdbServerTagInlineSummary: statusId=$statusId '
+        'displayMode=$displayMode '
+        'rawJsons.length=${rawJsons?.length ?? 0}');
     if (rawJsons == null || rawJsons.isEmpty) return const SizedBox.shrink();
 
     final selectedIndex = _selectedAdbTagIndex.clamp(0, rawJsons.length - 1);
@@ -9212,10 +9629,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     String driverName = '—';
     String driverIdentificacion = '';
     if (idUser != null) {
+      // _getUserName intenta primero usersList, luego caché y finalmente
+      // dispara una carga async desde SQLite que llamará setState al
+      // completar — la próxima rebuild mostrará el nombre real. Mientras
+      // tanto, usamos un fallback descriptivo en vez del id desnudo.
       final resolvedName = _getUserName(idUser.toString());
       final isResolved =
           resolvedName.isNotEmpty && resolvedName != idUser.toString();
-      driverName = isResolved ? resolvedName : '$idUser';
+      driverName = isResolved ? resolvedName : 'Carguero #$idUser';
       driverIdentificacion = _getUserIdentificacion(idUser);
       if (driverIdentificacion.isEmpty) {
         driverIdentificacion = '$idUser';
@@ -9246,6 +9667,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           driverIdentificacion.isNotEmpty ? driverIdentificacion : '—',
       visitData: visitData,
       formStatusDetails: formStatusDetails,
+      displayMode: displayMode,
     );
   }
 
@@ -9257,6 +9679,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     required String driverIdentificacion,
     required List<Map<String, dynamic>> visitData,
     List<Map<String, dynamic>> formStatusDetails = const [],
+    AdbCardDisplayMode displayMode = AdbCardDisplayMode.tree,
   }) {
     // Agrupar visitas por lote (mismo que árbol existente)
     final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
@@ -9286,6 +9709,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               ),
               child: Icon(icon, size: 15, color: iconColor),
             ),
+            if (copyValue != null && copyValue.isNotEmpty && copyValue != '—') ...[
+              const SizedBox(width: 6),
+              _CopyValueButton(
+                value: copyValue,
+                semanticLabel: copySemanticLabel,
+                iconSize: 12,
+              ),
+            ],
             const SizedBox(width: 10),
             Text(
               label,
@@ -9310,14 +9741,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 overflow: TextOverflow.ellipsis,
               ),
             ),
-            if (copyValue != null && copyValue.isNotEmpty && copyValue != '—') ...[
-              const SizedBox(width: 8),
-              _CopyValueButton(
-                value: copyValue,
-                semanticLabel: copySemanticLabel,
-                iconSize: 12,
-              ),
-            ],
           ],
         ),
       );
@@ -9340,12 +9763,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header con Origen / Destino / Conductor ──────────
+          // ── Header con Origen / Destino / Conductor / Identificación + visits_details
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+            child: Builder(builder: (_) {
+              final List<Widget> allInfoRows = [
                 infoRow(
                   Icons.inventory_2_outlined,
                   'ORIGEN',
@@ -9378,9 +9800,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                   copyValue: driverIdentificacion,
                   copySemanticLabel: 'Copiar identificación',
                 ),
-                // ── Detalles del formulario inyectados (status.visits_details) ──
                 ...formStatusDetails.map((d) {
-                  final option = (d['status_option'] ?? '').toString();
+                  final option =
+                      (d['status_option'] ?? '').toString().toUpperCase();
                   final response = (d['status_response'] ?? '').toString();
                   return infoRow(
                     Icons.checklist_rounded,
@@ -9393,8 +9815,46 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                         : 'Copiar valor',
                   );
                 }),
-              ],
-            ),
+              ];
+
+              // En modo tabla (panel DATOS PRINCIPALES) los items se distribuyen
+              // en DOS FILAS horizontales con anchos uniformes. En el modo árbol
+              // clásico se conserva el apilado vertical legacy.
+              if (displayMode != AdbCardDisplayMode.table) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: allInfoRows,
+                );
+              }
+
+              final perRow = ((allInfoRows.length + 1) / 2).ceil();
+              final row1 = allInfoRows.take(perRow).toList();
+              final row2 = allInfoRows.skip(perRow).toList();
+
+              Widget hRow(List<Widget> items) {
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (int i = 0; i < perRow; i++) ...[
+                      if (i > 0) const SizedBox(width: 12),
+                      Expanded(
+                        child: i < items.length
+                            ? items[i]
+                            : const SizedBox.shrink(),
+                      ),
+                    ],
+                  ],
+                );
+              }
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  hRow(row1),
+                  hRow(row2),
+                ],
+              );
+            }),
           ),
           // ── Separador ─────────────────────────────────────────
           if (groupedByHeadquarter.isNotEmpty)
@@ -9403,16 +9863,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               thickness: 1,
               color: Colors.white.withValues(alpha: 0.08),
             ),
-          // ── Árbol de visitas por lote ─────────────────────────
+          // ── Árbol o tabla de visitas por lote ─────────────────
           if (groupedByHeadquarter.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: groupedByHeadquarter.entries.map((entry) {
-                  return _buildHeadquarterGroup(entry.key, entry.value);
-                }).toList(),
-              ),
+              child: displayMode == AdbCardDisplayMode.table
+                  ? _buildTagOperatorLotesTable(visitData)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: groupedByHeadquarter.entries.map((entry) {
+                        return _buildHeadquarterGroup(entry.key, entry.value);
+                      }).toList(),
+                    ),
             ),
         ],
       ),
@@ -9449,13 +9911,35 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             child: GestureDetector(
               onTap: () async {
                 if (_isRestartingAdb) return;
-                if (mounted) { setState(() => _isRestartingAdb = true); }
-                await AdbNfcBridgeService.instance.restart();
-                if (mounted) {
-                  setState(() {
-                  _adbServerStatus = AdbNfcBridgeService.instance.currentStatus;
-                  _isRestartingAdb = false;
-                });
+                if (mounted) setState(() => _isRestartingAdb = true);
+                if (AdbNfcBridgeService.instance.isServerRunning) {
+                  final ok = await AdbNfcBridgeService.instance.retryAdbReverse();
+                  if (mounted) {
+                    setState(() => _isRestartingAdb = false);
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ok
+                          ? '🔗 adb reverse ejecutado — conecta el Android'
+                          : '❌ ${AdbNfcBridgeService.instance.adbError ?? 'Error desconocido'}'),
+                      backgroundColor: ok ? const Color(0xFF1565C0) : const Color(0xFFE53935),
+                      duration: const Duration(seconds: 3),
+                    ));
+                  }
+                } else {
+                  await AdbNfcBridgeService.instance.restart();
+                  if (mounted) {
+                    final ok = AdbNfcBridgeService.instance.adbError == null;
+                    setState(() {
+                      _adbServerStatus = AdbNfcBridgeService.instance.currentStatus;
+                      _isRestartingAdb = false;
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text(ok
+                          ? '🟢 Servidor reiniciado — conecta el Android'
+                          : '❌ ${AdbNfcBridgeService.instance.adbError ?? 'Error al reiniciar'}'),
+                      backgroundColor: ok ? const Color(0xFF2D6A4F) : const Color(0xFFE53935),
+                      duration: const Duration(seconds: 3),
+                    ));
+                  }
                 }
               },
               child: AnimatedContainer(
@@ -9777,10 +10261,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
     return GestureDetector(
       onTap: () async {
-        if (!AdbNfcBridgeService.instance.isServerRunning) {
+        if (AdbNfcBridgeService.instance.isServerRunning) {
+          await AdbNfcBridgeService.instance.retryAdbReverse();
+        } else {
           await AdbNfcBridgeService.instance.start();
-          if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
         }
+        if (mounted) setState(() => _adbServerStatus = AdbNfcBridgeService.instance.currentStatus);
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -13962,7 +14448,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
     // Formatear la fecha
     try {
-      final date = DateTime.parse(detail.statusResponse);
+      DateTime date;
+      try {
+        date = DateFormat('dd/MM/yyyy').parse(detail.statusResponse);
+      } catch (_) {
+        date = DateTime.parse(detail.statusResponse);
+      }
       return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     } catch (e) {
       return detail.statusResponse;
@@ -14862,6 +15353,405 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       ),
     );
   }
+
+  // ===== TABLA PLANA POR (CARGUERO × LOTE) — usada por el panel DATOS PRINCIPALES =====
+
+  String _resolveLoteName(int headquarterId) {
+    final hq = FFAppState().headquartersList.firstWhere(
+          (h) => h.idHeadquarter == headquarterId,
+          orElse: () => HeadquartersStruct(),
+        );
+    return hq.nameHeadquarter.isNotEmpty
+        ? hq.nameHeadquarter
+        : 'Lote #$headquarterId';
+  }
+
+  /// Formatea un double como peso en formato es-ES: "12,50 kg".
+  String _formatKg(double v) {
+    final fixed = v.toStringAsFixed(2);
+    final withComma = fixed.replaceAll('.', ',');
+    return '$withComma kg';
+  }
+
+  Widget _buildTagOperatorLotesTable(List<Map<String, dynamic>> visitData) {
+    debugPrint(
+        '🟣 _buildTagOperatorLotesTable: visitData.length=${visitData.length} '
+        '_headquarterWeights.length=${_headquarterWeights.length}');
+    if (visitData.isEmpty) return const SizedBox.shrink();
+
+    // 1 fila por record de Visits[]. Orden descendente por dateTime.
+    final records = List<Map<String, dynamic>>.from(visitData)
+      ..sort((a, b) {
+        final ta = a['dateTime'] as DateTime?;
+        final tb = b['dateTime'] as DateTime?;
+        if (ta == null && tb == null) return 0;
+        if (ta == null) return 1;
+        if (tb == null) return -1;
+        return tb.compareTo(ta);
+      });
+
+    int totalRacimos = 0;
+    double totalPesoAprox = 0;
+    final List<_TiqueteRow> rows = [];
+    for (int i = 0; i < records.length; i++) {
+      final r = records[i];
+      final opId = (r['operatorId'] as String?) ?? '';
+      final opIdInt = int.tryParse(opId) ?? 0;
+      final heId = (r['headquarterId'] as int?) ?? 0;
+      final results = (r['results'] as int?) ?? 0;
+      final dt = r['dateTime'] as DateTime?;
+      final pesoProm = _headquarterWeights[heId];
+      final pesoAprox = pesoProm != null ? results * pesoProm : 0.0;
+
+      totalRacimos += results;
+      totalPesoAprox += pesoAprox;
+
+      final cargueroResolved = _getUserName(opId);
+      final cargueroDisplay =
+          (cargueroResolved.isNotEmpty && cargueroResolved != opId)
+              ? cargueroResolved.toUpperCase()
+              : (opIdInt > 0 ? 'Carguero #$opIdInt' : '—');
+
+      final identResolved = _getUserIdentificacion(opIdInt);
+      final identDisplay = identResolved.isNotEmpty ? identResolved : '—';
+
+      rows.add(_TiqueteRow(
+        tiquete: i + 1,
+        fechaCorte: dt,
+        loteName: _resolveLoteName(heId),
+        racimos: results,
+        pesoPromedio: pesoProm,
+        pesoAproximado: pesoAprox,
+        cargueroNombre: cargueroDisplay,
+        cargueroIdentificacion: identDisplay,
+      ));
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withValues(alpha: 0.18),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.10),
+            width: 1,
+          ),
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: IntrinsicWidth(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minWidth: 1100),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildTiqueteTableHeader(),
+                  for (int i = 0; i < rows.length; i++)
+                    _buildTiqueteTableRow(rows[i], i.isOdd),
+                  _buildTiqueteTableFooter(totalRacimos, totalPesoAprox),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTiqueteTableHeader() {
+    Widget cell(String text, int flex,
+        {TextAlign align = TextAlign.center, double padR = 0}) {
+      return Expanded(
+        flex: flex,
+        child: Padding(
+          padding: EdgeInsets.only(right: padR),
+          child: Text(
+            text,
+            textAlign: align,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFFBBF24),
+              letterSpacing: 0.6,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1B4332), Color(0xFF2D6A4F)],
+        ),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+      ),
+      child: Row(
+        children: [
+          cell('TIQUETE', 1),
+          const SizedBox(width: 6),
+          cell('FECHA CORTE', 2),
+          const SizedBox(width: 6),
+          cell('LOTE', 3),
+          const SizedBox(width: 6),
+          cell('RACIMOS', 1),
+          const SizedBox(width: 6),
+          cell('PESO PROMEDIO', 2),
+          const SizedBox(width: 6),
+          cell('PESO APROXIMADO', 2),
+          const SizedBox(width: 6),
+          cell('NOMBRE CARGUERO', 3),
+          const SizedBox(width: 6),
+          cell('IDENTIFICACIÓN', 2),
+        ],
+      ),
+    );
+  }
+
+  /// Render de UNA celda de tabla — texto + botón copiar a la derecha del texto.
+  /// Si [leading] está definido (chip de lote), se renderiza en lugar del texto.
+  Widget _tiqueteCell({
+    required int flex,
+    required String text,
+    required String copyValue,
+    required String copyLabel,
+    TextAlign align = TextAlign.center,
+    Color textColor = Colors.white,
+    bool bold = true,
+    bool numeric = false,
+    Widget? leading,
+  }) {
+    final canCopy = copyValue.isNotEmpty && copyValue != '—';
+    return Expanded(
+      flex: flex,
+      child: Row(
+        mainAxisAlignment: align == TextAlign.right
+            ? MainAxisAlignment.end
+            : (align == TextAlign.center
+                ? MainAxisAlignment.center
+                : MainAxisAlignment.start),
+        children: [
+          if (leading != null)
+            Flexible(child: leading)
+          else
+            Flexible(
+              child: Text(
+                text,
+                textAlign: align,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                  fontWeight: bold ? FontWeight.w700 : FontWeight.w500,
+                  color: textColor,
+                  fontFeatures: numeric
+                      ? const [FontFeature.tabularFigures()]
+                      : null,
+                ),
+              ),
+            ),
+          if (canCopy) ...[
+            const SizedBox(width: 4),
+            _CopyValueButton(
+              value: copyValue,
+              semanticLabel: copyLabel,
+              iconSize: 10,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTiqueteTableRow(_TiqueteRow row, bool zebra) {
+    final bgColor =
+        zebra ? Colors.white.withValues(alpha: 0.03) : Colors.transparent;
+
+    final String fechaText = row.fechaCorte == null
+        ? '—'
+        : DateFormat('dd/MM/yyyy').format(row.fechaCorte!);
+
+    final String pesoPromText =
+        row.pesoPromedio == null ? 'Sin peso' : _formatKg(row.pesoPromedio!);
+    final String pesoAproxText =
+        row.pesoPromedio == null ? '0' : _formatKg(row.pesoAproximado);
+
+    final Widget loteChip = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF2D6A4F).withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(
+          color: const Color(0xFF52B788).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Text(
+        row.loteName,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontFamily: 'Roboto',
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      decoration: BoxDecoration(
+        color: bgColor,
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          _tiqueteCell(
+            flex: 1,
+            text: '${row.tiquete}',
+            copyValue: '${row.tiquete}',
+            copyLabel: 'Copiar tiquete',
+            numeric: true,
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 2,
+            text: fechaText,
+            copyValue: fechaText,
+            copyLabel: 'Copiar fecha de corte',
+            numeric: true,
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 3,
+            text: row.loteName,
+            copyValue: row.loteName,
+            copyLabel: 'Copiar lote',
+            leading: loteChip,
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 1,
+            text: '${row.racimos}',
+            copyValue: '${row.racimos}',
+            copyLabel: 'Copiar racimos',
+            numeric: true,
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 2,
+            text: pesoPromText,
+            copyValue: pesoPromText,
+            copyLabel: 'Copiar peso promedio',
+            numeric: true,
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 2,
+            text: pesoAproxText,
+            copyValue: pesoAproxText,
+            copyLabel: 'Copiar peso aproximado',
+            numeric: true,
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 3,
+            text: row.cargueroNombre,
+            copyValue: row.cargueroNombre,
+            copyLabel: 'Copiar nombre carguero',
+          ),
+          const SizedBox(width: 6),
+          _tiqueteCell(
+            flex: 2,
+            text: row.cargueroIdentificacion,
+            copyValue: row.cargueroIdentificacion,
+            copyLabel: 'Copiar identificación carguero',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTiqueteTableFooter(int totalRacimos, double totalPesoAprox) {
+    final String totalPesoText =
+        totalPesoAprox == 0 ? '0' : _formatKg(totalPesoAprox);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B4332).withValues(alpha: 0.5),
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+        ),
+      ),
+      child: Row(
+        children: [
+          // 1 + 6 + 2 + 6 + 3 + 6 = label TOTALES ocupa los tres primeros bloques
+          Expanded(
+            flex: 6, // tiquete + fecha + lote (1+2+3)
+            child: Text(
+              'TOTALES',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withValues(alpha: 0.75),
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
+          const SizedBox(width: 24), // los SizedBoxes entre columnas: 18 (3*6)
+          Expanded(
+            flex: 1, // racimos
+            child: Text(
+              '$totalRacimos',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // peso promedio (sin suma — n/a a nivel global)
+          const Expanded(flex: 2, child: SizedBox.shrink()),
+          const SizedBox(width: 6),
+          Expanded(
+            flex: 2, // peso aproximado total
+            child: Text(
+              totalPesoText,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          const Expanded(flex: 3, child: SizedBox.shrink()), // carguero
+          const SizedBox(width: 6),
+          const Expanded(flex: 2, child: SizedBox.shrink()), // identificación
+        ],
+      ),
+    );
+  }
+
 
   // ===== RESUMEN DEL TAG WRITER AGRUPADO POR LOTE =====
 
@@ -18472,18 +19362,27 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       parentStepId,
     );
 
-    if (dateValue.isEmpty || dateValue == '[Fecha]') {
-      return const SizedBox.shrink();
-    }
+    debugPrint(
+        '📅 _buildDateValueDisplay: statusId=$statusId parentStepId=$parentStepId raw="$dateValue"');
 
-    // Si es una fórmula (=DATENOW, =TIMENOW, etc.), no mostrar nada
-    if (dateValue.startsWith('=')) {
-      return const SizedBox.shrink();
+    // Vacío o placeholder → resolver a la fecha actual para no dejar el campo
+    // sin valor visible. Lo mismo aplica si todavía contiene la fórmula sin
+    // resolver (=DATENOW) porque la auto-inicialización aún no corrió o la
+    // entrada en visitDetails se persistió literalmente.
+    if (dateValue.isEmpty ||
+        dateValue == '[Fecha]' ||
+        dateValue.startsWith('=')) {
+      dateValue = DateTime.now().toIso8601String();
     }
 
     // Formatear la fecha
     try {
-      final date = DateTime.parse(dateValue);
+      DateTime date;
+      try {
+        date = DateFormat('dd/MM/yyyy').parse(dateValue);
+      } catch (_) {
+        date = DateTime.parse(dateValue);
+      }
       // Formato: "Miércoles 15 de Junio 2025"
       final dayName = DateFormat('EEEE', 'es_ES').format(date);
       final day = date.day;
@@ -18552,13 +19451,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       parentStepId,
     );
 
-    if (timeValue.isEmpty || timeValue == '[Hora]') {
-      return const SizedBox.shrink();
-    }
+    debugPrint(
+        '⏰ _buildTimeValueDisplay: statusId=$statusId parentStepId=$parentStepId raw="$timeValue"');
 
-    // Si es una fórmula (=TIMENOW, etc.), no mostrar nada
-    if (timeValue.startsWith('=')) {
-      return const SizedBox.shrink();
+    // Vacío, placeholder o fórmula no resuelta → caer a la hora actual para
+    // mantener el campo siempre visible.
+    if (timeValue.isEmpty ||
+        timeValue == '[Hora]' ||
+        timeValue.startsWith('=')) {
+      final now = TimeOfDay.now();
+      timeValue =
+          '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     }
 
     // El valor viene en formato TimeOfDay serializado, extraer horas y minutos
@@ -18666,12 +19569,19 @@ class _FullScreenNumericKeyboardDialog extends StatefulWidget {
 class _FullScreenNumericKeyboardDialogState
     extends State<_FullScreenNumericKeyboardDialog> {
   late String _currentValue;
+  final FocusNode _keyboardFocusNode = FocusNode();
 
   @override
   void initState() {
     super.initState();
     _currentValue =
         widget.initialValue > 0 ? widget.initialValue.toString() : '';
+  }
+
+  @override
+  void dispose() {
+    _keyboardFocusNode.dispose();
+    super.dispose();
   }
 
   void _onNumberPressed(String number) {
@@ -18705,11 +19615,66 @@ class _FullScreenNumericKeyboardDialogState
     }
   }
 
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final digitKeys = <LogicalKeyboardKey, String>{
+      LogicalKeyboardKey.digit0: '0',
+      LogicalKeyboardKey.digit1: '1',
+      LogicalKeyboardKey.digit2: '2',
+      LogicalKeyboardKey.digit3: '3',
+      LogicalKeyboardKey.digit4: '4',
+      LogicalKeyboardKey.digit5: '5',
+      LogicalKeyboardKey.digit6: '6',
+      LogicalKeyboardKey.digit7: '7',
+      LogicalKeyboardKey.digit8: '8',
+      LogicalKeyboardKey.digit9: '9',
+      LogicalKeyboardKey.numpad0: '0',
+      LogicalKeyboardKey.numpad1: '1',
+      LogicalKeyboardKey.numpad2: '2',
+      LogicalKeyboardKey.numpad3: '3',
+      LogicalKeyboardKey.numpad4: '4',
+      LogicalKeyboardKey.numpad5: '5',
+      LogicalKeyboardKey.numpad6: '6',
+      LogicalKeyboardKey.numpad7: '7',
+      LogicalKeyboardKey.numpad8: '8',
+      LogicalKeyboardKey.numpad9: '9',
+    };
+    if (digitKeys.containsKey(key)) {
+      _onNumberPressed(digitKeys[key]!);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter) {
+      _onConfirm();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.backspace) {
+      _onBackspace();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.delete) {
+      _onClear();
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.escape) {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: Container(
+    return Focus(
+      focusNode: _keyboardFocusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
         width: MediaQuery.of(context).size.width,
         height: MediaQuery.of(context).size.height,
         decoration: const BoxDecoration(
@@ -18911,7 +19876,8 @@ class _FullScreenNumericKeyboardDialogState
           ),
         ),
       ),
-    );
+    ),
+  );
   }
 
   Widget _buildKeyButton(String number) {
@@ -20024,6 +20990,34 @@ class _AdbPrintPreviewDialogState extends State<_AdbPrintPreviewDialog> {
       ),
     );
   }
+}
+
+// Modo de render del card del tag ADB: el árbol (jerárquico Lote → Carguero)
+// para el flujo clásico, o la tabla plana (1 fila por par CARGUERO × LOTE)
+// para el panel DATOS PRINCIPALES.
+enum AdbCardDisplayMode { tree, table }
+
+// Fila de la tabla de tiquete del panel DATOS PRINCIPALES — una por record de
+// Visits[] del tag ADB. Sin agregación.
+class _TiqueteRow {
+  final int tiquete;
+  final DateTime? fechaCorte;
+  final String loteName;
+  final int racimos;
+  final double? pesoPromedio;
+  final double pesoAproximado;
+  final String cargueroNombre;
+  final String cargueroIdentificacion;
+  _TiqueteRow({
+    required this.tiquete,
+    required this.fechaCorte,
+    required this.loteName,
+    required this.racimos,
+    required this.pesoPromedio,
+    required this.pesoAproximado,
+    required this.cargueroNombre,
+    required this.cargueroIdentificacion,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
