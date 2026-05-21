@@ -14,6 +14,7 @@ class NfcReadDialogWidget extends StatefulWidget {
     this.autoStart = false,
     this.isTagTransferMode = false,
     this.tagTransferTitle,
+    this.onTagReadCallback,
   });
 
   final bool autoStart;
@@ -21,6 +22,9 @@ class NfcReadDialogWidget extends StatefulWidget {
   final bool isTagTransferMode;
   /// Título personalizado para modo tag-transfer (ej: "Leer Punto de Acopio de origen")
   final String? tagTransferTitle;
+  /// Callback ejecutado dentro de la sesión NFC activa tras leer el tag.
+  /// Si retorna true, el tag se borra en la misma sesión (tag-transfer-adb-from).
+  final Future<bool> Function(String tagData)? onTagReadCallback;
 
   @override
   State<NfcReadDialogWidget> createState() => _NfcReadDialogWidgetState();
@@ -93,6 +97,7 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
         context,
         autoClose: false,
         clearAfterRead: widget.isTagTransferMode,
+        onTagReadCallback: widget.onTagReadCallback,
       );
 
       if (nfcData.isNotEmpty) {

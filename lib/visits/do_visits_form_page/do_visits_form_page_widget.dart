@@ -2671,31 +2671,38 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 }
                 // Abrir diálogo NFC de lectura
                 if (!mounted) return;
+                bool tagSentSuccessfully = false;
                 await showDialog(
                   barrierDismissible: false,
                   context: context,
-                  builder: (dialogContext) => const Dialog(
+                  builder: (dialogContext) => Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
                     child: NfcReadDialogWidget(
                       autoStart: true,
                       isTagTransferMode: false,
+                      onTagReadCallback: (tagContent) async {
+                        final sent = await AdbNfcClientService.instance
+                            .sendTagData(tagContent: tagContent);
+                        if (sent) tagSentSuccessfully = true;
+                        return sent;
+                      },
                     ),
                   ),
                 );
                 if (!mounted) return;
                 final nfcContent = FFAppState().nfcRead;
-                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
-                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
-                  if (!mounted) return;
+                if (tagSentSuccessfully &&
+                    nfcContent.isNotEmpty &&
+                    !nfcContent.startsWith('ERROR')) {
                   // Mostrar resumen inline en el dispositivo Android también
                   setState(() {
                     _tagReaderData[statusId] = _parseNfcTagContent(nfcContent);
                     _tagReaderProductName[statusId] = '';
                   });
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('📡 Tag enviado al servidor desktop'),
+                    content: Text('📡 Tag enviado al servidor desktop y borrado'),
                     backgroundColor: Color(0xFF00a86b),
                     duration: Duration(seconds: 3),
                   ));
@@ -4201,26 +4208,33 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   if (!connected) return;
                 }
                 if (!mounted) return;
+                bool tagSentSuccessfully = false;
                 await showDialog(
                   barrierDismissible: false,
                   context: context,
-                  builder: (dialogContext) => const Dialog(
+                  builder: (dialogContext) => Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
                     child: NfcReadDialogWidget(
                       autoStart: true,
                       isTagTransferMode: false,
+                      onTagReadCallback: (tagContent) async {
+                        final sent = await AdbNfcClientService.instance
+                            .sendTagData(tagContent: tagContent);
+                        if (sent) tagSentSuccessfully = true;
+                        return sent;
+                      },
                     ),
                   ),
                 );
                 if (!mounted) return;
                 final nfcContent = FFAppState().nfcRead;
-                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
-                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
-                  if (!mounted) return;
+                if (tagSentSuccessfully &&
+                    nfcContent.isNotEmpty &&
+                    !nfcContent.startsWith('ERROR')) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('📡 Tag enviado al servidor desktop'),
+                    content: Text('📡 Tag enviado al servidor desktop y borrado'),
                     backgroundColor: Color(0xFF00a86b),
                     duration: Duration(seconds: 3),
                   ));
@@ -5071,26 +5085,33 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   if (!connected) return;
                 }
                 if (!mounted) return;
+                bool tagSentSuccessfully = false;
                 await showDialog(
                   barrierDismissible: false,
                   context: context,
-                  builder: (dialogContext) => const Dialog(
+                  builder: (dialogContext) => Dialog(
                     elevation: 0,
                     insetPadding: EdgeInsets.zero,
                     backgroundColor: Colors.transparent,
                     child: NfcReadDialogWidget(
                       autoStart: true,
                       isTagTransferMode: false,
+                      onTagReadCallback: (tagContent) async {
+                        final sent = await AdbNfcClientService.instance
+                            .sendTagData(tagContent: tagContent);
+                        if (sent) tagSentSuccessfully = true;
+                        return sent;
+                      },
                     ),
                   ),
                 );
                 if (!mounted) return;
                 final nfcContent = FFAppState().nfcRead;
-                if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
-                  await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
-                  if (!mounted) return;
+                if (tagSentSuccessfully &&
+                    nfcContent.isNotEmpty &&
+                    !nfcContent.startsWith('ERROR')) {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('📡 Tag enviado al servidor desktop'),
+                    content: Text('📡 Tag enviado al servidor desktop y borrado'),
                     backgroundColor: Color(0xFF00a86b),
                     duration: Duration(seconds: 3),
                   ));

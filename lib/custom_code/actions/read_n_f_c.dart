@@ -22,6 +22,7 @@ Future<String> readNFC(
   BuildContext context, {
   bool autoClose = true,
   bool clearAfterRead = false,
+  Future<bool> Function(String tagData)? onTagReadCallback,
 }) async {
   if (!Platforms.isMobile) return ''; // NFC no disponible en desktop
   // Verificar si NFC está disponible y activado usando la nueva función
@@ -361,6 +362,22 @@ Future<String> readNFC(
                 : '⚠️ No se pudo borrar el tag de origen — continuando con los datos leídos');
           } catch (eraseError) {
             debugPrint('⚠️ Error durante borrado en sesión (no crítico): $eraseError');
+          }
+        }
+
+        // === ENVÍO + BORRADO EN SESIÓN (tag-transfer-adb-from) ===
+        if (onTagReadCallback != null) {
+          try {
+            final shouldErase = await onTagReadCallback(enrichedTagData);
+            if (shouldErase) {
+              debugPrint('🧹 onTagReadCallback=true: borrando tag en sesión activa...');
+              final erased = await _eraseTagInSession(tag);
+              debugPrint(erased
+                  ? '✅ Tag borrado tras envío ADB (misma sesión NFC)'
+                  : '⚠️ No se pudo borrar el tag tras envío ADB');
+            }
+          } catch (callbackError) {
+            debugPrint('⚠️ Error en onTagReadCallback (no crítico): $callbackError');
           }
         }
 
