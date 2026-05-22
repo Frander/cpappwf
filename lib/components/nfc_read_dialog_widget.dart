@@ -2,8 +2,10 @@ import '/backend/schema/structs/index.dart';
 import '/flutter_flow/flutter_flow_util.dart';
 import 'dart:ui';
 import '/custom_code/actions/index.dart' as actions;
+import '/custom_code/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nfc_manager/nfc_manager.dart';
 
 import 'nfc_read_dialog_model.dart';
 export 'nfc_read_dialog_model.dart';
@@ -71,6 +73,11 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
 
   @override
   void dispose() {
+    // Abortar cualquier sesión NFC activa para que cerrar el diálogo
+    // (botón X, botón atrás del sistema, etc.) cancele realmente la lectura.
+    if (Platforms.isMobile) {
+      NfcManager.instance.stopSession().catchError((_) {});
+    }
     _model.maybeDispose();
     _pulseController.dispose();
     super.dispose();

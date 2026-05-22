@@ -1,129 +1,52 @@
 import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/sqlite/sqlite_manager.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 // Imports other custom actions
 // Imports custom functions
 // Begin custom action code
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 Future updateVisitSQLite(VisitsStruct visitsStruct) async {
-  // Add your function code here!
-  final db = SQLiteManager.instance.database;
+  await globalDb.executeOperation((db) async {
+    final generatedId = await db.rawInsert('''
+      INSERT OR REPLACE INTO Visits (
+        Id_company, Id_activity, Id_headquarter, Id_product,
+        Id_bulk, Id_user, Id_device, Id_status, Created_at,
+        Battery, Latitude, Longitude, Altitude, Error_horizontal, Status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', [
+      visitsStruct.idCompany,
+      visitsStruct.idActivity,
+      visitsStruct.idHeadquarter,
+      visitsStruct.idProduct,
+      0, // Id_bulk — no existe en VisitsStruct
+      visitsStruct.idUser,
+      visitsStruct.idDevice,
+      visitsStruct.idStatus,
+      visitsStruct.createdAt?.toIso8601String() ??
+          DateTime.now().toIso8601String(),
+      0,   // Battery
+      0.0, // Latitude
+      0.0, // Longitude
+      0.0, // Altitude
+      0.0, // Error_horizontal
+      0,   // Status
+    ]);
 
-  // Preparar los datos del visit
-  Map<String, dynamic> visitData = {
-    'createdAt': visitsStruct.createdAt?.toIso8601String() ??
-        DateTime.now().toIso8601String(),
-    'idStatus': visitsStruct.idStatus,
-    'idCompany': visitsStruct.idCompany,
-    'idActivity': visitsStruct.idActivity,
-    'idHeadquarter': visitsStruct.idHeadquarter,
-    'idProduct': visitsStruct.idProduct,
-    'idUser': visitsStruct.idUser,
-    'idDevice': visitsStruct.idDevice,
-    'locationDefault': visitsStruct.locationDefault,
-  };
+    debugPrint('updateVisitSQLite: Visit insertada con ID $generatedId');
 
-  // Insertar visit y obtener el ID generado
-  // Insertar visit usando rawInsert
-  int generatedId = await db.rawInsert('''
-    INSERT OR REPLACE INTO Visit (
-      createdAt, idStatus, idCompany, idActivity,
-      idHeadquarter, idProduct, idUser, idDevice,
-      locationDefault
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-  ''', [
-    visitData['createdAt'],
-    visitData['idStatus'],
-    visitData['idCompany'],
-    visitData['idActivity'],
-    visitData['idHeadquarter'],
-    visitData['idProduct'],
-    visitData['idUser'],
-    visitData['idDevice'],
-    visitData['locationDefault'],
-  ]);
-
-  debugPrint('Visit insertado con ID autogenerado: $generatedId');
-
-  // 2. INSERTAR VISIT DETAILS SI EXISTEN
-  if (visitsStruct.visitsDetails.isNotEmpty) {
-    for (VisitsDetailsStruct detail in visitsStruct.visitsDetails) {
+    for (final detail in visitsStruct.visitsDetails) {
       await db.rawInsert('''
-        INSERT OR REPLACE INTO VisitDetail (
-          idVisit, idActivityStatus, statusOption, statusResponse,
-          idStepParent, rememberStatus, defaultStatus
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO Visits_details (
+          Id_visit, Id_activity_status, Status_option, Status_response
+        ) VALUES (?, ?, ?, ?)
       ''', [
-        generatedId, // Usar el idVisit del struct principal
+        generatedId,
         detail.idActivityStatus,
-        detail.statusOption.trim() ?? '',
-        detail.statusResponse.trim() ?? '',
-        detail.idStepParent,
-        detail.rememberStatus,
-        detail.defaultStatus.trim() ?? '',
+        detail.statusOption.trim(),
+        detail.statusResponse.trim(),
       ]);
     }
-    debugPrint(
-        '${visitsStruct.visitsDetails.length} VisitDetails insertados para idVisit: ${visitsStruct.idVisit}');
-  }
-
-  // Procesar locationsAdd si existe
-  if (visitsStruct.locationsAdd.isNotEmpty) {
-    String dateHour = visitsStruct.createdAt?.toIso8601String() ??
-        DateTime.now().toIso8601String();
-
-    for (String locationStr in visitsStruct.locationsAdd) {
-      // Variables con valores por defecto
-      double lat = 0.0;
-      double lon = 0.0;
-      double alt = 0.0;
-      double erh = 0.0;
-
-      // Dividir por punto y coma
-      List<String> parts = locationStr.split(';');
-
-      // Procesar cada parte
-      for (String part in parts) {
-        List<String> keyValue = part.split(':');
-
-        if (keyValue.length == 2) {
-          String key = keyValue[0].trim();
-          String valueStr = keyValue[1].trim();
-
-          switch (key) {
-            case 'LAT':
-              lat = double.tryParse(valueStr) ?? 0.0;
-              break;
-            case 'LON':
-              lon = double.tryParse(valueStr) ?? 0.0;
-              break;
-            case 'ALT':
-              alt = double.tryParse(valueStr) ?? 0.0;
-              break;
-            case 'ERH':
-              erh = double.tryParse(valueStr) ?? 0.0;
-              break;
-          }
-        }
-      }
-
-      // Insertar en VisitLocation
-      await db.rawInsert('''
-        INSERT INTO VisitLocation (
-          idVisit, latitude, longitude, altitude, errorHorizontal, dateHourRead
-        ) VALUES (?, ?, ?, ?, ?, ?)
-      ''', [
-        generatedId, // ID autogenerado del Visit
-        lat,
-        lon,
-        alt,
-        erh,
-        dateHour,
-      ]);
-    }
-
-    debugPrint('${visitsStruct.locationsAdd.length} VisitLocations insertadas');
-  }
+  });
 }

@@ -55,7 +55,7 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
     );
 
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 1.0), // Viene desde abajo
+      begin: const Offset(0, -1.0), // Viene desde arriba
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animationController,
@@ -217,11 +217,11 @@ class _GPSQualityIndicatorState extends State<GPSQualityIndicator>
         }
 
         return Positioned(
-          bottom: 16,
+          top: 16,
           left: 16,
           right: 16,
           child: SafeArea(
-            top: false,
+            bottom: false,
             child: FadeTransition(
               opacity: _fadeAnimation,
               child: SlideTransition(

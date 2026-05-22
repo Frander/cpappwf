@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 // Automatic FlutterFlow imports
 import '/backend/schema/structs/index.dart';
-import '/backend/sqlite/sqlite_manager.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 // Imports other custom actions
 // Imports custom functions
 // Begin custom action code
@@ -81,12 +81,9 @@ Future<bool> syncVisits(
 
     try {
       // 1. CONSULTAR TODOS LOS REGISTROS DE LA TABLA LOCATION_TRACKING
-      final db = SQLiteManager.instance.database;
-
-      // Obtener todos los registros
-      final List<Map<String, dynamic>> geoRecords = await db.query(
-        'Location_tracking',
-        orderBy: 'CreatedAt ASC',
+      final List<Map<String, dynamic>> geoRecords =
+          await globalDb.executeOperation(
+        (db) => db.query('Location_tracking', orderBy: 'CreatedAt ASC'),
       );
 
       // Verificar si hay registros para procesar
@@ -149,7 +146,8 @@ Future<bool> syncVisits(
           debugPrint('Respuesta del servidor: $responseData');
 
           // 5. BORRAR REGISTROS DE LA TABLA SOLO SI SE SUBIÓ EXITOSAMENTE
-          int deletedCount = await db.delete('Location_tracking');
+          int deletedCount = await globalDb.executeOperation(
+              (db) => db.delete('Location_tracking'));
           debugPrint('Eliminados $deletedCount registros de la tabla local');
 
           debugPrint('Archivo temporal eliminado');

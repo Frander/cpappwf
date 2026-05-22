@@ -95,3 +95,47 @@ class GetHeadquarterWeightsRow extends SqliteRow {
 }
 
 /// END GETHEADQUARTERWEIGHTS
+
+/// BEGIN GETUSEROPERADORPERMISSION
+Future<List<GetUserOperadorPermissionRow>> performGetUserOperadorPermission(
+  Database database, {
+  required int userId,
+}) {
+  final query = '''
+SELECT Name_permission
+FROM Users_permissions
+WHERE Id_user = $userId
+  AND Name_permission = 'OPERADOR'
+LIMIT 1
+''';
+  return _readQuery(database, query, (d) => GetUserOperadorPermissionRow(d));
+}
+
+class GetUserOperadorPermissionRow extends SqliteRow {
+  GetUserOperadorPermissionRow(super.data);
+  String get namePermission => data['Name_permission'] as String;
+}
+/// END GETUSEROPERADORPERMISSION
+
+/// BEGIN GETSUPERVISORADMINUSERS
+Future<List<GetSupervisorAdminUsersRow>> performGetSupervisorAdminUsers(
+  Database database,
+) {
+  const query = '''
+SELECT u.Id_user, u.Name_user, u.Oper_id
+FROM Users u
+INNER JOIN Users_permissions up ON u.Id_user = up.Id_user
+WHERE up.Name_permission IN ('SUPERVISOR', 'ADMINISTRADOR')
+  AND u.Oper_id IS NOT NULL
+  AND u.Oper_id != ''
+''';
+  return _readQuery(database, query, (d) => GetSupervisorAdminUsersRow(d));
+}
+
+class GetSupervisorAdminUsersRow extends SqliteRow {
+  GetSupervisorAdminUsersRow(super.data);
+  int get idUser => data['Id_user'] as int;
+  String get nameUser => (data['Name_user'] as String?) ?? '';
+  String get operId => (data['Oper_id'] as String?) ?? '';
+}
+/// END GETSUPERVISORADMINUSERS

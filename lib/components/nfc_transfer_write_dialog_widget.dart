@@ -1,7 +1,9 @@
 import '/flutter_flow/flutter_flow_util.dart';
 import '/custom_code/actions/index.dart' as actions;
+import '/custom_code/platform_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:nfc_manager/nfc_manager.dart';
 
 
 /// Diálogo para escribir en el tag de destino durante una transferencia NFC
@@ -50,6 +52,11 @@ class _NfcTransferWriteDialogWidgetState
 
   @override
   void dispose() {
+    // Abortar cualquier sesión NFC activa para que cerrar el diálogo
+    // (botón X, botón atrás del sistema, etc.) cancele realmente la escritura.
+    if (Platforms.isMobile) {
+      NfcManager.instance.stopSession().catchError((_) {});
+    }
     _pulseController.dispose();
     super.dispose();
   }
@@ -187,7 +194,9 @@ class _NfcTransferWriteDialogWidgetState
                   InkWell(
                     onTap: () {
                       HapticFeedback.lightImpact();
-                      Navigator.pop(context, false);
+                      // Sin resultado: el diálogo se abrió con showDialog<String?>,
+                      // devolver un bool aquí lanzaba un TypeError y el pop fallaba.
+                      Navigator.pop(context);
                     },
                     child: Container(
                       width: 44,

@@ -62,6 +62,14 @@ class SQLiteManager {
         month: month,
       );
 
+  Future<List<GetUserOperadorPermissionRow>> getUserOperadorPermission({
+    required int userId,
+  }) =>
+      performGetUserOperadorPermission(_database, userId: userId);
+
+  Future<List<GetSupervisorAdminUsersRow>> getSupervisorAdminUsers() =>
+      performGetSupervisorAdminUsers(_database);
+
   /// END READ QUERY CALLS
 
   /// START UPDATE QUERY CALLS

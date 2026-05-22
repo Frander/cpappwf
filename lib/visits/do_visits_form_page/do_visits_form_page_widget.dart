@@ -197,6 +197,9 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para FocusNodes de texto (tipo text)
   final Map<int, FocusNode> _textFocusNodes = {};
 
+  // Preferencia de voz de resumen (deshabilitada por defecto)
+  bool _voiceAnnouncementsEnabled = false;
+
   // Map para controladores de búsqueda de usuarios (tipo users-list)
   final Map<int, TextEditingController> _usersSearchControllers = {};
 
@@ -251,6 +254,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       _initializeDateTimeDefaults();
       _preloadUserNamesFromSQLite(); // Pre-cargar nombres de usuarios para el árbol de tags
       _initAdbBridge(); // Inicializar bridge ADB si corresponde
+      await _loadVoicePreference();
     });
   }
 
@@ -986,6 +990,16 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       debugPrint('');
     } catch (e) {
       debugPrint('❌ Error guardando caché: $e');
+    }
+  }
+
+  /// Carga la preferencia de voz desde SharedPreferences
+  Future<void> _loadVoicePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _voiceAnnouncementsEnabled = prefs.getBool('voice_announcements_enabled') ?? false;
+      });
     }
   }
 
@@ -6019,6 +6033,169 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     setState(() {});
   }
 
+  void _showOtrasOpcionesMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setSheet) {
+            return Container(
+              decoration: const BoxDecoration(
+                color: Color(0xFF1C2139),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white24,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'OTRAS OPCIONES',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white54,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // Opción: Escanear QR
+                  InkWell(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      triggerQrSaveFlow();
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.qr_code_scanner_rounded, color: Color(0xFF0EA5E9), size: 22),
+                          SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Guardar con QR',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Escanear código QR para registrar la visita',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 12,
+                                    color: Colors.white38,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded, color: Colors.white24, size: 20),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  // Opción: Voz de resumen (toggle)
+                  InkWell(
+                    onTap: () async {
+                      final newValue = !_voiceAnnouncementsEnabled;
+                      setState(() => _voiceAnnouncementsEnabled = newValue);
+                      setSheet(() {});
+                      final prefs = await SharedPreferences.getInstance();
+                      await prefs.setBool('voice_announcements_enabled', newValue);
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white12),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            _voiceAnnouncementsEnabled
+                                ? Icons.volume_up_rounded
+                                : Icons.volume_off_rounded,
+                            color: _voiceAnnouncementsEnabled
+                                ? const Color(0xFF00a86b)
+                                : Colors.white38,
+                            size: 22,
+                          ),
+                          const SizedBox(width: 14),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Voz de resumen',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'Anuncia en voz alta al guardar una visita',
+                                  style: TextStyle(
+                                    fontFamily: 'Roboto',
+                                    fontSize: 12,
+                                    color: Colors.white38,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _voiceAnnouncementsEnabled,
+                            onChanged: null,
+                            activeColor: const Color(0xFF00a86b),
+                            inactiveThumbColor: Colors.white38,
+                            inactiveTrackColor: Colors.white12,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _buildNavigationButtons() {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -6239,6 +6416,33 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   ],
                 ),
               ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // ═══════════════════════════════════════════════════════════════════
+          // BOTÓN OTRAS OPCIONES - QR, voz y más
+          // ═══════════════════════════════════════════════════════════════════
+          InkWell(
+            onTap: _showOtrasOpcionesMenu,
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              height: 50,
+              width: 54,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2D3250),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: Colors.white12),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 8,
+                    color: Colors.black.withValues(alpha: 0.3),
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.more_horiz_rounded, color: Colors.white70, size: 24),
             ),
           ),
         ],
@@ -7041,7 +7245,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       debugPrint('🧹 visitDetails limpiado completamente después de guardar visita NFC');
       debugPrint('✅ Visita NFC completada exitosamente. ID: $visitId');
-      unawaited(actions.announceVisitVoice());
+      if (_voiceAnnouncementsEnabled) unawaited(actions.announceVisitVoice());
       return true;
     } catch (e) {
       debugPrint('❌ Error creando visita NFC: $e');
@@ -7278,7 +7482,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
       debugPrint('🧹 visitDetails limpiado completamente después de guardar visita QR');
       debugPrint('✅ Visita QR completada exitosamente. ID: $visitId');
-      unawaited(actions.announceVisitVoice());
+      if (_voiceAnnouncementsEnabled) unawaited(actions.announceVisitVoice());
       return true;
     } catch (e) {
       debugPrint('❌ Error creando visita QR: $e');
