@@ -136,7 +136,15 @@
       "Bash(powershell -NoProfile -Command \"@\\(Get-Content 'e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\visits\\\\formulario_extractora_form_page\\\\formulario_extractora_form_page_widget.dart'\\).Length\")",
       "PowerShell(flutter analyze lib/visits/formulario_extractora_form_page/formulario_extractora_form_page_widget.dart)",
       "Read(//c/Program Files \\(x86\\)/**)",
-      "Read(//c/Program Files/**)"
+      "Read(//c/Program Files/**)",
+      "Bash(Get-Content \"e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\visits\\\\do_activities_page\\\\do_activities_page_widget.dart\")",
+      "Bash(Measure-Object -Line)",
+      "Bash(Get-ChildItem -Path \"E:\\\\RepositoriosFix\\\\ClickPalmAPI\" -Recurse -Filter \"*.cs\")",
+      "Bash(Select-Object -First 20)",
+      "Bash(Format-List FullName)",
+      "Bash(Get-ChildItem -Path \"e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\custom_code\\\\actions\" -Filter \"*.dart\" -File)",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Sort-Object)"
     ],
     "deny": [],
     "ask": [],

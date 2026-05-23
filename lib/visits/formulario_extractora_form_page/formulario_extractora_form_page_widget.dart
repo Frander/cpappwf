@@ -17,6 +17,7 @@ import 'dart:io';
 import '/custom_code/platform_utils.dart';
 import '/custom_code/actions/adb_nfc_bridge_service.dart';
 import '/custom_code/actions/adb_nfc_client_service.dart';
+import '/custom_code/actions/voronoi_assigner.dart';
 import 'dart:math' as math;
 import '/custom_code/actions/index.dart' as actions;
 import '/flutter_flow/custom_functions.dart' as functions;
@@ -6724,6 +6725,17 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         });
       });
 
+      // Asignación local de Id_virtual_point e Id_product vía caché de Voronoi.
+      // Fire-and-forget: si falla, la visita queda como antes (Id_virtual_point
+      // NULL) y el server la resolverá al sincronizar.
+      unawaited(VoronoiAssigner().assignToVisit(
+        visitId: visitId,
+        latitude: mainLocation.latitude,
+        longitude: mainLocation.longitude,
+        idHeadquarter: idHeadquarter,
+        rfid: nfcTagId,
+      ));
+
       // Actualizar el contador de visitas y limpiar visitDetails completamente
       FFAppState().update(() {
         FFAppState().visitCount = FFAppState().visitCount + 1;
@@ -6934,6 +6946,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         });
       });
 
+      // Asignación local de Id_virtual_point e Id_product vía caché de Voronoi.
+      // En el flujo QR no hay RFID; el assigner intentará nearest-by-coord.
+      unawaited(VoronoiAssigner().assignToVisit(
+        visitId: visitId,
+        latitude: mainLocation.latitude,
+        longitude: mainLocation.longitude,
+        idHeadquarter: idHeadquarter,
+        rfid: null,
+      ));
+
       // Actualizar el contador de visitas y limpiar visitDetails completamente
       FFAppState().update(() {
         FFAppState().visitCount = FFAppState().visitCount + 1;
@@ -7132,6 +7154,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           debugPrint('✅ $insertedDetails detalles de visita insertados');
         });
       });
+
+      // Asignación local de Id_virtual_point e Id_product vía caché de Voronoi.
+      // Fire-and-forget — si falla, la visita queda con los valores que ya
+      // estimó la lógica inline (idProduct/idVirtualPoint arriba) o NULL, y
+      // el server la resolverá al sincronizar.
+      unawaited(VoronoiAssigner().assignToVisit(
+        visitId: visitId,
+        latitude: lat,
+        longitude: lon,
+        idHeadquarter: idHeadquarter,
+        rfid: tagFromRfid.isNotEmpty ? tagFromRfid : null,
+      ));
 
       FFAppState().update(() => FFAppState().visitCount = FFAppState().visitCount + 1);
 

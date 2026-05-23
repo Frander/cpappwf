@@ -41,10 +41,19 @@ Future<bool> loadAppStateFromSqlite(BuildContext context) async {
 
     await db.close();
 
+    final hqCount = FFAppState().headquartersList.length;
     debugPrint('✅ [LoadSQLite] Datos cargados exitosamente:');
-    debugPrint('   📍 headquarters: ${FFAppState().headquartersList.length}');
+    debugPrint('   📍 headquarters: $hqCount');
     debugPrint('   👥 users:        ${FFAppState().usersList.length}');
     debugPrint('   📋 activitiesJSON: ${FFAppState().activitiesJSON != null ? "OK" : "vacío"}');
+
+    // Si tras la carga el AppState sigue sin lotes (ni SQLite ni la copia
+    // persistida en prefs tenían datos), devolver false para que StartPage
+    // limpie lastSyncBase y dispare el flujo de re-sync completo.
+    if (hqCount == 0) {
+      debugPrint('⚠️ [LoadSQLite] headquartersList vacío tras la carga → forzando re-sync');
+      return false;
+    }
     return true;
 
   } catch (e, st) {
@@ -82,8 +91,17 @@ Future<void> _lsLoadHeadquarters(Database db) async {
       polygon:            r['Polygon'] as String?,
     )).toList();
 
-    FFAppState().headquartersList = list;
-    debugPrint('   ✅ [LoadSQLite] ${list.length} lotes cargados');
+    // Sólo sobrescribir cuando SQLite trae datos. El setter de
+    // FFAppState().headquartersList también persiste a SharedPreferences,
+    // así que pasarle [] borraría la copia hidratada en el constructor
+    // del AppState (la "persistencia entre sesiones").
+    if (list.isNotEmpty) {
+      FFAppState().headquartersList = list;
+      debugPrint('   ✅ [LoadSQLite] ${list.length} lotes cargados');
+    } else {
+      final preserved = FFAppState().headquartersList.length;
+      debugPrint('   ⚠️ [LoadSQLite] Headquarters vacío en SQLite — se conserva la lista persistida en AppState ($preserved lotes)');
+    }
   } catch (e) {
     debugPrint('   ⚠️ [LoadSQLite] Error cargando headquarters: $e');
   }

@@ -24,6 +24,7 @@ import '/custom_code/actions/background_location_service.dart'
         gpsServiceRequestedByUser;
 import '/custom_code/actions/enriched_geo_buffer.dart';
 import '/custom_code/actions/get_location_list.dart' show depurarGeolocalizaciones;
+import '/custom_code/actions/voronoi_cache.dart';
 import '/backend/schema/structs/index.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 import '/components/gps_quality_indicator_widget.dart';
@@ -196,6 +197,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       _setupGlobalGpsListeners();
       _startSqlitePersistTimer();
     }
+
+    // Warm-up del caché de Voronoi para los lotes seleccionados — precomputa
+    // celdas en isolate y las persiste en SharedPreferences para que el
+    // asignador local (post-INSERT de visita) pueda resolver Id_virtual_point
+    // sin tocar la red. No-op si no hay lotes seleccionados.
+    unawaited(VoronoiCache().warmUpForSelectedLots());
   }
 
   @override

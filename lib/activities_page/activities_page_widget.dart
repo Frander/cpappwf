@@ -234,6 +234,7 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
   // Estado local para actividades cargadas desde SQLite
   List<ActivitiesStruct> _allActivities = [];
   bool _isLoading = true;
+  final Map<String, bool> _groupExpanded = {};
 
   @override
   void initState() {
@@ -271,15 +272,19 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
             Tracking_headquarter as tracking_headquarter
           FROM Activities
           WHERE Module_activity = ?
-          ORDER BY Name_activity ASC
+          ORDER BY Group_activity ASC, Name_activity ASC
         ''', [FFAppState().moduleSelected]);
       });
 
       if (mounted) {
+        final structs = activities.map((map) => ActivitiesStruct.fromMap(map)).toList();
+        // Inicializar todos los grupos como expandidos
+        for (final a in structs) {
+          final key = a.groupActivity.isNotEmpty ? a.groupActivity : 'Sin grupo';
+          _groupExpanded.putIfAbsent(key, () => true);
+        }
         setState(() {
-          _allActivities = activities
-              .map((map) => ActivitiesStruct.fromMap(map))
-              .toList();
+          _allActivities = structs;
           _isLoading = false;
         });
       }
@@ -311,6 +316,13 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
             final activityName = activity.nameActivity.toLowerCase();
             return activityName.contains(searchQuery);
           }).toList();
+
+    // Agrupar por Group_activity para el árbol
+    final groupedActivities = <String, List<ActivitiesStruct>>{};
+    for (final act in filteredActivities) {
+      final key = act.groupActivity.isNotEmpty ? act.groupActivity : 'Sin grupo';
+      groupedActivities.putIfAbsent(key, () => []).add(act);
+    }
 
     return GestureDetector(
       onTap: () {
@@ -665,24 +677,116 @@ class _ActivitiesPageWidgetState extends State<ActivitiesPageWidget> {
                                 ],
                               ),
                             )
-                          : ListView.separated(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                              shrinkWrap: true,
-                              scrollDirection: Axis.vertical,
-                              itemCount: filteredActivities.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) {
-                                final activityItem = filteredActivities[index];
-                                return _buildActivityCard(
+                          : ListView.builder(
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                              itemCount: groupedActivities.length,
+                              itemBuilder: (context, i) {
+                                final groupName = groupedActivities.keys.elementAt(i);
+                                final groupItems = groupedActivities[groupName]!;
+                                return _buildGroupTile(
                                   context,
-                                  activityItem: activityItem,
-                                  index: index,
+                                  groupName: groupName,
+                                  activities: groupItems,
                                 );
                               },
                             ),
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroupTile(
+    BuildContext context, {
+    required String groupName,
+    required List<ActivitiesStruct> activities,
+  }) {
+    final isExpanded = _groupExpanded[groupName] ?? true;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withValues(alpha: 0.12),
+            Colors.white.withValues(alpha: 0.04),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: const Color(0xFF00a86b).withValues(alpha: 0.45),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 18,
+            color: const Color(0xFF00a86b).withValues(alpha: 0.18),
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+          ),
+          child: ExpansionTile(
+            initiallyExpanded: isExpanded,
+            onExpansionChanged: (v) => setState(() => _groupExpanded[groupName] = v),
+            tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+            childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            iconColor: const Color(0xFF00ff9f),
+            collapsedIconColor: const Color(0xFF00a86b),
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00a86b), Color(0xFF003420)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 8,
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.folder_open_rounded, color: Colors.white, size: 22),
+            ),
+            title: Text(
+              groupName,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                letterSpacing: 0.4,
+              ),
+            ),
+            subtitle: Text(
+              '${activities.length} actividad${activities.length != 1 ? "es" : ""}',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: const Color(0xFF00ff9f).withValues(alpha: 0.7),
+              ),
+            ),
+            children: activities.asMap().entries.map((entry) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _buildActivityCard(context, activityItem: entry.value, index: entry.key),
+              );
+            }).toList(),
           ),
         ),
       ),

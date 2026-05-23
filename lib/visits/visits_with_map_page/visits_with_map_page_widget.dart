@@ -448,7 +448,7 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget> {
     return InkWell(
       onTap: () {
         HapticFeedback.mediumImpact();
-        _showExitConfirmationDialog(onConfirm: _showOtrasOpcionesDialog);
+        _showOtrasOpcionesDialog();
       },
       borderRadius: BorderRadius.circular(10),
       child: Container(
@@ -481,134 +481,218 @@ class _VisitsWithMapPageWidgetState extends State<VisitsWithMapPageWidget> {
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.7),
       builder: (dialogContext) {
-        return Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: Container(
-            width: 280,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: const Color(0xFF00a86b).withValues(alpha: 0.3),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  spreadRadius: 5,
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'OPCIONES',
-                  style: TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                    letterSpacing: 1.5,
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            final voiceEnabled =
+                _formKey.currentState?.voiceAnnouncementsEnabled ?? false;
+
+            return Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Container(
+                width: 280,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
                   ),
-                ),
-                const SizedBox(height: 20),
-                _buildOpcionItem(
-                  'Brújula',
-                  Icons.compass_calibration_rounded,
-                  const Color(0xFF00a86b),
-                  'Ver brújula de orientación',
-                  () {
-                    Navigator.pop(dialogContext);
-                    _openBrujelaOverlay();
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildOpcionItem(
-                  'Mapa',
-                  Icons.map_rounded,
-                  const Color(0xFF2196F3),
-                  'Ver mapa de visitas',
-                  () {
-                    Navigator.pop(dialogContext);
-                    _openMapaOverlay();
-                  },
-                ),
-                const SizedBox(height: 10),
-                _buildOpcionItem(
-                  'QR',
-                  Icons.qr_code_scanner_rounded,
-                  const Color(0xFF9C27B0),
-                  'Escanear código QR',
-                  () async {
-                    Navigator.pop(dialogContext);
-                    if (!FFAppState().activitySelected.isSync) {
-                      if (!mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: const Row(
-                            children: [
-                              Icon(Icons.sync_disabled_rounded, color: Colors.white),
-                              SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'La actividad no está sincronizada. No se puede registrar la visita.',
-                                  style: TextStyle(
-                                    fontFamily: 'Roboto',
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          duration: const Duration(seconds: 3),
-                          backgroundColor: Colors.orange,
-                          behavior: SnackBarBehavior.floating,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          margin: const EdgeInsets.all(16),
-                        ),
-                      );
-                      return;
-                    }
-                    await _formKey.currentState?.triggerQrSaveFlow();
-                  },
-                ),
-                const SizedBox(height: 16),
-                InkWell(
-                  onTap: () => Navigator.pop(dialogContext),
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    width: double.infinity,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.3),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 20,
+                      spreadRadius: 5,
                     ),
-                    child: const Center(
-                      child: Text(
-                        'Cancelar',
-                        style: TextStyle(
-                          fontFamily: 'Roboto',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white70,
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'OTRAS OPCIONES',
+                      style: TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildOpcionItem(
+                      'Brújula',
+                      Icons.compass_calibration_rounded,
+                      const Color(0xFF00a86b),
+                      'Ver brújula de orientación',
+                      () {
+                        Navigator.pop(dialogContext);
+                        _openBrujelaOverlay();
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _buildOpcionItem(
+                      'Mapa',
+                      Icons.map_rounded,
+                      const Color(0xFF2196F3),
+                      'Ver mapa de visitas',
+                      () {
+                        Navigator.pop(dialogContext);
+                        _openMapaOverlay();
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    _buildOpcionItem(
+                      'QR',
+                      Icons.qr_code_scanner_rounded,
+                      const Color(0xFF9C27B0),
+                      'Escanear código QR',
+                      () async {
+                        Navigator.pop(dialogContext);
+                        if (!FFAppState().activitySelected.isSync) {
+                          if (!mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: const Row(
+                                children: [
+                                  Icon(Icons.sync_disabled_rounded, color: Colors.white),
+                                  SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      'La actividad no está sincronizada. No se puede registrar la visita.',
+                                      style: TextStyle(
+                                        fontFamily: 'Roboto',
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              duration: const Duration(seconds: 3),
+                              backgroundColor: Colors.orange,
+                              behavior: SnackBarBehavior.floating,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              margin: const EdgeInsets.all(16),
+                            ),
+                          );
+                          return;
+                        }
+                        await _formKey.currentState?.triggerQrSaveFlow();
+                      },
+                    ),
+                    const SizedBox(height: 10),
+                    // Voz de resumen (toggle)
+                    InkWell(
+                      onTap: () async {
+                        await _formKey.currentState?.toggleVoiceAnnouncements();
+                        setDialogState(() {});
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.1),
+                            width: 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: (voiceEnabled
+                                        ? const Color(0xFF00a86b)
+                                        : Colors.white38)
+                                    .withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(
+                                voiceEnabled
+                                    ? Icons.volume_up_rounded
+                                    : Icons.volume_off_rounded,
+                                color: voiceEnabled
+                                    ? const Color(0xFF00a86b)
+                                    : Colors.white38,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Voz de resumen',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  Text(
+                                    'Anuncia en voz alta al guardar una visita',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 11,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: voiceEnabled,
+                              onChanged: null,
+                              activeColor: const Color(0xFF00a86b),
+                              inactiveThumbColor: Colors.white38,
+                              inactiveTrackColor: Colors.white12,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 16),
+                    InkWell(
+                      onTap: () => Navigator.pop(dialogContext),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: double.infinity,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Center(
+                          child: Text(
+                            'Cancelar',
+                            style: TextStyle(
+                              fontFamily: 'Roboto',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );

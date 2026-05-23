@@ -76,202 +76,12 @@ class _DoActivitiesPageWidgetState extends State<DoActivitiesPageWidget>
   }
 
   Future<bool> _showSupervisorCodeDialog() async {
-    final codeController = TextEditingController();
-    bool authorized = false;
-
-    await showDialog<void>(
+    final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (dialogContext) {
-        String? errorText;
-        bool isChecking = false;
-        return StatefulBuilder(
-          builder: (ctx, setDialogState) {
-            return Dialog(
-              elevation: 0,
-              insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-              backgroundColor: Colors.transparent,
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1B3A2D), Color(0xFF0D1F17)],
-                  ),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFF00a86b), width: 1),
-                ),
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF00a86b).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.lock_outline,
-                          color: Color(0xFF00ff9f), size: 28),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Acceso Restringido',
-                      style: TextStyle(
-                        color: Color(0xFF00ff9f),
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Ingrese el código de un Supervisor o Administrador para continuar',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.7),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: codeController,
-                      obscureText: true,
-                      keyboardType: TextInputType.visiblePassword,
-                      textAlign: TextAlign.center,
-                      autofocus: true,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        letterSpacing: 4,
-                      ),
-                      decoration: InputDecoration(
-                        hintText: '••••••••',
-                        hintStyle: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.3),
-                          letterSpacing: 4,
-                        ),
-                        errorText: errorText,
-                        filled: true,
-                        fillColor: Colors.white.withValues(alpha: 0.08),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide:
-                              const BorderSide(color: Color(0xFF00a86b)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color:
-                                const Color(0xFF00a86b).withValues(alpha: 0.4),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                              color: Color(0xFF00ff9f), width: 1.5),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton(
-                            onPressed: isChecking
-                                ? null
-                                : () => Navigator.of(dialogContext).pop(),
-                            style: TextButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                    vertical: 12)),
-                            child: Text('Cancelar',
-                                style: TextStyle(
-                                    color:
-                                        Colors.white.withValues(alpha: 0.5))),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: isChecking
-                                ? null
-                                : () async {
-                                    final code = codeController.text.trim();
-                                    if (code.isEmpty) {
-                                      setDialogState(() =>
-                                          errorText = 'Ingrese un código');
-                                      return;
-                                    }
-                                    setDialogState(() => isChecking = true);
-                                    List<Map<String, dynamic>> supervisors = [];
-                                    try {
-                                      supervisors = await globalDb
-                                          .executeOperation((db) => db.rawQuery(
-                                        '''SELECT u.Id_user, u.Name_user, u.Oper_id
-FROM Users u
-INNER JOIN Users_permissions up ON u.Id_user = up.Id_user
-WHERE up.Name_permission IN ('SUPERVISOR', 'ADMINISTRADOR')
-  AND u.Oper_id IS NOT NULL
-  AND u.Oper_id != ''
-''',
-                                      ));
-                                    } catch (_) {}
-                                    if (supervisors.isEmpty) {
-                                      setDialogState(() {
-                                        isChecking = false;
-                                        errorText =
-                                            'No hay supervisores configurados';
-                                      });
-                                      return;
-                                    }
-                                    final match = supervisors
-                                        .any((u) => u['Oper_id'] == code);
-                                    if (match) {
-                                      authorized = true;
-                                      Navigator.of(dialogContext).pop();
-                                    } else {
-                                      codeController.clear();
-                                      setDialogState(() {
-                                        isChecking = false;
-                                        errorText = 'Código incorrecto';
-                                      });
-                                    }
-                                  },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF00a86b),
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            child: isChecking
-                                ? const SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                : const Text('Confirmar',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+      builder: (_) => const _SupervisorCodeDialog(),
     );
-
-    codeController.dispose();
-    return authorized;
+    return result == true;
   }
 
   @override
@@ -499,6 +309,35 @@ LIMIT 1''',
                               FFAppState().activitySelected.hasNameActivity(),
                           onTap: () async {
                             HapticFeedback.vibrate();
+
+                            final currentUser = FFAppState().userSelected;
+                            bool requiresCode;
+
+                            if (currentUser.nameUser.isEmpty) {
+                              requiresCode = true;
+                            } else {
+                              try {
+                                final rows = await globalDb.executeOperation(
+                                    (db) => db.rawQuery(
+                                  '''SELECT Name_permission FROM Users_permissions
+WHERE Id_user = ${currentUser.idUser}
+  AND Name_permission = 'OPERADOR'
+LIMIT 1''',
+                                ));
+                                requiresCode = rows.isNotEmpty;
+                              } catch (_) {
+                                requiresCode = true;
+                              }
+                            }
+
+                            if (requiresCode) {
+                              if (!context.mounted) return;
+                              final authorized =
+                                  await _showSupervisorCodeDialog();
+                              if (!authorized) return;
+                            }
+
+                            if (!context.mounted) return;
                             context.pushNamed(
                               ActivitiesPageWidget.routeName,
                               extra: <String, dynamic>{
@@ -1306,6 +1145,201 @@ LIMIT 1''',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SupervisorCodeDialog extends StatefulWidget {
+  const _SupervisorCodeDialog();
+
+  @override
+  State<_SupervisorCodeDialog> createState() => _SupervisorCodeDialogState();
+}
+
+class _SupervisorCodeDialogState extends State<_SupervisorCodeDialog> {
+  final TextEditingController _codeController = TextEditingController();
+  String? _errorText;
+  bool _isChecking = false;
+
+  @override
+  void dispose() {
+    _codeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _confirm() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      setState(() => _errorText = 'Ingrese un código');
+      return;
+    }
+    setState(() => _isChecking = true);
+
+    List<Map<String, dynamic>> supervisors = [];
+    try {
+      supervisors = await globalDb.executeOperation((db) => db.rawQuery(
+        '''SELECT u.Oper_id
+FROM Users u
+INNER JOIN Users_permissions up ON u.Id_user = up.Id_user
+WHERE up.Name_permission IN ('SUPERVISOR', 'ADMINISTRADOR')
+  AND u.Oper_id IS NOT NULL
+  AND u.Oper_id != ''
+''',
+      ));
+    } catch (_) {}
+
+    if (!mounted) return;
+
+    if (supervisors.isEmpty) {
+      setState(() {
+        _isChecking = false;
+        _errorText = 'No hay supervisores configurados';
+      });
+      return;
+    }
+
+    if (supervisors.any((u) => u['Oper_id'] == code)) {
+      Navigator.of(context).pop(true);
+    } else {
+      _codeController.clear();
+      setState(() {
+        _isChecking = false;
+        _errorText = 'Código incorrecto';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      elevation: 0,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1B3A2D), Color(0xFF0D1F17)],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF00a86b), width: 1),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: const Color(0xFF00a86b).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.lock_outline,
+                  color: Color(0xFF00ff9f), size: 28),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Acceso Restringido',
+              style: TextStyle(
+                color: Color(0xFF00ff9f),
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Ingrese el código de un Supervisor o Administrador para continuar',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: _codeController,
+              obscureText: true,
+              keyboardType: TextInputType.visiblePassword,
+              textAlign: TextAlign.center,
+              autofocus: true,
+              onSubmitted: _isChecking ? null : (_) => _confirm(),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                letterSpacing: 4,
+              ),
+              decoration: InputDecoration(
+                hintText: '••••••••',
+                hintStyle: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.3),
+                  letterSpacing: 4,
+                ),
+                errorText: _errorText,
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.08),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0xFF00a86b)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: const Color(0xFF00a86b).withValues(alpha: 0.4),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: Color(0xFF00ff9f), width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: TextButton(
+                    onPressed:
+                        _isChecking ? null : () => Navigator.of(context).pop(false),
+                    style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12)),
+                    child: Text('Cancelar',
+                        style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5))),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isChecking ? null : _confirm,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00a86b),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: _isChecking
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Confirmar',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

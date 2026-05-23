@@ -1230,8 +1230,18 @@ Future<void> _sbLoadHeadquartersToAppState(Database db) async {
       areaHeadquarter:     r['Area_headquarter'] != null ? (r['Area_headquarter'] as num).toDouble() : null,
       polygon:             r['Polygon'] as String?,
     )).toList();
-    FFAppState().headquartersList = list;
-    debugPrint('✅ [SyncBase] headquartersList → ${list.length} lotes cargados');
+
+    // Sólo sobrescribir cuando SQLite trae datos. El setter de
+    // FFAppState().headquartersList también persiste a SharedPreferences,
+    // así que pasarle [] borraría la copia hidratada en el constructor
+    // del AppState (la "persistencia entre sesiones").
+    if (list.isNotEmpty) {
+      FFAppState().headquartersList = list;
+      debugPrint('✅ [SyncBase] headquartersList → ${list.length} lotes cargados');
+    } else {
+      final preserved = FFAppState().headquartersList.length;
+      debugPrint('⚠️ [SyncBase] Headquarters vacío tras el sync — se conserva la lista persistida en AppState ($preserved lotes)');
+    }
   } catch (e) {
     debugPrint('⚠️ [SyncBase] Error cargando headquarters al AppState: $e');
   }
