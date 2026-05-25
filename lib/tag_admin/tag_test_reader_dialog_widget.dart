@@ -381,16 +381,22 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
       groupedByHeadquarter[heId]!.add(record);
     }
 
+    // Calcular totales generales
+    int grandTotalVisits = 0;
+    for (var record in tagData) {
+      grandTotalVisits += (record['visits'] as int?) ?? 0;
+    }
+
     return Container(
       constraints: const BoxConstraints(maxHeight: 500),
       child: SingleChildScrollView(
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B4332), // Verde oscuro
+            color: const Color(0xFF1B3A4B), // Azul oscuro como tag-transfer
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.2),
+              color: const Color(0xFF2196F3).withValues(alpha: 0.3),
               width: 1,
             ),
           ),
@@ -400,13 +406,13 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
               Row(
                 children: [
                   const Icon(
-                    Icons.summarize_rounded,
-                    color: Colors.white,
+                    Icons.swap_horiz_rounded,
+                    color: Color(0xFF64B5F6),
                     size: 18,
                   ),
                   const SizedBox(width: 6),
                   const Text(
-                    'Resumen del TAG',
+                    'Contenido del TAG',
                     style: TextStyle(fontFamily: 'Roboto',
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
@@ -417,11 +423,11 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF3B82F6),
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      '${tagData.length} ${tagData.length == 1 ? 'registro' : 'registros'}',
+                      '$grandTotalVisits visita${grandTotalVisits != 1 ? "s" : ""}',
                       style: const TextStyle(fontFamily: 'Roboto',
                         fontSize: 11,
                         fontWeight: FontWeight.bold,
@@ -466,8 +472,6 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
       final operatorId = record['operatorId'] as String? ?? 'N/A';
 
       if (!operatorGroups.containsKey(operatorId)) {
-        // Buscar nombre del operador en usersList
-        // operatorId contiene el idUser (identificador numérico del usuario)
         String operatorName = 'Operador';
         try {
           final idUserFromTag = int.tryParse(operatorId);
@@ -504,21 +508,18 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     }
 
     // Calcular totales del lote
-    int totalVisits = 0;
     int totalResults = 0;
     for (var operatorGroup in operatorGroups.values) {
-      totalVisits += (operatorGroup['totalVisits'] as int?) ?? 0;
       totalResults += (operatorGroup['totalResults'] as int?) ?? 0;
     }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color:
-            const Color(0xFF2D6A4F).withValues(alpha: 0.3), // Verde medio con transparencia
+        color: const Color(0xFF2196F3).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.2),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -536,7 +537,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: Colors.white,
+                    color: const Color(0xFF64B5F6),
                     size: 32,
                     weight: 700,
                   ),
@@ -545,22 +546,69 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          loteName,
-                          style: const TextStyle(fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Lote: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF74C69D),
+                                ),
+                              ),
+                              TextSpan(
+                                text: loteName,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white.withValues(alpha: 0.85),
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$_unityLabel: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -568,7 +616,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.2),
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.3),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
@@ -586,7 +634,8 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
           ),
           if (isExpanded)
             Container(
-              padding: const EdgeInsets.only(left: 16, right: 10, bottom: 10, top: 10),
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 10),
               child: Column(
                 children: operatorGroups.entries.map((entry) {
                   final operatorId = entry.key;
@@ -615,10 +664,10 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFF2D6A4F).withValues(alpha: 0.3),
+        color: const Color(0xFF1565C0).withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: const Color(0xFF52B788).withValues(alpha: 0.4),
+          color: const Color(0xFF2196F3).withValues(alpha: 0.4),
           width: 1,
         ),
       ),
@@ -636,35 +685,86 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                 children: [
                   Icon(
                     isExpanded ? Icons.expand_more : Icons.chevron_right,
-                    color: const Color(0xFF74C69D),
+                    color: const Color(0xFF64B5F6),
                     size: 24,
                   ),
                   const SizedBox(width: 8),
-                  const Icon(
-                    Icons.person_outline_rounded,
-                    color: Color(0xFF74C69D),
-                    size: 18,
-                  ),
-                  const SizedBox(width: 6),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          operatorName,
-                          style: const TextStyle(fontFamily: 'Roboto',
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Operador: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64B5F6),
+                                ),
+                              ),
+                              TextSpan(
+                                text: operatorName.toUpperCase(),
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '$totalVisits visitas • $totalResults ${_unityLabel.toLowerCase()}',
-                          style: TextStyle(fontFamily: 'Roboto',
-                            fontSize: 11,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$_unityLabel: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.6),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white.withValues(alpha: 0.9),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$totalVisits visita${totalVisits != 1 ? "s" : ""}',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 11,
+                                color: Colors.white.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
@@ -674,7 +774,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     style: const TextStyle(fontFamily: 'Roboto',
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF74C69D),
+                      color: Color(0xFF64B5F6),
                     ),
                   ),
                 ],
@@ -701,10 +801,10 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1B4332).withValues(alpha: 0.4),
+                      color: const Color(0xFF1B3A4B).withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(6),
                       border: Border.all(
-                        color: const Color(0xFF74C69D).withValues(alpha: 0.2),
+                        color: const Color(0xFF2196F3).withValues(alpha: 0.2),
                         width: 1,
                       ),
                     ),
@@ -712,7 +812,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                       children: [
                         const Icon(
                           Icons.access_time_rounded,
-                          color: Color(0xFF95D5B2),
+                          color: Color(0xFF64B5F6),
                           size: 14,
                         ),
                         const SizedBox(width: 6),
@@ -730,7 +830,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                           style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF95D5B2),
+                            color: Color(0xFF64B5F6),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -739,7 +839,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                           style: const TextStyle(fontFamily: 'Roboto',
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF95D5B2),
+                            color: Color(0xFF64B5F6),
                           ),
                         ),
                       ],
