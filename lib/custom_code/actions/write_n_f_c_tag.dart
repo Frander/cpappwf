@@ -250,28 +250,72 @@ Future<bool> writeNFCTag(
           // Si dataToWrite ya es un JSON completo válido (tag-transfer),
           // inyectar tag_from (RFID origen ya viene en el JSON), tag_to y US
           if (isNewJsonFormat(dataToWrite)) {
-            debugPrint('🔄 TAG-TRANSFER: JSON completo detectado, inyectando tag_to y US');
+            debugPrint('🔄 TAG-TRANSFER: JSON detectado, inyectando tag_to y fusionando con destino');
             try {
               final transferJson = parseNfcJson(dataToWrite);
               if (transferJson != null) {
                 final readInfo = transferJson['Read_info'] as Map<String, dynamic>?;
                 if (readInfo != null) {
-                  // tag_from ya viene del JSON (RFID del tag origen)
-                  // tag_to = RFID del tag destino (el tag físico actual)
                   readInfo['tag_to'] = tagRfid;
                   readInfo['US'] = FFAppState().userSelected.idUser;
-                  // Si tag_from no fue seteado aún, usar el RFID guardado en Read_info.RFID
                   if ((readInfo['tag_from'] as String? ?? '').isEmpty) {
                     readInfo['tag_from'] = readInfo['RFID'] ?? '';
                   }
                 }
-                finalContent = nfcJsonToString(transferJson);
                 debugPrint('   tag_from=${readInfo?["tag_from"]}, tag_to=$tagRfid, US=${FFAppState().userSelected.idUser}');
+
+                // Fusionar con el contenido existente del tag de destino (misma sesión NFC)
+                if (existingContent.isNotEmpty) {
+                  try {
+                    final destDecoded = jsonDecode(existingContent);
+                    if (destDecoded is List) {
+                      finalContent = jsonEncode([...destDecoded, transferJson]);
+                      debugPrint('✅ TAG-TRANSFER: Array extendido a ${destDecoded.length + 1} elementos');
+                    } else if (destDecoded is Map) {
+                      finalContent = jsonEncode([destDecoded, transferJson]);
+                      debugPrint('✅ TAG-TRANSFER: Array de 2 elementos creado');
+                    } else {
+                      finalContent = nfcJsonToString(transferJson);
+                    }
+                  } catch (_) {
+                    finalContent = nfcJsonToString(transferJson);
+                  }
+                } else {
+                  finalContent = nfcJsonToString(transferJson);
+                  debugPrint('✅ TAG-TRANSFER: Primer elemento, tag destino vacío');
+                }
+
+                // Exponer el contenido escrito para que _startWriting() lo recupere
+                FFAppState().update(() { FFAppState().nfcRead = finalContent; });
               } else {
                 finalContent = dataToWrite;
               }
             } catch (e) {
-              debugPrint('⚠️ Error inyectando campos en tag-transfer: $e');
+              debugPrint('⚠️ Error en TAG-TRANSFER: $e');
+              finalContent = dataToWrite;
+            }
+          } else if (isJsonArrayFormat(dataToWrite)) {
+            // Array de transferencias (tag-transfer con destino ya ocupado).
+            // Inyectar tag_to y US únicamente en el último elemento (el más reciente).
+            debugPrint('🔄 TAG-TRANSFER array: inyectando tag_to y US en último elemento');
+            try {
+              final arrayData = (jsonDecode(dataToWrite) as List)
+                  .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
+                  .toList();
+              if (arrayData.isNotEmpty) {
+                final readInfo = arrayData.last['Read_info'] as Map<String, dynamic>?;
+                if (readInfo != null) {
+                  readInfo['tag_to'] = tagRfid;
+                  readInfo['US'] = FFAppState().userSelected.idUser;
+                  if ((readInfo['tag_from'] as String? ?? '').isEmpty) {
+                    readInfo['tag_from'] = readInfo['RFID'] ?? '';
+                  }
+                }
+              }
+              finalContent = jsonEncode(arrayData);
+              debugPrint('   ${arrayData.length} elementos, tag_to=$tagRfid inyectado en último');
+            } catch (e) {
+              debugPrint('⚠️ Error procesando array tag-transfer: $e');
               finalContent = dataToWrite;
             }
           } else {

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:math';
 import 'package:geolocator/geolocator.dart';
 import 'package:flutter/foundation.dart';
@@ -98,19 +99,33 @@ void onStart(ServiceInstance service) async {
   // por FFAppState). El isolate de background no tiene acceso directo a
   // FFAppState, por eso lo leemos desde prefs que ya está sincronizado.
   String gpsMode = 'ADVANCED';
+  int minMetersMargin = 0;
   try {
     final prefs = await SharedPreferences.getInstance();
     gpsMode = prefs.getString('ff_gpsMode') ?? 'ADVANCED';
+    final actJson = prefs.getString('ff_currentActivity');
+    if (actJson != null && actJson.isNotEmpty) {
+      final actMap = jsonDecode(actJson) as Map<String, dynamic>?;
+      if (actMap != null) {
+        minMetersMargin = (actMap['Min_meters_margin'] as int?) ?? 0;
+      }
+    }
   } catch (e) {
-    debugPrint('⚠️ No se pudo leer ff_gpsMode: $e — usando ADVANCED por defecto');
+    debugPrint('⚠️ No se pudo leer prefs GPS: $e — usando valores por defecto');
   }
 
-  debugPrint('🎯 Modo GPS activo: $gpsMode');
+  // Umbral efectivo de precisión GPS:
+  // min_meters_margin == 0 (o sin actividad) → 100.0 m (límite interno)
+  // min_meters_margin > 0                    → ese valor exacto en metros
+  final double effectiveAccuracyThreshold =
+      minMetersMargin > 0 ? minMetersMargin.toDouble() : 100.0;
+
+  debugPrint('🎯 Modo GPS activo: $gpsMode | umbral accuracy: ${effectiveAccuracyThreshold}m (min_meters_margin: $minMetersMargin)');
 
   if (gpsMode == 'ADVANCED') {
-    await _startBackgroundLocationTracking(service);
+    await _startBackgroundLocationTracking(service, effectiveAccuracyThreshold);
   } else {
-    await startLiteLocationTracking(service);
+    await startLiteLocationTracking(service, effectiveAccuracyThreshold);
   }
 }
 
@@ -122,7 +137,9 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 }
 
 /// Lógica principal de rastreo de ubicación en segundo plano
-Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
+Future<void> _startBackgroundLocationTracking(
+    ServiceInstance service,
+    double effectiveAccuracyThreshold) async {
   debugPrint('=== Iniciando rastreo de ubicación en segundo plano ===');
 
   // NOTA: Ya no se inserta directamente a SQLite desde el isolate.
@@ -257,6 +274,8 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
     var startTime = DateTime.now(); // var: se reinicia en cada intento de restart
     bool isWarmedUp = false;
     bool isStabilized = false;
+    int consecutiveOverMargin = 0;
+    const int overMarginHysteresis = 3;
 
     int updateCount = 0;
 
@@ -349,9 +368,9 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
       }
 
       // Estabilización con calidad: requiere TIEMPO + CALIDAD de lecturas
-      // No basta con que pase el tiempo; necesitamos lecturas con buena precisión
-      // MEJORA: Si el margen de error es ≤10m, estabilizar INMEDIATAMENTE
-      final bool stabilizedByAccuracy = position.accuracy <= 10.0;
+      // No basta con que pase el tiempo; necesitamos lecturas con buena precisión.
+      // El umbral de accuracy es dinámico según la actividad seleccionada.
+      final bool stabilizedByAccuracy = position.accuracy <= effectiveAccuracyThreshold;
       final bool stabilizedByConditions = elapsed >=
               LocationConfig.warmupSeconds +
                   LocationConfig.stabilizationSeconds &&
@@ -360,17 +379,35 @@ Future<void> _startBackgroundLocationTracking(ServiceInstance service) async {
 
       if (!isStabilized && (stabilizedByAccuracy || stabilizedByConditions)) {
         isStabilized = true;
+        consecutiveOverMargin = 0;
         stabilizationWatchdog?.cancel();
-        final String reason = stabilizedByAccuracy 
-            ? 'margen de error ≤7m (${position.accuracy.toStringAsFixed(1)}m)'
+        final String reason = stabilizedByAccuracy
+            ? 'accuracy ≤${effectiveAccuracyThreshold.toStringAsFixed(0)}m (${position.accuracy.toStringAsFixed(1)}m)'
             : 'después de ${elapsed}s (precisión: ${bestAccuracySeen.toStringAsFixed(1)}m)';
         debugPrint(
             '✅ Servicio estabilizado por $reason '
             '(lecturas válidas: $goodReadingsAfterWarmup, '
             'reinicios: $restartAttempts)');
 
-        // Notificar al hilo principal que el GPS está estabilizado
         service.invoke('gpsStabilized', {'stabilized': true});
+      }
+
+      // Verificación continua: si la accuracy supera el umbral durante N lecturas → desestabilizar.
+      // Aplica siempre (con o sin actividad), umbral mínimo 100 m.
+      if (isStabilized) {
+        if (position.accuracy > effectiveAccuracyThreshold) {
+          consecutiveOverMargin++;
+          if (consecutiveOverMargin >= overMarginHysteresis) {
+            isStabilized = false;
+            consecutiveOverMargin = 0;
+            service.invoke('gpsStabilized', {'stabilized': false});
+            debugPrint(
+                '⚠️ GPS desestabilizado: ${position.accuracy.toStringAsFixed(1)}m '
+                '> umbral ${effectiveAccuracyThreshold}m');
+          }
+        } else {
+          consecutiveOverMargin = 0;
+        }
       }
 
       // Conversión a UTM

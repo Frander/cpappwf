@@ -6,7 +6,7 @@
 
 #define AppName        "ClickPalm Desktop"
 #define AppPublisher   "3lox"
-#define AppVersion     "1.0.1"
+#define AppVersion     "1.0.3"
 #define AppExeName     "click_palm_a_p_p.exe"
 #define BuildDir       "build\windows\x64\runner\Release"
 #define VcRedistExe    "windows\redist\vc_redist.x64.exe"

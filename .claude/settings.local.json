@@ -144,7 +144,9 @@
       "Bash(Format-List FullName)",
       "Bash(Get-ChildItem -Path \"e:\\\\RepositoriosFix\\\\ClickPalmAPP\\\\lib\\\\custom_code\\\\actions\" -Filter \"*.dart\" -File)",
       "Bash(Select-Object -ExpandProperty Name)",
-      "Bash(Sort-Object)"
+      "Bash(Sort-Object)",
+      "Bash(Select-String -Pattern \"version\")",
+      "Bash(Select-String -Pattern \"error|warning|_collectFormVariables|_isHeadquarterWeight|_evaluateHeadquarterWeight|_recalculate\")"
     ],
     "deny": [],
     "ask": [],

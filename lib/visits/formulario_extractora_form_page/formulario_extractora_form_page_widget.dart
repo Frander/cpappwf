@@ -328,7 +328,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       _adbStatusSub = AdbNfcBridgeService.instance.onStatusChanged.listen((status) {
         if (mounted) setState(() => _adbServerStatus = status);
       });
-      _adbTagSub = AdbNfcBridgeService.instance.onTagReceived.listen((payload) {
+      _adbTagSub = AdbNfcBridgeService.instance.onTagReceived.listen((payload) async {
         if (!mounted) {
           debugPrint('🟡 ADB-TAG listener: widget NO mounted, ignorando tag');
           return;
@@ -358,43 +358,52 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             final productName = payload['productName'] as String? ?? '';
             if (tagContent.isEmpty) continue;
 
-            // Cada tag es una tarjeta independiente — sin acumulación ni reemplazo
-            final parsed = _parseNfcTagContent(tagContent);
-            _adbServerCardsData[id] ??= [];
-            _adbServerCardsData[id]!.add(parsed);
-            _adbServerCardsProductName[id] ??= [];
-            _adbServerCardsProductName[id]!.add(productName);
-            _adbServerCardsRawJson[id] ??= [];
-            _adbServerCardsRawJson[id]!.add(tagContent);
-
-            // Registrar timestamp y seleccionar la nueva tarjeta
-            _adbTagTimestamps.add(DateTime.now());
-            final newIndex = _adbTagTimestamps.length - 1;
-            _selectedAdbTagIndex = newIndex;
-
-            // Mostrar en el árbol inline los datos de la tarjeta recién recibida
-            _tagReaderData[id] = parsed;
-            _tagReaderProductName[id] = productName;
-            _tagReaderRawJsons.remove(id);
-            debugPrint(
-                '🟢 ADB-TAG: actualizando caches para statusId=$id — '
-                'parsed.length=${parsed.length} '
-                'rawJsons.length=${_adbServerCardsRawJson[id]?.length ?? 0}');
-
-            // Recolectar IDs para warm-up de cachés (US, OP, HE).
+            // Descomponer array o tratar como elemento único
+            List<String> elements;
             try {
-              final decoded = jsonDecode(tagContent) as Map<String, dynamic>;
-              final us = (decoded['Read_info'] as Map?)?['US'];
-              if (us is int) usIdsToWarm.add(us);
-            } catch (_) {}
-            for (final r in parsed) {
-              final op = (r['operatorId'] as String?) ?? '';
-              if (op.isNotEmpty) opIdsToWarm.add(op);
-              final he = (r['headquarterId'] as int?) ?? 0;
-              if (he > 0) heIdsToWarm.add(he);
+              elements = actions.isJsonArrayFormat(tagContent)
+                  ? (jsonDecode(tagContent) as List)
+                      .map((e) => jsonEncode(e as Object))
+                      .toList()
+                  : [tagContent];
+            } catch (_) {
+              elements = [tagContent];
             }
 
-            // Registrar para recalcular headquarter-weight después del setState
+            for (final elemJson in elements) {
+              final parsed = _parseNfcTagContent(elemJson);
+              _adbServerCardsData[id] ??= [];
+              _adbServerCardsData[id]!.add(parsed);
+              _adbServerCardsProductName[id] ??= [];
+              _adbServerCardsProductName[id]!.add(productName);
+              _adbServerCardsRawJson[id] ??= [];
+              _adbServerCardsRawJson[id]!.add(elemJson);
+
+              _adbTagTimestamps.add(DateTime.now());
+              _selectedAdbTagIndex = _adbTagTimestamps.length - 1;
+
+              _tagReaderData[id] = parsed;
+              _tagReaderProductName[id] = productName;
+              _tagReaderRawJsons.remove(id);
+              debugPrint(
+                  '🟢 ADB-TAG: actualizando caches para statusId=$id — '
+                  'parsed.length=${parsed.length} '
+                  'rawJsons.length=${_adbServerCardsRawJson[id]?.length ?? 0}');
+
+              try {
+                final decoded = jsonDecode(elemJson) as Map<String, dynamic>;
+                final us = (decoded['Read_info'] as Map?)?['US'];
+                if (us is int) usIdsToWarm.add(us);
+              } catch (_) {}
+              for (final r in parsed) {
+                final op = (r['operatorId'] as String?) ?? '';
+                if (op.isNotEmpty) opIdsToWarm.add(op);
+                final he = (r['headquarterId'] as int?) ?? 0;
+                if (he > 0) heIdsToWarm.add(he);
+              }
+            }
+
+            // toRecalc una sola vez por status (no por elemento)
             final sName = getJsonField(s, r'''$.status_name''')?.toString() ?? '';
             toRecalc.add((id: id, name: sName));
           }
@@ -423,21 +432,55 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           _autoCalculateRelatedHeadquarterWeights(entry.id, entry.name);
         }
 
-        // Auto-guardar visita en SQLite al recibir cada tag
+        // Auto-guardar visita en SQLite al recibir cada tag.
+        // Cambio a async para poder awaitar _autoSaveVisitFromAdbTag y enviar
+        // el ACK de vuelta al móvil solo cuando la guarda fue exitosa.
         final tagContent = payload['tagContent'] as String? ?? '';
         if (tagContent.isNotEmpty) {
-          // Mostrar spinner inmediatamente — la guarda y los cálculos demoran
-          // unos segundos, durante los cuales el overlay sigue visible.
+          // Mostrar spinner inmediatamente — la guarda demora unos segundos.
           if (mounted) setState(() => _processingTag = true);
 
-          final allServerStatuses = allStatuses.where((s) =>
-              (getJsonField(s, r'''$.type_status''')?.toString() ?? '').toLowerCase() ==
-              'tag-transfer-adb-server');
-          for (final s in allServerStatuses) {
-            final id = getJsonField(s, r'''$.id_activity_status''') as int?;
-            if (id == null) continue;
-            unawaited(_autoSaveVisitFromAdbTag(id, tagContent));
+          final serverStatusIds = allStatuses
+              .where((s) =>
+                  (getJsonField(s, r'''$.type_status''')?.toString() ?? '')
+                          .toLowerCase() ==
+                      'tag-transfer-adb-server')
+              .map((s) => getJsonField(s, r'''$.id_activity_status''') as int?)
+              .where((id) => id != null)
+              .cast<int>()
+              .toList();
+
+          // Descomponer array o tratar como elemento único
+          List<String> elementsToSave;
+          try {
+            elementsToSave = actions.isJsonArrayFormat(tagContent)
+                ? (jsonDecode(tagContent) as List)
+                    .map((e) => jsonEncode(e as Object))
+                    .toList()
+                : [tagContent];
+          } catch (_) {
+            elementsToSave = [tagContent];
           }
+
+          bool saveOk = true;
+          for (final elemJson in elementsToSave) {
+            try {
+              final results = await Future.wait(
+                serverStatusIds.map((id) => _autoSaveVisitFromAdbTag(id, elemJson)),
+              );
+              if (results.isEmpty || !results.every((ok) => ok)) saveOk = false;
+            } catch (e) {
+              debugPrint('❌ ADB-TAG: Error en auto-save element: $e');
+              saveOk = false;
+            }
+          }
+
+          // Enviar ACK al móvil. Si saveOk=true el tag se borrará en la
+          // sesión NFC activa (escribirá "0"); si false el tag se conserva.
+          AdbNfcBridgeService.instance.sendTagAck(success: saveOk);
+          debugPrint(saveOk
+              ? '✅ ADB-TAG: ACK success enviado — tag será borrado'
+              : '❌ ADB-TAG: ACK failure enviado — tag NO será borrado');
         }
       });
       AdbNfcBridgeService.instance.start().then((_) {
@@ -456,7 +499,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       _adbServerCommandSub = AdbNfcClientService.instance.onServerCommand.listen((cmd) {
         if (cmd['type'] == 'request_geo_location') {
           final geoList = FFAppState().geoLocationsList;
-          if (geoList.isEmpty) return;
+          const double kFallbackLat = 1.458083;
+          const double kFallbackLon = -78.686919;
+          if (geoList.isEmpty) {
+            AdbNfcClientService.instance.sendGeoLocation(
+              latitude: kFallbackLat,
+              longitude: kFallbackLon,
+            );
+            return;
+          }
           final latest = geoList.reduce((a, b) =>
               (a.dateHourRead?.isAfter(b.dateHourRead ?? DateTime(0)) ?? false) ? a : b);
           AdbNfcClientService.instance.sendGeoLocation(
@@ -687,6 +738,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     _model.dispose();
     // Disponer controllers de búsqueda
     _searchControllers.forEach((_, controller) => controller.dispose());
+    _textControllers.forEach((_, c) => c.dispose());
+    _textFocusNodes.forEach((_, fn) => fn.dispose());
+    _usersSearchControllers.forEach((_, c) => c.dispose());
+    _usersSearchFocusNodes.forEach((_, fn) => fn.dispose());
     _tabController?.dispose();
     // Limpiar ADB bridge
     _adbStatusSub?.cancel();
@@ -1010,7 +1065,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       debugPrint('📥 ===== FIN RESTAURACIÓN DE CACHÉ =====');
       debugPrint('');
 
-      // Forzar actualización de la UI
+      // Recalcular numbers-operation con los valores restaurados
+      _recalculateOperations();
       setState(() {});
     } catch (e) {
       debugPrint('❌ Error restaurando caché: $e');
@@ -1816,6 +1872,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 .toLowerCase() ==
             'tag-transfer-adb-server');
 
+    debugPrint('🏗️ [Layout] firstStepHasAdb=$firstStepHasAdb steps=${activitySteps.length}');
     if (firstStepHasAdb) {
       // Cuando el primer step contiene un tag-transfer-adb-server,
       // DATOS PRINCIPALES ocupa la fila 1 a todo ancho (con dos columnas
@@ -1836,18 +1893,15 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       );
     }
 
-    // Layout clásico: dos paneles lado a lado (izq 340px, der expanded).
-    return Padding(
+    // Layout vertical: paneles apilados uno sobre otro, scroll global.
+    return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(
-            width: 340,
-            child: _buildPanelForStep(firstStep),
-          ),
-          const SizedBox(width: 8),
-          Expanded(child: _buildMergedPanel(remainingSteps)),
+          _buildPanelForStep(firstStep, unboundedHeight: true),
+          const SizedBox(height: 10),
+          _buildMergedPanel(remainingSteps, unboundedHeight: true),
         ],
       ),
     );
@@ -1914,6 +1968,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           ...randomNumStatuses,
           ...normalStatuses,
         ];
+        debugPrint('🏗️ [Panel hasAdb] topControls=${topControls.length} '
+            '(date=${dateStatuses.length} time=${timeStatuses.length} '
+            'rnd=${randomNumStatuses.length} normal=${normalStatuses.length}) '
+            'unboundedHeight=$unboundedHeight');
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -1960,39 +2018,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               padding: const EdgeInsets.only(bottom: 10),
               child: _buildStatusOption(step, s, level: 0),
             ),
-          if (normalStatuses.isNotEmpty)
-            Column(
-              children: List.generate(
-                (normalStatuses.length / 2).ceil(),
-                (rowIndex) {
-                  final leftIndex = rowIndex * 2;
-                  final rightIndex = leftIndex + 1;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: IntrinsicHeight(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Expanded(
-                            child: _buildStatusOption(
-                                step, normalStatuses[leftIndex],
-                                level: 0),
-                          ),
-                          const SizedBox(width: 10),
-                          if (rightIndex < normalStatuses.length)
-                            Expanded(
-                              child: _buildStatusOption(
-                                  step, normalStatuses[rightIndex],
-                                  level: 0),
-                            )
-                          else
-                            const Expanded(child: SizedBox()),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+          for (final s in normalStatuses)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildStatusOption(step, s, level: 0),
             ),
         ],
       );
@@ -2146,39 +2175,32 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             child: _buildStatusOption(
                 _findStepForStatus(steps, s), s, level: 0),
           ),
-        // Resto en grid 2 columnas
-        ...List.generate(
-          (gridStatuses.length / 2).ceil(),
-          (rowIndex) {
-            final leftIndex = rowIndex * 2;
-            final rightIndex = leftIndex + 1;
-            final leftStep =
-                _findStepForStatus(steps, gridStatuses[leftIndex]);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+        // Grid de 2 columnas — pares de controles por fila
+        for (int i = 0; i < gridStatuses.length; i += 2)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _buildStatusOption(
+                      _findStepForStatus(steps, gridStatuses[i]),
+                      gridStatuses[i],
+                      level: 0),
+                ),
+                if (i + 1 < gridStatuses.length) ...[
+                  const SizedBox(width: 8),
                   Expanded(
                     child: _buildStatusOption(
-                        leftStep, gridStatuses[leftIndex], level: 0),
+                        _findStepForStatus(steps, gridStatuses[i + 1]),
+                        gridStatuses[i + 1],
+                        level: 0),
                   ),
-                  const SizedBox(width: 10),
-                  if (rightIndex < gridStatuses.length)
-                    Expanded(
-                      child: _buildStatusOption(
-                          _findStepForStatus(
-                              steps, gridStatuses[rightIndex]),
-                          gridStatuses[rightIndex],
-                          level: 0),
-                    )
-                  else
-                    const Expanded(child: SizedBox()),
-                ],
-              ),
-            );
-          },
-        ),
+                ] else
+                  const Expanded(child: SizedBox()),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -3542,13 +3564,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    if (!isDistanceExtractorType)
                                     Text(
                                       statusName,
                                       style: TextStyle(
                                         fontFamily: 'Roboto',
-                                        fontSize: (typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time') ? 13 : 19,
+                                        fontSize: isLabelInfoType ? 12 : (typeStatus.toLowerCase() == 'date' || typeStatus.toLowerCase() == 'time') ? 13 : 19,
                                         fontWeight: FontWeight.w800,
-                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isDistanceExtractorType || isLabelInfoType || isDynamicPrintingAdbType)
+                                        color: (isTagTransferType || isTagTransferAdbServerType || typeStatus.toLowerCase() == 'tag-transfer-adb-from' || isLabelInfoType || isDynamicPrintingAdbType)
                                                 ? Colors.white
                                                 : ((isReferenceListType ? hasSelectedRefChild : isSelected) &&
                                                             !isTagWriterType &&
@@ -3697,6 +3720,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               padding: const EdgeInsets.only(top: 8),
                               child: _buildDistanceExtractorDisplay(
                                 statusId: statusId,
+                                statusName: statusName,
                               ),
                             ),
                           // Resumen de weights of headquarters - DEBAJO
@@ -4551,6 +4575,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       // Fila superior: nombre + control numérico compacto
                       Row(
                         children: [
+                          if (!isDistanceExtractorType)
                           Expanded(
                             child: Text(
                               statusName,
@@ -4558,14 +4583,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontFamily: 'Roboto',
-                                fontSize: 19,
+                                fontSize: isLabelInfoType ? 12 : 19,
                                 fontWeight: FontWeight.w800,
-                                color: (isDistanceExtractorType &&
-                                        (_distanceExtractorCalculated[statusId] ?? false))
-                                    ? const Color(0xFF00695C)
-                                    : (hasValue && !isNumberType && !isTagWriterType && !isDistanceExtractorType)
-                                        ? Colors.white
-                                        : const Color(0xFFB45309),
+                                color: (hasValue && !isNumberType && !isTagWriterType)
+                                    ? Colors.white
+                                    : const Color(0xFFB45309),
                               ),
                             ),
                           ),
@@ -4714,7 +4736,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                       if (isDistanceExtractorType)
                         Padding(
                           padding: const EdgeInsets.only(top: 8),
-                          child: _buildDistanceExtractorDisplay(statusId: statusId),
+                          child: _buildDistanceExtractorDisplay(statusId: statusId, statusName: statusName),
                         ),
                       // Resumen de weights de headquarters
                       if (isHeadquarterWeightType &&
@@ -6372,11 +6394,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       },
     );
 
+    if (!confirmed || !mounted) {
+      codeController.dispose();
+      focusNode.dispose();
+      return;
+    }
+    await _deletePendingVisit();
     codeController.dispose();
     focusNode.dispose();
-
-    if (!confirmed || !mounted) return;
-    await _deletePendingVisit();
   }
 
   /// Borra de SQLite la visita activa (Visits + Visits_details + Visits_locations),
@@ -7002,7 +7027,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   /// Guarda automáticamente una visita en SQLite cada vez que se recibe un tag
   /// desde Android vía el puente ADB. No limpia visitDetails (el usuario puede
   /// seguir usando el formulario y generar más visitas).
-  Future<void> _autoSaveVisitFromAdbTag(int adbStatusId, String rawTagJson) async {
+  Future<bool> _autoSaveVisitFromAdbTag(int adbStatusId, String rawTagJson) async {
     try {
       debugPrint('💾 ===== AUTO-GUARDANDO VISITA DESDE ADB TAG (statusId=$adbStatusId) =====');
       final currentActivity = FFAppState().currentActivity;
@@ -7193,9 +7218,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       if (_voiceEnabled) {
         unawaited(actions.announceVisitVoice());
       }
+      return true;
     } catch (e) {
       debugPrint('❌ _autoSaveVisitFromAdbTag error: $e');
       if (mounted) setState(() => _processingTag = false);
+      return false;
     }
   }
 
@@ -7474,7 +7501,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               _textControllers[idStatus] ??= TextEditingController();
               _textControllers[idStatus]!.text = statusResponse;
               final parsed = double.tryParse(statusResponse);
-              if (parsed != null) _statusValuesByName[statusName] = parsed;
+              if (parsed != null) {
+                _statusValuesByName[statusName] = parsed;
+                // Alias DESTARE para campos cuyo nombre contenga Tara/Tare
+                if (statusName.toUpperCase().contains('TARA') ||
+                    statusName.toUpperCase().contains('TARE')) {
+                  _statusValuesByName['DESTARE'] = parsed;
+                }
+              }
             }
             break;
           case 'numbers-operation':
@@ -7536,6 +7570,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         _activeVisitId = visitId;
         _formLocked = false;
       });
+
+      // Recalcular campos numbers-operation ahora que _statusValuesByName está poblado
+      _recalculateOperations();
 
       // Recalcular fórmulas TAG_READER (mismo patrón que el listener del tag
       // ADB en línea ~372): los campos `headquarter-weight` y
@@ -7644,6 +7681,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
     // Actualizar el valor en el Map para fórmulas (numbers-operation)
     _statusValuesByName[statusName] = newValue.toDouble();
+    if (statusName.toUpperCase().contains('TARA') ||
+        statusName.toUpperCase().contains('TARE')) {
+      _statusValuesByName['DESTARE'] = newValue.toDouble();
+    }
     debugPrint('');
     debugPrint('🔢 ===== ACTUALIZACIÓN DE VALOR (STEP STATUS) =====');
     debugPrint('📝 Campo actualizado: "$statusName"');
@@ -8277,6 +8318,10 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
     // Actualizar el valor en el Map para fórmulas (numbers-operation)
     _statusValuesByName[statusName] = newValue.toDouble();
+    if (statusName.toUpperCase().contains('TARA') ||
+        statusName.toUpperCase().contains('TARE')) {
+      _statusValuesByName['DESTARE'] = newValue.toDouble();
+    }
     debugPrint('');
     debugPrint('🔢 ===== ACTUALIZACIÓN DE VALOR (ROOT STATUS) =====');
     debugPrint('📝 Campo actualizado: "$statusName"');
@@ -10762,7 +10807,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         final statusName = entry.key;
         final statusValue = entry.value;
         // Usar regex para reemplazar solo palabras completas (case-insensitive)
-        final regex = RegExp('\\b$statusName\\b', caseSensitive: false);
+        final regex = RegExp('\\b${RegExp.escape(statusName)}\\b', caseSensitive: false);
         if (regex.hasMatch(expression)) {
           expression = expression.replaceAll(regex, statusValue.toString());
           replacementCount++;
@@ -11983,17 +12028,20 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   /// Verifica si el default_status es una fórmula (tiene operadores y variables)
   bool _isHeadquarterWeightFormula(String defaultStatus) {
-    // Es fórmula si contiene operadores matemáticos (+, -, *, /) y variables del formulario
-    // Las variables pueden ser: TARE, DESTARE, u otros campos del form
+    // Es fórmula si contiene operadores aritméticos Y referencias a nombres de
+    // status (caracteres alfabéticos fuera de la parte TAG_READER:...).
     final hasOperators = defaultStatus.contains('+') ||
         defaultStatus.contains('-') ||
         defaultStatus.contains('*') ||
         defaultStatus.contains('/');
+    if (!hasOperators) return false;
 
-    final hasFormVariables = defaultStatus.toUpperCase().contains('TARE') ||
-        defaultStatus.toUpperCase().contains('DESTARE');
-
-    return hasOperators && hasFormVariables;
+    // Quitar referencias TAG_READER:... y verificar si quedan letras (nombres de status)
+    final withoutTagReader = defaultStatus.replaceAll(
+      RegExp(r'TAG_READER:[^\s\)]+(?:\s+[^\s\)]+)*', caseSensitive: false),
+      '',
+    );
+    return RegExp(r'[A-Za-z]').hasMatch(withoutTagReader);
   }
 
   /// Detecta si el default_status es el modo de distribución proporcional de peso
@@ -12062,12 +12110,28 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       return;
     }
 
-    // 2. Variables del formulario
-    final formVariables = _collectFormVariables();
-    if (formVariables.isEmpty) {
-      debugPrint('❌ No se encontraron variables (TARE, DESTARE)');
-      return;
+    // 2. Variables del formulario: _statusValuesByName (actualizado en tiempo real)
+    //    + complemento de visitDetails + alias DESTARE→campo que contenga Tara/Tare
+    final Map<String, double> formVariables = Map.from(_statusValuesByName);
+    for (final d in FFAppState().visitDetails) {
+      if (d.statusResponse.isNotEmpty && d.statusOption.isNotEmpty &&
+          !formVariables.containsKey(d.statusOption)) {
+        final val = double.tryParse(d.statusResponse);
+        if (val != null) formVariables[d.statusOption] = val;
+      }
     }
+    // Alias de compatibilidad: DESTARE → primer campo cuyo nombre contenga Tara o Tare
+    if (!formVariables.keys.any((k) => k.toUpperCase() == 'DESTARE')) {
+      for (final entry in formVariables.entries) {
+        if (entry.key.toUpperCase().contains('TARA') ||
+            entry.key.toUpperCase().contains('TARE')) {
+          formVariables['DESTARE'] = entry.value;
+          debugPrint('   🔁 Alias DESTARE → "${entry.key}" = ${entry.value}');
+          break;
+        }
+      }
+    }
+    debugPrint('📊 Variables disponibles: ${formVariables.keys.join(', ')}');
 
     // 3. Procesar fórmula
     final tagReaderPattern = RegExp(
@@ -12079,7 +12143,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     String displayFormula = processedFormula;
 
     for (final e in formVariables.entries) {
-      final pattern = RegExp('\\b${e.key}\\b', caseSensitive: false);
+      final pattern = RegExp('\\b${RegExp.escape(e.key)}\\b', caseSensitive: false);
       processedFormula = processedFormula.replaceAllMapped(pattern, (_) => e.value.toString());
       displayFormula = displayFormula.replaceAllMapped(pattern, (_) => _formatNumberForFormula(e.value));
     }
@@ -12137,8 +12201,27 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       return;
     }
 
-    // 2. Variables del formulario
-    final formVariables = _collectFormVariables();
+    // 2. Variables del formulario: _statusValuesByName (actualizado en tiempo real)
+    //    + complemento de visitDetails + alias DESTARE→campo que contenga Tara/Tare
+    final Map<String, double> formVariables = Map.from(_statusValuesByName);
+    for (final d in FFAppState().visitDetails) {
+      if (d.statusResponse.isNotEmpty && d.statusOption.isNotEmpty &&
+          !formVariables.containsKey(d.statusOption)) {
+        final val = double.tryParse(d.statusResponse);
+        if (val != null) formVariables[d.statusOption] = val;
+      }
+    }
+    if (!formVariables.keys.any((k) => k.toUpperCase() == 'DESTARE')) {
+      for (final entry in formVariables.entries) {
+        if (entry.key.toUpperCase().contains('TARA') ||
+            entry.key.toUpperCase().contains('TARE')) {
+          formVariables['DESTARE'] = entry.value;
+          debugPrint('   🔁 Alias DESTARE → "${entry.key}" = ${entry.value}');
+          break;
+        }
+      }
+    }
+    debugPrint('📊 Variables disponibles: ${formVariables.keys.join(', ')}');
 
     // 3. Nombres de lote — misma fuente que _buildHeadquarterGroup: headquartersList
     final Map<int, String> loteNames = {};
@@ -12169,7 +12252,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       String dispF = calcF;
 
       for (final varEntry in formVariables.entries) {
-        final pat = RegExp('\\b${varEntry.key}\\b', caseSensitive: false);
+        final pat = RegExp('\\b${RegExp.escape(varEntry.key)}\\b', caseSensitive: false);
         calcF = calcF.replaceAllMapped(pat, (_) => varEntry.value.toString());
         dispF = dispF.replaceAllMapped(pat, (_) => _formatNumberForFormula(varEntry.value));
       }
@@ -12222,38 +12305,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   }
 
   /// Extrae TARE y DESTARE de visitDetails como Map<String, double>.
-  Map<String, double> _collectFormVariables() {
-    final Map<String, double> vars = {};
-
-    // Recopilar todos los campos del formulario con respuesta numérica
-    for (final d in FFAppState().visitDetails) {
-      if (d.statusResponse.isNotEmpty && d.statusOption.isNotEmpty) {
-        final val = double.tryParse(d.statusResponse);
-        if (val != null) {
-          vars[d.statusOption.toUpperCase()] = val;
-        }
-      }
-    }
-
-    // Alias TARE para campos cuyo nombre contenga "TARE" (pero no "DESTARE"),
-    // por compatibilidad con formularios que no llamen al campo exactamente "TARE"
-    if (!vars.containsKey('TARE')) {
-      for (final d in FFAppState().visitDetails) {
-        if (d.statusOption.toUpperCase().contains('TARE') &&
-            !d.statusOption.toUpperCase().contains('DESTARE') &&
-            d.statusResponse.isNotEmpty) {
-          final val = double.tryParse(d.statusResponse);
-          if (val != null) {
-            vars['TARE'] = val;
-            break;
-          }
-        }
-      }
-    }
-
-    return vars;
-  }
-
   /// Obtiene el total de RESULTS de todos los registros del TAG_READER
   /// Evalúa una expresión matemática simple con paréntesis
   /// Soporta: +, -, *, /, ()
@@ -12361,11 +12412,19 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             return;
           }
 
-          // Verificar si la fórmula contiene el campo modificado
-          final normalizedFormula = defaultStatus.toUpperCase();
-          final normalizedFieldName = modifiedFieldName.toUpperCase();
+          // Verificar si la fórmula referencia el campo modificado (whole-word, case-insensitive)
+          final fieldPattern = RegExp(
+            '\\b${RegExp.escape(modifiedFieldName)}\\b',
+            caseSensitive: false,
+          );
+          // Alias: si el campo modificado es Tara/Tare, también disparar cuando la
+          // fórmula use "DESTARE" (nombre alternativo para el campo de tara)
+          final isTaraField = modifiedFieldName.toUpperCase().contains('TARA') ||
+              modifiedFieldName.toUpperCase().contains('TARE');
+          final aliasMatch = isTaraField &&
+              RegExp(r'\bDESTARE\b', caseSensitive: false).hasMatch(defaultStatus);
 
-          if (normalizedFormula.contains(normalizedFieldName)) {
+          if (fieldPattern.hasMatch(defaultStatus) || aliasMatch) {
             debugPrint('   ✅ Fórmula encontrada en "$statusName" (ID: $statusId)');
             debugPrint('      Fórmula: "$defaultStatus"');
 
@@ -13703,6 +13762,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       },
     );
 
+    await Future.delayed(const Duration(milliseconds: 400));
     latController.dispose();
     lonController.dispose();
 
@@ -15448,9 +15508,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   /// Formatea un double como peso en formato es-ES: "12,50 kg".
   String _formatKg(double v) {
-    final fixed = v.toStringAsFixed(2);
-    final withComma = fixed.replaceAll('.', ',');
-    return '$withComma kg';
+    return v.round().toString();
   }
 
   Widget _buildTagOperatorLotesTable(List<Map<String, dynamic>> visitData) {
@@ -17296,7 +17354,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 displayValue,
                 style: const TextStyle(
                   fontFamily: 'Roboto',
-                  fontSize: 32,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                   letterSpacing: 0.5,
@@ -18306,11 +18364,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     setState(() {});
   }
 
-  Widget _buildDistanceExtractorDisplay({required int statusId}) {
+  Widget _buildDistanceExtractorDisplay({required int statusId, required String statusName}) {
     final hasData = _calculatedDistances.containsKey(statusId);
-    final distanceFromTag = _calculatedDistances[statusId] ?? 0.0;
     final distancesFromProducts = _calculatedDistancesFromProduct[statusId];
-    final distanceFromTagKm = distanceFromTag / 1000;
 
     // Sin datos: mostrar placeholder hasta que se reciba un tag
     if (!hasData) {
@@ -18354,67 +18410,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
-            children: [
-              Icon(
-                Icons.straighten_rounded,
-                color: Colors.white,
-                size: 18,
-              ),
-              SizedBox(width: 6),
-              Text(
-                'Distancia a Extractora',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // NIVEL 1: Desde TAG
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Desde TAG',
-                    style: TextStyle(
-                      fontFamily: 'Roboto',
-                      fontSize: 11,
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${distanceFromTagKm.toStringAsFixed(2)} km',
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _CopyValueButton(
-                  value: distanceFromTagKm.toStringAsFixed(2),
-                  semanticLabel: 'Copiar distancia desde TAG',
-                ),
-              ],
-            ),
-          ),
-          // NIVEL 2: Desde Productos (siempre visible — árbol expandido por defecto)
-          const SizedBox(height: 8),
           Text(
-            'Desde Productos:',
+            statusName,
             style: TextStyle(
               fontFamily: 'Roboto',
               fontSize: 11,
@@ -18425,9 +18422,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           const SizedBox(height: 4),
           if (distancesFromProducts == null || distancesFromProducts.isEmpty)
             Padding(
-              padding: const EdgeInsets.only(left: 12, top: 2, bottom: 2),
+              padding: const EdgeInsets.only(top: 2, bottom: 2),
               child: Text(
-                'Sin distancias calculadas por producto',
+                'Sin distancias calculadas por lote',
                 style: TextStyle(
                   fontFamily: 'Roboto',
                   fontSize: 10,
@@ -18445,7 +18442,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               final distanceKm = distance / 1000;
 
               return Padding(
-                padding: const EdgeInsets.only(left: 12, bottom: 4),
+                padding: const EdgeInsets.only(bottom: 4),
                 child: Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

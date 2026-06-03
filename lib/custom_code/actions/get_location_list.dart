@@ -1175,7 +1175,6 @@ class BatteryCache {
       try {
         _cachedLevel = await _battery.batteryLevel;
         _lastUpdate = now;
-        debugPrint('🔋 Batería actualizada: $_cachedLevel%');
       } catch (e) {
         debugPrint('⚠️ No se pudo obtener nivel de batería: $e');
       }

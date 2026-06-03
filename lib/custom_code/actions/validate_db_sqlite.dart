@@ -220,6 +220,7 @@ Future<void> createClickPalmTables(Database db) async {
         Color_activity TEXT,
         Icon_activity TEXT,
         Visits_number INTEGER DEFAULT 0,
+        Min_meters_margin INTEGER DEFAULT 0,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
         FOREIGN KEY (Id_activity_parent) REFERENCES Activities(Id_activity)
     );
@@ -1655,6 +1656,7 @@ Future<void> upgradeClickPalmDatabase(
             Created_at TEXT,
             Is_default INTEGER DEFAULT 0,
             Read_default TEXT,
+            Min_meters_margin INTEGER DEFAULT 0,
             FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
             FOREIGN KEY (Id_activity_parent) REFERENCES Activities(Id_activity)
         );
@@ -2187,6 +2189,10 @@ Future<void> upgradeClickPalmDatabase(
         if (!actCols.contains('Visits_number')) {
           await db.execute('ALTER TABLE Activities ADD COLUMN Visits_number INTEGER DEFAULT 0;');
           debugPrint('   ✅ Columna Visits_number agregada a Activities');
+        }
+        if (!actCols.contains('Min_meters_margin')) {
+          await db.execute('ALTER TABLE Activities ADD COLUMN Min_meters_margin INTEGER DEFAULT 0;');
+          debugPrint('   ✅ Columna Min_meters_margin agregada a Activities');
         }
 
         // 3. Columnas faltantes en Activities_status

@@ -123,8 +123,10 @@ class LiteGPSFilter {
 
 /// Lógica de rastreo LITE. Se llama desde el isolate de background cuando el
 /// modo activo es 'LITE'. Comparte el mismo ServiceInstance que el ADVANCED.
-Future<void> startLiteLocationTracking(ServiceInstance service) async {
-  debugPrint('🌱 Iniciando rastreo GPS en modo LITE');
+Future<void> startLiteLocationTracking(
+    ServiceInstance service,
+    double effectiveAccuracyThreshold) async {
+  debugPrint('🌱 Iniciando rastreo GPS en modo LITE | umbral: ${effectiveAccuracyThreshold}m');
 
   final filter = LiteGPSFilter();
   final battery = Battery();
@@ -133,6 +135,8 @@ Future<void> startLiteLocationTracking(ServiceInstance service) async {
 
   StreamSubscription<Position>? locationSub;
   bool stabilizedEmitted = false;
+  int consecutiveOverMarginLite = 0;
+  const int overMarginHysteresis = 3;
 
   try {
     // Misma configuración de plataforma que ADVANCED para obtener las
@@ -173,17 +177,18 @@ Future<void> startLiteLocationTracking(ServiceInstance service) async {
           lastBatteryFetch = DateTime.now();
         }
 
-        // Estabilización inmediata por calidad (≤10m de accuracy cruda)
+        // Estabilización inmediata por calidad (umbral dinámico según actividad)
         if (!stabilizedEmitted &&
             position.accuracy > 0 &&
-            position.accuracy <= 10.0) {
+            position.accuracy <= effectiveAccuracyThreshold) {
           stabilizedEmitted = true;
+          consecutiveOverMarginLite = 0;
           service.invoke('gpsStabilized', {'stabilized': true});
           debugPrint(
-              '✅ LITE estabilizado (${position.accuracy.toStringAsFixed(1)}m)');
+              '✅ LITE estabilizado (${position.accuracy.toStringAsFixed(1)}m ≤ ${effectiveAccuracyThreshold}m)');
         }
 
-        // Progreso para UI
+        // Progreso para UI mientras no está estabilizado
         if (!stabilizedEmitted) {
           service.invoke('gpsProgress', {
             'accuracy': position.accuracy,
@@ -193,12 +198,30 @@ Future<void> startLiteLocationTracking(ServiceInstance service) async {
           });
         }
 
+        // Verificación continua: si la accuracy supera el umbral durante N lecturas → desestabilizar.
+        // Aplica siempre (con o sin actividad), umbral mínimo 100 m.
+        if (stabilizedEmitted) {
+          if (position.accuracy > effectiveAccuracyThreshold) {
+            consecutiveOverMarginLite++;
+            if (consecutiveOverMarginLite >= overMarginHysteresis) {
+              stabilizedEmitted = false;
+              consecutiveOverMarginLite = 0;
+              service.invoke('gpsStabilized', {'stabilized': false});
+              debugPrint(
+                  '⚠️ LITE desestabilizado: ${position.accuracy.toStringAsFixed(1)}m > ${effectiveAccuracyThreshold}m');
+            }
+          } else {
+            consecutiveOverMarginLite = 0;
+          }
+        }
+
         final payload = filter.process(position, cachedBattery);
         if (payload == null) return;
 
         // Fallback: filtro produjo resultado → emitir estabilizado
         if (!stabilizedEmitted) {
           stabilizedEmitted = true;
+          consecutiveOverMarginLite = 0;
           service.invoke('gpsStabilized', {'stabilized': true});
           debugPrint('✅ LITE estabilizado (primera lectura filtrada)');
         }

@@ -257,7 +257,7 @@ class AdbNfcBridgeService {
   /// Solicita la geolocalización actual al cliente Android y espera la respuesta.
   /// Retorna null si no hay cliente conectado o se agota el tiempo de espera.
   Future<Map<String, dynamic>?> requestAndWaitGeoLocation({
-    Duration timeout = const Duration(seconds: 6),
+    Duration timeout = const Duration(seconds: 1),
   }) async {
     if (_client == null) {
       debugPrint('⚠️ AdbNfcBridgeService: requestAndWaitGeoLocation — no hay cliente conectado');
@@ -296,6 +296,26 @@ class AdbNfcBridgeService {
       return true;
     } catch (e) {
       debugPrint('❌ AdbNfcBridgeService: sendPrintRequest falló: $e');
+      return false;
+    }
+  }
+
+  /// Confirma al cliente Android si el tag recibido fue procesado correctamente.
+  /// [success] = true → el servidor guardó la visita; false → error, NO borrar tag.
+  bool sendTagAck({bool success = true}) {
+    if (_client == null) {
+      debugPrint('⚠️ AdbNfcBridgeService: sendTagAck — no hay cliente conectado');
+      return false;
+    }
+    try {
+      _client!.add(jsonEncode({
+        'type': 'nfc_tag_ack',
+        'payload': {'success': success},
+      }));
+      debugPrint('📤 AdbNfcBridgeService: nfc_tag_ack(success=$success) enviado al Android');
+      return true;
+    } catch (e) {
+      debugPrint('❌ AdbNfcBridgeService: sendTagAck falló: $e');
       return false;
     }
   }

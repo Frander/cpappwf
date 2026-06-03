@@ -218,8 +218,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   // Map para almacenar resultados de búsqueda de usuarios (tipo users-list)
   final Map<int, List<UsersStruct>> _usersSearchResults = {};
 
-  // Set para rastrear qué status ya se loguearon (para evitar spam en logs)
-  final Set<int> _loggedStatusIds = {};
+
 
   // ============================================================================
   // CACHÉ DE RENDIMIENTO - LOTE 1
@@ -565,53 +564,69 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       if (!connected) return;
     }
 
-    // Abrir diálogo NFC — mismo flujo que el tap manual
+    // Abrir diálogo NFC — mismo flujo que el tap manual.
+    // El sendTagData corre dentro del callback para que _eraseTagInSession
+    // pueda borrar el tag (escribir "0") en la misma sesión NFC activa.
     if (!mounted) return;
+    bool tagSentSuccessfully = false;
     await showDialog(
       barrierDismissible: false,
       context: context,
-      builder: (dialogContext) => const Dialog(
+      builder: (dialogContext) => Dialog(
         elevation: 0,
         insetPadding: EdgeInsets.zero,
         backgroundColor: Colors.transparent,
         child: NfcReadDialogWidget(
           autoStart: true,
           isTagTransferMode: false,
+          onTagReadCallback: (tagContent) async {
+            final trimmed = tagContent.trim();
+            if (trimmed.isEmpty ||
+                trimmed == '0' ||
+                trimmed.startsWith('ERROR:') ||
+                (!actions.isNewJsonFormat(tagContent) && !actions.isJsonArrayFormat(tagContent))) {
+              debugPrint('⚠️ ADB-FROM (triggered): contenido inválido/vacío — no se envía al servidor');
+              return false;
+            }
+            final sent = await AdbNfcClientService.instance
+                .sendTagData(tagContent: tagContent);
+            if (sent) tagSentSuccessfully = true;
+            return sent; // readNFC borra el tag si retorna true
+          },
         ),
       ),
     );
     if (!mounted) return;
 
-    final nfcContent = FFAppState().nfcRead;
-    if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
-      await AdbNfcClientService.instance.sendTagData(tagContent: nfcContent);
-      if (!mounted) return;
-
-      // Reflejar el resumen inline en Android también (igual que el tap manual)
-      // Buscar el statusId del campo adb-from para actualizar _tagReaderData
-      final allStatuses = <dynamic>[..._cachedActivityStatus];
-      for (final step in _cachedActivitySteps) {
-        final ss = getJsonField(step, r'''$.activities_status''');
-        if (ss is List) allStatuses.addAll(ss);
-      }
-      for (final s in allStatuses) {
-        final t = getJsonField(s, r'''$.type_status''')?.toString().toLowerCase() ?? '';
-        if (t == 'tag-transfer-adb-from') {
-          final id = getJsonField(s, r'''$.id_activity_status''') as int?;
-          if (id != null) {
-            setState(() {
-              _tagReaderData[id] = _parseNfcTagContent(nfcContent);
-              _tagReaderProductName[id] = '';
-            });
+    if (tagSentSuccessfully) {
+      final nfcContent = FFAppState().nfcRead;
+      if (nfcContent.isNotEmpty && !nfcContent.startsWith('ERROR')) {
+        // Reflejar el resumen inline en Android también (igual que el tap manual)
+        // Buscar el statusId del campo adb-from para actualizar _tagReaderData
+        final allStatuses = <dynamic>[..._cachedActivityStatus];
+        for (final step in _cachedActivitySteps) {
+          final ss = getJsonField(step, r'''$.activities_status''');
+          if (ss is List) allStatuses.addAll(ss);
+        }
+        for (final s in allStatuses) {
+          final t = getJsonField(s, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+          if (t == 'tag-transfer-adb-from') {
+            final id = getJsonField(s, r'''$.id_activity_status''') as int?;
+            if (id != null) {
+              setState(() {
+                _tagReaderData[id] = _parseNfcTagContent(nfcContent);
+                _tagReaderProductName[id] = '';
+              });
+            }
           }
         }
-      }
 
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('📡 Tag enviado al servidor desktop'),
-        backgroundColor: Color(0xFF00a86b),
-        duration: Duration(seconds: 3),
-      ));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('📡 Tag enviado al servidor desktop y borrado'),
+          backgroundColor: Color(0xFF00a86b),
+          duration: Duration(seconds: 3),
+        ));
+      }
     }
   }
 
@@ -845,6 +860,10 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     _model.dispose();
     // Disponer controllers de búsqueda
     _searchControllers.forEach((_, controller) => controller.dispose());
+    _textControllers.forEach((_, c) => c.dispose());
+    _textFocusNodes.forEach((_, fn) => fn.dispose());
+    _usersSearchControllers.forEach((_, c) => c.dispose());
+    _usersSearchFocusNodes.forEach((_, fn) => fn.dispose());
     // Limpiar ADB bridge
     _adbStatusSub?.cancel();
     _adbTagSub?.cancel();
@@ -878,6 +897,31 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       // Si es requerido, empieza expandido; si no, colapsado
       _stepExpansionState[stepId] = isRequired;
     }
+  }
+
+  /// Re-expande los steps de tipo unique-list con is_required == true.
+  /// Se llama después de guardar una visita para que esos steps queden visibles.
+  void _reExpandRequiredUniqueLists() {
+    final activityStepsRaw = getJsonField(
+      FFAppState().currentActivity,
+      r'''$.activity_steps''',
+    );
+    if (activityStepsRaw == null) return;
+
+    final activitySteps =
+        activityStepsRaw is List ? activityStepsRaw : activityStepsRaw.toList();
+
+    for (final step in activitySteps) {
+      final typeStep = getJsonField(step, r'''$.type_step''')?.toString() ?? '';
+      final isRequired = getJsonField(step, r'''$.is_required''') == true;
+      final stepId = getJsonField(step, r'''$.id_activity_step''');
+
+      if (typeStep.toLowerCase() == 'unique-list' && isRequired && stepId != null) {
+        _stepExpansionState[stepId] = true;
+      }
+    }
+
+    if (mounted) setState(() {});
   }
 
   /// Genera una clave única para el caché basada en la actividad
@@ -962,20 +1006,22 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       final cacheKey = _getCacheKey();
       debugPrint('🔑 Clave de caché: $cacheKey');
 
-      // Crear un mapa con todo el estado del formulario
+      // Crear un mapa con todo el estado del formulario.
+      // Los datos de tag-transfer se excluyen deliberadamente: son operaciones
+      // NFC puntuales que se deben repetir en cada sesión; persistirlos causa
+      // que el campo aparezca poblado al volver al formulario tras guardar.
       final cacheData = <String, dynamic>{
-        'visitDetails':
-            FFAppState().visitDetails.map((v) => v.toMap()).toList(),
+        'visitDetails': FFAppState()
+            .visitDetails
+            .where((v) => v.typeStatus != 'tag-transfer')
+            .map((v) => v.toMap())
+            .toList(),
         'statusValuesByName': _statusValuesByName,
         'calculatedValues': _calculatedValues,
         'numbersOperationCalculated': _numbersOperationCalculated,
         'tagReaderData': _tagReaderData,
         'tagReaderProductName': _tagReaderProductName,
         'tagWriterProductName': _tagWriterProductName,
-        'tagTransferSourceProductName': _tagTransferSourceProductName,
-        'tagTransferDestProductName': _tagTransferDestProductName,
-        'tagTransferData': _tagTransferData,
-        'tagTransferCompleted': _tagTransferCompleted,
         'tagWriterData': _tagWriterData,
         'calculatedDistances': _calculatedDistances,
         'distanceExtractorCalculated': _distanceExtractorCalculated,
@@ -1103,33 +1149,10 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         _tagWriterProductName.addAll(Map<int, String>.from(cacheData['tagWriterProductName'] as Map));
       }
 
-      if (cacheData['tagTransferSourceProductName'] != null) {
-        _tagTransferSourceProductName.clear();
-        _tagTransferSourceProductName.addAll(Map<int, String>.from(cacheData['tagTransferSourceProductName'] as Map));
-      }
-
-      if (cacheData['tagTransferDestProductName'] != null) {
-        _tagTransferDestProductName.clear();
-        _tagTransferDestProductName.addAll(Map<int, String>.from(cacheData['tagTransferDestProductName'] as Map));
-      }
-
-      // Restaurar tag transfer data
-      if (cacheData['tagTransferData'] != null) {
-        _tagTransferData.clear();
-        _tagTransferData.addAll(
-          Map<int, Map<int, Map<String, dynamic>>>.from(
-              cacheData['tagTransferData'] as Map),
-        );
-        debugPrint('   ✓ Restaurados ${_tagTransferData.length} tag transfers');
-      }
-
-      // Restaurar tag transfer completed
-      if (cacheData['tagTransferCompleted'] != null) {
-        _tagTransferCompleted.clear();
-        _tagTransferCompleted.addAll(
-          Map<int, bool>.from(cacheData['tagTransferCompleted'] as Map),
-        );
-      }
+      // tag-transfer data NO se restaura desde caché: es una operación NFC puntual
+      // que debe repetirse en cada sesión. Los datos se restauran solo desde
+      // SharedPreferences vía _restoreTagTransferFromPrefs() si el usuario no
+      // completó la transferencia (y esas prefs se borran al guardar visita).
 
       // Restaurar tag writer data
       if (cacheData['tagWriterData'] != null) {
@@ -1599,6 +1622,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       },
     );
     _cleanupTagDatasByRememberFlag();
+    _saveFormCache();
+    _reExpandRequiredUniqueLists();
   }
 
   /// Escanea un QR y guarda la visita directamente (usado desde OTRAS OPCIONES).
@@ -2707,6 +2732,14 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                       autoStart: true,
                       isTagTransferMode: false,
                       onTagReadCallback: (tagContent) async {
+                        final trimmed = tagContent.trim();
+                        if (trimmed.isEmpty ||
+                            trimmed == '0' ||
+                            trimmed.startsWith('ERROR:') ||
+                            (!actions.isNewJsonFormat(tagContent) && !actions.isJsonArrayFormat(tagContent))) {
+                          debugPrint('⚠️ ADB-FROM (tap): contenido inválido/vacío — no se envía al servidor');
+                          return false;
+                        }
                         final sent = await AdbNfcClientService.instance
                             .sendTagData(tagContent: tagContent);
                         if (sent) tagSentSuccessfully = true;
@@ -3561,16 +3594,11 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
     final statusColorParsed = parseColor(statusColor);
 
-    // Log de renderizado
-    debugPrint(
-        '🎯 RENDERIZANDO ROOT STATUS: nombre="$statusName" tipo="$typeStatus" ID=$statusId nivel=$level stepsChilds=${stepsChilds.length} statusChilds=${statusChilds.length}');
-
     final isExpanded = _rootStatusExpansionState[statusId] ?? false;
     // LOTE 1: Usar búsqueda cacheada
     final hasValue = _cachedSearchInVisitDetails(statusId, 'STATUS');
 
     final hasChildren = stepsChilds.isNotEmpty || statusChilds.isNotEmpty;
-    debugPrint('   hasChildren=$hasChildren isExpanded=$isExpanded typeStatus="$typeStatus"');
 
     // Para status de tipo "number", "tag-writer", "tag-reader", "tag-transfer", "numbers-operation", "headquarter-weight", "label-info", "distance-extractor" y "dynamic-printing", NO abrir diálogo, mostrar control inline
     final isNumberType = typeStatus.toLowerCase() == 'number';
@@ -4720,13 +4748,6 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     final statusChilds = statusChildsRaw != null
         ? (statusChildsRaw is List ? statusChildsRaw : [statusChildsRaw])
         : [];
-
-    // Log de renderizado (solo la primera vez para cada status)
-    if (!_loggedStatusIds.contains(statusId)) {
-      _loggedStatusIds.add(statusId);
-      debugPrint(
-          '🔸 RENDERIZANDO ROOT STATUS CHILD: nombre="$statusName" tipo="$typeStatus" ID=$statusId parentID=$parentStatusId nivel=$level');
-    }
 
     // LOTE 1: Usar búsqueda cacheada
     final isSelected = _cachedSearchInVisitDetails(statusId, 'STATUS');
@@ -6140,8 +6161,15 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     ),
                   );
 
+                  // Quitar de visitDetails las entradas no recordadas (equivalente a removeVisits() del flujo GPS)
+                  FFAppState().visitDetails = FFAppState()
+                      .visitDetails
+                      .where((v) => v.rememberStatus == true)
+                      .toList();
                   // Limpiar los datos de tags que NO deben ser recordados
                   _cleanupTagDatasByRememberFlag();
+                  _saveFormCache();
+                  _reExpandRequiredUniqueLists();
                 }
               },
               child: Container(
@@ -6225,6 +6253,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                 // Limpiar los datos de tags que NO deben ser recordados después de crear la visita
                 _cleanupTagDatasByRememberFlag();
+                _saveFormCache();
+                _reExpandRequiredUniqueLists();
               },
               child: Container(
                 height: 50,
@@ -12442,6 +12472,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       },
     );
 
+    await Future.delayed(const Duration(milliseconds: 400));
     latController.dispose();
     lonController.dispose();
 
@@ -12697,13 +12728,18 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       cleanedCount++;
     }
 
-    // Limpiar tag-transfer data
+    // Limpiar tag-transfer data + SharedPreferences (para que _restoreTagTransferFromPrefs
+    // no los restaure en la siguiente sesión)
     final tagTransferIdsToRemove = _tagTransferData.keys
         .where((id) => !remainingVisitDetailsIds.contains(id))
         .toList();
     for (final statusId in tagTransferIdsToRemove) {
       _tagTransferData.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagTransferData[$statusId]');
+      _tagTransferSourceContent.remove(statusId);
+      _tagTransferSourceProductName.remove(statusId);
+      _tagTransferDestProductName.remove(statusId);
+      _clearTagTransferFromPrefs(statusId).ignore();
+      debugPrint('   ❌ Limpiado _tagTransferData[$statusId] + SharedPreferences');
       cleanedCount++;
     }
 

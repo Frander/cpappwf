@@ -92,4 +92,5 @@ export 'nfc_json_helper.dart'
         groupVisitsByHeadquarter,
         migrateOldFormatToJson,
         isNewJsonFormat,
-        isOldFormat;
+        isOldFormat,
+        isJsonArrayFormat;

@@ -977,8 +977,8 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
   }
 
   /// Muestra un bottom sheet para que el usuario seleccione el lote.
-  /// Se cierra automáticamente después de 4 segundos asignando el más cercano.
-  /// Retorna el lote seleccionado (nunca null - siempre asigna el más cercano como fallback).
+  /// El diálogo NO se cierra automáticamente — el usuario siempre debe elegir.
+  /// Retorna el lote seleccionado (fallback al más cercano si el sistema lo cierra).
   Future<HeadquartersStruct> _showSelectLotDialog(
     BuildContext context,
     List<HeadquarterDistance> nearestList,
@@ -2550,7 +2550,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
 }
 
 // ============================================================================
-// WIDGET DE SELECCIÓN DE LOTE CON AUTO-CLOSE (4 segundos)
+// WIDGET DE SELECCIÓN DE LOTE (selección obligatoria)
 // ============================================================================
 
 class _SelectLotSheetContent extends StatefulWidget {
@@ -2567,31 +2567,8 @@ class _SelectLotSheetContent extends StatefulWidget {
 }
 
 class _SelectLotSheetContentState extends State<_SelectLotSheetContent> {
-  int _secondsRemaining = 4;
-  Timer? _autoCloseTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _autoCloseTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() {
-        _secondsRemaining--;
-      });
-      if (_secondsRemaining <= 0) {
-        timer.cancel();
-        // Auto-close: retorna null → el caller asigna el más cercano
-        Navigator.pop(context);
-      }
-    });
-  }
-
   @override
   void dispose() {
-    _autoCloseTimer?.cancel();
     super.dispose();
   }
 
@@ -2643,7 +2620,7 @@ class _SelectLotSheetContentState extends State<_SelectLotSheetContent> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Tu ubicación está fuera de los polígonos registrados.\nSelecciona el lote o se asignará el más cercano en ${_secondsRemaining}s',
+            'Tu ubicación está fuera de los polígonos registrados.\nDebes seleccionar un lote para poder continuar.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Roboto',
@@ -2743,30 +2720,6 @@ class _SelectLotSheetContentState extends State<_SelectLotSheetContent> {
               ),
             );
           }),
-          const SizedBox(height: 12),
-          // Botón Cancelar
-          SizedBox(
-            width: double.infinity,
-            child: TextButton(
-              onPressed: () => Navigator.pop(context),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  side: BorderSide(color: Colors.grey.shade300),
-                ),
-              ),
-              child: Text(
-                'Cancelar (asignar más cercano)',
-                style: TextStyle(
-                  fontFamily: 'Roboto',
-                  fontSize: 14,
-                  color: theme.secondaryText,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ),
         ],
       ),
     );

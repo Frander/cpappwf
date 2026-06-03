@@ -176,7 +176,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   bool _everStabilized = false;
   static const int _badThreshold  = 3;   // lecturas malas seguidas → mostrar aviso
   static const int _goodThreshold = 3;   // lecturas buenas seguidas → ocultar aviso
-  static const double _qualityThreshold = 10.0; // metros
+  // Umbral dinámico según la actividad actual:
+  // Sin actividad o min_meters_margin == 0 → 100.0 m (sin límite real)
+  // min_meters_margin > 0 → ese valor en metros
+  double get _effectiveQualityThreshold {
+    final act = FFAppState().currentActivity as Map<String, dynamic>?;
+    final margin = (act?['Min_meters_margin'] as int?) ?? 0;
+    return margin > 0 ? margin.toDouble() : 100.0;
+  }
 
   // Timer de persistencia periódica: cada 2 minutos depura y persiste la mitad
   // más vieja de geoLocationsList a SQLite, conservando la mitad más reciente.
@@ -233,7 +240,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       final half = currentList.length ~/ 2;
       final toSave = currentList.sublist(0, half);      // mitad más vieja → SQLite
       final toKeep = currentList.sublist(half);          // mitad más reciente → memoria
-      debugPrint('💾 [Global] Persistiendo $half de ${currentList.length} puntos a SQLite');
 
       // Obtener speed y batería reales
       final lastPoint = EnrichedGeoBuffer().getAll();
@@ -270,10 +276,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             loc['Method'] ?? 'UNKNOWN',
           ]);
         }
-        final results = await batch.commit(noResult: false);
-        final inserted = results.whereType<int>().where((id) => id > 0).length;
-        debugPrint(
-            '💾 [Global] $inserted/${depurados.length} registros insertados en SQLite (de ${toSave.length} puntos)');
+        await batch.commit(noResult: true);
       });
 
       // Mantener solo los recientes en memoria
@@ -290,12 +293,18 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     final service = FlutterBackgroundService();
 
     _gpsStabilizedSub = service.on('gpsStabilized').listen((event) {
-      if (event != null && event['stabilized'] == true) {
+      if (event == null) return;
+      if (event['stabilized'] == true) {
         _everStabilized = true;
         FFAppState().update(() {
           FFAppState().isStabilized = true;
         });
         debugPrint('📡 [Global] GPS estabilizado');
+      } else if (event['stabilized'] == false) {
+        FFAppState().update(() {
+          FFAppState().isStabilized = false;
+        });
+        debugPrint('⚠️ [Global] GPS re-entra en estabilización (umbral de actividad)');
       }
     });
 
@@ -354,16 +363,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // capacidad de marcarlo false cuando la calidad se degrada.
         });
 
-        if (FFAppState().geoLocationsList.length % 20 == 0) {
-          debugPrint('📍 [Global] ${FFAppState().geoLocationsList.length} puntos GPS acumulados');
-        }
 
         // ── Detección de calidad GPS baja post-estabilización (Fix 5) ────────
         // Usa _everStabilized (fijo una vez verdadero) — independiente del flag
         // mutable isStabilized, para poder recuperarlo cuando mejora la señal.
         if (_everStabilized) {
           final err = (event['horizontalError'] as num?)?.toDouble() ?? 0.0;
-          if (err > _qualityThreshold) {
+          if (err > _effectiveQualityThreshold) {
             _consecutiveBadReadings++;
             _consecutiveGoodReadings = 0;
             if (_consecutiveBadReadings >= _badThreshold) {

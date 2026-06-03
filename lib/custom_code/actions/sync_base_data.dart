@@ -777,6 +777,7 @@ Future<void> _sbInsertActivities(
       'Color_activity':      a['color_activity'],
       'Icon_activity':       a['icon_activity'],
       'Visits_number':       a['visits_number'] ?? 0,
+      'Min_meters_margin':   (a['min_meters_margin'] as int?) ?? 0,
     });
 
     if (a['activity_steps'] is List) {

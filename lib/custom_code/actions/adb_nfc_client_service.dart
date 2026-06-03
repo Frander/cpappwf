@@ -17,6 +17,9 @@ class AdbNfcClientService {
   static final AdbNfcClientService instance = AdbNfcClientService._();
 
   WebSocket? _socket;
+  // Completer para esperar el ACK del servidor tras enviar un tag.
+  // null cuando no hay envío pendiente.
+  Completer<bool>? _pendingTagAck;
   final StreamController<bool> _connectedController =
       StreamController<bool>.broadcast();
   final StreamController<Map<String, dynamic>> _serverCommandController =
@@ -99,6 +102,12 @@ class AdbNfcClientService {
         case 'db_transfer_complete':
           _saveTransferredDb();
           break;
+        case 'nfc_tag_ack':
+          final success = (msg['payload']?['success'] as bool?) ?? false;
+          debugPrint('📨 AdbNfcClientService: nfc_tag_ack recibido (success=$success)');
+          _pendingTagAck?.complete(success);
+          _pendingTagAck = null;
+          break;
         default:
           _serverCommandController.add(msg);
       }
@@ -161,27 +170,48 @@ class AdbNfcClientService {
     }
   }
 
-  /// Send the NFC tag content to the desktop server.
-  /// [tagContent] is the raw NFC content string already read from the tag.
+  /// Envía el contenido del tag NFC al servidor desktop y espera su ACK.
+  /// Retorna true SOLO si el servidor confirmó que procesó el tag correctamente.
+  /// Si el ACK no llega en [ackTimeout] (default 5 s), retorna false → el tag NO se borra.
   Future<bool> sendTagData({
     required String tagContent,
     String? productName,
+    Duration ackTimeout = const Duration(seconds: 5),
   }) async {
     if (_socket == null) return false;
+
+    // Cancelar ACK pendiente anterior si lo hubiera (no debería ocurrir en uso normal)
+    _pendingTagAck?.complete(false);
+    _pendingTagAck = Completer<bool>();
+
     try {
-      final payload = jsonEncode({
+      _socket!.add(jsonEncode({
         'type': 'nfc_tag_read',
         'payload': {
           'tagContent': tagContent,
           'productName': productName ?? '',
           'timestamp': DateTime.now().toIso8601String(),
         },
-      });
-      _socket!.add(payload);
-      debugPrint('📤 AdbNfcClientService: Tag sent to server');
-      return true;
+      }));
+      debugPrint('📤 AdbNfcClientService: Tag enviado, esperando ACK del servidor...');
+
+      final ack = await _pendingTagAck!.future.timeout(
+        ackTimeout,
+        onTimeout: () {
+          debugPrint('⏰ AdbNfcClientService: Timeout ($ackTimeout) esperando ACK — tag NO se borrará');
+          _pendingTagAck = null;
+          return false;
+        },
+      );
+
+      debugPrint(ack
+          ? '✅ AdbNfcClientService: ACK success — tag será borrado'
+          : '❌ AdbNfcClientService: ACK failure/timeout — tag NO será borrado');
+      return ack;
     } catch (e) {
-      debugPrint('❌ AdbNfcClientService: Send failed: $e');
+      debugPrint('❌ AdbNfcClientService: sendTagData falló: $e');
+      _pendingTagAck?.complete(false);
+      _pendingTagAck = null;
       return false;
     }
   }

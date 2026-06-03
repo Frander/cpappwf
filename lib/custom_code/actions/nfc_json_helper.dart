@@ -314,3 +314,12 @@ bool isOldFormat(String nfcContent) {
       RegExp(r'\{DH:[^}]+;OP:[^}]+;VISITS:[^}]+;RESULTS:[^}]+;HE:[^}]+\}');
   return validPattern.hasMatch(nfcContent);
 }
+
+/// Valida si el contenido es un array JSON (múltiples registros tag-transfer)
+bool isJsonArrayFormat(String nfcContent) {
+  try {
+    return jsonDecode(nfcContent) is List;
+  } catch (_) {
+    return false;
+  }
+}

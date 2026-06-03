@@ -65,59 +65,14 @@ class _NfcTransferWriteDialogWidgetState
     HapticFeedback.mediumImpact();
 
     try {
-      // Leer el contenido actual del tag de destino
-      debugPrint('📖 Leyendo contenido actual del tag de destino...');
-      final destContent = await actions.readNFC(context, autoClose: false);
-
-      if (!mounted) return;
-
-      String contentToWrite;
-
-      if (destContent.trim().isEmpty || destContent.trim() == '0') {
-        // Tag de destino vacío: escribir el JSON completo del origen
-        debugPrint(
-            '📝 TAG-TRANSFER: Tag destino vacío, escribiendo JSON completo del origen');
-        contentToWrite = widget.sourceTagContent;
-      } else if (actions.isNewJsonFormat(destContent)) {
-        // Tag de destino ya tiene JSON: fusionar los arrays Visits
-        debugPrint('🔀 TAG-TRANSFER: Fusionando Visits del origen al destino...');
-        final destJson = actions.parseNfcJson(destContent);
-        final srcJson = actions.parseNfcJson(widget.sourceTagContent);
-
-        if (destJson != null && srcJson != null) {
-          final destVisits =
-              List<dynamic>.from(destJson['Visits'] as List? ?? []);
-          final srcVisits =
-              List<dynamic>.from(srcJson['Visits'] as List? ?? []);
-          destVisits.addAll(srcVisits);
-          destJson['Visits'] = destVisits;
-          if (srcJson['status'] != null) {
-            destJson['status'] = srcJson['status'];
-          }
-          contentToWrite = jsonEncode(destJson);
-          debugPrint(
-              '✅ TAG-TRANSFER: Fusionados ${srcVisits.length} Visits nuevos. Total destino: ${destVisits.length}');
-        } else {
-          debugPrint(
-              '⚠️ TAG-TRANSFER: No se pudo parsear JSON, escribiendo JSON completo del origen');
-          contentToWrite = widget.sourceTagContent;
-        }
-      } else {
-        // Formato de destino no reconocido: escribir fuente completo
-        debugPrint(
-            '⚠️ TAG-TRANSFER: Formato destino no reconocido, escribiendo JSON completo del origen');
-        contentToWrite = widget.sourceTagContent;
-      }
-
-      // Escribir el contenido final en el tag de destino
-      debugPrint('📝 Escribiendo contenido en tag de destino...');
-      final writeSuccess =
-          await actions.writeNFCTag(context, contentToWrite);
+      // writeNFCTag lee el contenido actual del tag destino en la misma sesión NFC,
+      // fusiona (array) e inyecta tag_to/US. El contenido final queda en FFAppState().nfcRead.
+      debugPrint('📝 TAG-TRANSFER: Esperando tag de destino...');
+      final writeSuccess = await actions.writeNFCTag(context, widget.sourceTagContent);
 
       if (!mounted) return;
 
       if (!writeSuccess) {
-        // Verificar si hubo un error de validación
         final nfcReadState = FFAppState().nfcRead;
 
         if (nfcReadState.startsWith('ERROR:PRODUCTO_NO_ENCONTRADO:')) {
@@ -135,12 +90,15 @@ class _NfcTransferWriteDialogWidgetState
               'El TAG de destino no es del tipo correcto.\n\nEsperado: $requiredType\nEncontrado: $foundType\n\nUtilice el TAG correcto.');
         }
 
-        throw Exception(
-            'No se pudo escribir en el tag de destino.\n\nIntente de nuevo.');
+        throw Exception('No se pudo escribir en el tag de destino.\n\nIntente de nuevo.');
       }
 
-      debugPrint('✅ Transferencia completada exitosamente');
-      debugPrint('📦 TAG-TRANSFER: Contenido escrito en destino: ${contentToWrite.length} caracteres');
+      // Contenido realmente escrito: array fusionado (o fuente solo si era el primer transfer)
+      final contentWritten = FFAppState().nfcRead.isNotEmpty
+          ? FFAppState().nfcRead
+          : widget.sourceTagContent;
+
+      debugPrint('✅ Transferencia completada: ${contentWritten.length} chars escritos');
 
       if (!mounted) return;
       setState(() {
@@ -150,10 +108,9 @@ class _NfcTransferWriteDialogWidgetState
 
       HapticFeedback.heavyImpact();
 
-      // Esperar un momento y cerrar el diálogo retornando el contenido escrito
       await Future.delayed(const Duration(seconds: 2));
       if (mounted) {
-        Navigator.pop(context, contentToWrite);
+        Navigator.pop(context, contentWritten);
       }
     } catch (e) {
       debugPrint('❌ Error en transferencia: $e');
