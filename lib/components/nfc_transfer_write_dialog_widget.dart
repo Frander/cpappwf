@@ -64,6 +64,13 @@ class _NfcTransferWriteDialogWidgetState
   Future<void> _startWriting() async {
     HapticFeedback.mediumImpact();
 
+    // Arrancar el polling ANTES del await: cuando el tag de destino está lleno,
+    // writeNFCTag NO completa su Completer (mantiene la sesión NFC activa
+    // esperando otro tag) y señala el estado con FFAppState().nfcRead =
+    // 'SOLICITAR_OTRO_TAG'. El polling detecta ese cambio y refresca la UI para
+    // pedir un nuevo tag vacío, sin que el await regrese.
+    _startNfcStatePolling();
+
     try {
       // writeNFCTag lee el contenido actual del tag destino en la misma sesión NFC,
       // fusiona (array) e inyecta tag_to/US. El contenido final queda en FFAppState().nfcRead.
@@ -74,6 +81,12 @@ class _NfcTransferWriteDialogWidgetState
 
       if (!writeSuccess) {
         final nfcReadState = FFAppState().nfcRead;
+
+        // Salvaguarda: si justo se solicitó otro tag, no tratarlo como error.
+        if (nfcReadState == 'SOLICITAR_OTRO_TAG') {
+          debugPrint('⏳ TAG-TRANSFER: Esperando que el usuario acerque otro tag...');
+          return;
+        }
 
         if (nfcReadState.startsWith('ERROR:PRODUCTO_NO_ENCONTRADO:')) {
           final parts = nfcReadState.split(':');
@@ -88,6 +101,14 @@ class _NfcTransferWriteDialogWidgetState
           final foundType = parts.length > 3 ? parts[3] : 'desconocido';
           throw Exception(
               'El TAG de destino no es del tipo correcto.\n\nEsperado: $requiredType\nEncontrado: $foundType\n\nUtilice el TAG correcto.');
+        }
+
+        // El contenido no cabe ni siquiera en un tag de destino vacío.
+        if (nfcReadState.startsWith('ERROR:ESPACIO_INSUFICIENTE:')) {
+          final parts = nfcReadState.split(':');
+          final bytesInfo = parts.length > 2 ? parts[2] : '';
+          throw Exception(
+              'El contenido no cabe en el tag de destino.${bytesInfo.isNotEmpty ? '\n\nTamaño: $bytesInfo bytes.' : ''}\n\nUtilice un tag con mayor capacidad.');
         }
 
         throw Exception('No se pudo escribir en el tag de destino.\n\nIntente de nuevo.');
@@ -122,6 +143,24 @@ class _NfcTransferWriteDialogWidgetState
       });
       HapticFeedback.vibrate();
     }
+  }
+
+  /// Polling del estado NFC mientras se escribe. Permite reflejar en la UI el
+  /// estado 'SOLICITAR_OTRO_TAG' (tag de destino lleno) que writeNFCTag publica
+  /// en FFAppState().nfcRead sin completar su Completer.
+  void _startNfcStatePolling() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(milliseconds: 300));
+
+      // Detener el polling cuando el diálogo deja de estar en estado de escritura.
+      if (!mounted || !isWriting) return false;
+
+      // Forzar rebuild para que _buildWritingState() refleje el estado actual
+      // (p.ej. cambiar a "Acerque OTRO tag" cuando el destino está lleno).
+      setState(() {});
+
+      return isWriting;
+    });
   }
 
   @override
@@ -197,6 +236,11 @@ class _NfcTransferWriteDialogWidgetState
   }
 
   Widget _buildWritingState() {
+    // El tag de destino está lleno: writeNFCTag conserva su contenido y espera
+    // que el usuario acerque un tag NUEVO (vacío) para escribir la transferencia.
+    final bool needsAnotherTag =
+        FFAppState().nfcRead == 'SOLICITAR_OTRO_TAG';
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -206,9 +250,11 @@ class _NfcTransferWriteDialogWidgetState
             child: Container(
               width: 120,
               height: 120,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.orange, Colors.deepOrange],
+                  colors: needsAnotherTag
+                      ? [Colors.amber, Colors.orange]
+                      : [Colors.orange, Colors.deepOrange],
                 ),
                 shape: BoxShape.circle,
               ),
@@ -216,9 +262,12 @@ class _NfcTransferWriteDialogWidgetState
             ),
           ),
           const SizedBox(height: 30),
-          const Text(
-            'ACERQUE EL TAG DE DESTINO',
-            style: TextStyle(fontFamily: 'Roboto',
+          Text(
+            needsAnotherTag
+                ? '⚠️ ACERQUE OTRO TAG'
+                : 'ACERQUE EL TAG DE DESTINO',
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontFamily: 'Roboto',
               fontSize: 20,
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -226,7 +275,9 @@ class _NfcTransferWriteDialogWidgetState
           ),
           const SizedBox(height: 12),
           Text(
-            'Se leerá el tag de destino y se agregarán\nlas visitas del tag de origen',
+            needsAnotherTag
+                ? 'El contenido no cabe en el tag de destino.\n\nEl contenido existente se conservará.\n\nAcerque un NUEVO tag (vacío) para continuar.'
+                : 'Se leerá el tag de destino y se agregarán\nlas visitas del tag de origen',
             textAlign: TextAlign.center,
             style: TextStyle(fontFamily: 'Roboto',
               fontSize: 14,
@@ -234,6 +285,33 @@ class _NfcTransferWriteDialogWidgetState
               height: 1.5,
             ),
           ),
+          if (needsAnotherTag) ...[
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.amber, width: 1),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber, size: 20),
+                  SizedBox(width: 8),
+                  Text(
+                    'Esperando nuevo tag...',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 13,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

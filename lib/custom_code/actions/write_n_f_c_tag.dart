@@ -14,12 +14,17 @@ import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:ndef_record/ndef_record.dart';
 import 'package:sqflite/sqflite.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 
-/// Escribe datos en un tag NFC
+/// Escribe datos en un tag NFC.
+/// [visitDelta] — delta pre-computado antes de abrir la sesión NFC (solo tag-writer).
+/// Si se provee y el tag ya tiene contenido comprimido/multi-chunk, se hace
+/// un append de string puro sin parseo JSON ni compresión durante la sesión.
 Future<bool> writeNFCTag(
   BuildContext context,
-  String dataToWrite,
-) async {
+  String dataToWrite, {
+  String? visitDelta,
+}) async {
   if (!Platforms.isMobile) return false; // NFC no disponible en desktop
   // Verificar si NFC está disponible y activado
   bool nfcReady = await checkNfcStatus(context, showAlert: true);
@@ -31,7 +36,25 @@ Future<bool> writeNFCTag(
 
   // Variables para controlar el flujo de múltiples tags
   bool needsAnotherTag = false;
-  String contentForNewTag = dataToWrite;
+
+  // ── Pre-trabajo FUERA de la sesión NFC (minimiza el tiempo en campo) ──
+  // (1)/(2) Conexión SQLite ya caliente vía GlobalDbSingleton (instancia única
+  //     WAL que NUNCA se cierra): la validación de producto en sesión será una
+  //     query directa, sin pagar openDatabase/WAL-init con el enlace ISO-DEP
+  //     abierto (lo que alargaba el tiempo en campo y favorecía el IOException).
+  Database? warmDb;
+  try {
+    warmDb = await GlobalDbSingleton().database;
+  } catch (e) {
+    debugPrint('⚠️ writeNFCTag: no se pudo pre-abrir SQLite: $e');
+  }
+  final Database? sharedDb = warmDb;
+
+  // (3) Decodificación del contenido de ORIGEN precomputada fuera de la sesión:
+  //     el merge en sesión ya no descomprime la fuente. (Solo se usa en el
+  //     camino tag-transfer; para tag-writer queda sin uso, sin costo relevante.)
+  final List<Map<String, dynamic>> preSrcRecords =
+      decodeNfcRecords(dataToWrite);
 
   // Iniciar sesión NFC para escritura
   NfcManager.instance.startSession(
@@ -78,17 +101,12 @@ Future<bool> writeNFCTag(
                   final requiredProductType = match.group(1)!.trim();
                   debugPrint('   Tipo requerido: $requiredProductType');
 
-                  // Buscar el producto en SQLite por RFID
+                  // Buscar el producto en SQLite (conexión singleton ya caliente)
                   try {
-                    final dbPath = FFAppState().pathDatabase;
-                    if (dbPath.isNotEmpty) {
-                      final database = await openDatabase(dbPath);
-
-                      final productResults = await database.rawQuery('''
+                    if (sharedDb != null) {
+                      final productResults = await sharedDb.rawQuery('''
                         SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
                       ''', [tagRfid]);
-
-                      await database.close();
 
                       if (productResults.isEmpty) {
                         debugPrint('❌ RFID no encontrado en Products: $tagRfid');
@@ -140,17 +158,12 @@ Future<bool> writeNFCTag(
                   final requiredProductType = match.group(1)!.trim();
                   debugPrint('   Tipo de destino requerido: $requiredProductType');
 
-                  // Buscar el producto en SQLite por RFID
+                  // Buscar el producto en SQLite (conexión singleton ya caliente)
                   try {
-                    final dbPath = FFAppState().pathDatabase;
-                    if (dbPath.isNotEmpty) {
-                      final database = await openDatabase(dbPath);
-
-                      final productResults = await database.rawQuery('''
+                    if (sharedDb != null) {
+                      final productResults = await sharedDb.rawQuery('''
                         SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
                       ''', [tagRfid]);
-
-                      await database.close();
 
                       if (productResults.isEmpty) {
                         debugPrint('❌ TAG-TRANSFER: RFID de destino no encontrado: $tagRfid');
@@ -196,11 +209,9 @@ Future<bool> writeNFCTag(
         String existingContent = '';
         Map<String, dynamic>? nfcJson;
 
-        // Si ya determinamos que necesitamos otro tag, escribir solo el nuevo contenido
         if (needsAnotherTag) {
-          debugPrint('Escribiendo en nuevo tag: Solo el contenido nuevo');
-          finalContent = contentForNewTag;
-        } else {
+          debugPrint('✏️ NUEVO TAG: tag virgen, procesando con pipeline completo...');
+        }
           // Intentar leer el contenido existente del tag
           // Esto funciona para tags NDEF: MifareClassic formateado, DESFire formateado, etc.
           try {
@@ -246,142 +257,126 @@ Future<bool> writeNFCTag(
             // Si falla la lectura, continuar con solo el nuevo contenido
           }
 
+          // ═══ FAST APPEND PATH (TAG-WRITER, writes 2+) ═══
+          // El visitDelta fue pre-computado ANTES de abrir la sesión NFC.
+          // Solo se hace concatenación de strings: cero parseo JSON, cero compresión.
+          if (visitDelta != null &&
+              visitDelta.isNotEmpty &&
+              existingContent.isNotEmpty &&
+              (isNfcCompressedFormat(existingContent) || isMultiChunkFormat(existingContent))) {
+            finalContent = existingContent + kNfcChunkDelimiter + visitDelta;
+            debugPrint('⚡ FAST APPEND: +${visitDelta.length} bytes, total ${finalContent.length} bytes');
+            // Saltar directamente a VALIDAR ESPACIO
+          } else {
+
+          // ═══ DECODIFICAR existingContent si viene en formato comprimido/minificado ═══
+          if (existingContent.isNotEmpty &&
+              (isNfcCompressedFormat(existingContent) || isMultiChunkFormat(existingContent))) {
+            final decoded = nfcDecode(existingContent);
+            if (decoded != null) {
+              existingContent = jsonEncode(decoded);
+              debugPrint('🔓 existingContent decodificado: ${(decoded["Visits"] as List?)?.length ?? 0} visitas');
+            }
+          }
+
           // === DETECTAR TIPO DE OPERACIÓN ===
           // Si dataToWrite ya es un JSON completo válido (tag-transfer),
           // inyectar tag_from (RFID origen ya viene en el JSON), tag_to y US
-          if (isNewJsonFormat(dataToWrite)) {
-            debugPrint('🔄 TAG-TRANSFER: JSON detectado, inyectando tag_to y fusionando con destino');
+          if (isNewJsonFormat(dataToWrite) || isJsonArrayFormat(dataToWrite)) {
+            // ═══ TAG-TRANSFER: fusionar por RFID de origen ═══
+            // El destino puede acumular VARIOS productos (uno por RFID de origen).
+            // Identidad = Read_info.tag_from (RFID del tag de origen):
+            //   • mismo origen    → se concatenan sus Visits en ese registro.
+            //   • origen distinto → se AGREGA un registro nuevo (NO se reemplaza),
+            //     preservando Read_info, Visits y status de cada producto.
+            // Soporta destino y fuente como objeto único o como array.
+            debugPrint('🔄 TAG-TRANSFER: fusionando por RFID de origen con destino');
             try {
-              final transferJson = parseNfcJson(dataToWrite);
-              if (transferJson != null) {
-                final readInfo = transferJson['Read_info'] as Map<String, dynamic>?;
-                if (readInfo != null) {
-                  readInfo['tag_to'] = tagRfid;
-                  readInfo['US'] = FFAppState().userSelected.idUser;
-                  if ((readInfo['tag_from'] as String? ?? '').isEmpty) {
-                    readInfo['tag_from'] = readInfo['RFID'] ?? '';
-                  }
-                }
-                debugPrint('   tag_from=${readInfo?["tag_from"]}, tag_to=$tagRfid, US=${FFAppState().userSelected.idUser}');
-
-                // Fusionar con el contenido existente del tag de destino (misma sesión NFC)
-                if (existingContent.isNotEmpty) {
-                  try {
-                    final destDecoded = jsonDecode(existingContent);
-                    if (destDecoded is List) {
-                      finalContent = jsonEncode([...destDecoded, transferJson]);
-                      debugPrint('✅ TAG-TRANSFER: Array extendido a ${destDecoded.length + 1} elementos');
-                    } else if (destDecoded is Map) {
-                      finalContent = jsonEncode([destDecoded, transferJson]);
-                      debugPrint('✅ TAG-TRANSFER: Array de 2 elementos creado');
-                    } else {
-                      finalContent = nfcJsonToString(transferJson);
-                    }
-                  } catch (_) {
-                    finalContent = nfcJsonToString(transferJson);
-                  }
-                } else {
-                  finalContent = nfcJsonToString(transferJson);
-                  debugPrint('✅ TAG-TRANSFER: Primer elemento, tag destino vacío');
-                }
-
-                // Exponer el contenido escrito para que _startWriting() lo recupere
-                FFAppState().update(() { FFAppState().nfcRead = finalContent; });
-              } else {
+              // Origen ya decodificado fuera de la sesión (preSrcRecords).
+              final srcRecords = preSrcRecords;
+              if (srcRecords.isEmpty) {
                 finalContent = dataToWrite;
-              }
-            } catch (e) {
-              debugPrint('⚠️ Error en TAG-TRANSFER: $e');
-              finalContent = dataToWrite;
-            }
-          } else if (isJsonArrayFormat(dataToWrite)) {
-            // Array de transferencias (tag-transfer con destino ya ocupado).
-            // Inyectar tag_to y US únicamente en el último elemento (el más reciente).
-            debugPrint('🔄 TAG-TRANSFER array: inyectando tag_to y US en último elemento');
-            try {
-              final arrayData = (jsonDecode(dataToWrite) as List)
-                  .map((e) => Map<String, dynamic>.from(e as Map<String, dynamic>))
-                  .toList();
-              if (arrayData.isNotEmpty) {
-                final readInfo = arrayData.last['Read_info'] as Map<String, dynamic>?;
-                if (readInfo != null) {
-                  readInfo['tag_to'] = tagRfid;
-                  readInfo['US'] = FFAppState().userSelected.idUser;
-                  if ((readInfo['tag_from'] as String? ?? '').isEmpty) {
-                    readInfo['tag_from'] = readInfo['RFID'] ?? '';
+              } else {
+                final destRecords = existingContent.isNotEmpty
+                    ? decodeNfcRecords(existingContent)
+                    : <Map<String, dynamic>>[];
+
+                String originOf(Map<String, dynamic> rec) {
+                  final ri = rec['Read_info'] as Map<String, dynamic>?;
+                  final from = (ri?['tag_from'] as String? ?? '').trim();
+                  if (from.isNotEmpty) return from;
+                  return (ri?['RFID'] as String? ?? '').trim();
+                }
+
+                for (final src in srcRecords) {
+                  // Inyectar tag_to / US / tag_from en cada registro de origen.
+                  final ri = src['Read_info'] as Map<String, dynamic>?;
+                  if (ri != null) {
+                    ri['tag_to'] = tagRfid;
+                    ri['US'] = FFAppState().userSelected.idUser;
+                    if ((ri['tag_from'] as String? ?? '').isEmpty) {
+                      ri['tag_from'] = ri['RFID'] ?? '';
+                    }
+                  }
+
+                  final origin = originOf(src);
+                  final idx = origin.isEmpty
+                      ? -1
+                      : destRecords.indexWhere((r) => originOf(r) == origin);
+
+                  if (idx >= 0) {
+                    // Mismo origen → concatenar Visits, refrescar Read_info/status.
+                    final destVisits = List<dynamic>.from(
+                        (destRecords[idx]['Visits'] as List?) ?? []);
+                    final srcVisits = List<dynamic>.from(
+                        (src['Visits'] as List?) ?? []);
+                    destRecords[idx] = Map<String, dynamic>.from(src)
+                      ..['Visits'] = [...destVisits, ...srcVisits];
+                    debugPrint('✅ TAG-TRANSFER: mismo origen ($origin) → '
+                        'Visits ${destVisits.length}+${srcVisits.length}');
+                  } else {
+                    // Origen distinto → registro nuevo (concatenar, NO reemplazar).
+                    destRecords.add(src);
+                    debugPrint('✅ TAG-TRANSFER: nuevo origen ($origin) → '
+                        'registro agregado (total ${destRecords.length} producto(s))');
                   }
                 }
+
+                finalContent = nfcEncodeRecords(destRecords);
+                debugPrint('📤 TAG-TRANSFER: destino con ${destRecords.length} '
+                    'producto(s), ${finalContent.length} chars');
               }
-              finalContent = jsonEncode(arrayData);
-              debugPrint('   ${arrayData.length} elementos, tag_to=$tagRfid inyectado en último');
+              // Exponer el contenido escrito para que _startWriting() lo recupere
+              FFAppState().update(() { FFAppState().nfcRead = finalContent; });
             } catch (e) {
-              debugPrint('⚠️ Error procesando array tag-transfer: $e');
+              debugPrint('⚠️ Error en TAG-TRANSFER merge: $e');
               finalContent = dataToWrite;
             }
           } else {
-            // === PROCESAR FORMATO ANTIGUO (TAG-WRITER) ===
-            // Parsear el dataToWrite para extraer los campos necesarios
-            // Formato esperado: {DH:2025_11_06_13:20:00;OP:4214;VISITS:50;RESULTS:25;HE:204}
+            // === TAG-WRITER: Extraer campos desde visitDelta ===
             int? operatorId;
             int? visits;
             int? results;
             int? headquarterId;
             DateTime? dateTime;
 
-            debugPrint('📝 TAG-WRITER: Parseando dataToWrite: $dataToWrite');
-
-          final recordRegex = RegExp(r'\{([^}]+)\}');
-          final recordMatch = recordRegex.firstMatch(dataToWrite);
-
-          if (recordMatch != null) {
-            final recordContent = recordMatch.group(1);
-            if (recordContent != null) {
-              debugPrint('📋 Contenido del registro: $recordContent');
-              final fields = recordContent.split(';');
-              for (var field in fields) {
-                final parts = field.split(':');
-                if (parts.length >= 2) {
-                  final key = parts[0].trim();
-                  final value = parts.sublist(1).join(':').trim();
-
-                  switch (key) {
-                    case 'DH':
-                      try {
-                        final dateStr = value.replaceAll('_', '-');
-                        final dateParts = dateStr.split('-');
-                        if (dateParts.length >= 4) {
-                          final year = int.parse(dateParts[0]);
-                          final month = int.parse(dateParts[1]);
-                          final day = int.parse(dateParts[2]);
-                          final timeParts = dateParts[3].split(':');
-                          final hour = int.parse(timeParts[0]);
-                          final minute = int.parse(timeParts[1]);
-                          final second = int.parse(timeParts[2]);
-                          dateTime = DateTime(year, month, day, hour, minute, second);
-                        }
-                      } catch (e) {
-                        dateTime = DateTime.now();
-                      }
-                      break;
-                    case 'OP':
-                      operatorId = int.tryParse(value);
-                      break;
-                    case 'VISITS':
-                      visits = int.tryParse(value);
-                      break;
-                    case 'RESULTS':
-                      results = int.tryParse(value);
-                      break;
-                    case 'HE':
-                      headquarterId = int.tryParse(value);
-                      break;
-                  }
+            if (visitDelta != null && visitDelta.startsWith('V:')) {
+              try {
+                final delta = jsonDecode(visitDelta.substring(2)) as Map<String, dynamic>;
+                operatorId = delta['o'] as int?;
+                visits = delta['v'] as int?;
+                results = delta['s'] as int?;
+                headquarterId = delta['e'] as int?;
+                final epoch = delta['h'] as int?;
+                if (epoch != null) {
+                  dateTime = DateTime.fromMillisecondsSinceEpoch(epoch * 1000);
                 }
+              } catch (e) {
+                debugPrint('⚠️ Error parseando visitDelta: $e');
               }
             }
-          }
 
-          debugPrint('📊 Valores parseados: OP=$operatorId, VISITS=$visits, RESULTS=$results, HE=$headquarterId');
+            debugPrint('📊 TAG-WRITER: OP=$operatorId, VISITS=$visits, RESULTS=$results, HE=$headquarterId');
 
           // Verificar si tenemos la información del producto desde la validación anterior
           int? productId;
@@ -390,13 +385,10 @@ Future<bool> writeNFCTag(
 
           if (tagRfid.isNotEmpty) {
             try {
-              final dbPath = FFAppState().pathDatabase;
-              if (dbPath.isNotEmpty) {
-                final database = await openDatabase(dbPath);
-                final productResults = await database.rawQuery('''
+              if (sharedDb != null) {
+                final productResults = await sharedDb.rawQuery('''
                   SELECT Id_product, Name_product, Type_product FROM Products WHERE Rfid = ? LIMIT 1
                 ''', [tagRfid]);
-                await database.close();
 
                 if (productResults.isNotEmpty) {
                   productId = productResults.first['Id_product'] as int?;
@@ -409,50 +401,16 @@ Future<bool> writeNFCTag(
             }
           }
 
-          // Determinar el formato del contenido existente
-          if (existingContent.isNotEmpty) {
-            if (isNewJsonFormat(existingContent)) {
-              // Formato JSON nuevo
-              debugPrint('✅ Formato JSON detectado, parseando...');
-              nfcJson = parseNfcJson(existingContent);
+          // Procesar contenido existente en formato JSON nuevo
+          if (existingContent.isNotEmpty && isNewJsonFormat(existingContent)) {
+            debugPrint('✅ Formato JSON detectado, parseando...');
+            nfcJson = parseNfcJson(existingContent);
 
-              if (nfcJson != null) {
-                // Actualizar Read_info con nueva fecha y datos del producto
-                if (productId != null && productName != null) {
-                  nfcJson = updateReadInfo(
-                    nfcJson,
-                    idProduct: productId,
-                    rfid: productRfid,
-                    nameProduct: productName,
-                    tagFrom: '',
-                    tagTo: tagRfid,
-                    userId: FFAppState().userSelected.idUser,
-                  );
-                  debugPrint('📝 Read_info actualizado (tag-writer)');
-                }
-
-                // Agregar nueva visita
-                if (operatorId != null && visits != null && results != null && headquarterId != null) {
-                  nfcJson = addVisitToNfcJson(
-                    nfcJson,
-                    operatorId: operatorId,
-                    visits: visits,
-                    results: results,
-                    headquarterId: headquarterId,
-                    dateTime: dateTime,
-                  );
-                  debugPrint('✅ Nueva visita agregada al JSON');
-                }
-
-                finalContent = nfcJsonToString(nfcJson);
-              }
-            } else if (isOldFormat(existingContent)) {
-              // Formato antiguo, migrar a JSON
-              debugPrint('🔄 Formato antiguo detectado, migrando a JSON...');
-
+            if (nfcJson != null) {
+              // Actualizar Read_info con nueva fecha y datos del producto
               if (productId != null && productName != null) {
-                nfcJson = migrateOldFormatToJson(
-                  existingContent,
+                nfcJson = updateReadInfo(
+                  nfcJson,
                   idProduct: productId,
                   rfid: productRfid,
                   nameProduct: productName,
@@ -460,27 +418,23 @@ Future<bool> writeNFCTag(
                   tagTo: tagRfid,
                   userId: FFAppState().userSelected.idUser,
                 );
-
-                if (nfcJson != null) {
-                  // Agregar nueva visita al JSON migrado
-                  if (operatorId != null && visits != null && results != null && headquarterId != null) {
-                    nfcJson = addVisitToNfcJson(
-                      nfcJson,
-                      operatorId: operatorId,
-                      visits: visits,
-                      results: results,
-                      headquarterId: headquarterId,
-                      dateTime: dateTime,
-                    );
-                  }
-
-                  finalContent = nfcJsonToString(nfcJson);
-                  debugPrint('✅ Migración completada, JSON generado');
-                }
+                debugPrint('📝 Read_info actualizado (tag-writer)');
               }
-            } else {
-              debugPrint('⚠️ Formato desconocido, usando contenido como está');
-              finalContent = '$existingContent,$dataToWrite';
+
+              // Agregar nueva visita
+              if (operatorId != null && visits != null && results != null && headquarterId != null) {
+                nfcJson = addVisitToNfcJson(
+                  nfcJson,
+                  operatorId: operatorId,
+                  visits: visits,
+                  results: results,
+                  headquarterId: headquarterId,
+                  dateTime: dateTime,
+                );
+                debugPrint('✅ Nueva visita agregada al JSON');
+              }
+
+              finalContent = nfcEncode(nfcJson);
             }
           } else {
             // Tag vacío, crear JSON inicial
@@ -508,12 +462,12 @@ Future<bool> writeNFCTag(
                 );
               }
 
-              finalContent = nfcJsonToString(nfcJson);
+              finalContent = nfcEncode(nfcJson);
               debugPrint('✅ JSON inicial creado');
             }
           }
           } // Fin del else para TAG-WRITER
-        }
+          } // Fin del else del fast-append path
 
         // VALIDAR ESPACIO DISPONIBLE
         final finalContentBytes = utf8.encode(finalContent);
@@ -544,10 +498,26 @@ Future<bool> writeNFCTag(
               'Tag Mifare Classic 1K con capacidad limitada: $maxCapacity bytes (para evitar timeout)');
         }
 
-        // Verificar si hay espacio suficiente
-        if (maxCapacity > 0 && requiredBytes > maxCapacity) {
+        // Calcular el tamaño REAL del mensaje NDEF que se enviará al tag.
+        // ndef.maxSize es el espacio máximo del MENSAJE NDEF completo (headers incluidos),
+        // no solo del texto. El record NDEF Text tiene overhead propio:
+        //   payload = [status_byte(1)] + [lang_code "en"(2)] + [texto(N)] = N+3 bytes
+        //   record  = [flags(1)] + [type_len(1)] + [payload_len_field(1 o 4)] + [type 'T'(1)] + payload
+        //   si payload > 255 → payload_len_field = 4 bytes (Long Record, SR=0)
+        //   si payload ≤ 255 → payload_len_field = 1 byte  (Short Record, SR=1)
+        const int textRecordStaticOverhead = 3; // status_byte + "en"
+        final int ndefPayloadSize = requiredBytes + textRecordStaticOverhead;
+        final int payloadLenFieldSize = ndefPayloadSize > 255 ? 4 : 1;
+        const int ndefRecordHeaderSize = 3; // flags(1) + type_len(1) + type_char(1)
+        final int totalNdefBytes =
+            ndefRecordHeaderSize + payloadLenFieldSize + ndefPayloadSize;
+
+        // Verificar si hay espacio suficiente (usando el tamaño NDEF real)
+        if (maxCapacity > 0 && totalNdefBytes > maxCapacity) {
           debugPrint(
-              'ESPACIO INSUFICIENTE: Se requieren $requiredBytes bytes, pero solo hay $maxCapacity bytes disponibles');
+              'ESPACIO INSUFICIENTE: NDEF message requiere $totalNdefBytes bytes '
+              '(texto=$requiredBytes + overhead NDEF=${totalNdefBytes - requiredBytes} bytes), '
+              'capacidad=$maxCapacity');
           debugPrint('Contenido existente: ${existingContent.length} bytes');
           debugPrint('Nuevo registro: ${dataToWrite.length} bytes');
 
@@ -562,7 +532,6 @@ Future<bool> writeNFCTag(
 
             // Marcar que necesitamos otro tag
             needsAnotherTag = true;
-            contentForNewTag = dataToWrite;
 
             // Actualizar AppState para mostrar mensaje al usuario
             FFAppState().update(() {
@@ -580,7 +549,7 @@ Future<bool> writeNFCTag(
             // Actualizar AppState con mensaje de error
             FFAppState().update(() {
               FFAppState().nfcRead =
-                  'ERROR:ESPACIO_INSUFICIENTE:$requiredBytes/$maxCapacity';
+                  'ERROR:ESPACIO_INSUFICIENTE:$totalNdefBytes/$maxCapacity';
             });
 
             completer.complete(false);
@@ -590,7 +559,8 @@ Future<bool> writeNFCTag(
         }
 
         debugPrint(
-            'Espacio OK: $requiredBytes bytes de $maxCapacity disponibles');
+            'Espacio OK: $totalNdefBytes bytes NDEF de $maxCapacity disponibles '
+            '($requiredBytes bytes de texto + ${totalNdefBytes - requiredBytes} overhead)');
 
         // Crear payload del Text Record según estándar NDEF
         // Formato: [status byte][language code][texto]
@@ -829,9 +799,30 @@ Future<bool> writeNFCTag(
           return;
         }
 
-        try {
-          // Escribir usando NDEF estándar
-          await ndefWriter.write(message: message);
+        // Escribir usando NDEF estándar, con reintentos ante error transitorio
+        // (IOException / tag lost). Se reescribe el MISMO finalContent (ya
+        // fusionado con el contenido del destino), así que aunque una escritura
+        // fallida deje el tag a medias, un reintento exitoso restaura el
+        // contenido completo sin perder los registros previamente acumulados.
+        Object? writeError;
+        bool ndefWritten = false;
+        for (int attempt = 1; attempt <= 3; attempt++) {
+          try {
+            await ndefWriter.write(message: message);
+            ndefWritten = true;
+            break;
+          } catch (e) {
+            writeError = e;
+            final m = e.toString().toLowerCase();
+            final transient =
+                m.contains('ioexception') || m.contains('tag was lost');
+            debugPrint('⚠️ Error al escribir NDEF (intento $attempt/3): $e');
+            if (!transient || attempt == 3) break;
+            await Future.delayed(const Duration(milliseconds: 300));
+          }
+        }
+
+        if (ndefWritten) {
           debugPrint('Mensaje NDEF escrito exitosamente');
           debugPrint('Contenido completo: $finalContent');
 
@@ -841,11 +832,11 @@ Future<bool> writeNFCTag(
           });
 
           completer.complete(true);
-        } catch (writeError) {
-          debugPrint('Error al escribir NDEF: $writeError');
+        } else {
+          debugPrint('Error al escribir NDEF tras reintentos: $writeError');
 
           // Detectar si el error es por tag alejado (IOException)
-          final errorMsg = writeError.toString().toLowerCase();
+          final errorMsg = (writeError?.toString() ?? '').toLowerCase();
           if (errorMsg.contains('ioexception') ||
               errorMsg.contains('tag was lost')) {
             // Tag se alejó durante la escritura

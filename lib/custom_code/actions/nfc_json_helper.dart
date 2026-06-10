@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:convert';
+import 'dart:io'; // ZLibCodec for tag content compression
 
 /// Helper para construir y parsear el nuevo formato JSON de los tags NFC
 ///
@@ -29,6 +30,373 @@ import 'dart:convert';
 ///   ]
 /// }
 /// ```
+
+// ─── Key compression maps ─────────────────────────────────────────────────────
+const Map<String, String> _kEncode = {
+  'Read_info': 'R', 'Id_product': 'i', 'RFID': 'r', 'Name_product': 'n',
+  'Date_created': 'd', 'tag_from': 'f', 'tag_to': 't', 'US': 'u',
+  'Visits': 'V', 'DH': 'h', 'OP': 'o', 'OP2': 'p',
+  'VISITS': 'v', 'RESULTS': 's', 'HE': 'e',
+};
+
+const Map<String, String> _kDecode = {
+  'R': 'Read_info', 'i': 'Id_product', 'r': 'RFID', 'n': 'Name_product',
+  'd': 'Date_created', 'f': 'tag_from', 't': 'tag_to', 'u': 'US',
+  'V': 'Visits', 'h': 'DH', 'o': 'OP', 'p': 'OP2',
+  'v': 'VISITS', 's': 'RESULTS', 'e': 'HE',
+};
+
+const int _kCompressionThreshold = 200;
+const String _kPrefixMinified    = 'N1:';
+const String _kPrefixCompressed  = 'C1:';
+
+/// Delimitador entre chunks (ASCII 30 — Record Separator).
+/// No puede aparecer en base64url, JSON numérico, ni strings de producto.
+const String kNfcChunkDelimiter = '\x1E';
+
+// ─── Private minification helpers ─────────────────────────────────────────────
+
+Map<String, dynamic> _minifyNfcMap(Map<String, dynamic> canonical) {
+  final result = <String, dynamic>{};
+  canonical.forEach((key, value) {
+    final shortKey = _kEncode[key] ?? key;
+    if (key == 'Read_info' && value is Map<String, dynamic>) {
+      result[shortKey] = _minifyReadInfo(value);
+    } else if (key == 'Visits' && value is List) {
+      result[shortKey] = value.map((v) {
+        if (v is Map<String, dynamic>) return _minifyVisitEntry(v);
+        return v;
+      }).toList();
+    } else {
+      result[shortKey] = value;
+    }
+  });
+  return result;
+}
+
+Map<String, dynamic> _minifyReadInfo(Map<String, dynamic> info) {
+  final r = <String, dynamic>{};
+  info.forEach((key, value) {
+    final shortKey = _kEncode[key] ?? key;
+    if ((key == 'tag_from' || key == 'tag_to') && (value == null || value == '')) return;
+    if (key == 'Name_product' && value is String) {
+      r[shortKey] = value.length > 24 ? value.substring(0, 24) : value;
+      return;
+    }
+    if (key == 'Date_created' && value is String) {
+      r[shortKey] = _isoToEpoch(value);
+      return;
+    }
+    r[shortKey] = value;
+  });
+  return r;
+}
+
+Map<String, dynamic> _minifyVisitEntry(Map<String, dynamic> visit) {
+  final r = <String, dynamic>{};
+  visit.forEach((key, value) {
+    final shortKey = _kEncode[key] ?? key;
+    if (key == 'DH' && value is String) {
+      r[shortKey] = _isoToEpoch(value);
+      return;
+    }
+    if (key == 'OP2' && (value == null || value.toString().isEmpty || value == 'false')) return;
+    r[shortKey] = value;
+  });
+  return r;
+}
+
+dynamic _isoToEpoch(String iso) {
+  try {
+    return DateTime.parse(iso).millisecondsSinceEpoch ~/ 1000;
+  } catch (_) {
+    return iso;
+  }
+}
+
+// ─── Private expansion helpers ────────────────────────────────────────────────
+
+Map<String, dynamic> _expandNfcMap(Map<String, dynamic> minified) {
+  final result = <String, dynamic>{};
+  minified.forEach((key, value) {
+    final longKey = _kDecode[key] ?? key;
+    if (longKey == 'Read_info' && value is Map) {
+      result[longKey] = _expandReadInfo(Map<String, dynamic>.from(value));
+    } else if (longKey == 'Visits' && value is List) {
+      result[longKey] = value.map((v) {
+        if (v is Map) return _expandVisitEntry(Map<String, dynamic>.from(v));
+        return v;
+      }).toList();
+    } else {
+      result[longKey] = value;
+    }
+  });
+  return result;
+}
+
+Map<String, dynamic> _expandReadInfo(Map<String, dynamic> info) {
+  final r = <String, dynamic>{};
+  info.forEach((key, value) {
+    final longKey = _kDecode[key] ?? key;
+    if (longKey == 'Date_created' && value is int) {
+      r[longKey] = _epochToIso(value);
+      return;
+    }
+    r[longKey] = value;
+  });
+  r.putIfAbsent('tag_from', () => '');
+  r.putIfAbsent('tag_to', () => '');
+  return r;
+}
+
+Map<String, dynamic> _expandVisitEntry(Map<String, dynamic> visit) {
+  final r = <String, dynamic>{};
+  visit.forEach((key, value) {
+    final longKey = _kDecode[key] ?? key;
+    if (longKey == 'DH' && value is int) {
+      r[longKey] = _epochToIso(value);
+      return;
+    }
+    r[longKey] = value;
+  });
+  r.putIfAbsent('OP2', () => '');
+  return r;
+}
+
+String _epochToIso(int epoch) =>
+    DateTime.fromMillisecondsSinceEpoch(epoch * 1000).toIso8601String();
+
+String _addBase64Padding(String b64) {
+  final rem = b64.length % 4;
+  return rem == 0 ? b64 : b64 + '=' * (4 - rem);
+}
+
+// ─── Public delta-chunk API ───────────────────────────────────────────────────
+
+/// Retorna true si el string contiene múltiples chunks separados por [kNfcChunkDelimiter].
+bool isMultiChunkFormat(String raw) => raw.contains(kNfcChunkDelimiter);
+
+/// Serializa una visita individual como delta chunk para concatenación rápida en NFC.
+/// Se pre-computa ANTES de abrir la sesión NFC para minimizar el tiempo con el tag activo.
+/// Formato de salida: 'V:{"h":epoch,"o":opId,"v":visits,"s":results,"e":heId}'
+String encodeVisitDelta({
+  required int operatorId,
+  required int visits,
+  required int results,
+  required int headquarterId,
+  required DateTime dateTime,
+}) {
+  final entry = <String, dynamic>{
+    'h': dateTime.millisecondsSinceEpoch ~/ 1000,
+    'o': operatorId,
+    'v': visits,
+    's': results,
+    'e': headquarterId,
+  };
+  return 'V:${jsonEncode(entry)}';
+}
+
+/// Decodifica un string multi-chunk al Map canónico con todas las visitas combinadas.
+/// El primer chunk contiene Read_info + primera visita (N1/C1/canónico).
+/// Los chunks siguientes son deltas 'V:{...}' con claves minificadas.
+Map<String, dynamic>? decodeMultiChunk(String raw) {
+  final parts = raw.split(kNfcChunkDelimiter);
+  if (parts.isEmpty) return null;
+
+  // Primer chunk: JSON completo con Read_info + Visits
+  final firstChunk = nfcDecode(parts[0]) ?? parseNfcJson(parts[0]);
+  if (firstChunk == null) return null;
+
+  final visits = List<dynamic>.from((firstChunk['Visits'] as List?) ?? []);
+
+  for (final part in parts.skip(1)) {
+    if (!part.startsWith('V:')) continue;
+    try {
+      final minVisit = jsonDecode(part.substring(2)) as Map<String, dynamic>;
+      visits.add(_expandVisitEntry(minVisit));
+    } catch (e) {
+      debugPrint('⚠️ decodeMultiChunk: delta inválido — $e');
+    }
+  }
+
+  return {...firstChunk, 'Visits': visits};
+}
+
+// ─── Public compression API ───────────────────────────────────────────────────
+
+/// Retorna true si el string usa el formato comprimido (C1) o minificado (N1)
+bool isNfcCompressedFormat(String raw) =>
+    raw.startsWith(_kPrefixCompressed) || raw.startsWith(_kPrefixMinified);
+
+/// Codifica un Map NFC canónico al string optimizado para escribir en el tag.
+/// - Payload ≤ 200 bytes → 'N1:<json-minificado>'
+/// - Payload > 200 bytes → 'C1:<base64url(zlib(json-minificado))>'
+/// Fallback transparente a jsonEncode si falla la codificación.
+String nfcEncode(Map<String, dynamic> nfcJson) {
+  try {
+    final minJson  = jsonEncode(_minifyNfcMap(nfcJson));
+    final minBytes = utf8.encode(minJson);
+    if (minBytes.length <= _kCompressionThreshold) {
+      return '$_kPrefixMinified$minJson';
+    }
+    final compressed = ZLibCodec(level: 6).encode(minBytes);
+    final b64 = base64Url.encode(compressed).replaceAll('=', '');
+    return '$_kPrefixCompressed$b64';
+  } catch (e) {
+    debugPrint('⚠️ nfcEncode error: $e — fallback a jsonEncode');
+    return jsonEncode(nfcJson);
+  }
+}
+
+/// Decodifica un string del tag NFC (multi-chunk, N1, C1 o JSON canónico plano) al Map canónico.
+/// Retorna null si el formato es irreconocible o hay error.
+Map<String, dynamic>? nfcDecode(String raw) {
+  if (raw.isEmpty || raw.trim() == '0') return null;
+  // Multi-chunk: delegar a decodeMultiChunk (parts[0] no tiene delimitador → no recursión)
+  if (isMultiChunkFormat(raw)) return decodeMultiChunk(raw);
+  try {
+    if (raw.startsWith(_kPrefixCompressed) || raw.startsWith(_kPrefixMinified)) {
+      final String minJson;
+      if (raw.startsWith(_kPrefixCompressed)) {
+        final b64        = raw.substring(_kPrefixCompressed.length);
+        final compressed = base64Url.decode(_addBase64Padding(b64));
+        minJson          = utf8.decode(ZLibCodec().decode(compressed));
+      } else {
+        minJson = raw.substring(_kPrefixMinified.length);
+      }
+      final decoded = jsonDecode(minJson);
+      // Tag multi-producto: el payload es un ARRAY de registros. nfcDecode
+      // retorna un solo Map (contrato histórico), así que devuelve el PRIMER
+      // registro. Los consumidores que necesitan todos los productos deben usar
+      // decodeNfcRecords. Sin esto, el cast `as Map` lanzaba
+      // "List<dynamic> is not a subtype of Map<String, dynamic>".
+      if (decoded is List) {
+        final maps = decoded.whereType<Map>().toList();
+        if (maps.isEmpty) return null;
+        return _expandNfcMap(Map<String, dynamic>.from(maps.first));
+      }
+      if (decoded is Map) {
+        return _expandNfcMap(Map<String, dynamic>.from(decoded));
+      }
+      return null;
+    }
+    if (raw.startsWith('{')) {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic> &&
+          decoded.containsKey('Read_info') &&
+          decoded.containsKey('Visits')) {
+        return decoded;
+      }
+    }
+  } catch (e) {
+    debugPrint('⚠️ nfcDecode error: $e');
+  }
+  return null;
+}
+
+/// Decodifica el contenido de un tag a una LISTA de registros canónicos.
+///
+/// Un tag de destino puede acumular varios productos (uno por RFID de origen).
+/// Soporta: objeto único (canónico / N1 / C1 / multi-chunk) y array de registros
+/// (canónico o comprimido N1/C1). Retorna [] si está vacío o es irreconocible.
+List<Map<String, dynamic>> decodeNfcRecords(String raw) {
+  if (raw.isEmpty || raw.trim() == '0') return const [];
+
+  // Multi-chunk PRIMERO: el primer chunk puede venir con prefijo N1/C1, así que
+  // debe delegarse a decodeMultiChunk ANTES del branch comprimido — de lo
+  // contrario jsonDecode falla en el delimitador \x1E seguido de los deltas 'V:'.
+  if (isMultiChunkFormat(raw)) {
+    final m = decodeMultiChunk(raw);
+    return m != null ? [m] : const [];
+  }
+
+  // Formato comprimido/minificado: el payload puede ser objeto o array.
+  if (raw.startsWith(_kPrefixCompressed) || raw.startsWith(_kPrefixMinified)) {
+    try {
+      final String minJson;
+      if (raw.startsWith(_kPrefixCompressed)) {
+        final b64 = raw.substring(_kPrefixCompressed.length);
+        final compressed = base64Url.decode(_addBase64Padding(b64));
+        minJson = utf8.decode(ZLibCodec().decode(compressed));
+      } else {
+        minJson = raw.substring(_kPrefixMinified.length);
+      }
+      final decoded = jsonDecode(minJson);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((e) => _expandNfcMap(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+      if (decoded is Map) {
+        return [_expandNfcMap(Map<String, dynamic>.from(decoded))];
+      }
+    } catch (e) {
+      debugPrint('⚠️ decodeNfcRecords (comprimido): $e');
+    }
+    return const [];
+  }
+
+  // Array JSON plano (registros canónicos)
+  final trimmed = raw.trimLeft();
+  if (trimmed.startsWith('[')) {
+    try {
+      final list = jsonDecode(trimmed) as List;
+      return list.whereType<Map>().map((e) {
+        final m = Map<String, dynamic>.from(e);
+        // Canónico (tiene Read_info) → tal cual; si viniera minificado → expandir.
+        return m.containsKey('Read_info') ? m : _expandNfcMap(m);
+      }).toList();
+    } catch (e) {
+      debugPrint('⚠️ decodeNfcRecords (array plano): $e');
+    }
+    return const [];
+  }
+
+  // Objeto único canónico
+  final single = parseNfcJson(raw);
+  return single != null ? [single] : const [];
+}
+
+/// Inyecta el bloque status.visits_details (respuestas del formulario) en CADA
+/// registro del contenido de origen (objeto único o array). Reutiliza
+/// [decodeNfcRecords] para soportar canónico / N1 / C1 / array. Devuelve canónico:
+/// objeto único si hay 1 registro, array JSON si hay varios. Si el contenido no
+/// es JSON reconocible, lo devuelve sin cambios.
+String injectFormStatus(
+    String sourceContent, List<Map<String, dynamic>> visitsDetails) {
+  final records = decodeNfcRecords(sourceContent);
+  if (records.isEmpty) return sourceContent;
+  for (final rec in records) {
+    rec['status'] = {'visits_details': visitsDetails};
+  }
+  return records.length == 1 ? jsonEncode(records.first) : jsonEncode(records);
+}
+
+/// Codifica una LISTA de registros canónicos al string para escribir en el tag.
+/// - 1 registro  → delega en [nfcEncode] (compat: objeto único N1/C1).
+/// - 2+ registros → array minificado: comprimido (C1) o plano (N1) según tamaño.
+/// Fallback a jsonEncode canónico si algo falla.
+String nfcEncodeRecords(List<Map<String, dynamic>> records) {
+  if (records.isEmpty) return '';
+  if (records.length == 1) return nfcEncode(records.first);
+  try {
+    final minList = records.map(_minifyNfcMap).toList();
+    final minJson = jsonEncode(minList);
+    final minBytes = utf8.encode(minJson);
+    if (minBytes.length <= _kCompressionThreshold) {
+      return '$_kPrefixMinified$minJson';
+    }
+    final compressed = ZLibCodec(level: 6).encode(minBytes);
+    final b64 = base64Url.encode(compressed).replaceAll('=', '');
+    return '$_kPrefixCompressed$b64';
+  } catch (e) {
+    debugPrint('⚠️ nfcEncodeRecords error: $e — fallback a jsonEncode');
+    return jsonEncode(records);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 /// Construye el JSON inicial para un nuevo tag
 /// [tagFrom] RFID de origen: para tag-reader = RFID leído, para tag-writer = '', para tag-transfer = RFID origen
@@ -104,9 +472,11 @@ Map<String, dynamic> addVisitToNfcJson(
   return nfcJson;
 }
 
-/// Parsea un string JSON del tag NFC y retorna el Map
+/// Parsea un string JSON del tag NFC en cualquier formato (multi-chunk, N1, C1, canónico) al Map canónico.
 /// Retorna null si el contenido no es un JSON válido
 Map<String, dynamic>? parseNfcJson(String nfcContent) {
+  if (isMultiChunkFormat(nfcContent)) return decodeMultiChunk(nfcContent);
+  if (isNfcCompressedFormat(nfcContent)) return nfcDecode(nfcContent);
   try {
     final decoded = jsonDecode(nfcContent);
     if (decoded is Map<String, dynamic>) {
@@ -192,111 +562,10 @@ Map<int, Map<String, dynamic>> groupVisitsByHeadquarter(
   return grouped;
 }
 
-/// Migra el formato antiguo {DH:...;OP:...} al nuevo formato JSON
-/// Útil para tags que todavía usan el formato antiguo
-Map<String, dynamic>? migrateOldFormatToJson(
-  String oldContent, {
-  required int idProduct,
-  required String rfid,
-  required String nameProduct,
-  String tagFrom = '',
-  String tagTo = '',
-  int userId = 0,
-}) {
-  try {
-    // Crear JSON base
-    final nfcJson = buildInitialNfcJson(
-      idProduct: idProduct,
-      rfid: rfid,
-      nameProduct: nameProduct,
-      tagFrom: tagFrom,
-      tagTo: tagTo,
-      userId: userId,
-    );
-
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(oldContent);
-
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
-
-      // Parsear cada campo del registro antiguo
-      final fields = recordContent.split(';');
-      DateTime? dateTime;
-      int? operatorId;
-      int? visits;
-      int? results;
-      int? headquarterId;
-
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value = parts.sublist(1).join(':').trim();
-
-          switch (key) {
-            case 'DH':
-              // Parsear fecha antigua: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  dateTime = DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                dateTime = DateTime.now();
-              }
-              break;
-            case 'OP':
-              operatorId = int.tryParse(value);
-              break;
-            case 'VISITS':
-              visits = int.tryParse(value);
-              break;
-            case 'RESULTS':
-              results = int.tryParse(value);
-              break;
-            case 'HE':
-              headquarterId = int.tryParse(value);
-              break;
-          }
-        }
-      }
-
-      // Solo agregar si tiene los datos mínimos
-      if (operatorId != null &&
-          visits != null &&
-          results != null &&
-          headquarterId != null) {
-        addVisitToNfcJson(
-          nfcJson,
-          operatorId: operatorId,
-          visits: visits,
-          results: results,
-          headquarterId: headquarterId,
-          dateTime: dateTime,
-        );
-      }
-    }
-
-    return nfcJson;
-  } catch (e) {
-    debugPrint('⚠️ Error migrando formato antiguo a JSON: $e');
-    return null;
-  }
-}
-
-/// Valida si el contenido del tag tiene el formato JSON nuevo
+/// Valida si el contenido del tag tiene el formato JSON nuevo (multi-chunk, N1, C1 o canónico)
 bool isNewJsonFormat(String nfcContent) {
+  if (isMultiChunkFormat(nfcContent)) return true;
+  if (isNfcCompressedFormat(nfcContent)) return true;
   try {
     final decoded = jsonDecode(nfcContent);
     if (decoded is Map<String, dynamic>) {
@@ -306,13 +575,6 @@ bool isNewJsonFormat(String nfcContent) {
     // No es JSON válido
   }
   return false;
-}
-
-/// Valida si el contenido del tag tiene el formato antiguo
-bool isOldFormat(String nfcContent) {
-  final validPattern =
-      RegExp(r'\{DH:[^}]+;OP:[^}]+;VISITS:[^}]+;RESULTS:[^}]+;HE:[^}]+\}');
-  return validPattern.hasMatch(nfcContent);
 }
 
 /// Valida si el contenido es un array JSON (múltiples registros tag-transfer)

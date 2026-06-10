@@ -3,7 +3,6 @@ import '/backend/sqlite/global_db_singleton.dart';
 import '/components/nfc_read_dialog_widget.dart';
 import '/components/nfc_write_dialog_widget.dart';
 import '/components/nfc_transfer_write_dialog_widget.dart';
-import '/components/qr_scanner_dialog_widget.dart';
 import '/components/photo_capture_component_widget.dart';
 import '/components/video_capture_component_widget.dart';
 import '/components/date_picker_component_widget.dart';
@@ -78,6 +77,16 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   // Map para almacenar datos de tags NFC leídos por status_id
   final Map<int, List<Map<String, dynamic>>> _tagReaderData = {};
+
+  // Overrides de status_response por statusId, válidos SOLO durante el auto-save
+  // de UN elemento ADB (se limpia tras cada elemento). Permite inyectar valores
+  // per-card (Registro random, distance-extractor, headquarter-weight) calculados
+  // para ESE producto, sin contaminar el estado compartido del formulario.
+  final Map<int, String> _adbElementResponseOverrides = {};
+
+  // Suprime los snackbars de usuario de las funciones de cálculo mientras se
+  // procesa un batch ADB (evita N toasts al computar cada producto).
+  bool _suppressCalcUi = false;
 
   // Map para acumulación de tags en modo NO_REMOVE (statusId → lista de raw JSON strings)
   final Map<int, List<String>> _tagReaderRawJsons = {};
@@ -358,17 +367,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             final productName = payload['productName'] as String? ?? '';
             if (tagContent.isEmpty) continue;
 
-            // Descomponer array o tratar como elemento único
-            List<String> elements;
-            try {
-              elements = actions.isJsonArrayFormat(tagContent)
-                  ? (jsonDecode(tagContent) as List)
-                      .map((e) => jsonEncode(e as Object))
-                      .toList()
-                  : [tagContent];
-            } catch (_) {
-              elements = [tagContent];
-            }
+            // Descomponer array (plano o comprimido C1/N1) o elemento único a
+            // registros canónicos. Un tag puede traer varios productos.
+            final elements = _decodeNfcToCanonicalList(tagContent);
 
             for (final elemJson in elements) {
               final parsed = _parseNfcTagContent(elemJson);
@@ -426,10 +427,13 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           unawaited(_loadHeadquarterWeights(heIdsToWarm.toList()));
         }
 
-        // Disparar cálculos fuera del setState (son async)
+        // Disparar cálculos fuera del setState (son async). Se AWAITan para que
+        // terminen antes del loop de auto-guardado (que reasigna _tagReaderData
+        // por elemento) y evitar una condición de carrera sobre el estado
+        // compartido.
         for (final entry in toRecalc) {
-          _autoCalculateRelatedDistances(entry.id, entry.name);
-          _autoCalculateRelatedHeadquarterWeights(entry.id, entry.name);
+          await _autoCalculateRelatedDistances(entry.id, entry.name);
+          await _autoCalculateRelatedHeadquarterWeights(entry.id, entry.name);
         }
 
         // Auto-guardar visita en SQLite al recibir cada tag.
@@ -450,30 +454,83 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
               .cast<int>()
               .toList();
 
-          // Descomponer array o tratar como elemento único
-          List<String> elementsToSave;
-          try {
-            elementsToSave = actions.isJsonArrayFormat(tagContent)
-                ? (jsonDecode(tagContent) as List)
-                    .map((e) => jsonEncode(e as Object))
-                    .toList()
-                : [tagContent];
-          } catch (_) {
-            elementsToSave = [tagContent];
+          // Descomponer array (plano o comprimido C1/N1) o elemento único a
+          // registros canónicos para auto-guardar uno por uno.
+          final elementsToSave = _decodeNfcToCanonicalList(tagContent);
+
+          // Snapshot del estado compartido para restaurarlo tras el batch.
+          final savedTagReaderData =
+              Map<int, List<Map<String, dynamic>>>.from(_tagReaderData);
+          final savedSelectedIndex = _selectedAdbTagIndex;
+          final savedActiveVisitId = _activeVisitId;
+
+          String adbStatusNameOf(int id) {
+            for (final s in allStatuses) {
+              if (getJsonField(s, r'$.id_activity_status') == id) {
+                return getJsonField(s, r'$.status_name')?.toString() ?? '';
+              }
+            }
+            return '';
           }
 
+          final batchSize = elementsToSave.length;
           bool saveOk = true;
-          for (final elemJson in elementsToSave) {
+          for (int i = 0; i < elementsToSave.length; i++) {
+            final elemJson = elementsToSave[i];
             try {
-              final results = await Future.wait(
-                serverStatusIds.map((id) => _autoSaveVisitFromAdbTag(id, elemJson)),
-              );
+              final parsedElement = _parseNfcTagContent(elemJson);
+              final results = <bool>[];
+              for (final id in serverStatusIds) {
+                // Índice REAL de la tarjeta de este elemento en la lista de
+                // tarjetas (las del batch son las últimas batchSize). Asegura que
+                // cada visita se mapee a SU propia tarjeta en
+                // _pendingTagIndexToVisitId, para que al seleccionar/editar una
+                // tarjeta se edite su propia visita.
+                final cardList = _adbServerCardsRawJson[id];
+                final cardIndex =
+                    cardList != null ? cardList.length - batchSize + i : i;
+                // Fijar el tag-reader a ESTE producto y computar sus valores
+                // per-element (Registro random + distancia + peso) antes de
+                // construir y guardar la visita. Anular _activeVisitId para que
+                // las escrituras SQLite incrementales de las funciones de cálculo
+                // (guardadas por _activeVisitId != null) no toquen la visita del
+                // elemento anterior; la visita actual se INSERTA con su propio
+                // detailsToInsert dentro de _autoSaveVisitFromAdbTag.
+                _activeVisitId = null;
+                _tagReaderData[id] = parsedElement;
+                await _computeAdbElementOverrides(id, adbStatusNameOf(id));
+                results.add(await _autoSaveVisitFromAdbTag(id, elemJson,
+                    tagIndex: cardIndex));
+                _adbElementResponseOverrides.clear();
+              }
               if (results.isEmpty || !results.every((ok) => ok)) saveOk = false;
             } catch (e) {
               debugPrint('❌ ADB-TAG: Error en auto-save element: $e');
               saveOk = false;
+              _adbElementResponseOverrides.clear();
             }
           }
+
+          // Restaurar el estado compartido a la tarjeta seleccionada y rehidratar
+          // su visita, para que el formulario y el árbol inline muestren esa card
+          // con los valores realmente guardados (un solo motor de cálculo).
+          _tagReaderData
+            ..clear()
+            ..addAll(savedTagReaderData);
+          _selectedAdbTagIndex = savedSelectedIndex;
+          _activeVisitId = savedActiveVisitId;
+          final selVisitId = savedSelectedIndex >= 0
+              ? _pendingTagIndexToVisitId[savedSelectedIndex]
+              : null;
+          if (selVisitId != null) {
+            _clearFormState();
+            await _hydrateVisitInForm(selVisitId);
+          }
+
+          // NO se enriquecen las tarjetas con los visitDetails del formulario:
+          // la tarjeta debe mostrar ÚNICAMENTE el status.visits_details que vino
+          // embebido en el JSON del tag (inyectado en origen por WRITER_STATUS),
+          // no los campos calculados de la visita actual de la extractora.
 
           // Enviar ACK al móvil. Si saveOk=true el tag se borrará en la
           // sesión NFC activa (escribirá "0"); si false el tag se conserva.
@@ -1275,176 +1332,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     debugPrint('');
   }
 
-  // ==========================================================================
-  // VALIDACIÓN DE CAMPOS OBLIGATORIOS
-  // ==========================================================================
-
-  /// Verifica si existe algún status de tipo tag-writer, tag-reader o tag-transfer
-  /// en la actividad actual (busca recursivamente en todos los niveles)
-  bool _hasTagTypeStatus() {
-    final activityStepsRaw = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_steps''',
-    );
-    if (activityStepsRaw == null) return false;
-    final activitySteps = activityStepsRaw.toList();
-
-    // También revisar activity_status raíz
-    final activityStatusRaw = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_status''',
-    );
-    final activityStatus = activityStatusRaw?.toList() ?? [];
-
-    // Declarar las funciones como late para permitir referencias mutuas
-    late bool Function(List<dynamic>) checkStatusList;
-    late bool Function(List<dynamic>) checkStepsList;
-
-    checkStatusList = (List<dynamic> statusList) {
-      for (var status in statusList) {
-        final typeStatus = getJsonField(status, r'''$.type_status''')?.toString().toLowerCase() ?? '';
-        if (typeStatus == 'tag-writer' || typeStatus == 'tag-reader' || typeStatus == 'tag-transfer') {
-          return true;
-        }
-        // Revisar status hijos
-        final statusChilds = getJsonField(status, r'''$.activities_status_childs''')?.toList() ?? [];
-        if (checkStatusList(statusChilds)) return true;
-
-        // Revisar steps hijos de este status
-        final stepsChilds = getJsonField(status, r'''$.activities_steps_childs''')?.toList() ?? [];
-        if (checkStepsList(stepsChilds)) return true;
-      }
-      return false;
-    };
-
-    checkStepsList = (List<dynamic> stepsList) {
-      for (var step in stepsList) {
-        final activitiesStatusRaw = getJsonField(step, r'''$.activities_status''');
-        final activitiesStatus = activitiesStatusRaw != null
-            ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
-            : [];
-        if (checkStatusList(activitiesStatus)) return true;
-      }
-      return false;
-    };
-
-    // Revisar status raíz
-    if (checkStatusList(activityStatus)) return true;
-
-    // Revisar steps
-    if (checkStepsList(activitySteps)) return true;
-
-    return false;
-  }
-
-  /// Valida recursivamente todos los steps requeridos en la jerarquía
-  /// Retorna un mapa con los steps faltantes y su ruta para expansión
-  Map<String, dynamic>? _validateRequiredStepsRecursive() {
-    // Si existe algún status de tipo tag-writer, tag-reader o tag-transfer,
-    // omitir la validación de is_required
-    if (_hasTagTypeStatus()) {
-      return null;
-    }
-
-    final activityStepsRaw = getJsonField(
-      FFAppState().currentActivity,
-      r'''$.activity_steps''',
-    );
-    if (activityStepsRaw == null) return null;
-    final activitySteps = activityStepsRaw.toList();
-
-    final visitDetails = FFAppState().visitDetails;
-
-    // Función recursiva para validar steps y sus hijos
-    Map<String, dynamic>? checkStep(dynamic step, List<int> parentPath) {
-      final stepId = getJsonField(step, r'''$.id_activity_step''');
-      final stepName = getJsonField(step, r'''$.name_step''').toString();
-      final isRequired = getJsonField(step, r'''$.is_required''') == true;
-      final activitiesStatusRaw =
-          getJsonField(step, r'''$.activities_status''');
-      final activitiesStatus = activitiesStatusRaw != null
-          ? (activitiesStatusRaw is List ? activitiesStatusRaw : [])
-          : [];
-
-      // Si no es requerido, no validar
-      if (!isRequired) {
-        return null;
-      }
-
-      // Si tiene opciones de status y es requerido, verificar que al menos una esté seleccionada
-      if (activitiesStatus.isNotEmpty) {
-        // Buscar si hay algún visitDetail con idStepParent igual a este stepId
-        final hasSelection =
-            visitDetails.any((detail) => detail.idStepParent == stepId);
-
-        if (!hasSelection) {
-          // Este step requerido no tiene ninguna opción seleccionada
-          return {
-            'stepId': stepId,
-            'stepName': stepName,
-            'path': [...parentPath, stepId],
-            'message': 'Debe seleccionar una opción en "$stepName"',
-          };
-        }
-
-        // Si tiene selección, verificar los steps hijos de las opciones seleccionadas
-        for (var detail in visitDetails) {
-          if (detail.idStepParent == stepId) {
-            // Encontrar el status seleccionado
-            final selectedStatus = activitiesStatus.firstWhere(
-              (status) =>
-                  getJsonField(status, r'''$.id_activity_status''') ==
-                  detail.idActivityStatus,
-              orElse: () => null,
-            );
-
-            if (selectedStatus != null) {
-              // Verificar steps hijos de este status
-              final stepsChilds =
-                  getJsonField(selectedStatus, r'''$.activities_steps_childs''')
-                      ?.toList() ?? [];
-
-              for (var childStep in stepsChilds) {
-                final childResult =
-                    checkStep(childStep, [...parentPath, stepId]);
-                if (childResult != null) {
-                  return childResult; // Retornar el primer error encontrado
-                }
-              }
-            }
-          }
-        }
-      }
-
-      return null;
-    }
-
-    // Validar todos los steps de nivel raíz
-    for (var step in activitySteps) {
-      final result = checkStep(step, []);
-      if (result != null) {
-        return result; // Retornar el primer step faltante
-      }
-    }
-
-    return null; // Todo válido
-  }
-
-  /// Expande el árbol hasta el step especificado por la ruta
-  void _expandTreeToStep(List<int> path) {
-    for (var stepId in path) {
-      setState(() {
-        _stepExpansionState[stepId] = true;
-      });
-    }
-
-    // Hacer scroll al elemento (pequeño delay para que el árbol se expanda)
-    Future.delayed(const Duration(milliseconds: 300), () {
-      // Aquí podrías agregar lógica de scroll si tienes una GlobalKey para el step
-      debugPrint('Árbol expandido hasta stepId: ${path.last}');
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     // Requerido por AutomaticKeepAliveClientMixin
@@ -2218,9 +2105,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     // reference-list es ahora un type_status, no type_step
     // Sus activities_status se cargan desde el JSON embebido
 
-    // Log de renderizado
-    debugPrint('📋 RENDERIZANDO STEP: nombre="$stepName" tipo="$typeStep" ID=$stepId nivel=$level requerido=$isRequired activitiesStatus=${activitiesStatus.length}');
-
     // Obtener estado de expansión (funciona para todos los tipos de steps)
     final isExpanded = _stepExpansionState[stepId] ?? false;
     // LOTE 1: Usar búsqueda cacheada en lugar de O(n) repetido
@@ -2472,16 +2356,12 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         if (isExpanded && activitiesStatus.isNotEmpty)
           Builder(
             builder: (context) {
-              debugPrint('   ✅ MOSTRANDO OPCIONES: paso la condición isExpanded=$isExpanded && activitiesStatus.isNotEmpty=${activitiesStatus.isNotEmpty}');
-
               // Para container-list, mostrar todos los status sin filtro
               // Para unique-list, aplicar filtro de búsqueda
               // reference-list es ahora type_status, no type_step
               final displayList = typeStep == 'container-list'
                   ? activitiesStatus
                   : _filterStatusList(stepId, activitiesStatus);
-
-              debugPrint('   📋 Lista a mostrar: ${displayList.length} opciones de ${activitiesStatus.length} (tipo: $typeStep)');
 
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
@@ -6492,534 +6372,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
   }
 
-  /// Crea una visita directamente usando el TAG NFC leído y las últimas 3 geolocalizaciones del AppState
-  Future<bool> _createVisitWithNfc(String nfcTagId) async {
-    try {
-      debugPrint('📱 ===== CREANDO VISITA CON NFC =====');
-      debugPrint('🏷️  TAG ID: $nfcTagId');
-
-      // Obtener datos necesarios
-      final currentActivity = FFAppState().currentActivity;
-      final idActivity = getJsonField(currentActivity, r'''$.id_activity''');
-      final userSelected = FFAppState().userSelected;
-      final deviceDefault = FFAppState().deviceDefault;
-
-      // === VALIDACIÓN DE TIPO DE PRODUCTO PARA TAG-READER ===
-      // Verificar si algún status es tag-reader con validación de tipo de producto
-      final activityStatusList = getJsonField(currentActivity, r'''$.activity_status''') as List?;
-      if (activityStatusList != null) {
-        for (var statusItem in activityStatusList) {
-          final typeStatus = getJsonField(statusItem, r'''$.type_status''')?.toString() ?? '';
-          final defaultStatus = getJsonField(statusItem, r'''$.default_status''')?.toString() ?? '';
-
-          if (typeStatus == 'tag-reader' && defaultStatus.contains('=TYPE_PRODUCT_DEFAULT:')) {
-            debugPrint('🔍 Validando tipo de producto para tag-reader');
-
-            // Extraer el tipo de producto requerido
-            final regex = RegExp(r'=TYPE_PRODUCT_DEFAULT:([^;}\s]+)');
-            final match = regex.firstMatch(defaultStatus);
-
-            if (match != null && match.groupCount >= 1) {
-              final requiredProductType = match.group(1)!.trim();
-              debugPrint('✅ Tipo de producto requerido: $requiredProductType');
-
-              // Buscar el producto en SQLite por RFID
-              // Usa GlobalDbSingleton.executeOperation: conexión compartida +
-              // retry automático en locked/busy/database_closed (3 intentos).
-              final productResults = await globalDb.executeOperation(
-                (db) => db.rawQuery(
-                  'SELECT Type_product FROM Products WHERE Rfid = ? LIMIT 1',
-                  [nfcTagId],
-                ),
-              );
-
-              if (productResults.isEmpty) {
-                debugPrint('❌ RFID no encontrado en Products: $nfcTagId');
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'El tag no corresponde a un $requiredProductType',
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      duration: const Duration(seconds: 4),
-                      backgroundColor: Colors.red.shade700,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.all(16),
-                    ),
-                  );
-                }
-                return false;
-              }
-
-              final productType = productResults.first['Type_product'] as String?;
-
-              if (productType != requiredProductType) {
-                // Tipo de producto no coincide
-                debugPrint('❌ Tipo de producto no coincide. Esperado: $requiredProductType, Encontrado: $productType');
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Row(
-                        children: [
-                          const Icon(Icons.error_outline_rounded, color: Colors.white),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'El tag no corresponde a un $requiredProductType',
-                              style: const TextStyle(
-                                fontFamily: 'Roboto',
-                                fontWeight: FontWeight.w500,
-                                fontSize: 14,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      duration: const Duration(seconds: 4),
-                      backgroundColor: Colors.red.shade700,
-                      behavior: SnackBarBehavior.floating,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      margin: const EdgeInsets.all(16),
-                    ),
-                  );
-                }
-                return false;
-              }
-
-              debugPrint('✅ Validación de tipo de producto exitosa: $productType');
-            }
-          }
-        }
-      }
-
-      // Obtener el Id_headquarter del lote actual
-      int idHeadquarter = 0;
-      final headquartersList = FFAppState().headquartersSelectedList;
-      if (headquartersList.isNotEmpty) {
-        idHeadquarter = headquartersList.first.idHeadquarter;
-        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
-      } else {
-        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
-      }
-
-      // Obtener geolocalizaciones de los últimos 5 segundos desde geoLocationsList
-      final allGeoLocations = FFAppState().geoLocationsList;
-      if (allGeoLocations.isEmpty) {
-        debugPrint('⚠️ No hay geolocalizaciones disponibles');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.location_off_rounded, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'No hay ubicación GPS disponible. Espere a que se obtenga la ubicación.',
-                      style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              duration: const Duration(seconds: 3),
-              backgroundColor: Colors.red.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-        }
-        return false;
-      }
-
-      // Filtrar ubicaciones de los últimos 5 segundos
-      final now = DateTime.now();
-      final fiveSecondsAgo = now.subtract(const Duration(seconds: 5));
-
-      final recentGeoLocations = allGeoLocations.where((loc) {
-        if (loc.dateHourRead == null) return false;
-        return loc.dateHourRead!.isAfter(fiveSecondsAgo) && loc.dateHourRead!.isBefore(now);
-      }).toList();
-
-      // Si no hay ubicaciones de los últimos 5 segundos, usar la más reciente
-      final locationsToSave = recentGeoLocations.isNotEmpty
-          ? recentGeoLocations
-          : [allGeoLocations.last];
-
-      // Usar la ubicación más reciente como la principal de la visita
-      final mainLocation = locationsToSave.last;
-      debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
-      debugPrint('📍 Total geolocalizaciones de los últimos 5 segundos: ${locationsToSave.length}');
-
-      // Obtener visitDetails filtrados
-      final visitDetails = FFAppState().visitDetails;
-      final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
-
-      // Insertar Visita + detalles + geolocalizaciones en una transacción.
-      // Usa GlobalDbSingleton.executeOperation: conexión compartida +
-      // retry automático en locked/busy/database_closed (3 intentos).
-      int visitId = 0;
-      await globalDb.executeOperation((db) async {
-        await db.transaction((txn) async {
-          // Insertar la visita con el RFID
-          visitId = await txn.rawInsert('''
-            INSERT INTO Visits (
-              Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
-              Id_user, Id_device, Id_status, Created_at, Battery,
-              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ''', [
-            userSelected.idCompany,
-            idActivity,
-            idHeadquarter,
-            0, // Id_product
-            0, // Id_bulk
-            userSelected.idUser,
-            deviceDefault.idDevice,
-            0, // Id_status
-            DateTime.now().toIso8601String(),
-            100, // Battery (valor por defecto)
-            mainLocation.latitude,
-            mainLocation.longitude,
-            mainLocation.altitude,
-            mainLocation.errorHorizontal,
-            null, // Id_virtual_point
-            0, // Status
-            nfcTagId, // RFID del TAG
-          ]);
-
-          debugPrint('✅ Visita NFC creada con ID: $visitId');
-
-          // Insertar detalles de la visita
-          int insertedCount = 0;
-          for (var detail in detailsToInsert) {
-            final idActivityStatus = detail.idActivityStatus;
-
-            final statusCheck = await txn.rawQuery('''
-              SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
-            ''', [idActivityStatus]);
-
-            if (statusCheck.isEmpty) continue;
-
-            await txn.rawInsert('''
-              INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
-              VALUES (?, ?, ?, ?)
-            ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
-
-            insertedCount++;
-          }
-
-          debugPrint('✅ $insertedCount detalles de visita insertados');
-
-          // Insertar las geolocalizaciones
-          for (var geoPoint in locationsToSave) {
-            await txn.rawInsert('''
-              INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
-              VALUES (?, ?, ?, ?, ?, ?)
-            ''', [
-              visitId,
-              geoPoint.latitude,
-              geoPoint.longitude,
-              geoPoint.altitude,
-              geoPoint.errorHorizontal,
-              geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
-            ]);
-          }
-
-          debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
-        });
-      });
-
-      // Asignación local de Id_virtual_point e Id_product vía caché de Voronoi.
-      // Fire-and-forget: si falla, la visita queda como antes (Id_virtual_point
-      // NULL) y el server la resolverá al sincronizar.
-      unawaited(VoronoiAssigner().assignToVisit(
-        visitId: visitId,
-        latitude: mainLocation.latitude,
-        longitude: mainLocation.longitude,
-        idHeadquarter: idHeadquarter,
-        rfid: nfcTagId,
-      ));
-
-      // Actualizar el contador de visitas y limpiar visitDetails completamente
-      FFAppState().update(() {
-        FFAppState().visitCount = FFAppState().visitCount + 1;
-        FFAppState().visitDetails = [];
-      });
-
-      debugPrint('🧹 visitDetails limpiado completamente después de guardar visita NFC');
-      debugPrint('✅ Visita NFC completada exitosamente. ID: $visitId');
-      unawaited(actions.announceVisitVoice());
-      return true;
-    } catch (e) {
-      debugPrint('❌ Error creando visita NFC: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Error al guardar la visita: $e',
-                    style: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 4),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-      return false;
-    }
-  }
-
-  /// Muestra el diálogo moderno para escanear un código QR
-  /// Retorna el código QR escaneado o null si el usuario cancela
-  Future<String?> _showQrScannerDialog() async {
-    return await showDialog<String?>(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black.withValues(alpha: 0.9),
-      builder: (dialogContext) {
-        return const Dialog(
-          elevation: 0,
-          insetPadding: EdgeInsets.zero,
-          backgroundColor: Colors.transparent,
-          child: QrScannerDialogWidget(
-            title: 'Escanear QR',
-            subtitle: 'Alinee el código QR dentro del marco para registrar la visita',
-          ),
-        );
-      },
-    );
-  }
-
-  /// Crea una visita directamente usando el código QR escaneado y las últimas 3 geolocalizaciones del AppState
-  Future<bool> _createVisitWithQr(String qrCode) async {
-    try {
-      debugPrint('📱 ===== CREANDO VISITA CON QR =====');
-      debugPrint('📷 QR Code: $qrCode');
-
-      // Obtener datos necesarios
-      final currentActivity = FFAppState().currentActivity;
-      final idActivity = getJsonField(currentActivity, r'''$.id_activity''');
-      final userSelected = FFAppState().userSelected;
-      final deviceDefault = FFAppState().deviceDefault;
-
-      // Obtener el Id_headquarter del lote actual
-      int idHeadquarter = 0;
-      final headquartersList = FFAppState().headquartersSelectedList;
-      if (headquartersList.isNotEmpty) {
-        idHeadquarter = headquartersList.first.idHeadquarter;
-        debugPrint('✅ Usando lote: ${headquartersList.first.nameHeadquarter} (ID: $idHeadquarter)');
-      } else {
-        debugPrint('⚠️ No hay lotes seleccionados, Id_headquarter será 0');
-      }
-
-      // Obtener geolocalizaciones de los últimos 5 segundos desde geoLocationsList
-      final allGeoLocations = FFAppState().geoLocationsList;
-      if (allGeoLocations.isEmpty) {
-        debugPrint('⚠️ No hay geolocalizaciones disponibles');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: const Row(
-                children: [
-                  Icon(Icons.location_off_rounded, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'No hay ubicación GPS disponible. Espere a que se obtenga la ubicación.',
-                      style: TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
-                    ),
-                  ),
-                ],
-              ),
-              duration: const Duration(seconds: 3),
-              backgroundColor: Colors.red.shade700,
-              behavior: SnackBarBehavior.floating,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              margin: const EdgeInsets.all(16),
-            ),
-          );
-        }
-        return false;
-      }
-
-      // Filtrar ubicaciones de los últimos 5 segundos
-      final now = DateTime.now();
-      final fiveSecondsAgo = now.subtract(const Duration(seconds: 5));
-
-      final recentGeoLocations = allGeoLocations.where((loc) {
-        if (loc.dateHourRead == null) return false;
-        return loc.dateHourRead!.isAfter(fiveSecondsAgo) && loc.dateHourRead!.isBefore(now);
-      }).toList();
-
-      // Si no hay ubicaciones de los últimos 5 segundos, usar la más reciente
-      final locationsToSave = recentGeoLocations.isNotEmpty
-          ? recentGeoLocations
-          : [allGeoLocations.last];
-
-      // Usar la ubicación más reciente como la principal de la visita
-      final mainLocation = locationsToSave.last;
-      debugPrint('📍 Ubicación principal: lat=${mainLocation.latitude}, lon=${mainLocation.longitude}');
-      debugPrint('📍 Total geolocalizaciones de los últimos 5 segundos: ${locationsToSave.length}');
-
-      // Obtener visitDetails filtrados
-      final visitDetails = FFAppState().visitDetails;
-      final detailsToInsert = visitDetails.where((detail) => detail.typeStatus != 'STEP').toList();
-
-      // Insertar Visita + detalles + geolocalizaciones en una transacción.
-      // Usa GlobalDbSingleton.executeOperation: conexión compartida +
-      // retry automático en locked/busy/database_closed (3 intentos).
-      int visitId = 0;
-      await globalDb.executeOperation((db) async {
-        await db.transaction((txn) async {
-          // Insertar la visita con el código QR en el campo Rfid
-          visitId = await txn.rawInsert('''
-            INSERT INTO Visits (
-              Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
-              Id_user, Id_device, Id_status, Created_at, Battery,
-              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ''', [
-            userSelected.idCompany,
-            idActivity,
-            idHeadquarter,
-            0, // Id_product
-            0, // Id_bulk
-            userSelected.idUser,
-            deviceDefault.idDevice,
-            0, // Id_status
-            DateTime.now().toIso8601String(),
-            100, // Battery (valor por defecto)
-            mainLocation.latitude,
-            mainLocation.longitude,
-            mainLocation.altitude,
-            mainLocation.errorHorizontal,
-            null, // Id_virtual_point
-            0, // Status
-            qrCode, // Código QR en el campo Rfid
-          ]);
-
-          debugPrint('✅ Visita QR creada con ID: $visitId');
-
-          // Insertar detalles de la visita
-          int insertedCount = 0;
-          for (var detail in detailsToInsert) {
-            final idActivityStatus = detail.idActivityStatus;
-
-            final statusCheck = await txn.rawQuery('''
-              SELECT Id_activity_status FROM Activities_status WHERE Id_activity_status = ?
-            ''', [idActivityStatus]);
-
-            if (statusCheck.isEmpty) continue;
-
-            await txn.rawInsert('''
-              INSERT INTO Visits_details (Id_visit, Id_activity_status, Status_option, Status_response)
-              VALUES (?, ?, ?, ?)
-            ''', [visitId, idActivityStatus, detail.statusOption, detail.statusResponse]);
-
-            insertedCount++;
-          }
-
-          debugPrint('✅ $insertedCount detalles de visita insertados');
-
-          // Insertar las geolocalizaciones
-          for (var geoPoint in locationsToSave) {
-            await txn.rawInsert('''
-              INSERT INTO Visits_locations (Id_visit, Latitude, Longitude, Altitude, HorizontalError, CreatedAt)
-              VALUES (?, ?, ?, ?, ?, ?)
-            ''', [
-              visitId,
-              geoPoint.latitude,
-              geoPoint.longitude,
-              geoPoint.altitude,
-              geoPoint.errorHorizontal,
-              geoPoint.dateHourRead?.toIso8601String() ?? DateTime.now().toIso8601String(),
-            ]);
-          }
-
-          debugPrint('✅ ${locationsToSave.length} ubicaciones GPS insertadas');
-        });
-      });
-
-      // Asignación local de Id_virtual_point e Id_product vía caché de Voronoi.
-      // En el flujo QR no hay RFID; el assigner intentará nearest-by-coord.
-      unawaited(VoronoiAssigner().assignToVisit(
-        visitId: visitId,
-        latitude: mainLocation.latitude,
-        longitude: mainLocation.longitude,
-        idHeadquarter: idHeadquarter,
-        rfid: null,
-      ));
-
-      // Actualizar el contador de visitas y limpiar visitDetails completamente
-      FFAppState().update(() {
-        FFAppState().visitCount = FFAppState().visitCount + 1;
-        FFAppState().visitDetails = [];
-      });
-
-      debugPrint('🧹 visitDetails limpiado completamente después de guardar visita QR');
-      debugPrint('✅ Visita QR completada exitosamente. ID: $visitId');
-      unawaited(actions.announceVisitVoice());
-      return true;
-    } catch (e) {
-      debugPrint('❌ Error creando visita QR: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline_rounded, color: Colors.white),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Error al guardar la visita: $e',
-                    style: const TextStyle(fontFamily: 'Roboto', fontWeight: FontWeight.w500),
-                  ),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 4),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-      }
-      return false;
-    }
-  }
-
   // ============================================================================
   // AUTO-GUARDADO AL RECIBIR TAG ADB (tag-transfer-adb-server)
   // ============================================================================
@@ -7027,7 +6379,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
   /// Guarda automáticamente una visita en SQLite cada vez que se recibe un tag
   /// desde Android vía el puente ADB. No limpia visitDetails (el usuario puede
   /// seguir usando el formulario y generar más visitas).
-  Future<bool> _autoSaveVisitFromAdbTag(int adbStatusId, String rawTagJson) async {
+  Future<bool> _autoSaveVisitFromAdbTag(int adbStatusId, String rawTagJson,
+      {int? tagIndex}) async {
     try {
       debugPrint('💾 ===== AUTO-GUARDANDO VISITA DESDE ADB TAG (statusId=$adbStatusId) =====');
       final currentActivity = FFAppState().currentActivity;
@@ -7060,10 +6413,11 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       debugPrint('📍 GPS obtenido: lat=$lat, lon=$lon');
 
       // 2. Parsear rawTagJson → RFID del tag destino (tag_from en Read_info)
+      // Usa parseNfcJson para soportar N1/C1/canónico/viejo formato.
       String tagFromRfid = '';
       try {
-        final decoded = jsonDecode(rawTagJson) as Map<String, dynamic>;
-        tagFromRfid = ((decoded['Read_info'] as Map?)?['tag_from'] as String? ?? '').trim();
+        final decoded = actions.parseNfcJson(rawTagJson);
+        tagFromRfid = ((decoded?['Read_info'] as Map?)?['tag_from'] as String? ?? '').trim();
       } catch (_) {}
       debugPrint('🏷️  Tag destino RFID: "$tagFromRfid"');
 
@@ -7202,12 +6556,14 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           _activeVisitId = visitId;
           _formLocked = false;
           _processingTag = false;
-          // Asociar la tarjeta recién insertada (última en _adbTagTimestamps)
-          // con el Id_visit en SQLite, para que el botón GUARDAR sepa cuál
-          // visita marcar como Status=1 al cerrarla.
-          final lastTagIndex = _adbTagTimestamps.length - 1;
-          if (lastTagIndex >= 0) {
-            _pendingTagIndexToVisitId[lastTagIndex] = visitId;
+          // Asociar la tarjeta correspondiente a ESTE elemento con su Id_visit.
+          // tagIndex viene del loop de auto-save (índice real de la tarjeta en
+          // un batch multi-producto). Sin él, _adbTagTimestamps.length - 1 sería
+          // siempre el último índice y todas las visitas del batch quedarían
+          // mapeadas a la misma tarjeta → al editar una se editaría otra.
+          final mappedTagIndex = tagIndex ?? (_adbTagTimestamps.length - 1);
+          if (mappedTagIndex >= 0) {
+            _pendingTagIndexToVisitId[mappedTagIndex] = visitId;
           }
         });
       } else if (mounted) {
@@ -7218,6 +6574,9 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       if (_voiceEnabled) {
         unawaited(actions.announceVisitVoice());
       }
+      // La tarjeta ADB muestra el status.visits_details embebido en el JSON del
+      // tag (inyectado en origen por WRITER_STATUS); no se enriquece con los
+      // visitDetails de la visita actual de la extractora.
       return true;
     } catch (e) {
       debugPrint('❌ _autoSaveVisitFromAdbTag error: $e');
@@ -7228,6 +6587,68 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
   /// Construye la lista de detalles a insertar en Visits_details recopilando
   /// los valores actuales de todos los status del formulario.
+  /// Genera un override fresco para cada status NUMBER con default =RANDOM, de
+  /// modo que cada visita auto-guardada de un batch multi-producto reciba SU
+  /// PROPIO número aleatorio (p. ej. el Registro/tiquete). Llamar antes de
+  /// _buildAllVisitDetails por elemento.
+  void _seedRandomOverridesForElement() {
+    final List<dynamic> allStatuses = [..._cachedActivityStatus];
+    for (final step in _cachedActivitySteps) {
+      final ss = getJsonField(step, r'$.activities_status');
+      if (ss is List) allStatuses.addAll(ss);
+    }
+    for (final s in allStatuses) {
+      final type =
+          (getJsonField(s, r'$.type_status')?.toString() ?? '').toLowerCase();
+      if (type != 'number') continue;
+      final def = getJsonField(s, r'$.default_status')?.toString() ?? '';
+      final m = RegExp(r'=RANDOM:MIN=(\d+)_MAX=(\d+)').firstMatch(def);
+      if (m == null) continue;
+      final id = getJsonField(s, r'$.id_activity_status') as int?;
+      if (id == null) continue;
+      final minV = int.parse(m.group(1)!);
+      final maxV = int.parse(m.group(2)!);
+      _adbElementResponseOverrides[id] =
+          (minV + math.Random().nextInt(maxV - minV + 1)).toString();
+    }
+  }
+
+  /// Calcula los valores per-element (Registro random + distance-extractor +
+  /// headquarter-weight) para UN elemento ADB y los deja en
+  /// _adbElementResponseOverrides, listos para que _buildStatusResponse los
+  /// prefiera. Asume que _tagReaderData[adbStatusId] ya apunta a ESE elemento.
+  /// Reutiliza las MISMAS funciones de cálculo que la rehidratación al
+  /// seleccionar una tarjeta, así el valor "de nacimiento" de cada visita es
+  /// idéntico al que produciría la selección. No toca la tarjeta seleccionada
+  /// ni dispara snackbars de usuario.
+  Future<void> _computeAdbElementOverrides(
+      int adbStatusId, String adbStatusName) async {
+    _adbElementResponseOverrides.clear();
+    _seedRandomOverridesForElement();
+    _suppressCalcUi = true;
+    try {
+      await _autoCalculateRelatedDistances(adbStatusId, adbStatusName);
+      await _autoCalculateRelatedHeadquarterWeights(adbStatusId, adbStatusName);
+    } finally {
+      _suppressCalcUi = false;
+    }
+    // Serializar los resultados frescos (escritos en los mapas compartidos por
+    // las funciones de cálculo) hacia overrides por statusId.
+    for (final e in _distanceExtractorCalculated.entries) {
+      if (e.value == true) {
+        _adbElementResponseOverrides[e.key] = jsonEncode({
+          'distanceFromTag': _calculatedDistances[e.key] ?? 0.0,
+          'distancesFromProducts': _calculatedDistancesFromProduct[e.key] ?? [],
+        });
+      }
+    }
+    for (final d in FFAppState().visitDetails) {
+      if (d.typeStatus == 'headquarter-weight' && d.statusResponse.isNotEmpty) {
+        _adbElementResponseOverrides[d.idActivityStatus] = d.statusResponse;
+      }
+    }
+  }
+
   List<Map<String, dynamic>> _buildAllVisitDetails(int adbStatusId, String rawTagJson) {
     final now = DateTime.now();
     final results = <Map<String, dynamic>>[];
@@ -7291,12 +6712,23 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         return '${pad2(now.hour)}:${pad2(now.minute)}:${pad2(now.second)}';
 
       case 'tag-transfer-adb-server':
+        // Cada visita debe persistir SU PROPIO producto: rawTagJson es el
+        // elemJson del elemento que se está guardando. Antes se usaba
+        // cards.last → en un batch multi-producto TODAS las visitas guardaban
+        // el último producto y al rehidratar desde SQLite se veían tarjetas
+        // duplicadas con el mismo producto.
+        if (statusId == adbStatusId && rawTagJson.isNotEmpty) return rawTagJson;
         final cards = _adbServerCardsRawJson[statusId];
         if (cards != null && cards.isNotEmpty) return cards.last;
-        if (statusId == adbStatusId) return rawTagJson;
         return null;
 
       case 'number':
+        // Override per-element (batch ADB): cada card recibe su propio valor
+        // (p. ej. =RANDOM genera un número fresco por producto).
+        final numberOverride = _adbElementResponseOverrides[statusId];
+        if (numberOverride != null && numberOverride.isNotEmpty) {
+          return numberOverride;
+        }
         final detail = FFAppState()
             .visitDetails
             .where((d) => d.idActivityStatus == statusId)
@@ -7317,6 +6749,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         return text.isNotEmpty ? text : (statusName.isNotEmpty ? statusName : null);
 
       case 'distance-extractor':
+        final distOverride = _adbElementResponseOverrides[statusId];
+        if (distOverride != null && distOverride.isNotEmpty) return distOverride;
         if (!(_distanceExtractorCalculated[statusId] ?? false)) return null;
         return jsonEncode({
           'distanceFromTag': _calculatedDistances[statusId] ?? 0.0,
@@ -7324,6 +6758,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         });
 
       case 'headquarter-weight':
+        final hqOverride = _adbElementResponseOverrides[statusId];
+        if (hqOverride != null && hqOverride.isNotEmpty) return hqOverride;
         // Preferir el JSON ya serializado en visitDetails (lo guarda
         // _saveHqWeightToVisitDetails con claves String). _calculatedHeadquarterWeights
         // contiene Map<int, ...> que jsonEncode no soporta.
@@ -7420,7 +6856,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             _adbServerCardsRawJson[serverStatusId] ??= [];
             _adbServerCardsProductName[serverStatusId] ??= [];
             _adbServerCardsData[serverStatusId] ??= [];
-            _adbServerCardsRawJson[serverStatusId]!.add(rawTagJson);
+            _adbServerCardsRawJson[serverStatusId]!.add(_decodeNfcToCanonical(rawTagJson));
             _adbServerCardsProductName[serverStatusId]!.add(productName);
             if (rawTagJson.isNotEmpty) {
               try {
@@ -9318,6 +8754,46 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     );
   }
 
+  /// Normaliza cualquier formato NFC (N1/C1/multi-chunk/canónico/viejo texto)
+  /// a JSON canónico codificado como String. Si ya es canónico lo retorna intacto.
+  String _decodeNfcToCanonical(String content) {
+    try {
+      return jsonEncode(actions.parseNfcJson(content));
+    } catch (_) {
+      return content;
+    }
+  }
+
+  /// Normaliza cualquier contenido NFC a una LISTA de registros canónicos
+  /// (JSON String). Un tag puede traer varios productos (array comprimido C1/N1
+  /// o plano); cada registro se devuelve por separado. decodeNfcRecords soporta
+  /// objeto único / array / N1 / C1 / multi-chunk y expande a canónico.
+  List<String> _decodeNfcToCanonicalList(String content) {
+    try {
+      final records = actions.decodeNfcRecords(content);
+      if (records.isNotEmpty) {
+        return records.map((r) => jsonEncode(r)).toList();
+      }
+    } catch (_) {}
+    return [_decodeNfcToCanonical(content)];
+  }
+
+  /// Formatea un status_response para mostrar: convierte el literal de Flutter
+  /// "TimeOfDay(HH:MM)" (24h) en formato 12h con sufijo am/pm, p. ej.
+  /// "TimeOfDay(17:52)" → "05:52 pm". Devuelve el valor sin cambios si no aplica.
+  String _formatStatusResponseForDisplay(String response) {
+    final m =
+        RegExp(r'TimeOfDay\((\d{1,2}):(\d{2})\)').firstMatch(response);
+    if (m != null) {
+      final h = int.tryParse(m.group(1)!) ?? 0;
+      final min = m.group(2)!;
+      final period = h < 12 ? 'am' : 'pm';
+      final h12 = h % 12 == 0 ? 12 : h % 12;
+      return '${h12.toString().padLeft(2, '0')}:$min $period';
+    }
+    return response;
+  }
+
   /// Parsea el contenido del tag NFC y lo agrupa por lote (headquarterId)
   /// Retorna un Map donde la clave es el headquarterId y el valor es un Map con la data agregada
   Map<int, Map<String, dynamic>> _parseNfcTagContentByHeadquarter(
@@ -9339,100 +8815,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
 
       return groupedByHeadquarter;
-    }
-
-    // Formato antiguo: El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
-    debugPrint('⚠️ TAG-WRITER: Formato antiguo detectado');
-
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(nfcContent);
-
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
-
-      // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {
-        'operatorId': '',
-        'operator2Id': '',
-        'visits': 0,
-        'results': 0,
-        'headquarterId': 0,
-        'dateTime': DateTime.now(),
-      };
-      final fields = recordContent.split(';');
-
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value = parts.sublist(1).join(':').trim();
-
-          switch (key) {
-            case 'DH':
-              // Parsear fecha: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  record['dateTime'] =
-                      DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                record['dateTime'] = DateTime.now();
-              }
-              break;
-            case 'OP':
-              record['operatorId'] = value;
-              break;
-            case 'OP2':
-              // Si OP2 es "false" (string literal), dejarlo como vacío
-              record['operator2Id'] = (value == 'false') ? '' : value;
-              break;
-            case 'VISITS':
-              record['visits'] = int.tryParse(value) ?? 0;
-              break;
-            case 'RESULTS':
-              record['results'] = int.tryParse(value) ?? 0;
-              break;
-            case 'HE':
-              record['headquarterId'] = int.tryParse(value) ?? 0;
-              break;
-          }
-        }
-      }
-
-      if (record['headquarterId'] != 0) {
-        final heId = record['headquarterId'] as int;
-
-        // Si el lote no existe en el map, crearlo
-        if (!groupedByHeadquarter.containsKey(heId)) {
-          groupedByHeadquarter[heId] = {
-            'totalVisits': 0,
-            'totalResults': 0,
-            'records': <Map<String, dynamic>>[],
-          };
-        }
-
-        // Agregar el registro al lote
-        groupedByHeadquarter[heId]!['totalVisits'] =
-            (groupedByHeadquarter[heId]!['totalVisits'] as int) +
-                (record['visits'] as int? ?? 0);
-        groupedByHeadquarter[heId]!['totalResults'] =
-            (groupedByHeadquarter[heId]!['totalResults'] as int) +
-                (record['results'] as int? ?? 0);
-        (groupedByHeadquarter[heId]!['records'] as List<Map<String, dynamic>>)
-            .add(record);
-      }
     }
 
     return groupedByHeadquarter;
@@ -9728,14 +9110,18 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     final idUser = readInfo?['US'] as int?;
     final nameProductDirect = readInfo?['Name_product'] as String? ?? '';
 
-    // Lookup origen (Id_product → Products)
+    // ORIGEN: el nombre que viaja en la tarjeta (Read_info.Name_product) es la
+    // fuente AUTORITATIVA por-tarjeta. La caché por Id_product solo enriquece
+    // cuando la tarjeta NO trae nombre, porque está indexada por Id_product
+    // (compartido entre tarjetas) y sobreescribiría el valor por-tarjeta,
+    // congelando la etiqueta al cambiar de tarjeta.
     final String originName;
-    if (idProduct != null && _productByIdCache.containsKey(idProduct)) {
-      originName = _productByIdCache[idProduct]!.isNotEmpty
-          ? _productByIdCache[idProduct]!
-          : nameProductDirect;
-    } else {
+    if (nameProductDirect.isNotEmpty) {
       originName = nameProductDirect;
+    } else if (idProduct != null && _productByIdCache.containsKey(idProduct)) {
+      originName = _productByIdCache[idProduct]!;
+    } else {
+      originName = '';
       if (idProduct != null) _loadProductById(idProduct);
     }
 
@@ -9928,7 +9314,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 ...formStatusDetails.map((d) {
                   final option =
                       (d['status_option'] ?? '').toString().toUpperCase();
-                  final response = (d['status_response'] ?? '').toString();
+                  final response = _formatStatusResponseForDisplay(
+                      (d['status_response'] ?? '').toString());
                   return infoRow(
                     Icons.checklist_rounded,
                     option,
@@ -10659,82 +10046,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       }
 
       return parsedData;
-    }
-
-    // Formato antiguo: El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
-    debugPrint('⚠️ TAG-READER: Formato antiguo detectado');
-
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(nfcContent);
-
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
-
-      // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {
-        'operatorId': '',
-        'operator2Id': '',
-        'visits': 0,
-        'results': 0,
-        'headquarterId': 0,
-        'dateTime': DateTime.now(),
-      };
-      final fields = recordContent.split(';');
-
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value =
-              parts.sublist(1).join(':').trim(); // Para manejar campos con ':'
-
-          switch (key) {
-            case 'DH':
-              // Parsear fecha: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  record['dateTime'] =
-                      DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                record['dateTime'] = DateTime.now();
-              }
-              break;
-            case 'OP':
-              record['operatorId'] = value;
-              break;
-            case 'OP2':
-              // Si OP2 es "false" (string literal), dejarlo como vacío
-              record['operator2Id'] = (value == 'false') ? '' : value;
-              break;
-            case 'VISITS':
-              record['visits'] = int.tryParse(value) ?? 0;
-              break;
-            case 'RESULTS':
-              record['results'] = int.tryParse(value) ?? 0;
-              break;
-            case 'HE':
-              record['headquarterId'] = int.tryParse(value) ?? 0;
-              break;
-          }
-        }
-      }
-
-      if (record['operatorId'].toString().isNotEmpty) {
-        parsedData.add(record);
-      }
     }
 
     return parsedData;
@@ -12996,7 +12307,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             '   Verifica que el API devuelva latitude_extractor y longitude_extractor');
 
         // Mostrar un diálogo de error al usuario
-        if (mounted) {
+        if (mounted && !_suppressCalcUi) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text(
@@ -13251,7 +12562,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       debugPrint('');
 
       // Mostrar mensaje de éxito al usuario
-      if (mounted) {
+      if (mounted && !_suppressCalcUi) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -13267,7 +12578,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       debugPrint('');
 
       // Mostrar mensaje de error al usuario
-      if (mounted) {
+      if (mounted && !_suppressCalcUi) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('❌ Error calculando distancia: $e'),
@@ -14061,80 +13372,6 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
     }
   }
 
-  /// Limpia los datos de tags (tag-reader, tag-writer, tag-transfer) que NO deben ser recordados
-  /// Se ejecuta después de crear la visita para no mostrar contenido INLINE de tags que ya fueron guardados
-  void _cleanupTagDatasByRememberFlag() {
-    debugPrint('🧹 LIMPIEZA DE DATOS DE TAGS VISUALES');
-
-    // NOTA: Los visitDetails ya fueron limpiados por removeVisits() en LoadCoordinatesVisit
-    // Por lo tanto, los tags con rememberStatus=false ya NO están en FFAppState().visitDetails
-    // Debemos buscar en los Maps locales y eliminar los que NO estén en visitDetails (ya fueron eliminados)
-
-    final remainingVisitDetailsIds = FFAppState()
-        .visitDetails
-        .map((d) => d.idActivityStatus)
-        .toSet();
-
-    int cleanedCount = 0;
-
-    // Limpiar tag-reader data: eliminar los que ya no están en visitDetails
-    final tagReaderIdsToRemove = _tagReaderData.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
-        .toList();
-    for (final statusId in tagReaderIdsToRemove) {
-      _tagReaderData.remove(statusId);
-      _tagReaderRawJsons.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagReaderData[$statusId]');
-      cleanedCount++;
-    }
-
-    // Limpiar tag-reader geolocations
-    final tagReaderGeoIdsToRemove = _tagReaderGeolocations.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
-        .toList();
-    for (final statusId in tagReaderGeoIdsToRemove) {
-      _tagReaderGeolocations.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagReaderGeolocations[$statusId]');
-    }
-
-    // Limpiar tag-writer data
-    final tagWriterIdsToRemove = _tagWriterData.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
-        .toList();
-    for (final statusId in tagWriterIdsToRemove) {
-      _tagWriterData.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagWriterData[$statusId]');
-      cleanedCount++;
-    }
-
-    // Limpiar tag-transfer data
-    final tagTransferIdsToRemove = _tagTransferData.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
-        .toList();
-    for (final statusId in tagTransferIdsToRemove) {
-      _tagTransferData.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagTransferData[$statusId]');
-      cleanedCount++;
-    }
-
-    // Limpiar tag-transfer completed flag
-    final tagTransferCompletedIdsToRemove = _tagTransferCompleted.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
-        .toList();
-    for (final statusId in tagTransferCompletedIdsToRemove) {
-      _tagTransferCompleted.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagTransferCompleted[$statusId]');
-    }
-
-    if (cleanedCount == 0) {
-      debugPrint('   ℹ️ No hay tags para limpiar (todos tienen rememberStatus=true)');
-    } else {
-      // Forzar rebuild para que desaparezca el contenido visual
-      setState(() {});
-      debugPrint('✅ Limpieza de tags completada: $cleanedCount tags limpiados');
-    }
-  }
-
   // ===== PROCESAR PLACEHOLDERS HTML PARA DYNAMIC-PRINTING =====
 
   Future<String> _processHTMLPlaceholders(String htmlTemplate) async {
@@ -14740,7 +13977,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
 
     for (final d in formStatusDetails) {
       final option = (d['status_option'] ?? '').toString();
-      final response = (d['status_response'] ?? '').toString();
+      final response = _formatStatusResponseForDisplay(
+          (d['status_response'] ?? '').toString());
       if (option.isEmpty && response.isEmpty) continue;
       buffer.write('<div>$option: $response</div>');
     }
@@ -14959,7 +14197,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
           const SizedBox(height: 8),
           ...visitsDetails.map((detail) {
             final option = detail['status_option']?.toString() ?? '';
-            final response = detail['status_response']?.toString() ?? '';
+            final response = _formatStatusResponseForDisplay(
+                detail['status_response']?.toString() ?? '');
             return Padding(
               padding: const EdgeInsets.only(bottom: 4),
               child: Row(
@@ -15528,16 +14767,46 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
         return tb.compareTo(ta);
       });
 
-    int totalRacimos = 0;
-    double totalPesoAprox = 0;
-    final List<_TiqueteRow> rows = [];
-    for (int i = 0; i < records.length; i++) {
-      final r = records[i];
+    // Agrupar por LOTE + OPERADOR: una sola fila por combinación, sumando los
+    // racimos (results). Antes se mostraba una fila por cada record de Visits[],
+    // por lo que el mismo lote+carguero aparecía repetido (p. ej. JP02 13 +
+    // JP02 23 en dos filas en vez de una sola con 36).
+    final Map<String, Map<String, dynamic>> grouped = {};
+    for (final r in records) {
       final opId = (r['operatorId'] as String?) ?? '';
-      final opIdInt = int.tryParse(opId) ?? 0;
       final heId = (r['headquarterId'] as int?) ?? 0;
       final results = (r['results'] as int?) ?? 0;
       final dt = r['dateTime'] as DateTime?;
+      final key = '${heId}__$opId';
+      final g = grouped.putIfAbsent(
+          key, () => {'opId': opId, 'heId': heId, 'results': 0, 'dateTime': dt});
+      g['results'] = (g['results'] as int) + results;
+      // Conservar la fecha de corte más reciente del grupo.
+      final cur = g['dateTime'] as DateTime?;
+      if (dt != null && (cur == null || dt.isAfter(cur))) g['dateTime'] = dt;
+    }
+
+    // Ordenar las filas agrupadas por fecha de corte más reciente (desc).
+    final groupedRows = grouped.values.toList()
+      ..sort((a, b) {
+        final ta = a['dateTime'] as DateTime?;
+        final tb = b['dateTime'] as DateTime?;
+        if (ta == null && tb == null) return 0;
+        if (ta == null) return 1;
+        if (tb == null) return -1;
+        return tb.compareTo(ta);
+      });
+
+    int totalRacimos = 0;
+    double totalPesoAprox = 0;
+    final List<_TiqueteRow> rows = [];
+    for (int i = 0; i < groupedRows.length; i++) {
+      final g = groupedRows[i];
+      final opId = g['opId'] as String;
+      final opIdInt = int.tryParse(opId) ?? 0;
+      final heId = g['heId'] as int;
+      final results = g['results'] as int;
+      final dt = g['dateTime'] as DateTime?;
       final pesoProm = _headquarterWeights[heId];
       final pesoAprox = pesoProm != null ? results * pesoProm : 0.0;
 
@@ -16630,22 +15899,21 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
                 // Si WRITER_STATUS=true, inyectar los status del formulario en el JSON del tag
                 String contentToTransfer = sourceTagContent;
                 if (writerStatus) {
-                  final srcJson = actions.parseNfcJson(sourceTagContent);
-                  if (srcJson != null) {
-                    final visitDetailsForForm = FFAppState()
-                        .visitDetails
-                        .where((d) => d.idActivityStatus != statusId)
-                        .map((d) => {
-                              'id_activity_status': d.idActivityStatus,
-                              'status_option': d.statusOption,
-                              'status_response': d.statusResponse,
-                            })
-                        .toList();
-                    srcJson['status'] = {'visits_details': visitDetailsForForm};
-                    contentToTransfer = jsonEncode(srcJson);
-                    debugPrint(
-                        '📋 WRITER_STATUS: ${visitDetailsForForm.length} status inyectados en JSON');
-                  }
+                  final visitDetailsForForm = FFAppState()
+                      .visitDetails
+                      .where((d) => d.idActivityStatus != statusId)
+                      .map((d) => {
+                            'id_activity_status': d.idActivityStatus,
+                            'status_option': d.statusOption,
+                            'status_response': d.statusResponse,
+                          })
+                      .toList();
+                  // Inyecta status.visits_details en CADA registro del origen
+                  // (objeto único o array multi-producto).
+                  contentToTransfer = actions.injectFormStatus(
+                      sourceTagContent, visitDetailsForForm);
+                  debugPrint(
+                      '📋 WRITER_STATUS: ${visitDetailsForForm.length} status inyectados (origen objeto único o array)');
                 }
 
                 // Abrir diálogo de escritura en tag de destino

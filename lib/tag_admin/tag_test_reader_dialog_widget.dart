@@ -92,73 +92,24 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     final List<Map<String, dynamic>> parsedData = [];
 
     try {
-      // Detectar si es formato JSON nuevo
-      if (actions.isNewJsonFormat(nfcContent)) {
-        debugPrint('📋 TAG TEST READER: Parseando formato JSON nuevo');
-        final nfcJson = actions.parseNfcJson(nfcContent);
-        if (nfcJson != null) {
-          return actions.extractVisitsFromJson(nfcJson);
-        }
-      } else if (actions.isOldFormat(nfcContent)) {
-        // Formato antiguo (retrocompatibilidad)
-        debugPrint('📋 TAG TEST READER: Parseando formato antiguo');
-        final regexRecords = RegExp(r'\{([^}]+)\}');
-        final matches = regexRecords.allMatches(nfcContent);
-
-        for (var match in matches) {
-          final recordContent = match.group(1);
-          if (recordContent == null) continue;
-
-          final Map<String, dynamic> record = {};
-          final fields = recordContent.split(';');
-
-          for (var field in fields) {
-            final parts = field.split(':');
-            if (parts.length >= 2) {
-              final key = parts[0].trim();
-              final value = parts.sublist(1).join(':').trim();
-
-              switch (key) {
-                case 'DH':
-                  try {
-                    final dateStr = value.replaceAll('_', '-');
-                    final dateParts = dateStr.split('-');
-                    if (dateParts.length >= 4) {
-                      final year = int.parse(dateParts[0]);
-                      final month = int.parse(dateParts[1]);
-                      final day = int.parse(dateParts[2]);
-                      final timeParts = dateParts[3].split(':');
-                      final hour = int.parse(timeParts[0]);
-                      final minute = int.parse(timeParts[1]);
-                      final second = int.parse(timeParts[2]);
-                      record['dateTime'] =
-                          DateTime(year, month, day, hour, minute, second);
-                    }
-                  } catch (e) {
-                    record['dateTime'] = DateTime.now();
-                  }
-                  break;
-                case 'OP':
-                  record['operatorId'] = value;
-                  break;
-                case 'VISITS':
-                  record['visits'] = int.tryParse(value) ?? 0;
-                  break;
-                case 'RESULTS':
-                  record['results'] = int.tryParse(value) ?? 0;
-                  break;
-                case 'HE':
-                  record['headquarterId'] = int.tryParse(value) ?? 0;
-                  break;
-              }
-            }
-          }
-
-          if (record.isNotEmpty) {
-            parsedData.add(record);
-          }
+      // Decodificar como LISTA de registros: un tag puede acumular varios
+      // productos (uno por RFID de origen). decodeNfcRecords soporta objeto
+      // único o array, en cualquier formato (canónico / N1 / C1 / multi-chunk).
+      // Cada visita se etiqueta con su Name_product para poder agrupar el árbol
+      // por PRODUCTO (extractVisitsFromJson no incluye el nombre del producto).
+      final records = actions.decodeNfcRecords(nfcContent);
+      for (final record in records) {
+        final readInfo = record['Read_info'] as Map<String, dynamic>?;
+        final productName = (readInfo?['Name_product'] as String?)?.trim();
+        final visits = actions.extractVisitsFromJson(record);
+        for (final v in visits) {
+          v['productName'] =
+              (productName?.isNotEmpty ?? false) ? productName : 'Producto';
+          parsedData.add(v);
         }
       }
+      debugPrint(
+          '📋 TAG TEST READER: ${records.length} registro(s), ${parsedData.length} visitas');
     } catch (e) {
       debugPrint('❌ Error parseando contenido NFC: $e');
     }
@@ -371,14 +322,11 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     final tagData = _model.parsedRecords;
     if (tagData.isEmpty) return const SizedBox.shrink();
 
-    // Agrupar por lote (headquarterId)
-    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
+    // Agrupar por PRODUCTO (Name_product) — primer nivel del árbol
+    final Map<String, List<Map<String, dynamic>>> groupedByProduct = {};
     for (var record in tagData) {
-      final heId = record['headquarterId'] as int? ?? 0;
-      if (!groupedByHeadquarter.containsKey(heId)) {
-        groupedByHeadquarter[heId] = [];
-      }
-      groupedByHeadquarter[heId]!.add(record);
+      final product = record['productName'] as String? ?? 'Producto';
+      groupedByProduct.putIfAbsent(product, () => []).add(record);
     }
 
     // Calcular totales generales
@@ -438,10 +386,10 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                 ],
               ),
               const SizedBox(height: 12),
-              ...groupedByHeadquarter.entries.map((entry) {
-                final headquarterId = entry.key;
+              ...groupedByProduct.entries.map((entry) {
+                final productName = entry.key;
                 final records = entry.value;
-                return _buildHeadquarterGroup(headquarterId, records);
+                return _buildProductGroup(productName, records);
               }),
             ],
           ),
@@ -450,8 +398,183 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
     );
   }
 
+  /// Nivel 1 del árbol: agrupa por PRODUCTO (Name_product). Al expandir,
+  /// agrupa sus registros por lote y delega en _buildHeadquarterGroup.
+  Widget _buildProductGroup(
+      String productName, List<Map<String, dynamic>> records) {
+    final expansionKey = 'PR_$productName';
+    final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
+
+    // Totales del producto
+    int totalVisits = 0;
+    int totalResults = 0;
+    for (var record in records) {
+      totalVisits += (record['visits'] as int?) ?? 0;
+      totalResults += (record['results'] as int?) ?? 0;
+    }
+
+    // Agrupar por lote (headquarterId) para el segundo nivel
+    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
+    for (var record in records) {
+      final heId = record['headquarterId'] as int? ?? 0;
+      groupedByHeadquarter.putIfAbsent(heId, () => []).add(record);
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D47A1).withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF42A5F5).withValues(alpha: 0.45),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: () {
+              setState(() {
+                _tagReaderExpansionState[expansionKey] = !isExpanded;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  Icon(
+                    isExpanded ? Icons.expand_more : Icons.chevron_right,
+                    color: const Color(0xFF90CAF9),
+                    size: 32,
+                    weight: 700,
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(
+                    Icons.inventory_2_rounded,
+                    color: Color(0xFF90CAF9),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Producto: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF90CAF9),
+                                ),
+                              ),
+                              TextSpan(
+                                text: productName,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$_unityLabel: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$totalVisits visita${totalVisits != 1 ? "s" : ""}',
+                              style: TextStyle(
+                                fontFamily: 'Roboto',
+                                fontSize: 11,
+                                color: Colors.white.withValues(alpha: 0.6),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF42A5F5).withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '${groupedByHeadquarter.length}',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            Container(
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 10),
+              child: Column(
+                children: groupedByHeadquarter.entries.map((entry) {
+                  return _buildHeadquarterGroup(
+                      entry.key, entry.value, productKey: productName);
+                }).toList(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildHeadquarterGroup(
-      int headquarterId, List<Map<String, dynamic>> records) {
+      int headquarterId, List<Map<String, dynamic>> records,
+      {String productKey = ''}) {
     // Buscar el nombre del lote
     String loteName = 'Lote #$headquarterId';
     final headquarters = FFAppState().headquartersList.firstWhere(
@@ -463,7 +586,7 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
       loteName = headquarters.nameHeadquarter;
     }
 
-    final expansionKey = 'HE_$headquarterId';
+    final expansionKey = 'HE_${productKey}_$headquarterId';
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     // Agrupar por operador
@@ -641,7 +764,8 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
                   final operatorId = entry.key;
                   final operatorData = entry.value;
                   return _buildTagReaderOperatorGroup(
-                      headquarterId, operatorId, operatorData);
+                      headquarterId, operatorId, operatorData,
+                      productKey: productKey);
                 }).toList(),
               ),
             ),
@@ -651,14 +775,15 @@ class _TagTestReaderDialogWidgetState extends State<TagTestReaderDialogWidget>
   }
 
   Widget _buildTagReaderOperatorGroup(
-      int headquarterId, String operatorId, Map<String, dynamic> operatorData) {
+      int headquarterId, String operatorId, Map<String, dynamic> operatorData,
+      {String productKey = ''}) {
     final operatorName = operatorData['operatorName'] as String? ?? 'Operador';
     final totalVisits = operatorData['totalVisits'] as int? ?? 0;
     final totalResults = operatorData['totalResults'] as int? ?? 0;
     final records =
         operatorData['records'] as List<Map<String, dynamic>>? ?? [];
 
-    final expansionKey = 'TR_OP_${headquarterId}_$operatorId';
+    final expansionKey = 'TR_OP_${productKey}_${headquarterId}_$operatorId';
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     return Container(

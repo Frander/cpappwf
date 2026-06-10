@@ -299,8 +299,8 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       final now = DateTime.now();
       _model.dateHour = now;
 
-      // 7. Generar string de datos a escribir
-      _model.dataToWrite = _generateNfcData(now);
+      // 7. dataToWrite vacío: los datos de la visita viajan via visitDelta
+      _model.dataToWrite = '';
 
       setState(() {
         _model.isCalculating = false;
@@ -312,33 +312,6 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
       });
       debugPrint('❌ Error en _calculateData: $e');
     }
-  }
-
-  String _generateNfcData(DateTime dateTime) {
-    // Generar formato de escritura para NFC tags
-    // El formato antiguo se usa como "instrucción" para writeNFCTag,
-    // que luego construye el JSON completo al escribir en el tag
-
-    // Validar que el operatorId no esté vacío
-    final operatorIdValue = _model.operatorId.isEmpty
-        ? FFAppState().userSelected.operID
-        : _model.operatorId;
-
-    if (operatorIdValue.isEmpty) {
-      debugPrint('❌ ERROR: OP field es vacío. No se puede escribir el tag.');
-      throw Exception('No se pudo obtener el ID del operador. Por favor seleccione un operador.');
-    }
-
-    final operatorIdInt = int.tryParse(operatorIdValue) ?? 0;
-
-    debugPrint('✅ NFC TAG: OP field = $operatorIdInt');
-
-    // Formato de fecha: 2025_11_06_13:20:00
-    final dateStr = '${dateTime.year}_${dateTime.month.toString().padLeft(2, '0')}_${dateTime.day.toString().padLeft(2, '0')}_${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}:${dateTime.second.toString().padLeft(2, '0')}';
-
-    // Generar string en formato antiguo: {DH:...;OP:...;VISITS:...;RESULTS:...;HE:...}
-    // writeNFCTag parseará esto y construirá el JSON completo
-    return '{DH:$dateStr;OP:$operatorIdInt;VISITS:${_model.totalVisits};RESULTS:${_model.totalResults};HE:${_model.headquarterId}}';
   }
 
   /// Cuenta visitas desde la base de datos SQLite agrupadas por Lote (Id_headquarter)
@@ -547,11 +520,21 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
     _startNfcStatePolling();
 
     try {
-      // Escribir el tag NFC directamente
-      // La validación de tipo de producto se hará internamente en writeNFCTag si es necesario
+      // Pre-computar el delta chunk ANTES de abrir la sesión NFC.
+      // Si el tag ya tiene contenido comprimido, writeNFCTag solo concatenará strings (sin parseo).
+      final visitDelta = actions.encodeVisitDelta(
+        operatorId: int.tryParse(_model.operatorId) ?? FFAppState().userSelected.idUser,
+        visits: _model.totalVisits,
+        results: _model.totalResults,
+        headquarterId: _model.headquarterId,
+        dateTime: _model.dateHour ?? DateTime.now(),
+      );
+
+      // Escribir el tag NFC — la sesión se abre aquí
       final success = await actions.writeNFCTag(
         context,
         _model.dataToWrite,
+        visitDelta: visitDelta,
       );
 
       if (success) {

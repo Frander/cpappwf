@@ -12,11 +12,8 @@ import 'package:nfc_manager/nfc_manager.dart';
 import 'package:nfc_manager_ndef/nfc_manager_ndef.dart';
 import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:ndef_record/ndef_record.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:path/path.dart' as path;
-import 'package:path_provider/path_provider.dart';
-import 'dart:io';
 import '/custom_code/platform_utils.dart';
+import '/backend/sqlite/global_db_singleton.dart';
 
 Future<String> readNFC(
   BuildContext context, {
@@ -36,6 +33,16 @@ Future<String> readNFC(
 
   // Se utiliza un Completer para esperar la lectura del tag
   Completer<String> completer = Completer<String>();
+
+  // Pre-calentar la conexión SQLite (singleton WAL) FUERA de la sesión NFC: así
+  // la validación de producto y el guardado de historial en sesión no pagan
+  // openDatabase/WAL-init con el enlace ISO-DEP abierto (lo que alargaba el
+  // tiempo en campo y favorecía el IOException).
+  try {
+    await GlobalDbSingleton().database;
+  } catch (e) {
+    debugPrint('⚠️ readNFC: no se pudo pre-abrir SQLite: $e');
+  }
 
   // Inicia la sesión NFC con un callback onDiscovered para cuando se detecte un tag
   NfcManager.instance.startSession(
@@ -274,18 +281,18 @@ Future<String> readNFC(
                   final requiredProductType = match.group(1)!.trim();
                   debugPrint('   Tipo de origen requerido: $requiredProductType');
 
-                  // Buscar el producto en SQLite por RFID
-                  // NOTA: No cerrar la base de datos manualmente — sqflite maneja el pool
-                  // automáticamente. Cerrarla aquí causa database_closed en _saveTagToHistory
-                  // que corre concurrentemente (sin await) en línea 248.
+                  // Buscar el producto en la conexión singleton (WAL, nunca se
+                  // cierra). Antes esto abría una conexión nueva con openDatabase
+                  // DENTRO de la sesión NFC, alargando el tiempo con el enlace
+                  // ISO-DEP abierto.
                   try {
-                    final dbPath = FFAppState().pathDatabase;
-                    if (dbPath.isNotEmpty) {
-                      final database = await openDatabase(dbPath);
-
-                      final productResults = await database.rawQuery('''
-                        SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1
-                      ''', [tagId]);
+                    {
+                      final productResults = await globalDb.executeOperation(
+                        (db) => db.rawQuery(
+                          'SELECT Type_product, Name_product FROM Products WHERE Rfid = ? LIMIT 1',
+                          [tagId],
+                        ),
+                      );
 
                       if (productResults.isEmpty) {
                         debugPrint('❌ TAG-TRANSFER: RFID de origen no encontrado: $tagId');
@@ -327,34 +334,11 @@ Future<String> readNFC(
           }
         }
 
-        // Inyectar tag_from, tag_to y US en el JSON leído (si es formato JSON)
-        String enrichedTagData = tagData;
-        if (isNewJsonFormat(tagData)) {
-          try {
-            final readJson = parseNfcJson(tagData);
-            if (readJson != null) {
-              final readInfo = readJson['Read_info'] as Map<String, dynamic>?;
-              if (readInfo != null) {
-                readInfo['tag_from'] = tagId; // RFID del tag leído
-                readInfo['tag_to'] = '';       // vacío para tag-reader
-                readInfo['US'] = FFAppState().userSelected.idUser;
-              }
-              enrichedTagData = nfcJsonToString(readJson);
-              debugPrint('✅ TAG-READER: JSON enriquecido con tag_from=$tagId, US=${FFAppState().userSelected.idUser}');
-            }
-          } catch (e) {
-            debugPrint('⚠️ Error enriqueciendo JSON del tag-reader: $e');
-          }
-        }
-
-        // Actualizar el AppState con los datos leídos
-        FFAppState().update(() {
-          FFAppState().nfcRead = enrichedTagData;
-        });
-
-        // === BORRADO EN SESIÓN (tag-transfer de origen) ===
+        // === TAG-TRANSFER (clearAfterRead=true) ===
+        // Flujo mínimo de sesión: leer raw → borrar en sesión → cerrar sesión.
+        // La decodificación/enriquecimiento ocurren FUERA de la sesión NFC.
         if (clearAfterRead) {
-          debugPrint('🧹 clearAfterRead=true: borrando tag de origen en sesión activa...');
+          debugPrint('📥 TAG-TRANSFER: contenido raw leído (${tagData.length} bytes), iniciando borrado en sesión...');
           try {
             final erased = await _eraseTagInSession(tag);
             debugPrint(erased
@@ -363,7 +347,32 @@ Future<String> readNFC(
           } catch (eraseError) {
             debugPrint('⚠️ Error durante borrado en sesión (no crítico): $eraseError');
           }
+          // Completar con el contenido RAW — decode/enrich ocurren fuera de sesión
+          completer.complete(tagData);
+          await NfcManager.instance.stopSession();
+          return;
         }
+
+        // ═══ TAG-READER: enriquecer (objeto único o ARRAY de productos) ═══
+        // tag_from / tag_to / US se inyectan en el Read_info de CADA registro.
+        // _enrichReadContent decodifica comprimido/multi-chunk/array y devuelve canónico.
+        String enrichedTagData = tagData;
+        if (tagData.isNotEmpty) {
+          try {
+            final enriched = _enrichReadContent(
+                tagData, tagId, FFAppState().userSelected.idUser);
+            if (enriched.isNotEmpty) enrichedTagData = enriched;
+            debugPrint(
+                '✅ TAG-READER: enriquecido (tag_from=$tagId, US=${FFAppState().userSelected.idUser})');
+          } catch (e) {
+            debugPrint('⚠️ Error enriqueciendo lectura: $e');
+          }
+        }
+
+        // Actualizar el AppState con los datos leídos
+        FFAppState().update(() {
+          FFAppState().nfcRead = enrichedTagData;
+        });
 
         // === ENVÍO + BORRADO EN SESIÓN (tag-transfer-adb-from) ===
         if (onTagReadCallback != null) {
@@ -402,8 +411,57 @@ Future<String> readNFC(
     },
   );
 
-  // Esperar a que se complete la lectura del tag o se produzca un error
-  return completer.future;
+  // Esperar a que la sesión NFC complete (tag leído y borrado si aplica)
+  final rawResult = await completer.future;
+
+  // TAG-TRANSFER: decodificar y enriquecer FUERA de la sesión (ya cerrada)
+  // Esto garantiza que la sesión estuvo abierta solo para I/O físico.
+  if (clearAfterRead && rawResult.isNotEmpty && !rawResult.startsWith('ERROR:')) {
+    String tagData = rawResult;
+    final tagId = FFAppState().nfcHardwareTagId; // guardado dentro de la sesión
+
+    // Enriquecer fuera de sesión: objeto único o ARRAY de productos.
+    // tag_from / tag_to / US en el Read_info de CADA registro.
+    String enrichedTagData = tagData;
+    try {
+      final enriched =
+          _enrichReadContent(tagData, tagId, FFAppState().userSelected.idUser);
+      if (enriched.isNotEmpty) enrichedTagData = enriched;
+      debugPrint(
+          '✅ TAG-TRANSFER: enriquecido fuera de sesión (tag_from=$tagId, ${enrichedTagData.length} chars)');
+    } catch (e) {
+      debugPrint('⚠️ Error enriqueciendo TAG-TRANSFER: $e');
+    }
+
+    FFAppState().update(() {
+      FFAppState().nfcRead = enrichedTagData;
+    });
+    return enrichedTagData;
+  }
+
+  return rawResult;
+}
+
+/// Enriquece el contenido leído de un tag (objeto único o ARRAY de productos)
+/// inyectando tag_from / tag_to / US en el Read_info de CADA registro.
+///
+/// Un tag de origen puede acumular varios productos (uno por RFID de origen),
+/// así que se procesan todos los registros, no solo el primero. Decodifica
+/// comprimido / multi-chunk / array y devuelve canónico: objeto único si hay
+/// 1 registro, array JSON si hay varios. Si el contenido no es JSON reconocible
+/// lo devuelve sin cambios.
+String _enrichReadContent(String tagData, String tagId, int userId) {
+  final records = decodeNfcRecords(tagData);
+  if (records.isEmpty) return tagData;
+  for (final rec in records) {
+    final readInfo = rec['Read_info'] as Map<String, dynamic>?;
+    if (readInfo != null) {
+      readInfo['tag_from'] = tagId; // RFID del tag físico leído
+      readInfo['tag_to'] = ''; // vacío al leer (se setea al escribir destino)
+      readInfo['US'] = userId;
+    }
+  }
+  return records.length == 1 ? jsonEncode(records.first) : jsonEncode(records);
 }
 
 /// Borra un tag NFC dentro de una sesión ya activa.
@@ -553,82 +611,68 @@ Future<void> _saveTagToHistory(String tagId, String tagType, int usedSpace) asyn
     totalSpace = 1024; // Por defecto 1KB
   }
 
-  // NOTA: No cerrar db manualmente — sqflite maneja el pool automáticamente.
-  // Cerrar aquí causa database_closed en _saveTagToHistory que corre concurrente (sin await).
+  // Historial en la conexión singleton (WAL, nunca se cierra). Antes esto abría
+  // una conexión nueva con openDatabase mientras la sesión NFC seguía activa
+  // (esta función corre fire-and-forget, sin await). El singleton es seguro para
+  // concurrencia (busy_timeout + reintentos).
   try {
-    late Directory baseDir;
-    if (Platform.isAndroid) {
-      final Directory? externalDir = await getExternalStorageDirectory();
-      if (externalDir == null) {
-        debugPrint('❌ No se pudo acceder al almacenamiento externo');
-        return;
-      }
-      baseDir = externalDir;
-    } else {
-      baseDir = await getApplicationDocumentsDirectory();
-    }
+    await globalDb.executeOperation((db) async {
+      final now = DateTime.now().toUtc();
 
-    final String dbPath = path.join(
-      '${baseDir.path}/ClickPalmData',
-      'clickpalm_database.db',
-    );
-
-    final Database db = await openDatabase(dbPath);
-    final now = DateTime.now().toUtc();
-
-    final List<Map<String, dynamic>> existing = await db.query(
-      'Nfc_tags_history',
-      where: 'Tag_id = ?',
-      whereArgs: [tagId],
-    );
-
-    if (existing.isNotEmpty) {
-      final int currentReadCount = existing.first['Read_count'] as int;
-      await db.update(
+      final List<Map<String, dynamic>> existing = await db.query(
         'Nfc_tags_history',
-        {
-          'Last_read': now.toIso8601String(),
-          'Read_count': currentReadCount + 1,
-          'Tag_type': tagType,
-          'Total_space': totalSpace,
-          'Used_space': usedSpace,
-        },
         where: 'Tag_id = ?',
         whereArgs: [tagId],
       );
-      debugPrint('📝 TAG actualizado en historial: $tagId (lecturas: ${currentReadCount + 1}, espacio: $usedSpace/$totalSpace bytes)');
-    } else {
-      await db.insert(
-        'Nfc_tags_history',
-        {
-          'Tag_id': tagId,
-          'Tag_type': tagType,
-          'Total_space': totalSpace,
-          'Used_space': usedSpace,
-          'Last_read': now.toIso8601String(),
-          'Read_count': 1,
-          'Created_at': now.toIso8601String(),
-        },
-      );
-      debugPrint('📝 Nuevo TAG agregado al historial: $tagId (espacio: $usedSpace/$totalSpace bytes)');
-    }
 
-    final List<Map<String, dynamic>> allTags = await db.query(
-      'Nfc_tags_history',
-      orderBy: 'Last_read DESC',
-    );
-
-    if (allTags.length > 50) {
-      final tagsToDelete = allTags.skip(50).toList();
-      for (var tag in tagsToDelete) {
-        await db.delete(
+      if (existing.isNotEmpty) {
+        final int currentReadCount = existing.first['Read_count'] as int;
+        await db.update(
           'Nfc_tags_history',
-          where: 'Id_nfc_tag = ?',
-          whereArgs: [tag['Id_nfc_tag']],
+          {
+            'Last_read': now.toIso8601String(),
+            'Read_count': currentReadCount + 1,
+            'Tag_type': tagType,
+            'Total_space': totalSpace,
+            'Used_space': usedSpace,
+          },
+          where: 'Tag_id = ?',
+          whereArgs: [tagId],
         );
+        debugPrint('📝 TAG actualizado en historial: $tagId (lecturas: ${currentReadCount + 1}, espacio: $usedSpace/$totalSpace bytes)');
+      } else {
+        await db.insert(
+          'Nfc_tags_history',
+          {
+            'Tag_id': tagId,
+            'Tag_type': tagType,
+            'Total_space': totalSpace,
+            'Used_space': usedSpace,
+            'Last_read': now.toIso8601String(),
+            'Read_count': 1,
+            'Created_at': now.toIso8601String(),
+          },
+        );
+        debugPrint('📝 Nuevo TAG agregado al historial: $tagId (espacio: $usedSpace/$totalSpace bytes)');
       }
-      debugPrint('🧹 Limpiados ${tagsToDelete.length} TAGs antiguos del historial');
-    }
+
+      final List<Map<String, dynamic>> allTags = await db.query(
+        'Nfc_tags_history',
+        orderBy: 'Last_read DESC',
+      );
+
+      if (allTags.length > 50) {
+        final tagsToDelete = allTags.skip(50).toList();
+        for (var tag in tagsToDelete) {
+          await db.delete(
+            'Nfc_tags_history',
+            where: 'Id_nfc_tag = ?',
+            whereArgs: [tag['Id_nfc_tag']],
+          );
+        }
+        debugPrint('🧹 Limpiados ${tagsToDelete.length} TAGs antiguos del historial');
+      }
+    });
   } catch (e) {
     debugPrint('❌ Error guardando TAG en historial SQLite: $e');
   }

@@ -68,118 +68,137 @@ Future<Map<String, dynamic>> readNfcDetailed(BuildContext context) async {
           debugPrint('🏷️ TAG ID: $tagId');
         }
 
-        // 2. OBTENER INFORMACIÓN DEL TAG (tipo y capacidad)
+        // 2. IDENTIFICAR HARDWARE DEL TAG (tecnología y capacidad real)
         final ndef = Ndef.from(tag);
-        if (ndef != null) {
-          maxSize = ndef.maxSize;
+        final isoDep = IsoDepAndroid.from(tag);
+        final mifareClassic = MifareClassicAndroid.from(tag);
+        final nfcA = NfcAAndroid.from(tag);
 
-          // Determinar tipo basado en maxSize
-          if (maxSize >= 4096) {
-            tagType = 'NTAG 216 / Mifare 4K';
-          } else if (maxSize >= 716) {
+        String tagTechnology = 'Desconocido';
+        bool ndefWritable = false;
+        String atqaSak = '';
+
+        // ATQA / SAK identifica el fabricante y familia del chip (NfcA only)
+        if (nfcA != null) {
+          final atqaHex = nfcA.atqa
+              .map((b) => b.toRadixString(16).padLeft(2, '0').toUpperCase())
+              .join('');
+          final sakHex = nfcA.sak.toRadixString(16).padLeft(2, '0').toUpperCase();
+          atqaSak = 'ATQA:$atqaHex  SAK:$sakHex';
+        }
+
+        if (mifareClassic != null) {
+          // Mifare Classic 1K / 4K — NfcA con sectores de 64 bytes
+          maxSize = mifareClassic.size;
+          tagType = maxSize >= 4096 ? 'Mifare Classic 4K' : 'Mifare Classic 1K';
+          tagTechnology = 'NfcA · Mifare Classic';
+          ndefWritable = ndef?.isWritable ?? false;
+          debugPrint('🏷️ Mifare Classic: ${mifareClassic.size}B, '
+              '${mifareClassic.sectorCount} sectores, ${mifareClassic.blockCount} bloques');
+        } else if (isoDep != null && ndef != null) {
+          // DESFire formateado como NDEF
+          maxSize = ndef.maxSize;
+          tagType = 'Mifare DESFire (NDEF)';
+          tagTechnology = 'IsoDep · DESFire';
+          ndefWritable = ndef.isWritable;
+          debugPrint('🏷️ DESFire NDEF: maxSize=$maxSize');
+        } else if (isoDep != null) {
+          // DESFire virgen (no formateado como NDEF)
+          maxSize = 2048;
+          tagType = 'Mifare DESFire (sin NDEF)';
+          tagTechnology = 'IsoDep · DESFire';
+          debugPrint('🏷️ DESFire sin NDEF');
+        } else if (ndef != null && nfcA != null) {
+          // NTAG213/215/216 y Ultralight — todos son NfcA + NDEF
+          maxSize = ndef.maxSize;
+          ndefWritable = ndef.isWritable;
+          tagTechnology = 'NfcA · Mifare Ultralight';
+          if (maxSize >= 888) {
+            tagType = 'NTAG 216';
+          } else if (maxSize >= 504) {
             tagType = 'NTAG 215';
           } else if (maxSize >= 137) {
-            tagType = 'NTAG 213 / Mifare 1K';
+            tagType = 'NTAG 213';
           } else {
-            tagType = 'NFC Type 2';
+            tagType = 'Mifare Ultralight C';
           }
+          debugPrint('🏷️ $tagType (NfcA+NDEF, maxSize=$maxSize, writable=$ndefWritable)');
+        } else if (ndef != null) {
+          // NDEF con tecnología no identificada
+          maxSize = ndef.maxSize;
+          ndefWritable = ndef.isWritable;
+          tagType = 'NDEF Tag';
+          tagTechnology = 'Desconocido';
+          debugPrint('🏷️ NDEF genérico: maxSize=$maxSize');
+        } else if (nfcA != null) {
+          tagType = 'NFC-A (sin NDEF)';
+          tagTechnology = 'NfcA';
+          debugPrint('🏷️ NfcA sin NDEF');
+        }
 
-          debugPrint('🏷️ TAG Type: $tagType (NDEF maxSize: $maxSize bytes)');
-
-          // 3. LEER CONTENIDO DEL TAG
-          if (ndef.cachedMessage != null) {
-            final records = ndef.cachedMessage!.records;
-            if (records.isNotEmpty) {
-              final firstRecord = records.first;
-              final payload = firstRecord.payload;
-
-              if (payload.isNotEmpty) {
-                try {
-                  // Decodificar Text Record
-                  final statusByte = payload[0];
-                  final languageCodeLength = statusByte & 0x3F;
-
-                  if (payload.length > languageCodeLength + 1) {
-                    final textBytes = payload.sublist(1 + languageCodeLength);
-                    tagData = utf8.decode(textBytes);
-                    currentSize = tagData.length;
-                    debugPrint('📖 Contenido leído: ${tagData.length} bytes');
-                  }
-                } catch (e) {
-                  debugPrint('⚠️ Error decodificando NDEF: $e');
+        // 3. LEER CONTENIDO DEL TAG
+        if (ndef != null && ndef.cachedMessage != null) {
+          final records = ndef.cachedMessage!.records;
+          if (records.isNotEmpty) {
+            final payload = records.first.payload;
+            if (payload.isNotEmpty) {
+              try {
+                final statusByte = payload[0];
+                final languageCodeLength = statusByte & 0x3F;
+                if (payload.length > languageCodeLength + 1) {
+                  final textBytes = payload.sublist(1 + languageCodeLength);
+                  tagData = utf8.decode(textBytes);
+                  currentSize = utf8.encode(tagData).length;
+                  debugPrint('📖 Contenido NDEF: ${tagData.length} chars / $currentSize bytes');
                 }
+              } catch (e) {
+                debugPrint('⚠️ Error decodificando NDEF: $e');
               }
             }
           }
-        } else {
-          // Intentar detectar otros tipos de TAG
-          final isoDep = IsoDepAndroid.from(tag);
-          if (isoDep != null) {
-            tagType = 'DESFire / IsoDep';
-            debugPrint('🏷️ TAG Type: $tagType (debe formatearse como NDEF)');
-          }
+        } else if (mifareClassic != null && tagData.isEmpty) {
+          // Mifare Classic sin NDEF: leer raw
+          try {
+            final key = Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
+            final allBytes = <int>[];
 
-          final nfcA = NfcAAndroid.from(tag);
-          if (nfcA != null) {
-            tagType = 'NFC-A (ATQA: ${nfcA.atqa}, SAK: ${nfcA.sak})';
-            debugPrint('🏷️ TAG Type: $tagType');
-          }
+            await mifareClassic.authenticateSectorWithKeyA(sectorIndex: 0, key: key);
+            allBytes.addAll(await mifareClassic.readBlock(blockIndex: 1));
+            allBytes.addAll(await mifareClassic.readBlock(blockIndex: 2));
 
-          final mifareClassic = MifareClassicAndroid.from(tag);
-          if (mifareClassic != null) {
-            tagType = 'Mifare Classic (${mifareClassic.size} bytes, ${mifareClassic.blockCount} bloques, ${mifareClassic.sectorCount} sectores)';
-            maxSize = mifareClassic.size;
-            debugPrint('🏷️ TAG Type: $tagType');
-
-            // Intentar leer contenido de Mifare Classic
-            try {
-              final key = Uint8List.fromList([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF]);
-              final allBytes = <int>[];
-
-              // Leer sector 0: bloques 1-2
-              await mifareClassic.authenticateSectorWithKeyA(sectorIndex: 0, key: key);
-              final block1 = await mifareClassic.readBlock(blockIndex: 1);
-              final block2 = await mifareClassic.readBlock(blockIndex: 2);
-              allBytes.addAll(block1);
-              allBytes.addAll(block2);
-
-              // Leer sectores 1-14
-              for (int sector = 1; sector <= 14; sector++) {
-                try {
-                  await mifareClassic.authenticateSectorWithKeyA(sectorIndex: sector, key: key);
-                  for (int block = 0; block < 3; block++) {
-                    final blockIndex = (sector * 4) + block;
-                    final blockData = await mifareClassic.readBlock(blockIndex: blockIndex);
-                    allBytes.addAll(blockData);
-                  }
-                } catch (e) {
-                  debugPrint('⚠️ No se pudo leer sector $sector');
-                  break;
+            for (int sector = 1; sector <= 14; sector++) {
+              try {
+                await mifareClassic.authenticateSectorWithKeyA(sectorIndex: sector, key: key);
+                for (int block = 0; block < 3; block++) {
+                  allBytes.addAll(await mifareClassic.readBlock(blockIndex: (sector * 4) + block));
                 }
+              } catch (_) {
+                break;
               }
-
-              // Filtrar bytes nulos del final
-              int lastNonZero = allBytes.lastIndexWhere((byte) => byte != 0);
-              if (lastNonZero >= 0) {
-                final trimmedBytes = allBytes.sublist(0, lastNonZero + 1);
-                tagData = utf8.decode(trimmedBytes, allowMalformed: true);
-                currentSize = tagData.length;
-                debugPrint('📖 Contenido Mifare Classic: ${tagData.length} bytes');
-              }
-            } catch (e) {
-              debugPrint('⚠️ Error leyendo Mifare Classic: $e');
             }
+
+            final lastNonZero = allBytes.lastIndexWhere((b) => b != 0);
+            if (lastNonZero >= 0) {
+              tagData = utf8.decode(allBytes.sublist(0, lastNonZero + 1), allowMalformed: true);
+              currentSize = tagData.length;
+              debugPrint('📖 Contenido Mifare Classic raw: ${tagData.length} bytes');
+            }
+          } catch (e) {
+            debugPrint('⚠️ Error leyendo Mifare Classic: $e');
           }
         }
 
         // Calcular espacio disponible
-        int availableSize = maxSize - currentSize;
+        int availableSize = maxSize > 0 ? maxSize - currentSize : 0;
         if (availableSize < 0) availableSize = 0;
 
-        // Preparar resultado
+        // Preparar resultado con campos extendidos
         result['success'] = true;
         result['tagId'] = tagId;
         result['tagType'] = tagType;
+        result['tagTechnology'] = tagTechnology;
+        result['ndefWritable'] = ndefWritable;
+        if (atqaSak.isNotEmpty) result['atqaSak'] = atqaSak;
         result['content'] = tagData;
         result['maxSize'] = maxSize;
         result['currentSize'] = currentSize;

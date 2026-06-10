@@ -68,6 +68,10 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
           final tagInfo = <String, dynamic>{
             'tagId': result['tagId'] ?? '',
             'tagType': result['tagType'] ?? 'Desconocido',
+            'tagTechnology': result['tagTechnology'] ?? 'Desconocido',
+            'ndefWritable': result['ndefWritable'] ?? false,
+            if ((result['atqaSak'] ?? '').toString().isNotEmpty)
+              'atqaSak': result['atqaSak'],
             'maxSize': result['maxSize'] ?? 0,
             'currentSize': result['currentSize'] ?? 0,
             'availableSize': result['availableSize'] ?? 0,
@@ -116,58 +120,75 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
   Map<String, dynamic> _extractTagInfo(String content) {
     final info = <String, dynamic>{};
 
-    // Tamaño en bytes (UTF-8)
     info['sizeBytes'] = content.length;
-
-    // Tamaño estimado en KB
     info['sizeKB'] = (content.length / 1024).toStringAsFixed(2);
 
-    // Detectar formato y contar registros
-    if (actions.isNewJsonFormat(content)) {
-      // Formato JSON nuevo
-      info['format'] = 'JSON';
+    if (actions.isMultiChunkFormat(content)) {
+      final parts = content.split(actions.kNfcChunkDelimiter);
+      final firstChunk = parts[0];
+      final deltaCount = parts.length - 1;
+      final dl = deltaCount == 1 ? 'delta' : 'deltas';
+
+      if (firstChunk.startsWith('N1:')) {
+        info['format'] = 'Multi-chunk (N1 + $deltaCount $dl)';
+      } else if (firstChunk.startsWith('C1:')) {
+        info['format'] = 'Multi-chunk (C1 + $deltaCount $dl)';
+      } else {
+        info['format'] = 'Multi-chunk ($deltaCount $dl)';
+      }
+      info['chunkCount'] = parts.length;
+      info['deltaCount'] = deltaCount;
+
       final nfcJson = actions.parseNfcJson(content);
       if (nfcJson != null) {
         final visits = nfcJson['Visits'] as List?;
         info['recordCount'] = visits?.length ?? 0;
-
-        // Extraer información de Read_info
-        if (nfcJson['Read_info'] != null) {
-          final readInfo = nfcJson['Read_info'] as Map<String, dynamic>;
+        final readInfo = nfcJson['Read_info'] as Map<String, dynamic>?;
+        if (readInfo != null) {
           info['productId'] = readInfo['Id_product'];
           info['rfid'] = readInfo['RFID'];
           info['productName'] = readInfo['Name_product'];
           info['dateCreated'] = readInfo['Date_created'];
         }
-
-        // Campos del formato JSON
+      } else {
+        info['recordCount'] = 0;
+      }
+    } else if (actions.isNfcCompressedFormat(content)) {
+      info['format'] = content.startsWith('C1:')
+          ? 'Comprimido (C1 — zlib + base64url)'
+          : 'Minificado (N1 — JSON compacto)';
+      final nfcJson = actions.nfcDecode(content);
+      if (nfcJson != null) {
+        final visits = nfcJson['Visits'] as List?;
+        info['recordCount'] = visits?.length ?? 0;
+        final readInfo = nfcJson['Read_info'] as Map<String, dynamic>?;
+        if (readInfo != null) {
+          info['productId'] = readInfo['Id_product'];
+          info['rfid'] = readInfo['RFID'];
+          info['productName'] = readInfo['Name_product'];
+          info['dateCreated'] = readInfo['Date_created'];
+        }
+      } else {
+        info['recordCount'] = 0;
+      }
+    } else if (actions.isNewJsonFormat(content)) {
+      info['format'] = 'JSON Canónico';
+      final nfcJson = actions.parseNfcJson(content);
+      if (nfcJson != null) {
+        final visits = nfcJson['Visits'] as List?;
+        info['recordCount'] = visits?.length ?? 0;
+        final readInfo = nfcJson['Read_info'] as Map<String, dynamic>?;
+        if (readInfo != null) {
+          info['productId'] = readInfo['Id_product'];
+          info['rfid'] = readInfo['RFID'];
+          info['productName'] = readInfo['Name_product'];
+          info['dateCreated'] = readInfo['Date_created'];
+        }
         info['fields'] = ['DH', 'OP', 'VISITS', 'RESULTS', 'HE'];
       } else {
         info['recordCount'] = 0;
         info['fields'] = [];
       }
-    } else if (actions.isOldFormat(content)) {
-      // Formato antiguo
-      info['format'] = 'Antiguo (compatibilidad)';
-      final regexRecords = RegExp(r'\{([^}]+)\}');
-      final matches = regexRecords.allMatches(content);
-      info['recordCount'] = matches.length;
-
-      // Extraer campos únicos
-      final Set<String> fields = {};
-      for (var match in matches) {
-        final recordContent = match.group(1);
-        if (recordContent != null) {
-          final parts = recordContent.split(';');
-          for (var part in parts) {
-            final keyValue = part.split(':');
-            if (keyValue.isNotEmpty) {
-              fields.add(keyValue[0].trim());
-            }
-          }
-        }
-      }
-      info['fields'] = fields.toList();
     } else {
       info['format'] = 'Desconocido';
       info['recordCount'] = 0;
@@ -393,7 +414,8 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: SelectableText(
-                                _model.rawContent,
+                                _model.rawContent.replaceAll(
+                                    actions.kNfcChunkDelimiter, '\n── DELTA ──\n'),
                                 style: const TextStyle(fontFamily: 'Roboto Mono',
                                   fontSize: 11,
                                   color: Color(0xFFF59E0B),
@@ -555,9 +577,18 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
               const SizedBox(height: 12),
               _buildInfoRow('ID', tagId),
               _buildInfoRow('Tipo', tagType),
+              if ((info['tagTechnology'] ?? '').toString().isNotEmpty &&
+                  info['tagTechnology'] != 'Desconocido')
+                _buildInfoRow('Tecnología', info['tagTechnology'].toString()),
+              if ((info['atqaSak'] ?? '').toString().isNotEmpty)
+                _buildInfoRow('ATQA / SAK', info['atqaSak'].toString()),
               _buildInfoRow('Capacidad Total', '$maxSize bytes'),
               _buildInfoRow('Espacio Usado', '$currentSize bytes ($usagePercent%)'),
               _buildInfoRow('Espacio Disponible', '$availableSize bytes'),
+              _buildInfoRow(
+                'NDEF Escribible',
+                (info['ndefWritable'] == true) ? 'Sí' : 'No',
+              ),
             ],
           ),
         ),
@@ -590,8 +621,17 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                   ],
                 ),
                 const SizedBox(height: 12),
+                if (info['format'] != null)
+                  _buildInfoRow('Formato', info['format'].toString()),
                 _buildInfoRow('Registros', '$recordCount'),
                 _buildInfoRow('Tamaño', '$sizeBytes bytes ($sizeKB KB)'),
+                if ((info['chunkCount'] ?? 0) > 1)
+                  _buildInfoRow(
+                    'Chunks',
+                    '${info['chunkCount']} total  (1 principal + ${info['deltaCount']} delta${(info['deltaCount'] ?? 0) > 1 ? "s" : ""})',
+                  ),
+                if (info['productName'] != null)
+                  _buildInfoRow('Producto', info['productName'].toString()),
                 if (fields.isNotEmpty) _buildInfoRow('Campos detectados', fields.join(', ')),
               ],
             ),
@@ -631,13 +671,23 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
   }
 
   Widget _buildDecodedContent() {
-    // Parsear y mostrar cada registro de forma estructurada
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(_model.rawContent);
+    final content = _model.rawContent;
+    if (content.isEmpty) return const SizedBox.shrink();
 
-    if (matches.isEmpty) {
+    final isMultiChunk = actions.isMultiChunkFormat(content);
+    final isCompressed = actions.isNfcCompressedFormat(content);
+    final isNewJson = actions.isNewJsonFormat(content);
+
+    if (!isMultiChunk &&
+        !isCompressed &&
+        !isNewJson &&
+        !actions.isJsonArrayFormat(content)) {
       return const SizedBox.shrink();
     }
+
+    // Decodificar como LISTA de registros (objeto único o array multi-producto,
+    // en cualquier formato: canónico / N1 / C1 / multi-chunk).
+    final records = actions.decodeNfcRecords(content);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -654,73 +704,114 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
         children: [
           const Text(
             'Registros Decodificados',
-            style: TextStyle(fontFamily: 'Roboto',
+            style: TextStyle(
+              fontFamily: 'Roboto',
               fontSize: 14,
               fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
           ),
           const SizedBox(height: 12),
-          ...matches.map((match) {
-            final index = matches.toList().indexOf(match) + 1;
-            final recordContent = match.group(1) ?? '';
-            final fields = recordContent.split(';');
+          if (isMultiChunk) ...[
+            _buildChunkBreakdown(content),
+            const SizedBox(height: 12),
+          ],
+          ...List.generate(
+            records.length,
+            (idx) => Padding(
+              padding: EdgeInsets.only(top: idx > 0 ? 10 : 0),
+              child: _buildDecodedRecords(
+                records[idx],
+                content,
+                recordLabel: records.length > 1 ? 'Producto ${idx + 1}' : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0F172A),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFFF59E0B).withValues(alpha: 0.2),
-                  width: 1,
+  Widget _buildChunkBreakdown(String content) {
+    final chunks = content.split(actions.kNfcChunkDelimiter);
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.layers_rounded, color: Color(0xFF3B82F6), size: 15),
+              const SizedBox(width: 6),
+              Text(
+                'Estructura Multi-chunk (${chunks.length} segmento${chunks.length != 1 ? "s" : ""})',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF3B82F6),
                 ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...List.generate(chunks.length, (i) {
+            final chunk = chunks[i];
+            final isFirst = i == 0;
+            final sizeB = chunk.length;
+            final String label;
+            final String encoding;
+            final Color labelColor;
+
+            if (isFirst) {
+              label = 'Chunk inicial';
+              encoding = chunk.startsWith('N1:')
+                  ? 'N1 — ${sizeB}B'
+                  : chunk.startsWith('C1:')
+                      ? 'C1 — ${sizeB}B (comprimido)'
+                      : '${sizeB}B';
+              labelColor = const Color(0xFF10B981);
+            } else {
+              label = 'Delta #$i';
+              encoding = '${sizeB}B';
+              labelColor = const Color(0xFFF59E0B);
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
                 children: [
+                  Icon(
+                    isFirst ? Icons.home_rounded : Icons.add_circle_outline,
+                    color: labelColor,
+                    size: 13,
+                  ),
+                  const SizedBox(width: 6),
                   Text(
-                    'Registro #$index',
-                    style: const TextStyle(fontFamily: 'Roboto',
+                    '$label  ',
+                    style: TextStyle(
+                      fontFamily: 'Roboto',
                       fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFF59E0B),
+                      fontWeight: FontWeight.w600,
+                      color: labelColor,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  ...fields.map((field) {
-                    final parts = field.split(':');
-                    if (parts.length >= 2) {
-                      final key = parts[0].trim();
-                      final value = parts.sublist(1).join(':').trim();
-                      return Padding(
-                        padding: const EdgeInsets.only(left: 12, bottom: 4),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$key: ',
-                              style: const TextStyle(fontFamily: 'Roboto Mono',
-                                fontSize: 10,
-                                color: Color(0xFFA78BFA),
-                              ),
-                            ),
-                            Expanded(
-                              child: Text(
-                                value,
-                                style: const TextStyle(fontFamily: 'Roboto Mono',
-                                  fontSize: 10,
-                                  color: Color(0xFF10B981),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }
-                    return const SizedBox.shrink();
-                  }),
+                  Text(
+                    encoding,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto Mono',
+                      fontSize: 10,
+                      color: Colors.white54,
+                    ),
+                  ),
                 ],
               ),
             );
@@ -728,5 +819,278 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
         ],
       ),
     );
+  }
+
+  Widget _buildDecodedRecords(Map<String, dynamic> canonical, String rawContent,
+      {String? recordLabel}) {
+    final readInfo = canonical['Read_info'] as Map<String, dynamic>?;
+    final visits = (canonical['Visits'] as List?)
+        ?.map((v) => v as Map<String, dynamic>)
+        .toList();
+    final isMultiChunk = actions.isMultiChunkFormat(rawContent);
+    final chunkCount =
+        isMultiChunk ? rawContent.split(actions.kNfcChunkDelimiter).length : 0;
+
+    // status.visits_details: campos del formulario inyectados por WRITER_STATUS.
+    // Solo se renderiza si existe y tiene elementos.
+    final statusBlock = canonical['status'];
+    final formDetails =
+        (statusBlock is Map ? statusBlock['visits_details'] : null) as List?;
+    final formDetailsList = formDetails
+            ?.whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList() ??
+        const <Map<String, dynamic>>[];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (recordLabel != null) ...[
+          Row(
+            children: [
+              const Icon(Icons.inventory_2_rounded,
+                  color: Color(0xFF60A5FA), size: 14),
+              const SizedBox(width: 6),
+              Text(
+                recordLabel,
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF60A5FA),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+        ],
+        if (readInfo != null) ...[
+          _buildReadInfoCard(readInfo),
+          const SizedBox(height: 8),
+        ],
+        if (visits != null)
+          ...List.generate(visits.length, (i) {
+            String? source;
+            if (isMultiChunk) {
+              source = i == 0 ? 'Chunk inicial' : 'Delta #$i';
+              if (i >= chunkCount - 1 && chunkCount > 1) {
+                source = 'Delta #$i';
+              }
+            }
+            return _buildVisitCard(i + 1, visits[i], source: source);
+          }),
+        if (formDetailsList.isNotEmpty) _buildStatusDetailsCard(formDetailsList),
+      ],
+    );
+  }
+
+  /// Renderiza el bloque status.visits_details como una lista de etiquetas:
+  /// status_option → status_response (con la hora formateada). No se llama si
+  /// la lista está vacía.
+  Widget _buildStatusDetailsCard(List<Map<String, dynamic>> details) {
+    return Container(
+      margin: const EdgeInsets.only(top: 4, bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF10B981).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.checklist_rounded, color: Color(0xFF10B981), size: 14),
+              SizedBox(width: 6),
+              Text(
+                'Detalles del Formulario',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF10B981),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...details.map((d) {
+            final option = (d['status_option'] ?? '').toString();
+            final response =
+                _formatStatusResponse((d['status_response'] ?? '').toString());
+            final idStatus = (d['id_activity_status'] ?? '').toString();
+            final label = option.isNotEmpty
+                ? option
+                : (idStatus.isNotEmpty ? 'Status $idStatus' : 'Campo');
+            return _buildFieldRow(label, response.isNotEmpty ? response : '—');
+          }),
+        ],
+      ),
+    );
+  }
+
+  /// Convierte el literal "TimeOfDay(HH:MM)" en "HH:MM"; deja el resto intacto.
+  String _formatStatusResponse(String response) {
+    final m = RegExp(r'TimeOfDay\((\d{1,2}:\d{2})\)').firstMatch(response);
+    if (m != null) return m.group(1)!;
+    return response;
+  }
+
+  Widget _buildReadInfoCard(Map<String, dynamic> readInfo) {
+    final productName = readInfo['Name_product']?.toString() ?? '';
+    final productId = readInfo['Id_product']?.toString() ?? '';
+    final rfid = readInfo['RFID']?.toString() ?? '';
+    final dateCreated = readInfo['Date_created'];
+    final tagTo = readInfo['tag_to']?.toString() ?? '';
+    final userId = readInfo['US']?.toString() ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.inventory_2_outlined, color: Color(0xFF8B5CF6), size: 14),
+              SizedBox(width: 6),
+              Text(
+                'Información del Producto',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8B5CF6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (productName.isNotEmpty) _buildFieldRow('Nombre', productName),
+          if (productId.isNotEmpty) _buildFieldRow('ID Producto', productId),
+          if (rfid.isNotEmpty) _buildFieldRow('RFID', rfid),
+          if (dateCreated != null)
+            _buildFieldRow('Fecha creación', _epochToReadable(dateCreated)),
+          if (tagTo.isNotEmpty) _buildFieldRow('Tag destino', tagTo),
+          if (userId.isNotEmpty) _buildFieldRow('Usuario escritor', userId),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVisitCard(int number, Map<String, dynamic> visit, {String? source}) {
+    final dh = visit['DH'] ?? visit['h'];
+    final op = visit['OP'] ?? visit['o'];
+    final visitCount = visit['VISITS'] ?? visit['v'];
+    final results = visit['RESULTS'] ?? visit['s'];
+    final he = visit['HE'] ?? visit['e'];
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFFF59E0B).withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.receipt_long, color: Color(0xFFF59E0B), size: 14),
+              const SizedBox(width: 6),
+              Text(
+                'Visita #$number',
+                style: const TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFF59E0B),
+                ),
+              ),
+              if (source != null) ...[
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF374151),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    source,
+                    style: const TextStyle(
+                      fontFamily: 'Roboto',
+                      fontSize: 9,
+                      color: Colors.white54,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (dh != null) _buildFieldRow('Fecha / Hora', _epochToReadable(dh)),
+          if (op != null) _buildFieldRow('Operador (OP)', op.toString()),
+          if (visitCount != null) _buildFieldRow('Visitas', visitCount.toString()),
+          if (results != null) _buildFieldRow('Resultados', results.toString()),
+          if (he != null) _buildFieldRow('Lote (HE)', he.toString()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFieldRow(String key, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$key: ',
+            style: const TextStyle(
+              fontFamily: 'Roboto Mono',
+              fontSize: 10,
+              color: Color(0xFFA78BFA),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontFamily: 'Roboto Mono',
+                fontSize: 10,
+                color: Color(0xFF10B981),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _epochToReadable(dynamic epoch) {
+    try {
+      final int seconds = epoch is int ? epoch : int.parse(epoch.toString());
+      final dt = DateTime.fromMillisecondsSinceEpoch(seconds * 1000);
+      String pad(int n) => n.toString().padLeft(2, '0');
+      return '${dt.day}/${pad(dt.month)}/${dt.year} ${pad(dt.hour)}:${pad(dt.minute)}';
+    } catch (_) {
+      return epoch.toString();
+    }
   }
 }

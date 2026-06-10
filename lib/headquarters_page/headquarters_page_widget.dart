@@ -634,11 +634,11 @@ class _HeadquartersPageWidgetState extends State<HeadquartersPageWidget> {
           // Permitir múltiples lotes seleccionados (comportamiento de checkbox)
           if (isSelected) {
             // Si ya está seleccionado, lo deseleccionamos
-            FFAppState().headquartersSelectedList.remove(headquarterItem);
+            FFAppState().removeFromHeadquartersSelectedList(headquarterItem);
             _model.checkboxValueMap.remove(headquarterItem);
           } else {
             // Agregarlo a la lista de seleccionados
-            FFAppState().headquartersSelectedList.add(headquarterItem);
+            FFAppState().addToHeadquartersSelectedList(headquarterItem);
             _model.checkboxValueMap[headquarterItem] = true;
           }
         });

@@ -271,12 +271,6 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       return false;
     }
 
-    // Validar formato antiguo (retrocompatibilidad)
-    if (actions.isOldFormat(content)) {
-      debugPrint('✅ TAG-TRANSFER: Formato antiguo válido para transferir');
-      return true;
-    }
-
     debugPrint('⚠️ TAG-TRANSFER: Formato inválido');
     return false;
   }
@@ -290,15 +284,11 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
       return true;
     }
 
-    // Pattern 2: Formato JSON nuevo (prioridad)
-    if (actions.isNewJsonFormat(content)) {
+    // Pattern 2: Formato JSON nuevo (objeto único, array multi-producto,
+    // comprimido N1/C1 o multi-chunk). decodeNfcRecords decodifica todos esos
+    // casos; si devuelve registros, el contenido es válido y NO debe borrarse.
+    if (actions.decodeNfcRecords(content).isNotEmpty) {
       debugPrint('✅ Contenido del TAG válido (formato JSON)');
-      return true;
-    }
-
-    // Pattern 3: Formato antiguo (retrocompatibilidad)
-    if (actions.isOldFormat(content)) {
-      debugPrint('✅ Contenido del TAG válido (formato antiguo)');
       return true;
     }
 
@@ -554,14 +544,17 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
     List<NfcRecord> records = [];
 
     try {
-      // Detectar si es formato JSON nuevo
-      if (actions.isNewJsonFormat(content)) {
-        debugPrint('📋 Parseando formato JSON nuevo');
-        final nfcJson = actions.parseNfcJson(content);
-        if (nfcJson != null) {
-          final visits = actions.extractVisitsFromJson(nfcJson);
-
-          for (var visit in visits) {
+      // Decodificar como LISTA de registros: un tag puede acumular varios
+      // productos (uno por RFID de origen). decodeNfcRecords soporta objeto
+      // único o array, en cualquier formato (canónico / N1 / C1 / multi-chunk).
+      final decodedRecords = actions.decodeNfcRecords(content);
+      if (decodedRecords.isNotEmpty) {
+        debugPrint('📋 Parseando ${decodedRecords.length} registro(s)');
+        final visits = <Map<String, dynamic>>[];
+        for (final rec in decodedRecords) {
+          visits.addAll(actions.extractVisitsFromJson(rec));
+        }
+        for (var visit in visits) {
             final operatorId = visit['operatorId'] as String;
             final dateTime = visit['dateTime'] as DateTime;
             final visitsCount = visit['visits'] as int;
@@ -615,129 +608,11 @@ class _NfcReadDialogWidgetState extends State<NfcReadDialogWidget>
             ));
           }
         }
-      } else if (actions.isOldFormat(content)) {
-        // Formato antiguo (retrocompatibilidad)
-        debugPrint('📋 Parseando formato antiguo');
-        final recordStrings = content.split('},').where((r) => r.isNotEmpty);
-
-        for (var recordStr in recordStrings) {
-          recordStr = recordStr.trim();
-          if (!recordStr.startsWith('{')) {
-            recordStr = '{$recordStr';
-          }
-          if (!recordStr.endsWith('}')) {
-            recordStr = '$recordStr}';
-          }
-
-          if (recordStr.startsWith('{') && recordStr.endsWith('}')) {
-            final content = recordStr.substring(1, recordStr.length - 1);
-            final parts = content.split(';');
-
-            String? dateHour;
-            String? operatorId;
-            int? visits;
-            int? results;
-            int? headquarterId;
-
-            for (var part in parts) {
-              final keyValue = part.split(':');
-              if (keyValue.length >= 2) {
-                final key = keyValue[0].trim();
-                final value = keyValue.sublist(1).join(':').trim();
-
-                switch (key) {
-                  case 'DH':
-                    dateHour = value;
-                    break;
-                  case 'OP':
-                    operatorId = value;
-                    break;
-                  case 'VISITS':
-                    visits = int.tryParse(value);
-                    break;
-                  case 'RESULTS':
-                    results = int.tryParse(value);
-                    break;
-                  case 'HE':
-                    headquarterId = int.tryParse(value);
-                    break;
-                }
-              }
-            }
-
-            if (dateHour != null && operatorId != null) {
-              String operatorName = 'Desconocido';
-              String operatorIdentification = '';
-
-              try {
-                final idUserFromTag = int.tryParse(operatorId);
-                if (idUserFromTag != null) {
-                  final user = FFAppState().usersList.firstWhere(
-                        (u) => u.idUser == idUserFromTag,
-                        orElse: () => UsersStruct(),
-                      );
-
-                  if (user.nameUser.isNotEmpty) {
-                    operatorName = user.nameUser;
-                    operatorIdentification = user.operID;
-                  }
-                }
-              } catch (e) {
-                debugPrint('❌ Error buscando operador: $e');
-              }
-
-              String loteName = 'N/A';
-              if (headquarterId != null) {
-                final headquarter = FFAppState().headquartersList.firstWhere(
-                      (h) => h.idHeadquarter == headquarterId,
-                      orElse: () => HeadquartersStruct(),
-                    );
-
-                if (headquarter.nameHeadquarter.isNotEmpty) {
-                  loteName = headquarter.nameHeadquarter;
-                }
-              }
-
-              records.add(NfcRecord(
-                dateHour: _parseDateHour(dateHour),
-                operatorName: operatorName,
-                operatorIdentification: operatorIdentification,
-                visits: visits ?? 0,
-                results: results ?? 0,
-                loteName: loteName,
-              ));
-            }
-          }
-        }
-      }
     } catch (e) {
       debugPrint('❌ Error al parsear contenido NFC: $e');
     }
 
     return records;
-  }
-
-  DateTime? _parseDateHour(String dateHourStr) {
-    try {
-      // Formato: 2025_11_06_13:20:00
-      final parts = dateHourStr.split('_');
-      if (parts.length >= 4) {
-        final year = int.parse(parts[0]);
-        final month = int.parse(parts[1]);
-        final day = int.parse(parts[2]);
-        final timeParts = parts[3].split(':');
-        if (timeParts.length == 3) {
-          final hour = int.parse(timeParts[0]);
-          final minute = int.parse(timeParts[1]);
-          final second = int.parse(timeParts[2]);
-
-          return DateTime(year, month, day, hour, minute, second);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error al parsear fecha: $e');
-    }
-    return null;
   }
 
   String _formatDateHour(DateTime? dateTime) {

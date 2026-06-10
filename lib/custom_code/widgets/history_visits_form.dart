@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 // DO NOT REMOVE OR MODIFY THE CODE ABOVE!
 
 import 'dart:async';
+import 'dart:io';
 import 'package:intl/date_symbol_data_local.dart';
 import '/backend/sqlite/global_db_singleton.dart';
 
@@ -20,11 +21,13 @@ class _DetailItem {
   final String statusOption;
   final String statusResponse;
   final int count; // 1 para multi-detalle, N para agregado
+  final String typeStatus;
 
   const _DetailItem({
     required this.statusOption,
     required this.statusResponse,
     required this.count,
+    this.typeStatus = '',
   });
 }
 
@@ -203,7 +206,8 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
           DATE(v.Created_at) as visit_date,
           vd.Status_option,
           vd.Status_response,
-          COALESCE(ast.Factor, 0) as factor
+          COALESCE(ast.Factor, 0) as factor,
+          LOWER(COALESCE(ast.Type_status, '')) as type_status
         FROM Visits v
         INNER JOIN Users u ON v.Id_user = u.Id_user
         INNER JOIN Headquarters h ON v.Id_headquarter = h.Id_headquarter
@@ -283,6 +287,7 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
       tree[userId]![hqId]![dateStr]!.add(_DetailItem(
         statusOption: row['Status_option'] as String? ?? '',
         statusResponse: row['Status_response'] as String? ?? '',
+        typeStatus: row['type_status'] as String? ?? '',
         count: 1,
       ));
     }
@@ -1022,15 +1027,8 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
               ),
               Expanded(
                 flex: 4,
-                child: Text(
-                  item.statusResponse,
-                  style: const TextStyle(
-                    fontFamily: 'Roboto',
-                    fontSize: 12,
-                    color: Colors.white70,
-                  ),
-                  softWrap: true,
-                ),
+                child: _buildStatusResponseWidget(
+                    item.typeStatus, item.statusResponse),
               ),
             ],
           ],
@@ -1108,6 +1106,145 @@ class _HistoryVisitsFormState extends State<HistoryVisitsForm> {
         ),
       );
     }
+  }
+
+  // ── Renderizado de status_response por tipo ─────────────────────────────
+
+  Widget _buildStatusResponseWidget(String type, String response) {
+    if (response.isEmpty) return const SizedBox.shrink();
+
+    switch (type) {
+      case 'photo':
+        return _buildPhotoPreview(response);
+      case 'video':
+        return _buildVideoPreview(response);
+      case 'tag-writer':
+      case 'tag-reader':
+      case 'tag-transfer':
+      case 'tag-transfer-adb-server':
+      case 'tag-transfer-adb-from':
+        return _buildNfcPreview(type, response);
+      case 'unique_choice':
+      case 'unique-option':
+        return _buildSelectedBadge();
+      case 'date':
+        return _buildIconText(Icons.calendar_today_rounded, response);
+      case 'time':
+        return _buildIconText(Icons.access_time_rounded, response);
+      case 'distance-extractor':
+        return _buildDistanceDisplay(response);
+      case 'users-list':
+        return _buildIconText(Icons.person_rounded, response);
+      case 'number':
+      case 'numbers-operation':
+      case 'headquarter-weight':
+        return _buildNumericDisplay(response);
+      default:
+        return Text(
+          response,
+          style: const TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 12,
+            color: Colors.white70,
+          ),
+          softWrap: true,
+        );
+    }
+  }
+
+  Widget _buildPhotoPreview(String path) {
+    final file = File(path);
+    if (file.existsSync()) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(6),
+        child: Image.file(file, height: 72, fit: BoxFit.cover),
+      );
+    }
+    return _buildIconText(Icons.photo_camera_rounded, 'Foto registrada',
+        color: Colors.white38);
+  }
+
+  Widget _buildVideoPreview(String path) {
+    return _buildIconText(Icons.videocam_rounded, 'Video registrado');
+  }
+
+  Widget _buildNfcPreview(String type, String response) {
+    String summary = 'NFC registrado';
+    try {
+      final decoded = jsonDecode(response);
+      if (decoded is Map && decoded.containsKey('Visits')) {
+        final visits = (decoded['Visits'] as List?)?.length ?? 0;
+        summary = '$visits visita${visits != 1 ? 's' : ''}';
+      } else if (decoded is List) {
+        summary =
+            '${decoded.length} registro${decoded.length != 1 ? 's' : ''}';
+      }
+    } catch (_) {
+      summary =
+          response.length > 30 ? '${response.substring(0, 30)}…' : response;
+    }
+    return _buildIconText(Icons.nfc_rounded, summary);
+  }
+
+  Widget _buildSelectedBadge() {
+    return const Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.check_circle_rounded, size: 14, color: _kGreen1),
+        SizedBox(width: 4),
+        Text(
+          'Seleccionado',
+          style: TextStyle(
+            fontFamily: 'Roboto',
+            fontSize: 12,
+            color: _kGreen1,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDistanceDisplay(String response) {
+    final meters = double.tryParse(response) ?? 0.0;
+    final label = meters >= 1000
+        ? '${(meters / 1000).toStringAsFixed(1)} km'
+        : '${meters.toStringAsFixed(0)} m';
+    return _buildIconText(Icons.straighten_rounded, label);
+  }
+
+  Widget _buildNumericDisplay(String response) {
+    return Text(
+      response,
+      style: const TextStyle(
+        fontFamily: 'Roboto',
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+        color: Colors.white,
+      ),
+    );
+  }
+
+  Widget _buildIconText(IconData icon, String text,
+      {Color color = Colors.white70}) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontFamily: 'Roboto',
+              fontSize: 12,
+              color: color,
+            ),
+            softWrap: true,
+          ),
+        ),
+      ],
+    );
   }
 
   // ── Sección 3: Sincronización ────────────────────────────────────────────

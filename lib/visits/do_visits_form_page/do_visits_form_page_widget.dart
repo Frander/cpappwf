@@ -1592,6 +1592,52 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         return false;
       }
     }
+
+    // Validar que al menos un unique-option raíz esté seleccionado
+    final rootUniqueOptions = _cachedActivityStatus.where((s) {
+      final t = getJsonField(s, r'''$.type_status''')?.toString().toLowerCase() ?? '';
+      return t == 'unique-option';
+    }).toList();
+
+    if (rootUniqueOptions.isNotEmpty) {
+      final visitDetails = FFAppState().visitDetails;
+      final anySelected = rootUniqueOptions.any((s) {
+        final sId = getJsonField(s, r'''$.id_activity_status''');
+        return visitDetails.any((d) => d.idActivityStatus == sId);
+      });
+      if (!anySelected) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Row(
+                children: [
+                  Icon(Icons.warning_rounded, color: Colors.white, size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Debe seleccionar una opción antes de guardar la visita',
+                      style: TextStyle(
+                          fontFamily: 'Roboto',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              duration: const Duration(seconds: 4),
+              backgroundColor: FlutterFlowTheme.of(context).warning,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16)),
+              margin: const EdgeInsets.all(16),
+            ),
+          );
+        }
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -1954,9 +2000,6 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     // reference-list es ahora un type_status, no type_step
     // Sus activities_status se cargan desde el JSON embebido
 
-    // Log de renderizado
-    debugPrint('📋 RENDERIZANDO STEP: nombre="$stepName" tipo="$typeStep" ID=$stepId nivel=$level requerido=$isRequired activitiesStatus=${activitiesStatus.length}');
-
     // Obtener estado de expansión (funciona para todos los tipos de steps)
     final isExpanded = _stepExpansionState[stepId] ?? false;
     // LOTE 1: Usar búsqueda cacheada en lugar de O(n) repetido
@@ -2208,16 +2251,12 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         if (isExpanded && activitiesStatus.isNotEmpty)
           Builder(
             builder: (context) {
-              debugPrint('   ✅ MOSTRANDO OPCIONES: paso la condición isExpanded=$isExpanded && activitiesStatus.isNotEmpty=${activitiesStatus.isNotEmpty}');
-
               // Para container-list, mostrar todos los status sin filtro
               // Para unique-list, aplicar filtro de búsqueda
               // reference-list es ahora type_status, no type_step
               final displayList = typeStep == 'container-list'
                   ? activitiesStatus
                   : _filterStatusList(stepId, activitiesStatus);
-
-              debugPrint('   📋 Lista a mostrar: ${displayList.length} opciones de ${activitiesStatus.length} (tipo: $typeStep)');
 
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
@@ -4134,6 +4173,11 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                   _tagTransferSourceProductName[statusId] = sourceProductName;
+                  // Copia durable del contenido de origen: NO depender de
+                  // FFAppState().nfcRead, que writeNFCTag sobrescribe con señales
+                  // de control ('SOLICITAR_OTRO_TAG'/'ERROR:...') cuando el tag de
+                  // destino está lleno. Sin esta copia se perderían los datos.
+                  _tagTransferSourceContent[statusId] = nfcContent;
                 });
                 _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
@@ -4351,7 +4395,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                     typeStatus != 'tag-writer' &&
                     typeStatus != 'tag-reader' &&
                     typeStatus != 'tag-transfer' &&
-                    typeStatus != 'tag-transfer-adb-server')
+                    typeStatus != 'tag-transfer-adb-server' &&
+                    typeStatus != 'tag-transfer-adb-from')
                   // Mostrar indicador de color para unique-option y unique_choice
                   (typeStatus.toLowerCase() == 'unique-option' || typeStatus.toLowerCase() == 'unique_choice')
                       ? Container(
@@ -5087,6 +5132,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                 setState(() {
                   _tagTransferData[statusId] = parsedData;
                   _tagTransferSourceProductName[statusId] = sourceProductName;
+                  // Copia durable del contenido de origen (ver nota en camino ROOT).
+                  _tagTransferSourceContent[statusId] = nfcContent;
                 });
                 _persistTagTransferToPrefs(statusId, nfcContent).ignore();
 
@@ -8835,120 +8882,212 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   /// Retorna un Map donde la clave es el headquarterId y el valor es un Map con la data agregada
   Map<int, Map<String, dynamic>> _parseNfcTagContentByHeadquarter(
       String nfcContent) {
-    final Map<int, Map<String, dynamic>> groupedByHeadquarter = {};
+    // Decodificar como LISTA de registros: un tag de destino puede acumular
+    // varios productos (uno por RFID de origen). decodeNfcRecords soporta
+    // objeto único o array (canónico / N1 / C1 / multi-chunk).
+    final records = actions.decodeNfcRecords(nfcContent);
+    if (records.isEmpty) return {};
 
-    // Verificar si es el nuevo formato JSON
-    if (actions.isNewJsonFormat(nfcContent)) {
-      debugPrint('✅ TAG-WRITER: Formato JSON detectado');
-      final nfcJson = actions.parseNfcJson(nfcContent);
-
-      if (nfcJson != null) {
-        // Extraer visitas del JSON usando el helper
-        final visits = actions.extractVisitsFromJson(nfcJson);
-        debugPrint('📋 TAG-WRITER: ${visits.length} visitas extraídas del JSON');
-
-        // Agrupar por headquarterId usando el helper
-        return actions.groupVisitsByHeadquarter(visits);
+    // Agregar las visitas de TODOS los registros antes de agrupar por sede.
+    // Cada visita se etiqueta con su Name_product (el agrupado por sede conserva
+    // el campo al copiar el visit map a 'records') para poder construir luego un
+    // primer nivel de árbol por PRODUCTO.
+    final allVisits = <Map<String, dynamic>>[];
+    for (final record in records) {
+      final p = (record['Read_info'] as Map<String, dynamic>?)?['Name_product']
+          as String?;
+      final productName = (p?.trim().isNotEmpty ?? false) ? p!.trim() : 'Producto';
+      final visits = actions.extractVisitsFromJson(record);
+      for (final v in visits) {
+        v['productName'] = productName;
       }
-
-      return groupedByHeadquarter;
+      allVisits.addAll(visits);
     }
+    debugPrint(
+        '📋 TAG-TRANSFER: ${records.length} registro(s), ${allVisits.length} visitas extraídas');
 
-    // Formato antiguo: El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
-    debugPrint('⚠️ TAG-WRITER: Formato antiguo detectado');
+    return actions.groupVisitsByHeadquarter(allVisits);
+  }
 
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(nfcContent);
-
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
-
-      // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {
-        'operatorId': '',
-        'operator2Id': '',
-        'visits': 0,
-        'results': 0,
-        'headquarterId': 0,
-        'dateTime': DateTime.now(),
-      };
-      final fields = recordContent.split(';');
-
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value = parts.sublist(1).join(':').trim();
-
-          switch (key) {
-            case 'DH':
-              // Parsear fecha: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  record['dateTime'] =
-                      DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                record['dateTime'] = DateTime.now();
-              }
-              break;
-            case 'OP':
-              record['operatorId'] = value;
-              break;
-            case 'OP2':
-              // Si OP2 es "false" (string literal), dejarlo como vacío
-              record['operator2Id'] = (value == 'false') ? '' : value;
-              break;
-            case 'VISITS':
-              record['visits'] = int.tryParse(value) ?? 0;
-              break;
-            case 'RESULTS':
-              record['results'] = int.tryParse(value) ?? 0;
-              break;
-            case 'HE':
-              record['headquarterId'] = int.tryParse(value) ?? 0;
-              break;
-          }
-        }
+  /// Reagrupa la data agrupada por sede (Map<headquarterId, {totals,records}>)
+  /// en Map<productName, Map<headquarterId, {totals,records}>> usando el campo
+  /// 'productName' que cada visita lleva tras el parseo. Reusado por los
+  /// resúmenes de tag-writer y tag-transfer para el primer nivel por PRODUCTO.
+  Map<String, Map<int, Map<String, dynamic>>> _regroupHeadquarterDataByProduct(
+      Map<int, Map<String, dynamic>> headquarterData) {
+    final result = <String, Map<int, Map<String, dynamic>>>{};
+    headquarterData.forEach((heId, data) {
+      for (final rec in (data['records'] as List).cast<Map<String, dynamic>>()) {
+        final p = (rec['productName'] as String?)?.trim();
+        final key = (p?.isNotEmpty ?? false) ? p! : 'Producto';
+        final he = result.putIfAbsent(key, () => {}).putIfAbsent(
+            heId,
+            () => {
+                  'totalVisits': 0,
+                  'totalResults': 0,
+                  'records': <Map<String, dynamic>>[],
+                });
+        he['totalVisits'] = (he['totalVisits'] as int) + (rec['visits'] as int? ?? 0);
+        he['totalResults'] =
+            (he['totalResults'] as int) + (rec['results'] as int? ?? 0);
+        (he['records'] as List).add(rec);
       }
+    });
+    return result;
+  }
 
-      if (record['headquarterId'] != 0) {
-        final heId = record['headquarterId'] as int;
-
-        // Si el lote no existe en el map, crearlo
-        if (!groupedByHeadquarter.containsKey(heId)) {
-          groupedByHeadquarter[heId] = {
-            'totalVisits': 0,
-            'totalResults': 0,
-            'records': <Map<String, dynamic>>[],
-          };
-        }
-
-        // Agregar el registro al lote
-        groupedByHeadquarter[heId]!['totalVisits'] =
-            (groupedByHeadquarter[heId]!['totalVisits'] as int) +
-                (record['visits'] as int? ?? 0);
-        groupedByHeadquarter[heId]!['totalResults'] =
-            (groupedByHeadquarter[heId]!['totalResults'] as int) +
-                (record['results'] as int? ?? 0);
-        (groupedByHeadquarter[heId]!['records'] as List<Map<String, dynamic>>)
-            .add(record);
-      }
-    }
-
-    return groupedByHeadquarter;
+  /// Nodo visual reutilizable del nivel PRODUCTO (cabecera + hijos expandibles)
+  /// para los árboles inline de tag-reader / tag-writer / tag-transfer.
+  Widget _buildProductNode({
+    required String productName,
+    required int totalVisits,
+    required int totalResults,
+    required int childCount,
+    required bool isExpanded,
+    required VoidCallback onTap,
+    required List<Widget> children,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0D47A1).withValues(alpha: 0.25),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: const Color(0xFF42A5F5).withValues(alpha: 0.45),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  Icon(
+                    isExpanded ? Icons.expand_more : Icons.chevron_right,
+                    color: const Color(0xFF90CAF9),
+                    size: 32,
+                    weight: 700,
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.inventory_2_rounded,
+                      color: Color(0xFF90CAF9), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        RichText(
+                          text: TextSpan(
+                            children: [
+                              const TextSpan(
+                                text: 'Producto: ',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF90CAF9),
+                                ),
+                              ),
+                              TextSpan(
+                                text: productName,
+                                style: const TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.3),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$_unityLabel: ',
+                                    style: TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.white.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  Text(
+                                    '$totalResults',
+                                    style: const TextStyle(
+                                      fontFamily: 'Roboto',
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                '$totalVisits visita${totalVisits != 1 ? "s" : ""}',
+                                style: TextStyle(
+                                  fontFamily: 'Roboto',
+                                  fontSize: 11,
+                                  color: Colors.white.withValues(alpha: 0.6),
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF42A5F5).withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      '$childCount',
+                      style: const TextStyle(
+                        fontFamily: 'Roboto',
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (isExpanded)
+            Container(
+              padding: const EdgeInsets.only(
+                  left: 16, right: 10, bottom: 10, top: 10),
+              child: Column(children: children),
+            ),
+        ],
+      ),
+    );
   }
 
   // ===== BOTÓN TAG READER (NFC) =====
@@ -9554,95 +9693,20 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   List<Map<String, dynamic>> _parseNfcTagContent(String nfcContent) {
     final List<Map<String, dynamic>> parsedData = [];
 
-    // Verificar si es el nuevo formato JSON
-    if (actions.isNewJsonFormat(nfcContent)) {
-      debugPrint('✅ TAG-READER: Formato JSON detectado');
-      final nfcJson = actions.parseNfcJson(nfcContent);
-
-      if (nfcJson != null) {
-        // Extraer visitas del JSON usando el helper
-        parsedData.addAll(actions.extractVisitsFromJson(nfcJson));
-        debugPrint('📋 TAG-READER: ${parsedData.length} visitas extraídas del JSON');
+    // Decodificar como LISTA de registros (objeto único o array multi-producto,
+    // en cualquier formato: canónico / N1 / C1 / multi-chunk). Cada visita se
+    // etiqueta con su Name_product para poder agrupar el árbol por PRODUCTO.
+    for (final record in actions.decodeNfcRecords(nfcContent)) {
+      final p =
+          (record['Read_info'] as Map<String, dynamic>?)?['Name_product'] as String?;
+      final productName = (p?.trim().isNotEmpty ?? false) ? p!.trim() : 'Producto';
+      final visits = actions.extractVisitsFromJson(record);
+      for (final v in visits) {
+        v['productName'] = productName;
       }
-
-      return parsedData;
+      parsedData.addAll(visits);
     }
-
-    // Formato antiguo: El contenido puede tener múltiples registros separados por comas
-    // Ejemplo: {DH:2025_11_06_13:20:00;OP:4214;OP2:5432;VISITS:50;RESULTS:25;HE:204},{DH:...}
-    debugPrint('⚠️ TAG-READER: Formato antiguo detectado');
-
-    // Extraer todos los registros entre {}
-    final regexRecords = RegExp(r'\{([^}]+)\}');
-    final matches = regexRecords.allMatches(nfcContent);
-
-    for (var match in matches) {
-      final recordContent = match.group(1);
-      if (recordContent == null) continue;
-
-      // Parsear cada campo dentro del registro
-      final Map<String, dynamic> record = {
-        'operatorId': '',
-        'operator2Id': '',
-        'visits': 0,
-        'results': 0,
-        'headquarterId': 0,
-        'dateTime': DateTime.now(),
-      };
-      final fields = recordContent.split(';');
-
-      for (var field in fields) {
-        final parts = field.split(':');
-        if (parts.length >= 2) {
-          final key = parts[0].trim();
-          final value =
-              parts.sublist(1).join(':').trim(); // Para manejar campos con ':'
-
-          switch (key) {
-            case 'DH':
-              // Parsear fecha: 2025_11_06_13:20:00
-              try {
-                final dateStr = value.replaceAll('_', '-');
-                final dateParts = dateStr.split('-');
-                if (dateParts.length >= 4) {
-                  final year = int.parse(dateParts[0]);
-                  final month = int.parse(dateParts[1]);
-                  final day = int.parse(dateParts[2]);
-                  final timeParts = dateParts[3].split(':');
-                  final hour = int.parse(timeParts[0]);
-                  final minute = int.parse(timeParts[1]);
-                  final second = int.parse(timeParts[2]);
-                  record['dateTime'] =
-                      DateTime(year, month, day, hour, minute, second);
-                }
-              } catch (e) {
-                record['dateTime'] = DateTime.now();
-              }
-              break;
-            case 'OP':
-              record['operatorId'] = value;
-              break;
-            case 'OP2':
-              // Si OP2 es "false" (string literal), dejarlo como vacío
-              record['operator2Id'] = (value == 'false') ? '' : value;
-              break;
-            case 'VISITS':
-              record['visits'] = int.tryParse(value) ?? 0;
-              break;
-            case 'RESULTS':
-              record['results'] = int.tryParse(value) ?? 0;
-              break;
-            case 'HE':
-              record['headquarterId'] = int.tryParse(value) ?? 0;
-              break;
-          }
-        }
-      }
-
-      if (record['operatorId'].toString().isNotEmpty) {
-        parsedData.add(record);
-      }
-    }
+    debugPrint('📋 TAG-READER: ${parsedData.length} visitas extraídas del JSON');
 
     return parsedData;
   }
@@ -12728,28 +12792,31 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       cleanedCount++;
     }
 
-    // Limpiar tag-transfer data + SharedPreferences (para que _restoreTagTransferFromPrefs
-    // no los restaure en la siguiente sesión)
-    final tagTransferIdsToRemove = _tagTransferData.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
+    // Purgar el cache de tag-transfer (memoria + SharedPreferences) cuando:
+    //  (1) el status ya no está en visitDetails (rememberStatus=false), o
+    //  (2) la transferencia ya se completó con éxito: su contenido de origen ya
+    //      viajó al tag de destino y quedó persistido en la visita, por lo que el
+    //      campo debe volver a quedar vacío aunque el status permanezca en
+    //      visitDetails (rememberStatus=true).
+    // Limpiar SharedPreferences evita que _restoreTagTransferFromPrefs lo
+    // restaure en la siguiente sesión.
+    final tagTransferIdsToRemove = <int>{
+      ..._tagTransferData.keys,
+      ..._tagTransferCompleted.keys,
+    }
+        .where((id) =>
+            !remainingVisitDetailsIds.contains(id) ||
+            _tagTransferCompleted[id] == true)
         .toList();
     for (final statusId in tagTransferIdsToRemove) {
       _tagTransferData.remove(statusId);
       _tagTransferSourceContent.remove(statusId);
       _tagTransferSourceProductName.remove(statusId);
       _tagTransferDestProductName.remove(statusId);
-      _clearTagTransferFromPrefs(statusId).ignore();
-      debugPrint('   ❌ Limpiado _tagTransferData[$statusId] + SharedPreferences');
-      cleanedCount++;
-    }
-
-    // Limpiar tag-transfer completed flag
-    final tagTransferCompletedIdsToRemove = _tagTransferCompleted.keys
-        .where((id) => !remainingVisitDetailsIds.contains(id))
-        .toList();
-    for (final statusId in tagTransferCompletedIdsToRemove) {
       _tagTransferCompleted.remove(statusId);
-      debugPrint('   ❌ Limpiado _tagTransferCompleted[$statusId]');
+      _clearTagTransferFromPrefs(statusId).ignore();
+      debugPrint('   ❌ Limpiado tag-transfer[$statusId] (memoria + SharedPreferences)');
+      cleanedCount++;
     }
 
     if (cleanedCount == 0) {
@@ -13393,14 +13460,11 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   }) {
     if (sectionData.isEmpty) return const SizedBox.shrink();
 
-    // Agrupar por lote (headquarterId)
-    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
+    // Agrupar por PRODUCTO (Name_product) — primer nivel del árbol
+    final Map<String, List<Map<String, dynamic>>> groupedByProduct = {};
     for (var record in sectionData) {
-      final heId = record['headquarterId'] as int? ?? 0;
-      if (!groupedByHeadquarter.containsKey(heId)) {
-        groupedByHeadquarter[heId] = [];
-      }
-      groupedByHeadquarter[heId]!.add(record);
+      final product = record['productName'] as String? ?? 'Producto';
+      groupedByProduct.putIfAbsent(product, () => []).add(record);
     }
 
     // Checkbox state para adb-server
@@ -13463,9 +13527,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
           ],
         ),
         const SizedBox(height: 12),
-        ...groupedByHeadquarter.entries.map((entry) {
-          return _buildHeadquarterGroup(entry.key, entry.value);
-        }),
+        ...groupedByProduct.entries.map((entry) =>
+            _buildTagReaderProductGroup(entry.key, entry.value)),
       ],
     );
 
@@ -13530,8 +13593,41 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
+  /// Nivel 1 del árbol tag-reader: agrupa por PRODUCTO. Al expandir delega en
+  /// _buildHeadquarterGroup por cada lote del producto.
+  Widget _buildTagReaderProductGroup(
+      String productName, List<Map<String, dynamic>> records) {
+    final expansionKey = 'RD_PR_$productName';
+    final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
+
+    int totalVisits = 0;
+    int totalResults = 0;
+    final Map<int, List<Map<String, dynamic>>> groupedByHeadquarter = {};
+    for (var record in records) {
+      totalVisits += (record['visits'] as int?) ?? 0;
+      totalResults += (record['results'] as int?) ?? 0;
+      final heId = record['headquarterId'] as int? ?? 0;
+      groupedByHeadquarter.putIfAbsent(heId, () => []).add(record);
+    }
+
+    return _buildProductNode(
+      productName: productName,
+      totalVisits: totalVisits,
+      totalResults: totalResults,
+      childCount: groupedByHeadquarter.length,
+      isExpanded: isExpanded,
+      onTap: () => setState(
+          () => _tagReaderExpansionState[expansionKey] = !isExpanded),
+      children: groupedByHeadquarter.entries
+          .map((e) =>
+              _buildHeadquarterGroup(e.key, e.value, productKey: productName))
+          .toList(),
+    );
+  }
+
   Widget _buildHeadquarterGroup(
-      int headquarterId, List<Map<String, dynamic>> records) {
+      int headquarterId, List<Map<String, dynamic>> records,
+      {String productKey = ''}) {
     // Buscar el nombre del lote
     String loteName = 'Lote #$headquarterId';
     final headquarters = FFAppState().headquartersList.firstWhere(
@@ -13543,7 +13639,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       loteName = headquarters.nameHeadquarter;
     }
 
-    final expansionKey = 'HE_$headquarterId';
+    final expansionKey = 'HE_${productKey}_$headquarterId';
     final isExpanded = _tagReaderExpansionState[expansionKey] ?? false;
 
     // Agrupar por par de operadores (OP + OP2)
@@ -13929,18 +14025,45 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ],
           ),
           const SizedBox(height: 12),
-          ...headquarterData.entries.map((entry) {
-            final headquarterId = entry.key;
-            final data = entry.value;
-            return _buildTagWriterHeadquarterGroup(headquarterId, data);
-          }),
+          ..._regroupHeadquarterDataByProduct(headquarterData).entries.map(
+              (entry) => _buildTagWriterProductGroup(entry.key, entry.value)),
         ],
       ),
     );
   }
 
+  /// Nivel 1 del árbol tag-writer: agrupa por PRODUCTO. Al expandir delega en
+  /// _buildTagWriterHeadquarterGroup por cada lote del producto.
+  Widget _buildTagWriterProductGroup(
+      String productName, Map<int, Map<String, dynamic>> headquarterData) {
+    final expansionKey = 'TW_PR_$productName';
+    final isExpanded = _tagWriterExpansionState[expansionKey] ?? false;
+
+    int totalVisits = 0;
+    int totalResults = 0;
+    for (final data in headquarterData.values) {
+      totalVisits += (data['totalVisits'] as int?) ?? 0;
+      totalResults += (data['totalResults'] as int?) ?? 0;
+    }
+
+    return _buildProductNode(
+      productName: productName,
+      totalVisits: totalVisits,
+      totalResults: totalResults,
+      childCount: headquarterData.length,
+      isExpanded: isExpanded,
+      onTap: () => setState(
+          () => _tagWriterExpansionState[expansionKey] = !isExpanded),
+      children: headquarterData.entries
+          .map((e) => _buildTagWriterHeadquarterGroup(e.key, e.value,
+              productKey: productName))
+          .toList(),
+    );
+  }
+
   Widget _buildTagWriterHeadquarterGroup(
-      int headquarterId, Map<String, dynamic> data) {
+      int headquarterId, Map<String, dynamic> data,
+      {String productKey = ''}) {
     // Buscar el nombre del lote en headquartersList (igual que tag-reader)
     String loteName = 'Lote #$headquarterId';
 
@@ -13953,7 +14076,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       loteName = headquarters.nameHeadquarter;
     }
 
-    final expansionKey = 'TW_HE_$headquarterId';
+    final expansionKey = 'TW_HE_${productKey}_$headquarterId';
     final isExpanded = _tagWriterExpansionState[expansionKey] ?? false;
 
     // Obtener los registros desde el data
@@ -14358,11 +14481,8 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ],
           ),
           const SizedBox(height: 12),
-          ...headquarterData.entries.map((entry) {
-            final headquarterId = entry.key;
-            final data = entry.value;
-            return _buildTagTransferHeadquarterGroup(headquarterId, data);
-          }),
+          ..._regroupHeadquarterDataByProduct(headquarterData).entries.map(
+              (entry) => _buildTagTransferProductGroup(entry.key, entry.value)),
           // Botón TRANSFERIR AHORA o TRANSFERENCIA EXITOSA
           const SizedBox(height: 16),
           if (_tagTransferCompleted[statusId] == true)
@@ -14409,10 +14529,21 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             // TRANSFERIR AHORA - Clickeable
             InkWell(
               onTap: () async {
-                // Obtener el contenido del tag de origen (nfcRead o caché local)
-                final sourceTagContent = FFAppState().nfcRead.isNotEmpty
-                    ? FFAppState().nfcRead
-                    : (_tagTransferSourceContent[statusId] ?? '');
+                // Obtener el contenido del tag de origen. La fuente de verdad es la
+                // copia durable en memoria (_tagTransferSourceContent), NO
+                // FFAppState().nfcRead: writeNFCTag sobrescribe nfcRead con señales de
+                // control ('SOLICITAR_OTRO_TAG'/'ERROR:...') cuando el tag de destino
+                // está lleno. Usar nfcRead como fuente borraría/corrompería los datos
+                // del campo ante una escritura fallida. Solo se usa nfcRead como último
+                // recurso y descartando explícitamente las cadenas de control.
+                final durableSource = _tagTransferSourceContent[statusId] ?? '';
+                final volatileRead = FFAppState().nfcRead;
+                final sourceTagContent = durableSource.isNotEmpty
+                    ? durableSource
+                    : (volatileRead.startsWith('SOLICITAR_OTRO_TAG') ||
+                            volatileRead.startsWith('ERROR'))
+                        ? ''
+                        : volatileRead;
                 if (sourceTagContent.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -14569,34 +14700,30 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   debugPrint('═══════════════════════════════════════════════════════════');
                   debugPrint('');
 
-                  final srcJson = actions.parseNfcJson(sourceTagContent);
-                  if (srcJson != null) {
-                    final visitDetailsForForm = FFAppState()
-                        .visitDetails
-                        .where((d) => d.idActivityStatus != statusId)
-                        .map((d) => {
-                              'id_activity_status': d.idActivityStatus,
-                              'status_option': d.statusOption,
-                              'status_response': d.statusResponse,
-                            })
-                        .toList();
-                    srcJson['status'] = {'visits_details': visitDetailsForForm};
-                    contentToTransfer = jsonEncode(srcJson);
-                    debugPrint(
-                        '📋 WRITER_STATUS: ${visitDetailsForForm.length} status inyectados en JSON');
-                    // Imprimir el bloque exacto inyectado al tag (status.visits_details)
-                    debugPrint('───────────────────────────────────────────────────────────');
-                    debugPrint('📤 BLOQUE INYECTADO en tag.status.visits_details:');
-                    debugPrint(const JsonEncoder.withIndent('  ')
-                        .convert(srcJson['status']));
-                    debugPrint('───────────────────────────────────────────────────────────');
-                    debugPrint('📤 JSON FINAL a escribir en tag de destino (${contentToTransfer.length} chars):');
-                    debugPrint(contentToTransfer);
-                    debugPrint('═══════════════════════════════════════════════════════════');
-                  } else {
-                    debugPrint(
-                        '⚠️ TAG-TRANSFER: parseNfcJson devolvió null — no se pudo inyectar visits_details. Se escribirá el contenido origen sin modificar.');
-                  }
+                  final visitDetailsForForm = FFAppState()
+                      .visitDetails
+                      .where((d) => d.idActivityStatus != statusId)
+                      .map((d) => {
+                            'id_activity_status': d.idActivityStatus,
+                            'status_option': d.statusOption,
+                            'status_response': d.statusResponse,
+                          })
+                      .toList();
+                  // Inyecta status.visits_details en CADA registro del origen
+                  // (objeto único o array multi-producto). Si el origen no es JSON
+                  // reconocible, injectFormStatus devuelve el contenido sin cambios.
+                  contentToTransfer = actions.injectFormStatus(
+                      sourceTagContent, visitDetailsForForm);
+                  debugPrint(
+                      '📋 WRITER_STATUS: ${visitDetailsForForm.length} status inyectados (origen objeto único o array)');
+                  debugPrint('───────────────────────────────────────────────────────────');
+                  debugPrint('📤 BLOQUE INYECTADO en status.visits_details:');
+                  debugPrint(const JsonEncoder.withIndent('  ')
+                      .convert({'visits_details': visitDetailsForForm}));
+                  debugPrint('───────────────────────────────────────────────────────────');
+                  debugPrint('📤 JSON FINAL a escribir en tag de destino (${contentToTransfer.length} chars):');
+                  debugPrint(contentToTransfer);
+                  debugPrint('═══════════════════════════════════════════════════════════');
                 }
 
                 // Abrir diálogo de escritura en tag de destino
@@ -14616,11 +14743,13 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   },
                 );
 
-                // Si la transferencia fue exitosa, obtener el contenido escrito y actualizar visitDetails
+                // Si la transferencia fue exitosa, guardar el contenido del tag ORIGEN en visitDetails
                 if (result != null && result.isNotEmpty && mounted) {
-                  final destinationTagContent = result;
-                  
-                  // Actualizar el statusResponse en visitDetails con el JSON del tag de destino
+                  // Usar el contenido del tag de origen ya guardado en memoria (no el del destino).
+                  // El tag de origen fue leído, descifrado y guardado en _tagTransferSourceContent
+                  // antes de abrir la sesión de escritura, por lo que es el dato autoritativo.
+                  final sourceContent = _tagTransferSourceContent[statusId] ?? '';
+
                   int existingIndex = -1;
                   for (int i = 0; i < FFAppState().visitDetails.length; i++) {
                     if (FFAppState().visitDetails[i].idActivityStatus == statusId) {
@@ -14638,7 +14767,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: detail.idVisit,
                         idActivityStatus: statusId,
                         statusOption: existingDetail.statusOption,
-                        statusResponse: destinationTagContent,
+                        statusResponse: sourceContent,
                         idStepParent: existingDetail.idStepParent,
                         rememberStatus: existingDetail.rememberStatus,
                         defaultStatus: existingDetail.defaultStatus,
@@ -14646,7 +14775,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         auxStep: existingDetail.auxStep,
                       ),
                     );
-                    debugPrint('💾 TAG-TRANSFER: statusResponse actualizado con JSON del tag de destino en visitDetails[$existingIndex]');
+                    debugPrint('💾 TAG-TRANSFER: statusResponse actualizado con contenido del tag de ORIGEN en visitDetails[$existingIndex]');
                   } else {
                     FFAppState().addToVisitDetails(
                       VisitsDetailsStruct(
@@ -14654,7 +14783,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         idVisit: 0,
                         idActivityStatus: statusId,
                         statusOption: 'Tag Transfer',
-                        statusResponse: destinationTagContent,
+                        statusResponse: sourceContent,
                         idStepParent: 0,
                         rememberStatus: false,
                         defaultStatus: '',
@@ -14662,7 +14791,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                         auxStep: 0,
                       ),
                     );
-                    debugPrint('💾 TAG-TRANSFER: Nuevo registro agregado a visitDetails con JSON del tag de destino');
+                    debugPrint('💾 TAG-TRANSFER: Nuevo registro en visitDetails con contenido del tag de ORIGEN');
                   }
 
                   setState(() {
@@ -14746,8 +14875,38 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
     );
   }
 
+  /// Nivel 1 del árbol tag-transfer: agrupa por PRODUCTO. Al expandir delega en
+  /// _buildTagTransferHeadquarterGroup por cada lote del producto.
+  Widget _buildTagTransferProductGroup(
+      String productName, Map<int, Map<String, dynamic>> headquarterData) {
+    final expansionKey = 'TT_PR_$productName';
+    final isExpanded = _tagTransferExpansionState[expansionKey] ?? false;
+
+    int totalVisits = 0;
+    int totalResults = 0;
+    for (final data in headquarterData.values) {
+      totalVisits += (data['totalVisits'] as int?) ?? 0;
+      totalResults += (data['totalResults'] as int?) ?? 0;
+    }
+
+    return _buildProductNode(
+      productName: productName,
+      totalVisits: totalVisits,
+      totalResults: totalResults,
+      childCount: headquarterData.length,
+      isExpanded: isExpanded,
+      onTap: () => setState(
+          () => _tagTransferExpansionState[expansionKey] = !isExpanded),
+      children: headquarterData.entries
+          .map((e) => _buildTagTransferHeadquarterGroup(e.key, e.value,
+              productKey: productName))
+          .toList(),
+    );
+  }
+
   Widget _buildTagTransferHeadquarterGroup(
-      int headquarterId, Map<String, dynamic> data) {
+      int headquarterId, Map<String, dynamic> data,
+      {String productKey = ''}) {
     // Buscar el nombre del lote en headquartersList
     String loteName = 'Lote #$headquarterId';
 
@@ -14760,7 +14919,7 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
       loteName = headquarters.nameHeadquarter;
     }
 
-    final expansionKey = 'TT_HE_$headquarterId';
+    final expansionKey = 'TT_HE_${productKey}_$headquarterId';
     final isExpanded = _tagTransferExpansionState[expansionKey] ?? false;
 
     final totalResults = (data['totalResults'] as int?) ?? 0;

@@ -14,7 +14,7 @@ class _TagCapacityTestWidgetState extends State<TagCapacityTestWidget>
     with TickerProviderStateMixin {
   // Registro base a escribir
   static const String baseRecord =
-      '{DH:2025_11_27_13:36:48;OP:4442;OP2:7859VISITS:30;RESULTS:120;HE:112}';
+      'N1:{"R":{"i":999999,"r":"TEST1234","n":"TAG de Prueba","d":1700000000,"f":"","t":"","u":4442},"V":[{"h":1700000000,"o":4442,"v":30,"s":120,"e":112}]}';
 
   // Capacidades de TAGs NFC (en bytes)
   static const int ntag213Capacity = 144;
