@@ -153,7 +153,7 @@ class _PhotoCaptureComponentWidgetState
       widget.idStepParent,
       widget.statusName,
       photoPath, // Guardar path de la foto temporalmente
-      getJsonField(widget.statusJSON, r'''$.remember_status'''),
+      (getJsonField(widget.statusJSON, r'''$.remember_status''') as bool?) ?? false,
       getJsonField(widget.statusJSON, r'''$.default_status''').toString(),
       0,
     );

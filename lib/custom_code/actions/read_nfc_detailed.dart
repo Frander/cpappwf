@@ -89,8 +89,9 @@ Future<Map<String, dynamic>> readNfcDetailed(BuildContext context) async {
 
         if (mifareClassic != null) {
           // Mifare Classic 1K / 4K — NfcA con sectores de 64 bytes
-          maxSize = mifareClassic.size;
-          tagType = maxSize >= 4096 ? 'Mifare Classic 4K' : 'Mifare Classic 1K';
+          // Capacidad usable real: Sector 0 (2 bloques) + sectores 1..N-1 (3 bloques cada uno)
+          maxSize = 32 + (mifareClassic.sectorCount - 1) * 48;
+          tagType = mifareClassic.size >= 4096 ? 'Mifare Classic 4K' : 'Mifare Classic 1K';
           tagTechnology = 'NfcA · Mifare Classic';
           ndefWritable = ndef?.isWritable ?? false;
           debugPrint('🏷️ Mifare Classic: ${mifareClassic.size}B, '
@@ -147,7 +148,9 @@ Future<Map<String, dynamic>> readNfcDetailed(BuildContext context) async {
                 final languageCodeLength = statusByte & 0x3F;
                 if (payload.length > languageCodeLength + 1) {
                   final textBytes = payload.sublist(1 + languageCodeLength);
-                  tagData = utf8.decode(textBytes);
+                  // allowMalformed: un tag con escritura interrumpida (NDEF
+                  // parcial) debe mostrar su contenido rescatable, no "vacío"
+                  tagData = utf8.decode(textBytes, allowMalformed: true);
                   currentSize = utf8.encode(tagData).length;
                   debugPrint('📖 Contenido NDEF: ${tagData.length} chars / $currentSize bytes');
                 }
@@ -166,7 +169,7 @@ Future<Map<String, dynamic>> readNfcDetailed(BuildContext context) async {
             allBytes.addAll(await mifareClassic.readBlock(blockIndex: 1));
             allBytes.addAll(await mifareClassic.readBlock(blockIndex: 2));
 
-            for (int sector = 1; sector <= 14; sector++) {
+            for (int sector = 1; sector < mifareClassic.sectorCount; sector++) {
               try {
                 await mifareClassic.authenticateSectorWithKeyA(sectorIndex: sector, key: key);
                 for (int block = 0; block < 3; block++) {

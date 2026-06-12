@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '/flutter_flow/flutter_flow_util.dart';
 import '/flutter_flow/flutter_flow_widgets.dart';
 import '/custom_code/actions/index.dart' as actions;
@@ -20,6 +22,14 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
   late TagRawReaderDialogModel _model;
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+
+  // ── Depuración de registros corruptos ──
+  // Contenido depurado en memoria (sin chunks corruptos); null si el contenido
+  // leído está sano o si el chunk base es irrecuperable.
+  String? _purgedCandidate;
+  bool _isPurgeWriting = false;
+  bool _purgeSuccess = false;
+  String? _purgeMessage;
 
   @override
   void initState() {
@@ -54,6 +64,10 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
       _model.isSuccess = false;
       _model.errorMessage = null;
       _model.rawContent = '';
+      _purgedCandidate = null;
+      _isPurgeWriting = false;
+      _purgeSuccess = false;
+      _purgeMessage = null;
     });
 
     try {
@@ -84,6 +98,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
             _model.tagInfo = tagInfo;
             _model.isSuccess = true;
             _model.isReading = false;
+            _purgedCandidate = _computePurgedCandidate(content);
           });
 
           debugPrint('');
@@ -114,6 +129,78 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
           _model.errorMessage = e.toString();
         });
       }
+    }
+  }
+
+  /// Calcula el contenido depurado (sin registros corruptos) a partir del
+  /// contenido leído. Retorna null si el contenido está sano (no hay nada que
+  /// depurar) o si el chunk base es irrecuperable.
+  String? _computePurgedCandidate(String raw) {
+    if (raw.isEmpty) return null;
+    try {
+      final purged = actions.purgeCorruptedNfcContent(raw);
+      if (purged == null || purged.isEmpty || purged == raw) return null;
+      debugPrint('🧹 Corrupción detectada: ${raw.length} chars → '
+          '${purged.length} chars tras depurar');
+      return purged;
+    } catch (e) {
+      debugPrint('⚠️ Error calculando contenido depurado: $e');
+      return null;
+    }
+  }
+
+  /// Depura los registros corruptos del contenido en memoria y solicita
+  /// acercar el tag para reemplazar su contenido por la versión depurada.
+  Future<void> _purgeAndRewrite() async {
+    final original = _model.rawContent;
+    final purged = _purgedCandidate;
+    if (purged == null) return;
+
+    final removed = original.split(actions.kNfcChunkDelimiter).length -
+        purged.split(actions.kNfcChunkDelimiter).length;
+
+    setState(() {
+      _isPurgeWriting = true;
+      _purgeSuccess = false;
+      _purgeMessage = null;
+    });
+
+    debugPrint('🧹 DEPURAR: contenido depurado en memoria '
+        '(${original.length} → ${purged.length} chars, '
+        '$removed chunk(s) eliminados). Esperando tag para reescribir...');
+
+    final ok = await actions.writeNFCTagDirect(context, purged);
+    if (!mounted) return;
+
+    if (ok) {
+      final newSize = utf8.encode(purged).length;
+      final maxSize = (_model.tagInfo?['maxSize'] as int?) ?? 0;
+      setState(() {
+        _isPurgeWriting = false;
+        _purgeSuccess = true;
+        _purgeMessage = removed == 1
+            ? 'Se eliminó 1 registro corrupto. El tag fue reescrito con el '
+                'contenido válido ($newSize bytes).'
+            : 'Se eliminaron $removed registros corruptos. El tag fue '
+                'reescrito con el contenido válido ($newSize bytes).';
+        _model.rawContent = purged;
+        _model.tagInfo = {
+          ...?_model.tagInfo,
+          'currentSize': newSize,
+          'availableSize': maxSize > newSize ? maxSize - newSize : 0,
+          ..._extractTagInfo(purged),
+        };
+        _purgedCandidate = null;
+      });
+      debugPrint('✅ DEPURAR: tag reescrito con contenido depurado');
+    } else {
+      setState(() {
+        _isPurgeWriting = false;
+        _purgeSuccess = false;
+        _purgeMessage = 'No se pudo reescribir el tag. El contenido depurado '
+            'sigue en memoria: vuelva a intentar acercando bien el tag.';
+      });
+      debugPrint('❌ DEPURAR: fallo al reescribir el tag');
     }
   }
 
@@ -236,10 +323,11 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
             // Header
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -462,10 +550,134 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                 ),
               ),
 
+            // ── Depuración de registros corruptos ──
+            // Esperando tag para reescribir el contenido depurado
+            if (_isPurgeWriting) ...[
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF374151),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFEF4444), width: 2),
+                ),
+                child: Column(
+                  children: [
+                    ScaleTransition(
+                      scale: _pulseAnimation,
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444).withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.nfc,
+                          color: Color(0xFFEF4444),
+                          size: 48,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'ACERQUE EL TAG',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFEF4444),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Se reemplazará el contenido del tag por la versión '
+                      'depurada (sin los registros corruptos)',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontFamily: 'Roboto',
+                        fontSize: 13,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Resultado de la depuración
+            if (_purgeMessage != null && !_isPurgeWriting) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: (_purgeSuccess
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFDC2626))
+                      .withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _purgeSuccess
+                        ? const Color(0xFF10B981)
+                        : const Color(0xFFDC2626),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _purgeSuccess
+                          ? Icons.check_circle_outline
+                          : Icons.error_outline,
+                      color: _purgeSuccess
+                          ? const Color(0xFF10B981)
+                          : const Color(0xFFDC2626),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _purgeMessage!,
+                        style: TextStyle(fontFamily: 'Roboto',
+                          fontSize: 13,
+                          color: _purgeSuccess
+                              ? const Color(0xFF10B981)
+                              : const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+
+            // Botón de depuración (solo cuando hay registros corruptos)
+            if (_model.isSuccess &&
+                !_model.isReading &&
+                !_isPurgeWriting &&
+                _purgedCandidate != null) ...[
+              const SizedBox(height: 16),
+              FFButtonWidget(
+                onPressed: _purgeAndRewrite,
+                text: 'Depurar registros corruptos',
+                icon: const Icon(Icons.cleaning_services_rounded, size: 20),
+                options: FFButtonOptions(
+                  width: double.infinity,
+                  height: 48,
+                  color: const Color(0xFFEF4444),
+                  textStyle: const TextStyle(fontFamily: 'Roboto',
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ],
+
             if (!_model.isReading) const SizedBox(height: 24),
 
             // Botones de acción
-            if (!_model.isReading)
+            if (!_model.isReading && !_isPurgeWriting)
               Row(
                 children: [
                   Expanded(
@@ -506,6 +718,7 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
                 ],
               ),
             ],
+            ),
           ),
         ),
       ),
@@ -594,6 +807,10 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
         ),
         const SizedBox(height: 12),
 
+        // Análisis de capacidad teniendo en cuenta formato N1:/C1:
+        _buildCapacityAnalysisSection(info),
+        const SizedBox(height: 12),
+
         // Información del Contenido
         if (recordCount > 0)
           Container(
@@ -660,6 +877,209 @@ class _TagRawReaderDialogWidgetState extends State<TagRawReaderDialogWidget>
               value,
               style: const TextStyle(fontFamily: 'Roboto',
                 fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCapacityAnalysisSection(Map<String, dynamic> info) {
+    final maxSize = (info['maxSize'] as int?) ?? 0;
+    final contentBytes = (info['sizeBytes'] as int?) ?? 0;
+    if (maxSize <= 0 || contentBytes <= 0) return const SizedBox.shrink();
+
+    final content = _model.rawContent;
+
+    // NDEF overhead (igual que write_n_f_c_tag.dart):
+    // flags(1)+type_len(1)+type_char(1)+payload_len_field(1 o 4)+status_byte(1)+lang_code(2)
+    // = 7 bytes si payload ≤ 255, 10 bytes si payload > 255
+    final ndefOverhead = (contentBytes + 3) > 255 ? 10 : 7;
+    final maxContentBytes = maxSize - ndefOverhead;
+    final freeContentBytes = (maxContentBytes - contentBytes).clamp(0, maxSize);
+    final usageFraction =
+        maxContentBytes > 0 ? (contentBytes / maxContentBytes).clamp(0.0, 1.0) : 0.0;
+    final usagePercent = (usageFraction * 100).toStringAsFixed(1);
+
+    // Formato del contenido
+    final isMultiChunk = actions.isMultiChunkFormat(content);
+    final isC1 = content.startsWith('C1:');
+    final isN1 = content.startsWith('N1:');
+
+    String formatShort;
+    String formatDesc;
+    Color formatColor;
+    if (isMultiChunk) {
+      final prefix = content.startsWith('C1:') ? 'C1:' : (content.startsWith('N1:') ? 'N1:' : '');
+      formatShort = 'Multi-chunk ($prefix)';
+      formatDesc = prefix == 'C1:'
+          ? 'Bloque base comprimido + deltas de visita'
+          : 'Bloque base minificado + deltas de visita';
+      formatColor = const Color(0xFFF59E0B);
+    } else if (isC1) {
+      formatShort = 'C1: Comprimido';
+      formatDesc = 'zlib + base64url — máxima densidad';
+      formatColor = const Color(0xFF10B981);
+    } else if (isN1) {
+      formatShort = 'N1: Minificado';
+      formatDesc = 'JSON compacto — óptimo para < 200 bytes';
+      formatColor = const Color(0xFF3B82F6);
+    } else {
+      formatShort = 'JSON Canónico';
+      formatDesc = 'Formato sin comprimir';
+      formatColor = Colors.white60;
+    }
+
+    // Deltas adicionales aproximados para fast-append (tag-writer)
+    // Cada delta ≈ 1 (delimitador \x1E) + ~50 bytes (V:{...}) = ~51 bytes
+    const int deltaBytes = 51;
+    final approxDeltasLeft = freeContentBytes > 0 ? (freeContentBytes / deltaBytes).floor() : 0;
+
+    // Color del progreso según uso
+    final Color progressColor;
+    if (usageFraction < 0.6) {
+      progressColor = const Color(0xFF10B981);
+    } else if (usageFraction < 0.85) {
+      progressColor = const Color(0xFFF59E0B);
+    } else {
+      progressColor = const Color(0xFFEF4444);
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111827),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: progressColor.withValues(alpha: 0.4),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.data_usage_rounded, color: progressColor, size: 18),
+              const SizedBox(width: 8),
+              const Text(
+                'Capacidad NFC',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: formatColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: formatColor.withValues(alpha: 0.5), width: 1),
+                ),
+                child: Text(
+                  formatShort,
+                  style: TextStyle(
+                    fontFamily: 'Roboto',
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: formatColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // Barra de progreso
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: usageFraction,
+              backgroundColor: Colors.white12,
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+              minHeight: 8,
+            ),
+          ),
+          const SizedBox(height: 6),
+
+          // Bytes usados / disponibles
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$contentBytes / $maxContentBytes bytes  ($usagePercent%)',
+                style: const TextStyle(fontFamily: 'Roboto', fontSize: 11, color: Colors.white60),
+              ),
+              Text(
+                '$freeContentBytes bytes libres',
+                style: TextStyle(
+                  fontFamily: 'Roboto',
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: progressColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Divider(color: Colors.white12, height: 1),
+          const SizedBox(height: 8),
+
+          _buildCapacityRow(
+            'Overhead NDEF',
+            '$ndefOverhead bytes (cabecera de registro)',
+            Icons.layers_outlined,
+            Colors.white38,
+          ),
+          _buildCapacityRow(
+            'Codificación',
+            formatDesc,
+            Icons.description_outlined,
+            formatColor,
+          ),
+          if (approxDeltasLeft > 0)
+            _buildCapacityRow(
+              'Visitas adicionales',
+              '≈ $approxDeltasLeft más antes del próximo tag  (~$deltaBytes bytes/delta)',
+              Icons.add_circle_outline_rounded,
+              const Color(0xFF10B981),
+            ),
+          if (approxDeltasLeft == 0 && freeContentBytes < deltaBytes)
+            _buildCapacityRow(
+              'Estado',
+              'Tag casi lleno — el siguiente escaneo usará un segundo tag',
+              Icons.warning_amber_rounded,
+              const Color(0xFFF59E0B),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCapacityRow(String label, String value, IconData icon, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            '$label: ',
+            style: const TextStyle(fontFamily: 'Roboto', fontSize: 11, color: Colors.white54),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
               ),

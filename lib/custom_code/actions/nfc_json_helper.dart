@@ -222,6 +222,44 @@ Map<String, dynamic>? decodeMultiChunk(String raw) {
   return {...firstChunk, 'Visits': visits};
 }
 
+/// Depura un contenido NFC corrupto por una escritura interrumpida.
+/// Corta en el primer carácter inválido (U+FFFD, producto de
+/// `utf8.decode(allowMalformed: true)`) o NUL (relleno tras el punto de corte)
+/// y descarta los chunks que no parsean (típicamente un delta 'V:' truncado).
+/// - Retorna el contenido depurado (puede ser igual a [raw] si no había corrupción).
+/// - Retorna null si el chunk base (N1:/C1:/JSON canónico) es irrecuperable.
+String? purgeCorruptedNfcContent(String raw) {
+  var s = raw;
+  for (final stop in [String.fromCharCode(0xFFFD), String.fromCharCode(0x00)]) {
+    final i = s.indexOf(stop);
+    if (i >= 0) s = s.substring(0, i);
+  }
+  if (s.isEmpty) return null;
+
+  final parts = s.split(kNfcChunkDelimiter);
+  // El chunk base debe decodificar completo; sin él no hay nada que rescatar.
+  if (nfcDecode(parts[0]) == null && parseNfcJson(parts[0]) == null) {
+    return null;
+  }
+
+  final valid = <String>[parts[0]];
+  for (var i = 1; i < parts.length; i++) {
+    final p = parts[i];
+    if (p.startsWith('V:')) {
+      try {
+        jsonDecode(p.substring(2));
+        valid.add(p);
+        continue;
+      } catch (_) {
+        // delta truncado/corrupto — se descarta
+      }
+    }
+    debugPrint(
+        '🧹 purgeCorruptedNfcContent: chunk $i descartado (${p.length} chars)');
+  }
+  return valid.join(kNfcChunkDelimiter);
+}
+
 // ─── Public compression API ───────────────────────────────────────────────────
 
 /// Retorna true si el string usa el formato comprimido (C1) o minificado (N1)

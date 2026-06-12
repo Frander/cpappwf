@@ -132,11 +132,11 @@ Future<String> readNFC(
                 }
               }
 
-              // Leer solo sectores 1-6 (reducido para evitar timeout)
-              // Esto da ~240 bytes de datos útiles, suficiente para la mayoría de casos
+              // Leer todos los sectores disponibles del tag (dinámica según sectorCount).
+              // Parada anticipada por null-bytes o TagLostException para máxima robustez.
               if (!tagLost) {
                 bool foundEnd = false;
-                for (var sector = 1; sector <= 6 && !tagLost; sector++) {
+                for (var sector = 1; sector < mifareClassic.sectorCount && !tagLost; sector++) {
                   try {
                     await mifareClassic.authenticateSectorWithKeyA(
                       sectorIndex: sector,

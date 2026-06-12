@@ -1528,6 +1528,33 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
   /// Retorna true si todas las validaciones pasan.
   Future<bool> _runPreSaveValidations() async {
     if (!mounted) return false;
+
+    // Siempre validar que haya al menos un detalle, independientemente de si hay pasos
+    if (FFAppState().visitDetails.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.warning_rounded, color: Colors.white, size: 20),
+              SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Debe seleccionar al menos un estado antes de guardar la visita',
+                  style: TextStyle(fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 4),
+          backgroundColor: FlutterFlowTheme.of(context).warning,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          margin: const EdgeInsets.all(16),
+        ),
+      );
+      return false;
+    }
+
     final currentActivity = FFAppState().currentActivity;
     final hasSteps = getJsonField(currentActivity, r'''$.activity_steps''')?.toList().isNotEmpty ?? false;
 
@@ -1559,31 +1586,6 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
             ),
             duration: const Duration(milliseconds: 4000),
             backgroundColor: FlutterFlowTheme.of(context).error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            margin: const EdgeInsets.all(16),
-          ),
-        );
-        return false;
-      }
-    } else {
-      if (FFAppState().visitDetails.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Row(
-              children: [
-                Icon(Icons.warning_rounded, color: Colors.white, size: 20),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Debe seleccionar al menos un estado antes de guardar la visita',
-                    style: TextStyle(fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            duration: const Duration(seconds: 4),
-            backgroundColor: FlutterFlowTheme.of(context).warning,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             margin: const EdgeInsets.all(16),
@@ -2401,8 +2403,20 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   // Parsear el contenido del tag y agrupar por headquarterId
                   final parsedData =
                       _parseNfcTagContentByHeadquarter(nfcContent);
+
+                  // Detectar overflow (tag lleno → nuevo tag): el nuevo tag tiene menos
+                  // visitas que los datos acumulados → fusionar en lugar de reemplazar.
+                  final oldData = _tagWriterData[statusId] ?? {};
+                  final oldTotal = oldData.values.fold<int>(
+                      0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                  final newTotal = parsedData.values.fold<int>(
+                      0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                  final isOverflow = oldTotal > 0 && newTotal < oldTotal;
+
                   setState(() {
-                    _tagWriterData[statusId] = parsedData;
+                    _tagWriterData[statusId] = isOverflow
+                        ? _mergeTagWriterData(oldData, parsedData)
+                        : parsedData;
                     _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
                   });
 
@@ -2634,12 +2648,6 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
             // Si es tipo tag-transfer, leer SOLO el tag de origen
             if (isTagTransferType) {
-              // Si ya se leyó el tag origen, bloquear el tap — solo debe usarse TRANSFERIR AHORA
-              if (_tagTransferData.containsKey(statusId) && _tagTransferData[statusId]!.isNotEmpty) {
-                debugPrint('🚫 TAG-TRANSFER: Tag origen ya leído, tap bloqueado — usar TRANSFERIR AHORA');
-                return;
-              }
-
               // Si la transferencia ya está completada, NO procesar el tap
               if (_tagTransferCompleted[statusId] == true) {
                 debugPrint('🚫 TAG-TRANSFER: Transferencia ya completada, tap ignorado');
@@ -2684,12 +2692,28 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
 
                 // Guardar los datos del tag de origen
                 final sourceProductName = await _fetchProductNameFromRfid(nfcContent);
+
+                // Detectar overflow (segundo tag fuente): menos visitas que el acumulado → fusionar
+                final oldData = _tagTransferData[statusId] ?? {};
+                final oldTotal = oldData.values
+                    .fold<int>(0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                final newTotal = parsedData.values
+                    .fold<int>(0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                final isOverflow = oldTotal > 0 && newTotal < oldTotal;
+
+                final mergedSourceContent = isOverflow
+                    ? _mergeTransferSourceContents(
+                        _tagTransferSourceContent[statusId] ?? '', nfcContent)
+                    : nfcContent;
+
                 setState(() {
-                  _tagTransferData[statusId] = parsedData;
+                  _tagTransferData[statusId] = isOverflow
+                      ? _mergeTagWriterData(oldData, parsedData)
+                      : parsedData;
                   _tagTransferSourceProductName[statusId] = sourceProductName;
-                  _tagTransferSourceContent[statusId] = nfcContent;
+                  _tagTransferSourceContent[statusId] = mergedSourceContent;
                 });
-                _persistTagTransferToPrefs(statusId, nfcContent).ignore();
+                _persistTagTransferToPrefs(statusId, mergedSourceContent).ignore();
 
                 debugPrint(
                     '✅ TAG-TRANSFER: Tag de origen guardado y limpiado correctamente');
@@ -3861,8 +3885,20 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   // Parsear el contenido del tag y agrupar por headquarterId
                   final parsedData =
                       _parseNfcTagContentByHeadquarter(nfcContent);
+
+                  // Detectar overflow (tag lleno → nuevo tag): el nuevo tag tiene menos
+                  // visitas que los datos acumulados → fusionar en lugar de reemplazar.
+                  final oldData = _tagWriterData[statusId] ?? {};
+                  final oldTotal = oldData.values.fold<int>(
+                      0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                  final newTotal = parsedData.values.fold<int>(
+                      0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                  final isOverflow = oldTotal > 0 && newTotal < oldTotal;
+
                   setState(() {
-                    _tagWriterData[statusId] = parsedData;
+                    _tagWriterData[statusId] = isOverflow
+                        ? _mergeTagWriterData(oldData, parsedData)
+                        : parsedData;
                     _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
                   });
 
@@ -4859,8 +4895,20 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
                   // Parsear el contenido del tag y agrupar por headquarterId
                   final parsedData =
                       _parseNfcTagContentByHeadquarter(nfcContent);
+
+                  // Detectar overflow (tag lleno → nuevo tag): el nuevo tag tiene menos
+                  // visitas que los datos acumulados → fusionar en lugar de reemplazar.
+                  final oldData = _tagWriterData[statusId] ?? {};
+                  final oldTotal = oldData.values.fold<int>(
+                      0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                  final newTotal = parsedData.values.fold<int>(
+                      0, (s, h) => s + (h['totalVisits'] as int? ?? 0));
+                  final isOverflow = oldTotal > 0 && newTotal < oldTotal;
+
                   setState(() {
-                    _tagWriterData[statusId] = parsedData;
+                    _tagWriterData[statusId] = isOverflow
+                        ? _mergeTagWriterData(oldData, parsedData)
+                        : parsedData;
                     _tagWriterProductName[statusId] = FFAppState().nfcLastProductName;
                   });
 
@@ -8876,6 +8924,45 @@ class DoVisitsFormPageWidgetState extends State<DoVisitsFormPageWidget>
         ),
       ),
     );
+  }
+
+  /// Combina datos de dos tags (tag lleno + tag nuevo) sin duplicar visitas.
+  /// Suma totalVisits/totalResults por headquarterId y concatena los registros.
+  Map<int, Map<String, dynamic>> _mergeTagWriterData(
+    Map<int, Map<String, dynamic>> old,
+    Map<int, Map<String, dynamic>> incoming,
+  ) {
+    final merged = Map<int, Map<String, dynamic>>.from(
+      old.map((k, v) => MapEntry(k, Map<String, dynamic>.from(v))));
+    for (final entry in incoming.entries) {
+      final heId = entry.key;
+      final newHe = entry.value;
+      if (merged.containsKey(heId)) {
+        merged[heId]!['totalVisits'] =
+            (merged[heId]!['totalVisits'] as int? ?? 0) +
+            (newHe['totalVisits'] as int? ?? 0);
+        merged[heId]!['totalResults'] =
+            (merged[heId]!['totalResults'] as int? ?? 0) +
+            (newHe['totalResults'] as int? ?? 0);
+        final existingRec = List.from((merged[heId]!['records'] as List?) ?? []);
+        final newRec = (newHe['records'] as List?) ?? [];
+        merged[heId]!['records'] = [...existingRec, ...newRec];
+      } else {
+        merged[heId] = Map<String, dynamic>.from(newHe);
+      }
+    }
+    return merged;
+  }
+
+  /// Combina dos strings de contenido NFC de origen (overflow de tag-transfer).
+  /// Decodifica cada uno como lista de registros y los une en un único bloque re-codificado.
+  String _mergeTransferSourceContents(String existing, String incoming) {
+    if (existing.isEmpty) return incoming;
+    final existingRecords = actions.decodeNfcRecords(existing);
+    final incomingRecords = actions.decodeNfcRecords(incoming);
+    final combined = [...existingRecords, ...incomingRecords];
+    if (combined.isEmpty) return incoming;
+    return actions.nfcEncodeRecords(combined);
   }
 
   /// Parsea el contenido del tag NFC y lo agrupa por lote (headquarterId)

@@ -146,7 +146,9 @@
       "Bash(Select-Object -ExpandProperty Name)",
       "Bash(Sort-Object)",
       "Bash(Select-String -Pattern \"version\")",
-      "Bash(Select-String -Pattern \"error|warning|_collectFormVariables|_isHeadquarterWeight|_evaluateHeadquarterWeight|_recalculate\")"
+      "Bash(Select-String -Pattern \"error|warning|_collectFormVariables|_isHeadquarterWeight|_evaluateHeadquarterWeight|_recalculate\")",
+      "PowerShell(flutter analyze lib/custom_code/actions/write_n_f_c_tag.dart lib/custom_code/actions/read_nfc_detailed.dart lib/custom_code/actions/read_nfc_basic.dart 2>$null)",
+      "PowerShell(flutter analyze lib/tag_admin/tag_raw_reader_dialog_widget.dart lib/custom_code/actions/nfc_json_helper.dart lib/custom_code/actions/write_n_f_c_tag.dart lib/custom_code/actions/index.dart 2>$null)"
     ],
     "deny": [],
     "ask": [],

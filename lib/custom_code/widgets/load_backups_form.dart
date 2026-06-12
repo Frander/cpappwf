@@ -24,6 +24,9 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/services.dart'; // Para MethodChannel
 import 'package:share_plus/share_plus.dart'; // Para compartir archivos
 import '/custom_code/platform_utils.dart';
+import '/custom_code/actions/persistent_id_paths.dart';
+import '/backend/sqlite/global_db_singleton.dart';
+import 'package:path/path.dart' as p;
 
 // ============================================================================
 // MODELOS DE DATOS
@@ -119,6 +122,16 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
   String _transferSpeed = '';
   DateTime? _transferStartTime;
 
+  // DB Backup tab
+  bool _dbBackupInProgress = false;
+  String _dbBackupLastResult = '';
+  bool _dbBackupLastSuccess = false;
+  List<FileItem> _dbBackupFiles = [];
+  bool _dbBackupFilesLoading = false;
+  bool _dbRestoreInProgress = false;
+  String _dbRestoreResult = '';
+  bool _dbRestoreSuccess = false;
+
   // Animación
   late TabController _tabController;
   late AnimationController _progressAnimationController;
@@ -127,13 +140,17 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() {
-          _selectedCategory = _tabController.index == 0
-              ? FileCategory.csvExports
-              : FileCategory.syncFiles;
+          if (_tabController.index == 0) {
+            _selectedCategory = FileCategory.csvExports;
+          } else if (_tabController.index == 1) {
+            _selectedCategory = FileCategory.syncFiles;
+          }
+          // índice 2: tab Base de datos
+          if (_tabController.index == 2) _loadDbBackupFiles();
         });
       }
     });
@@ -1557,15 +1574,18 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
           children: [
             _buildHeader(),
             _buildTabBar(),
-            _buildToolbar(),
+            if (_tabController.index != 2) _buildToolbar(),
             Expanded(
               child: _isLoading
                   ? _buildLoadingView()
                   : _errorMessage.isNotEmpty
                       ? _buildErrorView()
-                      : _buildFilesList(),
+                      : _tabController.index == 2
+                          ? _buildDbBackupTab()
+                          : _buildFilesList(),
             ),
-            if (_selectedFiles.isNotEmpty) _buildBottomBar(),
+            if (_selectedFiles.isNotEmpty && _tabController.index != 2)
+              _buildBottomBar(),
           ],
         ),
       ),
@@ -1658,7 +1678,7 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
               children: [
                 const Icon(Icons.table_chart, size: 20),
                 const SizedBox(width: 8),
-                Text('CSV (${_csvFiles.length})'),
+                Flexible(child: Text('CSV (${_csvFiles.length})', overflow: TextOverflow.ellipsis)),
               ],
             ),
           ),
@@ -1668,13 +1688,448 @@ class _LoadBackupsFormState extends State<LoadBackupsForm>
               children: [
                 const Icon(Icons.sync, size: 20),
                 const SizedBox(width: 8),
-                Text('Sync (${_syncFiles.length})'),
+                Flexible(child: Text('Sync (${_syncFiles.length})', overflow: TextOverflow.ellipsis)),
+              ],
+            ),
+          ),
+          const Tab(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.storage, size: 20),
+                SizedBox(width: 8),
+                Flexible(child: Text('Base de datos', overflow: TextOverflow.ellipsis)),
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  // ==========================================================================
+  // TAB BASE DE DATOS — EXPORTAR .db A ALMACENAMIENTO PÚBLICO
+  // ==========================================================================
+
+  Widget _buildDbBackupTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ── Sección: exportar nueva copia ──
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.storage,
+                          size: 28,
+                          color: FlutterFlowTheme.of(context).primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text('Base de datos',
+                            style: FlutterFlowTheme.of(context).titleMedium),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Exporta el archivo .db al almacenamiento público '
+                    '(Downloads / Documents) para abrirlo en el computador '
+                    'con DB Browser for SQLite, DBeaver u otro visor.',
+                    style: FlutterFlowTheme.of(context).bodySmall,
+                  ),
+                  const SizedBox(height: 14),
+                  ElevatedButton.icon(
+                    onPressed: _dbBackupInProgress ? null : _performDbBackup,
+                    icon: _dbBackupInProgress
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.save_alt, size: 18),
+                    label: Text(
+                        _dbBackupInProgress ? 'Exportando...' : 'NUEVO BACKUP'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: FlutterFlowTheme.of(context).primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 44),
+                      textStyle: const TextStyle(
+                          fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  if (_dbBackupLastResult.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    _buildResultBanner(
+                        _dbBackupLastResult, _dbBackupLastSuccess),
+                  ],
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // ── Sección: lista de backups disponibles ──
+          Row(
+            children: [
+              const Icon(Icons.history, size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Backups disponibles'
+                  '${_dbBackupFiles.isNotEmpty ? ' (${_dbBackupFiles.length})' : ''}',
+                  style: FlutterFlowTheme.of(context).titleSmall,
+                ),
+              ),
+              IconButton(
+                onPressed: _dbBackupFilesLoading ? null : _loadDbBackupFiles,
+                icon: _dbBackupFilesLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh, size: 20),
+                tooltip: 'Actualizar lista',
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          if (_dbBackupFilesLoading)
+            const Center(
+                child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: CircularProgressIndicator(),
+            ))
+          else if (_dbBackupFiles.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Icon(Icons.inbox_outlined,
+                        size: 40,
+                        color: FlutterFlowTheme.of(context).secondaryText),
+                    const SizedBox(height: 10),
+                    Text(
+                      'No se encontraron backups.\nUsa NUEVO BACKUP para crear uno.',
+                      textAlign: TextAlign.center,
+                      style: FlutterFlowTheme.of(context).bodyMedium,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ...(_dbBackupFiles.map(_buildDbBackupItem)),
+
+          if (_dbRestoreResult.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildResultBanner(_dbRestoreResult, _dbRestoreSuccess),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildResultBanner(String message, bool success) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: (success ? Colors.green : Colors.red).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: success ? Colors.green : Colors.red),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            success ? Icons.check_circle : Icons.error,
+            color: success ? Colors.green : Colors.red,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(message,
+                style: FlutterFlowTheme.of(context).bodyMedium),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _performDbBackup() async {
+    setState(() {
+      _dbBackupInProgress = true;
+      _dbBackupLastResult = '';
+    });
+    try {
+      // Permiso (Android)
+      if (Platform.isAndroid) {
+        final sdkInt = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
+        final status = sdkInt >= 33
+            ? await Permission.manageExternalStorage.request()
+            : await Permission.storage.request();
+        if (!status.isGranted && !status.isLimited) {
+          throw Exception('Permiso de almacenamiento denegado');
+        }
+      }
+
+      // Ruta fuente: usar el path real del singleton (no FFAppState que puede estar vacío)
+      final String dbPath = await GlobalDbSingleton().dbPath;
+      final dbFile = File(dbPath);
+      if (!await dbFile.exists()) {
+        throw Exception('Base de datos no encontrada en:\n$dbPath');
+      }
+      final srcSizeMb = (await dbFile.length() / 1024 / 1024).toStringAsFixed(2);
+      debugPrint('📦 [BACKUP] Fuente: $dbPath ($srcSizeMb MB)');
+
+      // Ruta destino pública (discoverWritablePaths prueba escritura real)
+      String destDirPath;
+      final writablePaths = await discoverWritablePaths();
+      if (writablePaths.isNotEmpty) {
+        destDirPath = writablePaths.values.first;
+      } else if (Platform.isAndroid) {
+        final extDir = await getExternalStorageDirectory();
+        destDirPath =
+            extDir?.path ?? (await getApplicationDocumentsDirectory()).path;
+      } else {
+        destDirPath = (await getApplicationDocumentsDirectory()).path;
+      }
+
+      // Nombre con timestamp
+      final ts = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
+      final destPath = '$destDirPath/ClickPalmDB_$ts.db';
+      debugPrint('📦 [BACKUP] Destino: $destPath');
+      await dbFile.copy(destPath);
+
+      final sizeMb =
+          (await File(destPath).length() / 1024 / 1024).toStringAsFixed(2);
+      debugPrint('✅ [BACKUP] Copiado: $sizeMb MB → $destPath');
+      setState(() {
+        _dbBackupLastResult = 'Guardado en:\n$destPath\n($sizeMb MB)';
+        _dbBackupLastSuccess = true;
+      });
+      _loadDbBackupFiles();
+    } catch (e) {
+      setState(() {
+        _dbBackupLastResult = 'Error: $e';
+        _dbBackupLastSuccess = false;
+      });
+    } finally {
+      setState(() => _dbBackupInProgress = false);
+    }
+  }
+
+  // ==========================================================================
+  // LISTA DE BACKUPS Y RESTORE
+  // ==========================================================================
+
+  Future<void> _loadDbBackupFiles() async {
+    if (!mounted) return;
+    setState(() => _dbBackupFilesLoading = true);
+    try {
+      final writablePaths = await discoverWritablePaths();
+      final found = <FileItem>[];
+      final seen = <String>{};
+      for (final dirPath in writablePaths.values) {
+        final dir = Directory(dirPath);
+        if (!await dir.exists()) continue;
+        try {
+          await for (final entity in dir.list()) {
+            if (entity is! File) continue;
+            final name = p.basename(entity.path);
+            if (!name.startsWith('ClickPalmDB_') || !name.endsWith('.db')) {
+              continue;
+            }
+            if (!seen.add(entity.path)) continue;
+            final stat = await entity.stat();
+            found.add(FileItem(
+              name: name,
+              path: entity.path,
+              sizeBytes: stat.size,
+              modifiedDate: stat.modified,
+            ));
+          }
+        } catch (_) {}
+      }
+      found.sort((a, b) => b.modifiedDate.compareTo(a.modifiedDate));
+      if (mounted) setState(() => _dbBackupFiles = found);
+    } finally {
+      if (mounted) setState(() => _dbBackupFilesLoading = false);
+    }
+  }
+
+  Widget _buildDbBackupItem(FileItem file) {
+    // Intentar parsear fecha de creación desde el nombre del archivo
+    // Formato: ClickPalmDB_yyyy-MM-dd_HH-mm.db
+    String? createdLabel;
+    try {
+      final namePart = file.name
+          .replaceFirst('ClickPalmDB_', '')
+          .replaceAll('.db', '');
+      final created = DateFormat('yyyy-MM-dd_HH-mm').parseStrict(namePart);
+      createdLabel = DateFormat('dd/MM/yyyy HH:mm').format(created);
+    } catch (_) {}
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.storage, color: Color(0xFF6366F1), size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    file.name,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Text('Peso: ${file.formattedSize}',
+                      style: const TextStyle(fontSize: 12)),
+                  if (createdLabel != null)
+                    Text('Creado: $createdLabel',
+                        style: const TextStyle(fontSize: 12)),
+                  Text(
+                      'Modificado: ${DateFormat('dd/MM/yyyy HH:mm').format(file.modifiedDate)}',
+                      style: const TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              onPressed:
+                  _dbRestoreInProgress ? null : () => _confirmAndRestore(file),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                textStyle: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              child: const Text('RECUPERAR'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _confirmAndRestore(FileItem backup) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Recuperar base de datos'),
+        content: Text(
+          'Se reemplazará la base de datos activa con:\n\n'
+          '${backup.name}\n\n'
+          'Se creará una copia de seguridad de la BD actual antes '
+          'de reemplazarla.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white),
+            child: const Text('Confirmar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) await _performDbRestore(backup);
+  }
+
+  Future<void> _performDbRestore(FileItem backup) async {
+    setState(() {
+      _dbRestoreInProgress = true;
+      _dbRestoreResult = '';
+    });
+    try {
+      // Permiso (Android)
+      if (Platform.isAndroid) {
+        final sdkInt = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
+        final status = sdkInt >= 33
+            ? await Permission.manageExternalStorage.request()
+            : await Permission.storage.request();
+        if (!status.isGranted && !status.isLimited) {
+          throw Exception('Permiso de almacenamiento denegado');
+        }
+      }
+
+      // Ruta real del singleton — obtener ANTES de cerrar (close no borra _dbPath)
+      final String currentDbPath = await GlobalDbSingleton().dbPath;
+      debugPrint('🔄 [RESTORE] Backup origen: ${backup.path}');
+      debugPrint('🔄 [RESTORE] BD destino:    $currentDbPath');
+
+      final backupSrcSize = (await File(backup.path).length() / 1024 / 1024).toStringAsFixed(2);
+      debugPrint('🔄 [RESTORE] Tamaño backup: $backupSrcSize MB');
+
+      // Backup de seguridad de la BD actual antes de reemplazar
+      final ts = DateFormat('yyyy-MM-dd_HH-mm').format(DateTime.now());
+      final safetyName = 'clickpalm_database_pre_restore_$ts.db';
+      final safetyPath = '${p.dirname(currentDbPath)}/$safetyName';
+      final currentFile = File(currentDbPath);
+      if (await currentFile.exists()) {
+        await currentFile.copy(safetyPath);
+        debugPrint('🔄 [RESTORE] Seguridad guardada: $safetyPath');
+      }
+
+      // 1. Cerrar el singleton (flush WAL, _database = null)
+      await GlobalDbSingleton().close();
+      debugPrint('🔄 [RESTORE] Singleton cerrado');
+
+      // 2. Eliminar archivos WAL/SHM del estado anterior para evitar que SQLite
+      //    los aplique sobre la BD restaurada al reabrir (causaría datos mezclados)
+      final walFile = File('$currentDbPath-wal');
+      final shmFile = File('$currentDbPath-shm');
+      if (await walFile.exists()) { await walFile.delete(); debugPrint('🔄 [RESTORE] WAL eliminado'); }
+      if (await shmFile.exists()) { await shmFile.delete(); debugPrint('🔄 [RESTORE] SHM eliminado'); }
+
+      // 3. Copiar el backup → ruta real de la BD activa
+      await File(backup.path).copy(currentDbPath);
+      final restoredSize = (await File(currentDbPath).length() / 1024 / 1024).toStringAsFixed(2);
+      debugPrint('✅ [RESTORE] Copia completada: $restoredSize MB en $currentDbPath');
+
+      // 4. Forzar reapertura del singleton
+      await GlobalDbSingleton().database;
+      debugPrint('✅ [RESTORE] Singleton reabierto');
+
+      setState(() {
+        _dbRestoreResult = 'Base de datos recuperada.\n'
+            'Origen: ${backup.name} ($backupSrcSize MB)\n'
+            'Destino: $currentDbPath\n'
+            'Seguridad: $safetyName';
+        _dbRestoreSuccess = true;
+      });
+    } catch (e) {
+      // Garantizar que el singleton no quede cerrado ante un error parcial
+      try {
+        await GlobalDbSingleton().database;
+      } catch (_) {}
+      setState(() {
+        _dbRestoreResult = 'Error al recuperar: $e';
+        _dbRestoreSuccess = false;
+      });
+    } finally {
+      setState(() => _dbRestoreInProgress = false);
+    }
   }
 
   Widget _buildToolbar() {

@@ -919,7 +919,7 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
         _statusMessage = 'ID: $visitId\nCoordenadas: ${_gpsPoints.length} puntos';
       });
 
-      await Future.delayed(const Duration(seconds: 2));
+      await Future.delayed(const Duration(seconds: 1));
       if (mounted) {
         Navigator.pop(context, true);
       }
@@ -1093,6 +1093,11 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                         // Botón VISITA MANUAL (siempre visible bajo el contador)
                         _buildManualButton(),
 
+                        SizedBox(height: isVeryCompact ? 4 : 6),
+
+                        // Botón VISITA RAPIDA (omite el timer)
+                        _buildQuickVisitButton(),
+
                         SizedBox(height: isVeryCompact ? 8 : 16),
 
                         // Mensaje dinámico
@@ -1158,6 +1163,47 @@ class _LoadCoordinatesVisitState extends State<LoadCoordinatesVisit>
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: Color(0xFF94A3B8),
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickVisitButton() {
+    return GestureDetector(
+      onTap: () {
+        _countdownTimer?.cancel();
+        setState(() {
+          _countdown = 0;
+        });
+        _checkGPSPoints();
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: _accentGreen.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _accentGreen.withValues(alpha: 0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.flash_on_rounded,
+                color: _accentGreen, size: 14),
+            const SizedBox(width: 6),
+            Text(
+              'VISITA RAPIDA',
+              style: TextStyle(
+                fontFamily: 'Roboto',
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _accentGreen,
                 letterSpacing: 0.8,
               ),
             ),

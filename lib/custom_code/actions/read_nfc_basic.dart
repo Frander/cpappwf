@@ -57,7 +57,9 @@ Future<String> readNFCBasic(BuildContext context,
 
                 if (payload.length > languageCodeLength + 1) {
                   final textBytes = payload.sublist(1 + languageCodeLength);
-                  tagData = utf8.decode(textBytes);
+                  // allowMalformed: tags con escritura interrumpida siguen
+                  // siendo legibles (contenido parcial) en vez de quedar vacíos
+                  tagData = utf8.decode(textBytes, allowMalformed: true);
                   debugPrint('📖 readNFCBasic: Leído desde NDEF: ${tagData.length} bytes');
                 }
               } catch (e) {
@@ -103,9 +105,9 @@ Future<String> readNFCBasic(BuildContext context,
                 }
               }
 
-              // Leer sectores 1-3
+              // Leer todos los sectores disponibles del tag
               if (!tagLost) {
-                for (int sector = 1; sector <= 3 && !tagLost; sector++) {
+                for (int sector = 1; sector < mifareClassic.sectorCount && !tagLost; sector++) {
                   try {
                     await mifareClassic.authenticateSectorWithKeyA(
                       sectorIndex: sector,

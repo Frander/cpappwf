@@ -101,4 +101,5 @@ export 'nfc_json_helper.dart'
         decodeMultiChunk,
         decodeNfcRecords,
         nfcEncodeRecords,
-        injectFormStatus;
+        injectFormStatus,
+        purgeCorruptedNfcContent;
