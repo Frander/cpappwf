@@ -135,6 +135,7 @@ dependencies:
   http_parser: any
   vector_tile_renderer: any
   ndef_record: any
+  sentry_flutter: ^9.22.0
 dependency_overrides:
   http: 1.4.0
   intl: 0.20.2

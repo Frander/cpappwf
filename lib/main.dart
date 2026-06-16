@@ -1,5 +1,7 @@
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
@@ -39,6 +41,18 @@ StreamSubscription<Position>? locationSubscription;
 final GlobalKey<ScaffoldMessengerState> rootScaffoldMessengerKey =
     GlobalKey<ScaffoldMessengerState>();
 
+/// DSN del proyecto Sentry para reporte de errores/crashes.
+/// Obtenlo en Sentry → Settings → Projects → [tu proyecto] → Client Keys (DSN).
+/// Se puede sobrescribir en compilación con:
+///   flutter build ... --dart-define=SENTRY_DSN=https://....ingest.sentry.io/...
+/// Si queda con el valor por defecto, Sentry simplemente no se inicializa
+/// (la app sigue funcionando con el log local `releaseLog`).
+const String _sentryDsn = String.fromEnvironment(
+  'SENTRY_DSN',
+  defaultValue:
+      'https://b05c9d2a647ec96df3052b75fceae3c0@o4511575133716480.ingest.us.sentry.io/4511575160324096',
+);
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -48,6 +62,8 @@ void main() async {
   // legible en lugar de un rectángulo vacío (que se ve como pantalla blanca).
   ErrorWidget.builder = (FlutterErrorDetails details) {
     releaseLog('ErrorWidget.builder', details.exception, details.stack);
+    // ErrorWidget no lo captura Sentry automáticamente: lo reportamos a mano.
+    Sentry.captureException(details.exception, stackTrace: details.stack);
     return Container(
       padding: const EdgeInsets.all(8),
       margin: const EdgeInsets.symmetric(vertical: 4),
@@ -72,6 +88,29 @@ void main() async {
     releaseLog('PlatformDispatcher', error, stack);
     return true; // Marcarlo como manejado para evitar crash nativo
   };
+
+  // Inicializar Sentry DESPUÉS de definir los handlers anteriores: las
+  // integraciones de Sentry envuelven (chain) los onError ya instalados,
+  // así cada error se reporta a Sentry Y se sigue escribiendo en releaseLog.
+  // Además habilita la captura de crashes NATIVOS de Android (p. ej. la
+  // excepción del foreground service que no llega al lado Dart).
+  if (_sentryDsn.startsWith('https://')) {
+    try {
+      await SentryFlutter.init((options) {
+        options.dsn = _sentryDsn;
+        options.environment = kReleaseMode ? 'production' : 'debug';
+        options.tracesSampleRate = 0.2;
+        options.attachStacktrace = true;
+        options.debug = !kReleaseMode;
+      });
+      releaseLog('Sentry inicializado');
+    } catch (e, st) {
+      // Nunca dejar que un fallo de Sentry impida arrancar la app.
+      releaseLog('Sentry init FALLÓ', e, st);
+    }
+  } else {
+    releaseLog('Sentry no configurado (DSN por defecto) — solo log local');
+  }
 
   try {
     releaseLog('Step 1: GoRouter config');
@@ -109,6 +148,9 @@ void main() async {
     releaseLog('Step 6: runApp() completed');
   } catch (e, stack) {
     releaseLog('FATAL CRASH', e, stack);
+    // Crash de arranque: reportar a Sentry con nivel fatal antes de mostrar
+    // la pantalla de error mínima.
+    Sentry.captureException(e, stackTrace: stack);
     // Mostrar app mínima con el error para que no se cierre
     runApp(MaterialApp(
       home: Scaffold(
