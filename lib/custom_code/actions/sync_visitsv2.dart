@@ -65,10 +65,15 @@ Future<bool> syncVisitsv2(
     }).toList();
 
     // 3. OBTENER VISITS_ADD DESDE SQLITE
+    // Las fotos/videos se reemplazan por referencias "media_X" en
+    // status_response y los archivos se registran en mediaFiles para
+    // adjuntarlos como partes multipart del request
     debugPrint('🔄 Obteniendo visits_add desde SQLite...');
+    final Map<String, String> mediaFiles = {};
     final List<Map<String, dynamic>> visitsAddJson =
-        await _getVisitsAddFromSQLite(idCompany);
+        await _getVisitsAddFromSQLite(idCompany, mediaFiles);
     debugPrint('📊 Visits_add obtenidas: ${visitsAddJson.length}');
+    debugPrint('📎 Archivos de media a adjuntar: ${mediaFiles.length}');
 
     // 4. CREAR JSON PARA SYNC
     final syncData = {
@@ -97,9 +102,10 @@ Future<bool> syncVisitsv2(
     int multipartStatus = await _syncWithMultipart(
       syncData,
       currentToken,
-      idCompany,
       newsAddJson.length,
       visitsAddJson.length,
+      visitsAddJson,
+      mediaFiles,
     );
 
     // Si recibimos 401, renovar token y reintentar
@@ -113,9 +119,10 @@ Future<bool> syncVisitsv2(
         multipartStatus = await _syncWithMultipart(
           syncData,
           currentToken,
-          idCompany,
           newsAddJson.length,
           visitsAddJson.length,
+          visitsAddJson,
+          mediaFiles,
         );
       }
     }
@@ -138,6 +145,7 @@ Future<bool> syncVisitsv2(
       currentToken,
       newsAddJson.length,
       visitsAddJson.length,
+      mediaFiles,
     );
 
     // Si recibimos 401 y aún no renovamos el token, renovar y reintentar
@@ -153,6 +161,7 @@ Future<bool> syncVisitsv2(
           currentToken,
           newsAddJson.length,
           visitsAddJson.length,
+          mediaFiles,
         );
       }
     }
@@ -216,41 +225,45 @@ Future<String?> _renewAuthToken(String imei) async {
   }
 }
 
-/// Sincronización con endpoint JSON simple (SIN archivos comprimidos).
-/// Retorna el HTTP status code, o -1 en caso de excepción.
+/// Sincronización con endpoint SyncVisitsAdd (SIN archivos comprimidos).
+/// Envía el JSON en el campo multipart "SyncModelJson" junto con los archivos
+/// de media referenciados como "media_X" (mismo formato que el fallback de
+/// ModernSyncPage). Retorna el HTTP status code, o -1 en caso de excepción.
 Future<int> _syncWithSimpleJson(
   Map<String, dynamic> syncData,
   String authToken,
   int newsCount,
   int visitsCount,
+  Map<String, String> mediaFiles,
 ) async {
   try {
     const String url = 'https://api.clickpalm.com/Sync_times/SyncVisitsAdd';
 
-    debugPrint('🚀 Iniciando sincronización con endpoint JSON simple...');
+    debugPrint('🚀 Iniciando sincronización con endpoint SyncVisitsAdd...');
 
-    final String jsonBody = jsonEncode(syncData);
+    final request = http.MultipartRequest('POST', Uri.parse(url));
+    request.headers['Authorization'] = 'Bearer $authToken';
+    request.fields['SyncModelJson'] = jsonEncode(syncData);
 
-    debugPrint('📤 ===== PAYLOAD ENVIADO AL API (JSON) =====');
+    // Adjuntar fotos/videos referenciados como "media_X"
+    await _attachMediaFiles(request, mediaFiles);
+
+    debugPrint('📤 ===== PAYLOAD ENVIADO AL API (SyncVisitsAdd) =====');
     debugPrint('   - URL: $url');
     debugPrint('   - News: $newsCount');
     debugPrint('   - Visits: $visitsCount');
+    debugPrint('   - Archivos media: ${request.files.length}');
 
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $authToken',
-        'Content-Type': 'application/json',
-      },
-      body: jsonBody,
-    ).timeout(const Duration(seconds: 90));
+    final streamedResponse =
+        await request.send().timeout(const Duration(seconds: 90));
+    final response = await http.Response.fromStream(streamedResponse);
 
-    debugPrint('📥 ===== RESPUESTA DEL API (JSON) =====');
+    debugPrint('📥 ===== RESPUESTA DEL API (SyncVisitsAdd) =====');
     debugPrint('   - Status Code: ${response.statusCode}');
     debugPrint('   - Body: ${response.body}');
 
     if (response.statusCode != 200 && response.statusCode != 202) {
-      debugPrint('❌ Error en endpoint JSON:');
+      debugPrint('❌ Error en endpoint SyncVisitsAdd:');
       debugPrint('   Status: ${response.statusCode}');
       debugPrint('   Response: ${response.body}');
     }
@@ -267,9 +280,10 @@ Future<int> _syncWithSimpleJson(
 Future<int> _syncWithMultipart(
   Map<String, dynamic> syncData,
   String authToken,
-  int idCompany,
   int newsCount,
   int visitsCount,
+  List<Map<String, dynamic>> visitsAddJson,
+  Map<String, String> mediaFiles,
 ) async {
   try {
     const String url =
@@ -278,12 +292,10 @@ Future<int> _syncWithMultipart(
     debugPrint('🚀 Iniciando sincronización con endpoint multipart...');
 
     // Obtener archivos comprimidos
-    final String tempFolderPath = await _getTempFolderPath();
     final String csvFolderPath = await _getCSVFolderPath();
 
     debugPrint('🔄 Generando archivos comprimidos...');
-    final List<int> visitsCompressed =
-        await _getVisitsFromSQLiteAndCompress(tempFolderPath, idCompany);
+    final List<int> visitsCompressed = _compressVisitsJson(visitsAddJson);
     final List<int> locationCompressed =
         await _getLocationTrackingFromSQLiteAndCompress(csvFolderPath);
 
@@ -324,6 +336,9 @@ Future<int> _syncWithMultipart(
       debugPrint('✅ Archivo LocationsCompressed agregado');
     }
 
+    // Adjuntar fotos/videos referenciados como "media_X"
+    await _attachMediaFiles(request, mediaFiles);
+
     debugPrint('📤 ===== PAYLOAD ENVIADO AL API (MULTIPART) =====');
     debugPrint('   - URL: $url');
     debugPrint('   - News: $newsCount');
@@ -355,21 +370,8 @@ Future<int> _syncWithMultipart(
 // FUNCIONES AUXILIARES
 // ============================================================================
 
-String _convertLocationToSimpleFormat(String location) {
-  if (location.contains('LAT:') && location.contains('LON:')) {
-    final latMatch = RegExp(r'LAT:([-\d.]+)').firstMatch(location);
-    final lonMatch = RegExp(r'LON:([-\d.]+)').firstMatch(location);
-
-    if (latMatch != null && lonMatch != null) {
-      return '${latMatch.group(1)},${lonMatch.group(1)}';
-    }
-  }
-
-  return location;
-}
-
 Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
-    int idCompany) async {
+    int idCompany, Map<String, String> mediaFiles) async {
   try {
     final String dbPath = await _getDatabasePath();
     final Database db = await openDatabase(dbPath);
@@ -509,24 +511,29 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
           String statusResponse = row['detail_status_response'] ?? '';
           final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
 
-          // ⚠️ DESHABILITADO: No convertir a base64
-          // Los archivos de media deben enviarse como multipart, no como base64 en JSON
-          // El backend espera referencias "media_X" en status_response y archivos multipart separados
-          /*
-          if (statusResponse.isNotEmpty) {
-            if (typeStatus == 'photo') {
-              statusResponse = _compressPhotoBase64(statusResponse);
-            } else if (typeStatus == 'video') {
-              statusResponse = await _convertVideoToBase64(statusResponse);
+          // Para photo/video: leer el archivo local y enviarlo embebido en
+          // base64 directamente dentro de status_response (data URI). El
+          // backend almacena el contenido del campo tal cual, así que enviar
+          // la imagen en base64 evita el problema de que quedara guardada la
+          // referencia literal "media_X".
+          if ((typeStatus == 'photo' || typeStatus == 'video') &&
+              statusResponse.isNotEmpty &&
+              statusResponse.contains('/') &&
+              !statusResponse.startsWith('http') &&
+              !statusResponse.startsWith('data:')) {
+            final String? base64Data =
+                await _fileToBase64DataUri(statusResponse);
+            if (base64Data != null) {
+              debugPrint(
+                  '🖼️ Archivo $typeStatus convertido a base64: '
+                  '${statusResponse.split('/').last} '
+                  '(${(base64Data.length / 1024).toStringAsFixed(1)} KB en base64)');
+              statusResponse = base64Data;
+            } else {
+              debugPrint(
+                  '⚠️ No se pudo convertir a base64: $statusResponse '
+                  '(se envía la ruta original)');
             }
-          }
-          */
-
-          // Para archivos de media, dejar la ruta tal cual temporalmente
-          // TODO: Implementar sistema de referencias "media_X" + multipart
-          if ((typeStatus == 'photo' || typeStatus == 'video') && statusResponse.isNotEmpty) {
-            debugPrint('⚠️ ADVERTENCIA: Archivo $typeStatus con ruta local no será sincronizado correctamente: ${statusResponse.substring(0, 100)}');
-            debugPrint('⚠️ Se requiere implementar sistema de referencias multipart para este archivo');
           }
 
           visit['visits_details'].add({
@@ -584,19 +591,18 @@ Future<List<Map<String, dynamic>>> _getVisitsAddFromSQLite(
       debugPrint('   id_visit: ${firstVisit['id_visit']}');
       debugPrint('   id_company: ${firstVisit['id_company']}');
       debugPrint('   id_activity: ${firstVisit['id_activity']}');
+      final List detailsList = firstVisit['visits_details'] as List;
       debugPrint(
-          '   visits_details (${firstVisit['visits_details'].length} detalles):');
-      if (firstVisit['visits_details'].isNotEmpty) {
-        final firstDetail = firstVisit['visits_details'][0];
+          '   visits_details (${detailsList.length} detalles):');
+      for (int i = 0; i < detailsList.length; i++) {
+        final d = detailsList[i] as Map<String, dynamic>;
+        final String sr = (d['status_response'] ?? '').toString();
+        final String srPreview =
+            sr.length > 80 ? '${sr.substring(0, 80)}… (${sr.length} chars)' : sr;
         debugPrint(
-            '      [0] id_visit_detail: ${firstDetail['id_visit_detail']} (siempre 0)');
-        debugPrint(
-            '          id_visit: ${firstDetail['id_visit']} (siempre 0)');
-        debugPrint(
-            '          id_activity_status: ${firstDetail['id_activity_status']}');
-        debugPrint('          status_option: ${firstDetail['status_option']}');
-        debugPrint(
-            '          status_response: ${firstDetail['status_response']}');
+            '      [$i] id_activity_status: ${d['id_activity_status']} | '
+            'status_option: "${d['status_option']}" | '
+            'status_response: "$srPreview"');
       }
       debugPrint(
           '   locations_add (${firstVisit['locations_add'].length} coords)');
@@ -685,256 +691,6 @@ Future<void> _cleanupFolderFiles(
     }
   } catch (e) {
     debugPrint('Error limpiando carpeta $fileType: $e');
-  }
-}
-
-Future<List<int>> _getVisitsFromSQLiteAndCompress(
-    String tempPath, int idCompany) async {
-  try {
-    debugPrint('🚀 Iniciando compresión de visitas...');
-
-    final String dbPath = await _getDatabasePath();
-    final Database db = await openDatabase(dbPath);
-
-    final List<Map<String, dynamic>> rawData = await db.rawQuery('''
-      SELECT
-        v.Id_visit as id_visit,
-        v.Id_company as id_company,
-        v.Id_activity as id_activity,
-        v.Id_headquarter as id_headquarter,
-        v.Id_product as id_product,
-        v.Id_user as id_user,
-        v.Id_device as id_device,
-        v.Created_at as created_at,
-        v.Latitude,
-        v.Longitude,
-        v.Altitude,
-        v.Error_horizontal,
-        v.Rfid as rfid,
-
-        vd.Id_visit_detail as detail_id,
-        vd.Id_activity_status as detail_activity_status,
-        vd.Status_option as detail_status_option,
-        vd.Status_response as detail_status_response,
-
-        ast.Type_status as detail_type_status,
-
-        vl.Id as location_id,
-        vl.Latitude as location_latitude,
-        vl.Longitude as location_longitude,
-        vl.Altitude as location_altitude,
-        vl.HorizontalError as location_horizontal_error
-      FROM Visits v
-      LEFT JOIN Visits_details vd ON v.Id_visit = vd.Id_visit
-      LEFT JOIN Activities_status ast ON vd.Id_activity_status = ast.Id_activity_status
-      LEFT JOIN Visits_locations vl ON v.Id_visit = vl.Id_visit
-      WHERE v.Id_company = ?
-      ORDER BY v.Created_at DESC, vd.Id_visit_detail ASC, vl.Id ASC
-    ''', [idCompany]);
-
-    debugPrint('🔍 Query compresión: ${rawData.length} filas obtenidas');
-
-    // Debug: Imprimir primeras filas del query para verificar estructura
-    if (rawData.isNotEmpty) {
-      debugPrint('📊 DEBUG - Primeras 3 filas del query de compresión:');
-      for (int i = 0; i < rawData.length && i < 3; i++) {
-        final row = rawData[i];
-        debugPrint('   Fila $i:');
-        debugPrint('      id_visit: ${row['id_visit']}');
-        debugPrint('      detail_id: ${row['detail_id']}');
-        debugPrint(
-            '      detail_activity_status: ${row['detail_activity_status']}');
-        debugPrint(
-            '      detail_type_status: ${row['detail_type_status']}');
-        debugPrint(
-            '      detail_status_option: ${row['detail_status_option']}');
-        final statusResponse = row['detail_status_response'] ?? '';
-        debugPrint(
-            '      detail_status_response: ${statusResponse.length > 100 ? statusResponse.substring(0, 100) + "..." : statusResponse}');
-      }
-    }
-
-    final Map<int, Map<String, dynamic>> visitsMap = {};
-
-    for (final row in rawData) {
-      final int visitId = row['id_visit'];
-
-      if (!visitsMap.containsKey(visitId)) {
-        // Parsear y validar created_at
-        String createdAt;
-        String createdAtLocal;
-        try {
-          final rawCreatedAt = row['created_at'];
-          if (rawCreatedAt != null && rawCreatedAt.toString().isNotEmpty) {
-            // Intentar parsear la fecha
-            final parsedDate = DateTime.tryParse(rawCreatedAt.toString());
-            if (parsedDate != null && parsedDate.year > 1900) {
-              // Fecha válida
-              createdAt = parsedDate.toUtc().toIso8601String();
-              createdAtLocal = parsedDate.toIso8601String();
-            } else {
-              // Fecha inválida, usar fecha actual
-              final now = DateTime.now();
-              createdAt = now.toUtc().toIso8601String();
-              createdAtLocal = now.toIso8601String();
-              debugPrint('⚠️ Fecha inválida para visita $visitId, usando fecha actual');
-            }
-          } else {
-            // Campo vacío, usar fecha actual
-            final now = DateTime.now();
-            createdAt = now.toUtc().toIso8601String();
-            createdAtLocal = now.toIso8601String();
-            debugPrint('⚠️ Campo created_at vacío para visita $visitId, usando fecha actual');
-          }
-        } catch (e) {
-          // Error parseando, usar fecha actual
-          final now = DateTime.now();
-          createdAt = now.toUtc().toIso8601String();
-          createdAtLocal = now.toIso8601String();
-          debugPrint('⚠️ Error parseando created_at para visita $visitId: $e, usando fecha actual');
-        }
-
-        visitsMap[visitId] = {
-          'created_at': createdAt,
-          'created_at_local': createdAtLocal,
-          'id_visit': row['id_visit'],
-          'id_company': row['id_company'],
-          'id_activity': row['id_activity'],
-          'id_headquarter': row['id_headquarter'],
-          'id_product': row['id_product'],
-          'id_user': row['id_user'],
-          'id_device': row['id_device'],
-          'rfid': row['rfid'], // RFID del TAG NFC o código QR
-          'visits_details': <Map<String, dynamic>>[],
-          'locations_add': <String>[],
-          'location_default':
-              'LAT:${row['Latitude']};LON:${row['Longitude']};ALT:${row['Altitude']};ERH:${row['Error_horizontal']}',
-          '_locations_raw': <Map<String, double>>[],
-          '_details_ids': <int>{},
-          '_location_ids': <int>{},
-        };
-      }
-
-      final visit = visitsMap[visitId]!;
-
-      if (row['detail_id'] != null) {
-        final int detailId = row['detail_id'];
-        if (!visit['_details_ids'].contains(detailId)) {
-          visit['_details_ids'].add(detailId);
-
-          // Obtener status_response y type_status
-          String statusResponse = row['detail_status_response'] ?? '';
-          final String typeStatus = (row['detail_type_status'] ?? '').toString().toLowerCase();
-
-          // ⚠️ DESHABILITADO: No convertir a base64
-          // Los archivos de media deben enviarse como multipart, no como base64 en JSON
-          // El backend espera referencias "media_X" en status_response y archivos multipart separados
-          /*
-          if (statusResponse.isNotEmpty) {
-            if (typeStatus == 'photo') {
-              statusResponse = _compressPhotoBase64(statusResponse);
-            } else if (typeStatus == 'video') {
-              statusResponse = await _convertVideoToBase64(statusResponse);
-            }
-          }
-          */
-
-          // Para archivos de media, dejar la ruta tal cual temporalmente
-          // TODO: Implementar sistema de referencias "media_X" + multipart
-          if ((typeStatus == 'photo' || typeStatus == 'video') && statusResponse.isNotEmpty) {
-            debugPrint('⚠️ ADVERTENCIA: Archivo $typeStatus con ruta local no será sincronizado correctamente: ${statusResponse.substring(0, 100)}');
-            debugPrint('⚠️ Se requiere implementar sistema de referencias multipart para este archivo');
-          }
-
-          visit['visits_details'].add({
-            'id_visit_detail':
-                0, // Siempre 0 para que el API lo trate como nuevo
-            'id_visit': 0, // Siempre 0 para que EF asigne el ID correcto
-            'id_activity_status': row['detail_activity_status'],
-            'status_option': row['detail_status_option'] ?? '',
-            'status_response': statusResponse,
-          });
-        }
-      }
-
-      if (row['location_id'] != null) {
-        final int locationId = row['location_id'];
-        if (!visit['_location_ids'].contains(locationId)) {
-          visit['_location_ids'].add(locationId);
-          final String locationString = _formatLocationString(
-            row['location_latitude']?.toDouble() ?? 0.0,
-            row['location_longitude']?.toDouble() ?? 0.0,
-            row['location_altitude']?.toDouble() ?? 0.0,
-            row['location_horizontal_error']?.toDouble() ?? 0.0,
-          );
-          visit['locations_add'].add(locationString);
-          (visit['_locations_raw'] as List<Map<String, double>>).add({
-            'lat': row['location_latitude']?.toDouble() ?? 0.0,
-            'lon': row['location_longitude']?.toDouble() ?? 0.0,
-            'alt': row['location_altitude']?.toDouble() ?? 0.0,
-            'err': row['location_horizontal_error']?.toDouble() ?? 0.0,
-          });
-        }
-      }
-    }
-
-    final List<Map<String, dynamic>> visitsWithDetails =
-        visitsMap.values.map((visit) {
-      final rawList = visit['_locations_raw'] as List<Map<String, double>>;
-      if (rawList.isNotEmpty) {
-        visit['location_default'] = _computeWeightedLocation(rawList);
-      }
-      visit.remove('_locations_raw');
-      visit.remove('_details_ids');
-      visit.remove('_location_ids');
-      return visit;
-    }).toList();
-
-    await db.close();
-
-    debugPrint('📊 Visitas para comprimir: ${visitsWithDetails.length}');
-
-    if (visitsWithDetails.isEmpty) {
-      debugPrint('⚠️ No hay visitas para comprimir');
-      return [];
-    }
-
-    // Generar JSON
-    final String jsonContent = jsonEncode(visitsWithDetails);
-    debugPrint('📄 JSON generado: ${jsonContent.length} caracteres');
-
-    // Debug: Imprimir primera visita para verificar estructura
-    if (visitsWithDetails.isNotEmpty) {
-      debugPrint('🔍 DEBUG - Primera visita en JSON comprimido:');
-      final firstVisit = visitsWithDetails.first;
-      debugPrint('   id_visit: ${firstVisit['id_visit']}');
-      debugPrint('   visits_details: ${firstVisit['visits_details']}');
-      if (firstVisit['visits_details'] != null &&
-          firstVisit['visits_details'].isNotEmpty) {
-        debugPrint(
-            '   ✅ Tiene ${firstVisit['visits_details'].length} detalles');
-        debugPrint('   Primer detalle: ${firstVisit['visits_details'][0]}');
-      } else {
-        debugPrint('   ⚠️ visits_details está VACÍO');
-      }
-    }
-
-    // Comprimir con GZIP
-    final List<int> jsonBytes = utf8.encode(jsonContent);
-    final List<int> compressed = gzip.encode(jsonBytes);
-    debugPrint('🗜️ Compresión completada: ${compressed.length} bytes');
-
-    debugPrint('✅ Compresión de visitas exitosa');
-    debugPrint('   - Original: ${jsonBytes.length} bytes');
-    debugPrint('   - Comprimido: ${compressed.length} bytes');
-    debugPrint(
-        '   - Ratio: ${((1 - compressed.length / jsonBytes.length) * 100).toStringAsFixed(1)}% reducción');
-
-    return compressed;
-  } catch (e, stackTrace) {
-    debugPrint('❌ ERROR en _getVisitsFromSQLiteAndCompress: $e');
-    debugPrint('Stack trace: $stackTrace');
-    return [];
   }
 }
 
@@ -1179,122 +935,80 @@ String _computeWeightedLocation(List<Map<String, double>> points) {
   return 'LAT:${lat.toStringAsFixed(8)};LON:${lon.toStringAsFixed(8)};ALT:${alt.toStringAsFixed(2)};ERH:${err.toStringAsFixed(2)}';
 }
 
-/// Comprime el contenido base64 de una foto con GZIP
-/// Proceso:
-/// 1. Decodifica base64 → bytes
-/// 2. Comprime con GZIP
-/// 3. Re-codifica a base64
-String _compressPhotoBase64(String photoPathOrBase64) {
-  try {
-    if (photoPathOrBase64.isEmpty) {
-      return photoPathOrBase64;
-    }
+/// Comprime con GZIP el JSON de visitas ya construido
+/// (con referencias "media_X" en status_response)
+List<int> _compressVisitsJson(List<Map<String, dynamic>> visitsAddJson) {
+  if (visitsAddJson.isEmpty) {
+    debugPrint('\u26a0\ufe0f No hay visitas para comprimir');
+    return [];
+  }
 
-    debugPrint('🗜️ Procesando foto para compresión...');
+  final String jsonContent = jsonEncode(visitsAddJson);
+  final List<int> jsonBytes = utf8.encode(jsonContent);
+  final List<int> compressed = gzip.encode(jsonBytes);
 
-    Uint8List originalBytes;
+  debugPrint(
+      '\ud83d\udddc\ufe0f Visitas comprimidas: ${jsonBytes.length} bytes \u2192 ${compressed.length} bytes '
+      '(${((1 - compressed.length / jsonBytes.length) * 100).toStringAsFixed(1)}% reducci\u00f3n)');
 
-    // Verificar si es una ruta de archivo
-    if (photoPathOrBase64.startsWith('/') ||
-        photoPathOrBase64.contains('/data/') ||
-        photoPathOrBase64.contains('/cache/')) {
-      // Es una ruta de archivo, leer el archivo
-      debugPrint('   📂 Detectado como ruta de archivo');
-      debugPrint('   📂 Ruta: ${photoPathOrBase64.length > 80 ? "${photoPathOrBase64.substring(0, 80)}..." : photoPathOrBase64}');
+  return compressed;
+}
 
-      final File photoFile = File(photoPathOrBase64);
-      if (!photoFile.existsSync()) {
-        debugPrint('   ⚠️ Archivo no existe: $photoPathOrBase64');
-        return photoPathOrBase64; // Retornar ruta original si no existe
-      }
+/// Adjunta los archivos de media (fotos/videos) al request multipart.
+/// Cada archivo usa como nombre de campo la referencia "media_X" que quedó
+/// en el status_response del detalle correspondiente.
+Future<void> _attachMediaFiles(
+    http.MultipartRequest request, Map<String, String> mediaFiles) async {
+  for (final entry in mediaFiles.entries) {
+    final String fieldName = entry.key;
+    final String filePath = entry.value;
 
-      // Leer bytes del archivo
-      originalBytes = photoFile.readAsBytesSync();
-      debugPrint('   ✅ Archivo leído: ${originalBytes.length} bytes (${(originalBytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
+    final File file = File(filePath);
+    if (await file.exists()) {
+      final fileBytes = await file.readAsBytes();
+      final String fileName = filePath.split('/').last;
+
+      request.files.add(http.MultipartFile.fromBytes(
+        fieldName,
+        fileBytes,
+        filename: fileName,
+        contentType: MediaType.parse(_mimeTypeForFile(fileName)),
+      ));
+
+      debugPrint(
+          '   \ud83d\udcce $fieldName: $fileName (${(fileBytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
     } else {
-      // Es base64, decodificar
-      debugPrint('   📄 Detectado como base64');
-
-      // Remover prefijo data URI si existe (data:image/jpeg;base64,)
-      String cleanBase64 = photoPathOrBase64;
-      if (photoPathOrBase64.contains(',')) {
-        final parts = photoPathOrBase64.split(',');
-        if (parts.length > 1 && parts[0].contains('base64')) {
-          cleanBase64 = parts[1];
-          debugPrint('   ℹ️ Prefijo data URI removido');
-        }
-      }
-
-      // Decodificar base64 a bytes
-      debugPrint('   📄 Decodificando base64: ${photoPathOrBase64.length} caracteres');
-      originalBytes = base64.decode(cleanBase64);
-      debugPrint('   ✅ Base64 decodificado: ${originalBytes.length} bytes');
+      debugPrint('   \u26a0\ufe0f Archivo de media no encontrado: $filePath');
     }
-
-    // Comprimir con GZIP
-    debugPrint('   🗜️ Comprimiendo con GZIP...');
-    final List<int> compressedBytes = gzip.encode(originalBytes);
-    debugPrint('   ✅ Comprimido: ${compressedBytes.length} bytes');
-
-    // Codificar a base64
-    final String compressedBase64 = base64.encode(compressedBytes);
-    debugPrint('   ✅ Convertido a base64: ${compressedBase64.length} caracteres');
-
-    // Calcular ratio de compresión
-    final double compressionRatio = (1 - compressedBytes.length / originalBytes.length) * 100;
-    debugPrint('   ✅ Compresión: ${compressionRatio.toStringAsFixed(1)}% reducción');
-    debugPrint('   📊 Original: ${originalBytes.length} bytes → Comprimido: ${compressedBytes.length} bytes');
-
-    return compressedBase64;
-  } catch (e) {
-    debugPrint('⚠️ Error comprimiendo foto: $e');
-    debugPrint('   Retornando contenido original sin comprimir');
-    return photoPathOrBase64;
   }
 }
 
-/// Convierte un video desde ruta de archivo a base64 (SIN comprimir)
-/// Los videos ya están comprimidos con codecs H.264/H.265, no requieren GZIP
-///
-/// Proceso:
-/// 1. Lee el archivo de video desde la ruta
-/// 2. Convierte bytes a base64
-/// 3. Retorna base64 del video
-Future<String> _convertVideoToBase64(String videoPath) async {
+/// Lee un archivo de media (foto/video) y lo devuelve como cadena base64 con
+/// prefijo data URI (data:<mime>;base64,<contenido>), lista para enviarse
+/// dentro del JSON en el campo status_response. Retorna null si el archivo no
+/// existe o no se puede leer.
+Future<String?> _fileToBase64DataUri(String filePath) async {
   try {
-    // Verificar si es una ruta de archivo
-    if (!videoPath.startsWith('/') && !videoPath.contains('/data/') && !videoPath.contains('/cache/')) {
-      // No es una ruta, podría ser ya un base64 u otro formato
-      debugPrint('⚠️ Video no parece ser una ruta de archivo, retornando sin cambios');
-      return videoPath;
+    final File file = File(filePath);
+    if (!await file.exists()) {
+      debugPrint('   ⚠️ Archivo de media no encontrado: $filePath');
+      return null;
     }
-
-    debugPrint('🎥 Convirtiendo video a base64...');
-    debugPrint('   📂 Ruta: ${videoPath.length > 80 ? "${videoPath.substring(0, 80)}..." : videoPath}');
-
-    final File videoFile = File(videoPath);
-
-    if (!videoFile.existsSync()) {
-      debugPrint('   ⚠️ Archivo no existe: $videoPath');
-      return videoPath; // Retornar ruta original si no existe
-    }
-
-    // Leer bytes del archivo
-    final Uint8List videoBytes = await videoFile.readAsBytes();
-    debugPrint('   ✅ Archivo leído: ${videoBytes.length} bytes (${(videoBytes.length / 1024 / 1024).toStringAsFixed(2)} MB)');
-
-    // Convertir a base64 (SIN comprimir, video ya está comprimido)
-    final String videoBase64 = base64.encode(videoBytes);
-    debugPrint('   ✅ Convertido a base64: ${videoBase64.length} caracteres');
-
-    // Calcular tamaño final
-    final double sizeMB = videoBase64.length / 1024 / 1024;
-    debugPrint('   📊 Tamaño final: ${sizeMB.toStringAsFixed(2)} MB');
-
-    return videoBase64;
+    final List<int> bytes = await file.readAsBytes();
+    final String fileName = filePath.split('/').last;
+    final String mime = _mimeTypeForFile(fileName);
+    return 'data:$mime;base64,${base64Encode(bytes)}';
   } catch (e) {
-    debugPrint('⚠️ Error convirtiendo video a base64: $e');
-    debugPrint('   Retornando ruta original: $videoPath');
-    return videoPath; // Retornar ruta original en caso de error
+    debugPrint('   ⚠️ Error convirtiendo a base64 ($filePath): $e');
+    return null;
   }
+}
+
+String _mimeTypeForFile(String fileName) {
+  final String lower = fileName.toLowerCase();
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.mp4')) return 'video/mp4';
+  if (lower.endsWith('.mov')) return 'video/quicktime';
+  return 'application/octet-stream';
 }

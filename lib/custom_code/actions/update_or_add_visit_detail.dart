@@ -52,8 +52,10 @@ Future<List<VisitsDetailsStruct>> updateOrAddVisitDetail(
       debugPrint('🔎 Búsqueda por idActivityStatus (porque idStepParent = 0)');
       debugPrint('🔍 Buscando registro con idActivityStatus = $idActivityStatus');
     } else {
-      debugPrint('🔎 Búsqueda por idStepParent (porque idStepParent ≠ 0)');
-      debugPrint('🔍 Buscando registro con idStepParent = $idStepParent');
+      debugPrint(
+          '🔎 Búsqueda por (idActivityStatus, idStepParent) porque idStepParent ≠ 0');
+      debugPrint(
+          '🔍 Buscando registro con idActivityStatus = $idActivityStatus AND idStepParent = $idStepParent');
     }
 
     // Buscar registro existente paso a paso para debugging
@@ -70,19 +72,23 @@ Future<List<VisitsDetailsStruct>> updateOrAddVisitDetail(
         debugPrint(
             '   [$i] Comparando idActivityStatus: ${visit.idActivityStatus} == $idActivityStatus? $found');
       } else {
-        // Buscar por idStepParent
-        found = visit.idStepParent == idStepParent;
+        // Buscar por la combinación (idActivityStatus, idStepParent).
+        // IMPORTANTE: dentro de un mismo step (idStepParent) pueden coexistir
+        // varios campos distintos (p. ej. un number y una photo), cada uno con
+        // su propio idActivityStatus. Si se buscara solo por idStepParent, al
+        // guardar el segundo campo se sobrescribiría el primero. Esto refleja
+        // la misma clave usada por la lectura
+        // (statusResponseByActivityStatusAlternative).
+        found = visit.idActivityStatus == idActivityStatus &&
+            visit.idStepParent == idStepParent;
         debugPrint(
-            '   [$i] Comparando idStepParent: ${visit.idStepParent} == $idStepParent? $found');
+            '   [$i] Comparando (idActivityStatus: ${visit.idActivityStatus} == $idActivityStatus, '
+            'idStepParent: ${visit.idStepParent} == $idStepParent)? $found');
       }
 
       if (found) {
         existingIndex = i;
         debugPrint('   ✅ ¡COINCIDENCIA ENCONTRADA en índice $i!');
-        if (idStepParent != 0) {
-          debugPrint(
-              '   📝 Se actualizará idActivityStatus de ${visit.idActivityStatus} a $idActivityStatus');
-        }
         break;
       } else {
         debugPrint('   ❌ No coincide');
