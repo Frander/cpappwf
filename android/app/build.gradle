@@ -27,6 +27,9 @@ def keystorePropertiesFile = rootProject.file('key.properties')
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
 }
+// Solo hay llave de release válida si key.properties existe Y define storeFile.
+// (Un key.properties vacío no cuenta: se usará firma debug para builds de prueba.)
+def hasReleaseKey = keystorePropertiesFile.exists() && keystoreProperties['storeFile'] != null
 
 android {
     namespace "com.clickpalm.clickpalmapp"
@@ -68,17 +71,22 @@ android {
 
    signingConfigs {
        release {
-           keyAlias keystoreProperties['keyAlias']
-           keyPassword keystoreProperties['keyPassword']
-           storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-           storePassword keystoreProperties['storePassword']
+           // Solo se rellena si hay una llave de release válida.
+           if (hasReleaseKey) {
+               keyAlias keystoreProperties['keyAlias']
+               keyPassword keystoreProperties['keyPassword']
+               storeFile file(keystoreProperties['storeFile'])
+               storePassword keystoreProperties['storePassword']
+           }
        }
    }
 
     buildTypes {
         release {
-            // Firma con el keystore de producción
-            signingConfig signingConfigs.release
+            // Con llave de release válida, firma de producción.
+            // Si no, cae a la firma debug para permitir builds de prueba
+            // (p. ej. para verificar Sentry en un dispositivo) sin la llave.
+            signingConfig hasReleaseKey ? signingConfigs.release : signingConfigs.debug
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
