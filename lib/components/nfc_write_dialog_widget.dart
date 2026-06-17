@@ -590,6 +590,14 @@ class _NfcWriteDialogWidgetState extends State<NfcWriteDialogWidget>
               'Error al escribir en el TAG.\n\nIntente de nuevo o utilice otro TAG.');
         }
 
+        if (nfcReadState == 'ERROR:VERIFICACION_FALLIDA') {
+          // La escritura no se pudo confirmar por relectura. El contenido íntegro
+          // quedó guardado en memoria: reacercar EL MISMO tag dispara la
+          // reescritura (recovery) sin perder ni duplicar datos.
+          throw Exception(
+              'No se pudo verificar la escritura en el TAG.\n\nEl contenido quedó guardado. Vuelva a acercar EL MISMO TAG y manténgalo firme para reintentar sin perder datos.');
+        }
+
         // Errores de validación de tipo de producto
         if (nfcReadState.startsWith('ERROR:PRODUCTO_NO_ENCONTRADO:')) {
           final parts = nfcReadState.split(':');

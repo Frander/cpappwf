@@ -57,7 +57,14 @@ export 'calculate_current_headquarter.dart'
         checkLocationInPolygons,
         HeadquarterCheckResult,
         HeadquarterDistance;
-export 'write_n_f_c_tag.dart' show writeNFCTag;
+export 'write_n_f_c_tag.dart' show writeNFCTag, rewriteVerifiedExact;
+export 'nfc_transfer_journal.dart'
+    show
+        startTransferJournal,
+        markJournalCommitted,
+        markJournalNeedsRetry,
+        findUnresolvedJournalForDest,
+        getPendingTransferJournals;
 export 'calculate_activity_results.dart' show calculateActivityResults;
 export 'cleanup_step_records.dart' show cleanupStepRecords;
 export 'clear_n_f_c_tag.dart' show clearNFCTag;
@@ -103,4 +110,6 @@ export 'nfc_json_helper.dart'
         nfcEncodeRecords,
         injectFormStatus,
         purgeCorruptedNfcContent,
-        computeVisitUid;
+        computeVisitUid,
+        countVisitsInContent,
+        mergeTransferContent;

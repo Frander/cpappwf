@@ -683,3 +683,67 @@ String _stableHashHex(String input) {
   }
   return buf.toString();
 }
+
+// ─── Verificación por total esperado / merge para transferencias ──────────────
+
+/// Cuenta el TOTAL de visitas en un contenido de tag, en CUALQUIER formato:
+/// canónico, N1 (minificado), C1 (base64url+zlib), multi-chunk o array de varios
+/// productos. Decodifica con [decodeNfcRecords] (que sabe deshacer el base64) y
+/// suma las visitas de todos los registros. Retorna 0 si está vacío/ilegible.
+int countVisitsInContent(String content) {
+  final records = decodeNfcRecords(content);
+  var total = 0;
+  for (final rec in records) {
+    final visits = rec['Visits'];
+    if (visits is List) total += visits.length;
+  }
+  return total;
+}
+
+String _visitKey(dynamic v) {
+  if (v is! Map) return v.toString();
+  return '${v['DH']};${v['OP']};${v['VISITS']};${v['RESULTS']};${v['HE']}';
+}
+
+String _originKey(Map<String, dynamic> rec) {
+  final ri = rec['Read_info'] as Map<String, dynamic>?;
+  final from = (ri?['tag_from'] as String? ?? '').trim();
+  if (from.isNotEmpty) return from;
+  return (ri?['RFID'] as String? ?? '').trim();
+}
+
+/// Fusiona el contenido de un tag ORIGEN con el de un tag DESTINO en un único
+/// contenido canónico, sumando las visitas SIN duplicar. Identidad de visita =
+/// (DH, OP, VISITS, RESULTS, HE): una visita que ya esté en el destino no se
+/// vuelve a agregar, por lo que reaplicar el merge (reintentos) es idempotente.
+/// Los productos se agrupan por RFID de origen (un destino puede acumular
+/// varios). Acepta cualquier formato de entrada (canónico / N1 / C1 / array) y
+/// devuelve el contenido YA CODIFICADO para el tag (N1 minificado o C1
+/// base64url+zlib, vía [nfcEncodeRecords]), listo para escribir VERBATIM.
+String mergeTransferContent(String originContent, String destContent) {
+  final originRecs = decodeNfcRecords(originContent);
+  final destRecs = decodeNfcRecords(destContent)
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
+  if (originRecs.isEmpty) {
+    return destRecs.isEmpty ? '' : nfcEncodeRecords(destRecs);
+  }
+  for (final src in originRecs) {
+    final key = _originKey(src);
+    final idx = key.isEmpty
+        ? -1
+        : destRecs.indexWhere((r) => _originKey(r) == key);
+    if (idx >= 0) {
+      final destVisits =
+          List<dynamic>.from((destRecs[idx]['Visits'] as List?) ?? []);
+      final seen = destVisits.map(_visitKey).toSet();
+      for (final sv in (src['Visits'] as List? ?? const [])) {
+        if (seen.add(_visitKey(sv))) destVisits.add(sv);
+      }
+      destRecs[idx] = Map<String, dynamic>.from(src)..['Visits'] = destVisits;
+    } else {
+      destRecs.add(Map<String, dynamic>.from(src));
+    }
+  }
+  return nfcEncodeRecords(destRecs);
+}

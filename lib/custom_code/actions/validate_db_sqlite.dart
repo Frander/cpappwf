@@ -42,7 +42,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          30, // v30: Visit_uid (idempotencia de visitas NFC)
+          31, // v31: Nfc_transfer_journal (respaldo durable de transferencias)
       onCreate: (Database db, int version) async {
         await createClickPalmTables(db);
       },
@@ -462,6 +462,31 @@ Future<void> createClickPalmTables(Database db) async {
   // las filas con Visit_uid NULL (origen distinto a NFC) no colisionen entre sí.
   await db.execute(
       'CREATE UNIQUE INDEX IF NOT EXISTS IX_Visits_uid ON Visits(Visit_uid) WHERE Visit_uid IS NOT NULL;');
+
+  // Tabla Nfc_transfer_journal: respaldo durable de operaciones de transferencia
+  // NFC. Antes de escribir, se guarda el contenido de origen y destino + el
+  // resultado fusionado + el total esperado de visitas. Permite verificar el
+  // resultado y reintentar DESDE EL RESPALDO (no desde el tag), sobreviviendo a
+  // cierres de app / cortes de energía.
+  await db.execute('''
+    CREATE TABLE IF NOT EXISTS Nfc_transfer_journal (
+        Id_journal INTEGER PRIMARY KEY AUTOINCREMENT,
+        Op_type TEXT NOT NULL,
+        Rfid_origin TEXT,
+        Rfid_dest TEXT,
+        Content_origin TEXT,
+        Content_dest_before TEXT,
+        Content_merged TEXT,
+        Expected_visits INTEGER NOT NULL DEFAULT 0,
+        State TEXT NOT NULL DEFAULT 'pending',
+        Attempts INTEGER NOT NULL DEFAULT 0,
+        Message TEXT,
+        Created_at TEXT NOT NULL,
+        Updated_at TEXT NOT NULL
+    );
+  ''');
+  await db.execute(
+      'CREATE INDEX IF NOT EXISTS IX_Nfc_transfer_journal_state ON Nfc_transfer_journal(State);');
 
   // Tabla Visits_details
   await db.execute('''
@@ -2385,6 +2410,35 @@ Future<void> upgradeClickPalmDatabase(
         debugPrint('✅ Migración a versión 30 completada');
       } catch (e) {
         debugPrint('❌ Error en migración a versión 30: $e');
+      }
+    }
+
+    // Migración v30 a v31: Nfc_transfer_journal (respaldo durable de transferencias)
+    if (oldVersion < 31) {
+      debugPrint('📦 Aplicando migración a versión 31...');
+      try {
+        await db.execute('''
+          CREATE TABLE IF NOT EXISTS Nfc_transfer_journal (
+              Id_journal INTEGER PRIMARY KEY AUTOINCREMENT,
+              Op_type TEXT NOT NULL,
+              Rfid_origin TEXT,
+              Rfid_dest TEXT,
+              Content_origin TEXT,
+              Content_dest_before TEXT,
+              Content_merged TEXT,
+              Expected_visits INTEGER NOT NULL DEFAULT 0,
+              State TEXT NOT NULL DEFAULT 'pending',
+              Attempts INTEGER NOT NULL DEFAULT 0,
+              Message TEXT,
+              Created_at TEXT NOT NULL,
+              Updated_at TEXT NOT NULL
+          );
+        ''');
+        await db.execute(
+            'CREATE INDEX IF NOT EXISTS IX_Nfc_transfer_journal_state ON Nfc_transfer_journal(State);');
+        debugPrint('✅ Migración a versión 31 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 31: $e');
       }
     }
   } catch (e) {

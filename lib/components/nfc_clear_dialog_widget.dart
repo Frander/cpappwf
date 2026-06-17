@@ -50,13 +50,22 @@ class _NfcClearDialogWidgetState extends State<NfcClearDialogWidget> {
         // Si es false, hubo un error
         setState(() {
           _model.isClearing = false;
-          _model.errorMessage =
-            'No se pudo limpiar el TAG.\n\n'
-            'Posibles causas:\n'
-            '• TAG protegido contra escritura\n'
-            '• TAG DESFire con aplicaciones protegidas\n'
-            '• TAG requiere formateo con app externa\n\n'
-            'Sugerencia: Use NXP TagWriter para formatear el TAG como NDEF primero.';
+          if (FFAppState().nfcRead == 'ERROR:LIMPIEZA_FALLIDA') {
+            // El borrado no se pudo confirmar por relectura: el TAG puede seguir
+            // conteniendo datos. Reintentar manteniéndolo firme.
+            _model.errorMessage =
+              'No se pudo confirmar que el TAG quedó limpio.\n\n'
+              'El TAG podría conservar datos. Vuelva a acercarlo y manténgalo '
+              'firme durante el proceso para reintentar.';
+          } else {
+            _model.errorMessage =
+              'No se pudo limpiar el TAG.\n\n'
+              'Posibles causas:\n'
+              '• TAG protegido contra escritura\n'
+              '• TAG DESFire con aplicaciones protegidas\n'
+              '• TAG requiere formateo con app externa\n\n'
+              'Sugerencia: Use NXP TagWriter para formatear el TAG como NDEF primero.';
+          }
         });
       }
     } catch (e) {

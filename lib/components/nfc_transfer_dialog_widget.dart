@@ -259,69 +259,100 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
       _model.errorMessage = null;
     });
 
+    int journalId = -1;
     try {
       // Leer el contenido actual del tag de destino
       debugPrint('📖 Leyendo contenido actual del tag de destino...');
       final destContent = await actions.readNFC(context, autoClose: false);
-
       if (!mounted) return;
 
-      String contentToWrite;
+      // RFID físico del tag destino (para no escribir en el tag equivocado y
+      // para localizar respaldos previos de ESTE destino).
+      final destRfid = FFAppState().nfcHardwareTagId;
+      final originContent = _model.sourceTagContent;
 
-      if (destContent.trim().isEmpty || destContent.trim() == '0') {
-        // Tag de destino vacío: escribir el JSON completo del origen
+      String merged;
+      int expected;
+
+      // ¿Hay un respaldo SIN resolver para este tag destino? Entonces es un
+      // reintento: trabajar DESDE EL RESPALDO (origen+destino guardados), no
+      // desde lo que quedó en el tag — que un intento previo pudo dejar vacío.
+      final pending = await actions.findUnresolvedJournalForDest(destRfid);
+      final pendingMerged = (pending?['Content_merged'] as String?) ?? '';
+      if (pending != null && pendingMerged.isNotEmpty) {
+        merged = pendingMerged;
+        expected = (pending['Expected_visits'] as int?) ??
+            actions.countVisitsInContent(merged);
+        journalId = pending['Id_journal'] as int;
         debugPrint(
-            '📝 TAG-TRANSFER: Tag destino vacío, escribiendo JSON completo del origen');
-        contentToWrite = _model.sourceTagContent;
-      } else if (actions.isNewJsonFormat(destContent)) {
-        // Tag de destino ya tiene JSON: fusionar los arrays Visits
-        debugPrint('🔀 TAG-TRANSFER: Fusionando Visits del origen al destino...');
-        final destJson = actions.parseNfcJson(destContent);
-        final srcJson = actions.parseNfcJson(_model.sourceTagContent);
-
-        if (destJson != null && srcJson != null) {
-          final destVisits =
-              List<dynamic>.from(destJson['Visits'] as List? ?? []);
-          final srcVisits =
-              List<dynamic>.from(srcJson['Visits'] as List? ?? []);
-          destVisits.addAll(srcVisits);
-          destJson['Visits'] = destVisits;
-          contentToWrite = jsonEncode(destJson);
-          debugPrint(
-              '✅ TAG-TRANSFER: Fusionados ${srcVisits.length} Visits nuevos. Total destino: ${destVisits.length}');
-        } else {
-          // Fallback: no se pudo parsear, escribir fuente completo
-          debugPrint(
-              '⚠️ TAG-TRANSFER: No se pudo parsear JSON, escribiendo JSON completo del origen');
-          contentToWrite = _model.sourceTagContent;
-        }
+            '♻️ TAG-TRANSFER: reintento desde respaldo (journal #$journalId, $expected visitas)');
       } else {
-        // Formato de destino no reconocido: escribir fuente completo
+        // Transferencia nueva: fusionar origen + destino SIN duplicar, en
+        // formato de tag (N1/C1). mergeTransferContent tolera destino vacío.
+        merged = actions.mergeTransferContent(originContent, destContent);
+        if (merged.isEmpty) {
+          throw Exception('No hay datos para transferir.');
+        }
+        expected = actions.countVisitsInContent(merged);
+        final originVisits = actions.countVisitsInContent(originContent);
+        final destVisits = actions.countVisitsInContent(destContent);
         debugPrint(
-            '⚠️ TAG-TRANSFER: Formato destino no reconocido, escribiendo JSON completo del origen');
-        contentToWrite = _model.sourceTagContent;
+            '🔢 TAG-TRANSFER: origen=$originVisits + destino=$destVisits → esperado=$expected visitas');
+
+        // RFID de origen (informativo): tag_from del contenido leído.
+        String originRfid = '';
+        try {
+          final srcJson = actions.parseNfcJson(originContent);
+          originRfid =
+              ((srcJson?['Read_info'] as Map?)?['tag_from'] as String? ?? '')
+                  .trim();
+        } catch (_) {}
+
+        // RESPALDO DURABLE antes de escribir: si algo falla (corte de energía,
+        // app cerrada, tag alejado), origen y destino quedan guardados para
+        // reintentar desde el respaldo, nunca desde lo que quede en el tag.
+        journalId = await actions.startTransferJournal(
+          rfidOrigin: originRfid,
+          contentOrigin: originContent,
+          rfidDest: destRfid,
+          contentDestBefore: destContent,
+          contentMerged: merged,
+          expectedVisits: expected,
+        );
       }
 
-      // Escribir el contenido final en el tag de destino
-      debugPrint('📝 Escribiendo contenido en tag de destino...');
-      final writeSuccess =
-          await actions.writeNFCTag(context, contentToWrite);
-
+      // Escribir el resultado fusionado VERBATIM (sin re-fusionar con el tag) y
+      // verificar por relectura. Garantiza el total esperado de visitas.
+      debugPrint('📝 Escribiendo contenido fusionado en tag de destino...');
+      final writeSuccess = await actions.rewriteVerifiedExact(
+        context,
+        merged,
+        expectedRfid: destRfid,
+      );
       if (!mounted) return;
 
       if (!writeSuccess) {
-        throw Exception(
-            'No se pudo escribir en el tag de destino.\\n\\nIntente de nuevo.');
+        final signal = FFAppState().nfcRead;
+        await actions.markJournalNeedsRetry(
+            journalId, 'No verificado ($expected visitas). Señal: $signal');
+        setState(() {
+          _model.isClearingAndWriting = false;
+          _model.errorMessage =
+              'No se pudo confirmar la transferencia ($expected visitas esperadas).\n\n'
+              'Los datos quedaron respaldados. Vuelva a acercar EL MISMO TAG DESTINO '
+              'y manténgalo firme para reintentar sin perder ni duplicar.';
+        });
+        HapticFeedback.vibrate();
+        return;
       }
 
-      debugPrint('✅ Transferencia completada exitosamente');
+      await actions.markJournalCommitted(journalId);
+      debugPrint('✅ Transferencia completada y verificada ($expected visitas)');
 
-      if (!mounted) return;
       setState(() {
         _model.isClearingAndWriting = false;
         _model.isSuccess = true;
       });
-
       HapticFeedback.heavyImpact();
 
       // Esperar un momento y cerrar el diálogo
@@ -331,8 +362,11 @@ class _NfcTransferDialogWidgetState extends State<NfcTransferDialogWidget>
       }
     } catch (e) {
       debugPrint('❌ Error en paso 2: $e');
+      // Excepción inesperada: si ya había respaldo, marcarlo para reintento.
+      if (journalId > 0) {
+        await actions.markJournalNeedsRetry(journalId, e.toString());
+      }
       if (!mounted) return;
-
       setState(() {
         _model.isClearingAndWriting = false;
         _model.errorMessage = e.toString();

@@ -90,6 +90,35 @@ Future<Object?> _writeNdefWithRetry(Ndef ndefWriter, NdefMessage message) async 
   return lastError;
 }
 
+/// Re-lee el tag por NDEF y confirma que su contenido de texto coincide
+/// EXACTAMENTE con [expected]. Detecta escrituras parciales/corruptas que NO
+/// lanzaron excepción (el API reportó éxito pero el tag quedó mal). Se ejecuta
+/// dentro de la misma sesión, con el tag aún en el campo. Retorna false si no
+/// se pudo releer o el contenido difiere.
+Future<bool> _verifyTagContent(NfcTag tag, String expected) async {
+  try {
+    final ndef = Ndef.from(tag);
+    if (ndef == null) return false;
+    final msg = await ndef.read();
+    if (msg == null || msg.records.isEmpty) return false;
+    final payload = msg.records.first.payload;
+    if (payload.isEmpty) return false;
+    final langLen = payload[0] & 0x3F;
+    if (payload.length <= langLen + 1) return false;
+    final readBack =
+        utf8.decode(payload.sublist(1 + langLen), allowMalformed: true);
+    final ok = readBack == expected;
+    if (!ok) {
+      debugPrint('🔍 Verificación NO coincide: releído ${readBack.length} bytes '
+          'vs esperado ${expected.length} bytes');
+    }
+    return ok;
+  } catch (e) {
+    debugPrint('⚠️ _verifyTagContent error: $e');
+    return false;
+  }
+}
+
 /// Intenta rescatar el prefijo válido de un contenido NFC corrupto por una
 /// escritura parcial: decodifica tolerante, corta en el primer byte inválido
 /// o NUL, y descarta el último chunk si quedó truncado a mitad.
@@ -193,8 +222,9 @@ Future<bool> writeNFCTag(
                 _buildNdefTextMessage(_pendingRewriteContent!);
             final recoveryError =
                 await _writeNdefWithRetry(recoveryWriter, recoveryMessage);
-            if (recoveryError == null) {
-              debugPrint('✅ RECOVERY: contenido restaurado íntegramente');
+            if (recoveryError == null &&
+                await _verifyTagContent(tag, _pendingRewriteContent!)) {
+              debugPrint('✅ RECOVERY: contenido restaurado y verificado');
               final restored = _pendingRewriteContent!;
               _pendingRewriteContent = null;
               _pendingRewriteRfid = null;
@@ -810,16 +840,32 @@ Future<bool> writeNFCTag(
           if (ndefFormatable != null) {
             try {
               await ndefFormatable.format(message);
+              // Verificar por relectura que el formateo+escritura quedó íntegro.
+              if (await _verifyTagContent(tag, finalContent)) {
+                debugPrint(
+                    'Tag $tagTypeName formateado, escrito y verificado como NDEF');
+                debugPrint('Contenido completo: $finalContent');
+
+                FFAppState().update(() {
+                  FFAppState().nfcRead = finalContent;
+                });
+
+                completer.complete(true);
+                await NfcManager.instance.stopSession();
+                return;
+              }
+              // Formateo sin excepción pero contenido no verificable: guardar
+              // en memoria y reportar para reintento.
               debugPrint(
-                  'Tag $tagTypeName formateado y escrito exitosamente como NDEF');
-              debugPrint('Contenido completo: $finalContent');
-
-              // Actualizar AppState
+                  '❌ Verificación tras formateo falló: contenido no coincide');
+              if (tagRfid.isNotEmpty && finalContent.isNotEmpty) {
+                _pendingRewriteContent = finalContent;
+                _pendingRewriteRfid = tagRfid;
+              }
               FFAppState().update(() {
-                FFAppState().nfcRead = finalContent;
+                FFAppState().nfcRead = 'ERROR:VERIFICACION_FALLIDA';
               });
-
-              completer.complete(true);
+              completer.complete(false);
               await NfcManager.instance.stopSession();
               return;
             } catch (formatError) {
@@ -983,11 +1029,25 @@ Future<bool> writeNFCTag(
         // fusionado con el contenido del destino), así que aunque una escritura
         // fallida deje el tag a medias, un reintento exitoso restaura el
         // contenido completo sin perder los registros previamente acumulados.
-        final writeError = await _writeNdefWithRetry(ndefWriter, message);
-        final ndefWritten = writeError == null;
+        // Escribir + VERIFICAR por relectura, con reintento en sesión.
+        // _writeNdefWithRetry ya reintenta errores transitorios; aquí se suma
+        // la relectura de confirmación: si el contenido releído NO coincide con
+        // lo que se quiso escribir (escritura parcial/corrupta que no lanzó
+        // excepción), se reescribe una vez más antes de darse por vencido.
+        Object? writeError;
+        bool verified = false;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+          writeError = await _writeNdefWithRetry(ndefWriter, message);
+          if (writeError != null) break; // error de escritura (ya reintentado)
+          verified = await _verifyTagContent(tag, finalContent);
+          if (verified) break;
+          debugPrint(
+              '⚠️ Verificación tras escritura falló (intento $attempt/2) — reescribiendo...');
+        }
+        final ndefWritten = writeError == null && verified;
 
         if (ndefWritten) {
-          debugPrint('Mensaje NDEF escrito exitosamente');
+          debugPrint('✅ Mensaje NDEF escrito y verificado por relectura');
           debugPrint('Contenido completo: $finalContent');
 
           // Escritura íntegra confirmada: descartar cualquier pendiente previo
@@ -1003,11 +1063,10 @@ Future<bool> writeNFCTag(
 
           completer.complete(true);
         } else {
-          debugPrint('Error al escribir NDEF tras reintentos: $writeError');
-
-          // Guardar el contenido completo (ya fusionado) para reescribirlo
-          // íntegro cuando se vuelva a acercar el MISMO tag: una escritura
-          // interrumpida puede dejar el NDEF parcial/corrupto en el tag.
+          // Guardar el contenido completo (ya fusionado) en memoria para
+          // reescribirlo íntegro al reintentar o reacercar el MISMO tag: una
+          // escritura interrumpida o no verificada puede dejar el NDEF
+          // parcial/corrupto, pero el contenido a salvo permite recuperarlo.
           if (tagRfid.isNotEmpty && finalContent.isNotEmpty) {
             _pendingRewriteContent = finalContent;
             _pendingRewriteRfid = tagRfid;
@@ -1015,27 +1074,35 @@ Future<bool> writeNFCTag(
                 '$tagRfid, ${finalContent.length} bytes');
           }
 
-          // Detectar si el error es por tag alejado (IOException o handle
-          // invalidado porque el tag salió del campo: "Tag is out of date")
-          final errorMsg = writeError.toString().toLowerCase();
-          if (errorMsg.contains('ioexception') ||
-              errorMsg.contains('tag was lost') ||
-              errorMsg.contains('out of date')) {
-            // Tag se alejó durante la escritura
+          if (writeError == null && !verified) {
+            // La escritura no lanzó error, pero el contenido releído NO coincide.
+            // El contenido íntegro queda pendiente para reintento.
+            debugPrint(
+                '❌ Verificación por relectura falló: el contenido del tag no coincide');
             FFAppState().update(() {
-              FFAppState().nfcRead = 'ERROR:TAG_ALEJADO';
-            });
-          } else if (errorMsg.contains('readonly') ||
-              errorMsg.contains('not writable')) {
-            // Tag protegido contra escritura
-            FFAppState().update(() {
-              FFAppState().nfcRead = 'ERROR:TAG_PROTEGIDO';
+              FFAppState().nfcRead = 'ERROR:VERIFICACION_FALLIDA';
             });
           } else {
-            // Otro tipo de error
-            FFAppState().update(() {
-              FFAppState().nfcRead = 'ERROR:ESCRITURA_FALLIDA';
-            });
+            debugPrint('Error al escribir NDEF tras reintentos: $writeError');
+            // Detectar si el error es por tag alejado (IOException o handle
+            // invalidado porque el tag salió del campo: "Tag is out of date")
+            final errorMsg = (writeError ?? '').toString().toLowerCase();
+            if (errorMsg.contains('ioexception') ||
+                errorMsg.contains('tag was lost') ||
+                errorMsg.contains('out of date')) {
+              FFAppState().update(() {
+                FFAppState().nfcRead = 'ERROR:TAG_ALEJADO';
+              });
+            } else if (errorMsg.contains('readonly') ||
+                errorMsg.contains('not writable')) {
+              FFAppState().update(() {
+                FFAppState().nfcRead = 'ERROR:TAG_PROTEGIDO';
+              });
+            } else {
+              FFAppState().update(() {
+                FFAppState().nfcRead = 'ERROR:ESCRITURA_FALLIDA';
+              });
+            }
           }
 
           completer.complete(false);
@@ -1044,6 +1111,99 @@ Future<bool> writeNFCTag(
         await NfcManager.instance.stopSession();
       } catch (e) {
         debugPrint('Error general escribiendo NFC: $e');
+        completer.complete(false);
+        await NfcManager.instance.stopSession();
+      }
+    },
+  );
+
+  return completer.future;
+}
+
+/// Escribe [content] VERBATIM en un tag (sin leer ni fusionar el contenido
+/// previo), con verificación por relectura y reintento. Pensado para reintentos
+/// "desde el respaldo": [content] ya es el resultado final deseado (p. ej. la
+/// fusión origen+destino guardada en el journal) y debe SOBREESCRIBIR lo que
+/// haya en el tag — no se vuelve a fusionar, evitando dobles conteos.
+/// Si [expectedRfid] no está vacío y el tag presentado tiene otro RFID, aborta
+/// (ERROR:TAG_INCORRECTO) para no escribir en el tag equivocado.
+Future<bool> rewriteVerifiedExact(
+  BuildContext context,
+  String content, {
+  String expectedRfid = '',
+}) async {
+  if (!Platforms.isMobile) return false;
+  if (!await checkNfcStatus(context, showAlert: true)) return false;
+
+  final completer = Completer<bool>();
+  NfcManager.instance.startSession(
+    pollingOptions: {
+      NfcPollingOption.iso14443,
+      NfcPollingOption.iso15693,
+    },
+    onDiscovered: (NfcTag tag) async {
+      if (completer.isCompleted) return;
+      try {
+        // Verificar que es el tag esperado (si se exigió un RFID).
+        if (expectedRfid.isNotEmpty) {
+          final androidTag = NfcTagAndroid.from(tag);
+          final rfid = (androidTag != null && androidTag.id.isNotEmpty)
+              ? androidTag.id
+                  .map((b) =>
+                      b.toRadixString(16).toUpperCase().padLeft(2, '0'))
+                  .join('')
+              : '';
+          if (rfid.isNotEmpty && rfid != expectedRfid) {
+            debugPrint(
+                '❌ rewriteVerifiedExact: RFID $rfid ≠ esperado $expectedRfid');
+            FFAppState().update(() {
+              FFAppState().nfcRead = 'ERROR:TAG_INCORRECTO';
+            });
+            completer.complete(false);
+            await NfcManager.instance.stopSession();
+            return;
+          }
+        }
+
+        final ndef = Ndef.from(tag);
+        if (ndef == null || !ndef.isWritable) {
+          FFAppState().update(() {
+            FFAppState().nfcRead = 'ERROR:TAG_PROTEGIDO';
+          });
+          completer.complete(false);
+          await NfcManager.instance.stopSession();
+          return;
+        }
+
+        final message = _buildNdefTextMessage(content);
+        Object? writeError;
+        bool verified = false;
+        for (int attempt = 1; attempt <= 2; attempt++) {
+          writeError = await _writeNdefWithRetry(ndef, message);
+          if (writeError != null) break;
+          verified = await _verifyTagContent(tag, content);
+          if (verified) break;
+          debugPrint(
+              '⚠️ rewriteVerifiedExact: verificación falló (intento $attempt/2) — reescribiendo...');
+        }
+
+        if (writeError == null && verified) {
+          debugPrint('✅ rewriteVerifiedExact: escrito y verificado');
+          FFAppState().update(() {
+            FFAppState().nfcRead = content;
+          });
+          completer.complete(true);
+        } else {
+          FFAppState().update(() {
+            FFAppState().nfcRead = (writeError == null && !verified)
+                ? 'ERROR:VERIFICACION_FALLIDA'
+                : 'ERROR:ESCRITURA_FALLIDA';
+          });
+          completer.complete(false);
+        }
+        await NfcManager.instance.stopSession();
+      } catch (e) {
+        debugPrint('❌ rewriteVerifiedExact error: $e');
         completer.complete(false);
         await NfcManager.instance.stopSession();
       }

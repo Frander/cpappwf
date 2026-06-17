@@ -44,21 +44,27 @@ Future<bool> clearNFCTag(BuildContext context) async {
         final ndef = Ndef.from(tag);
         if (ndef != null) {
           if (ndef.isWritable) {
-            try {
-              debugPrint('🔄 TAG NDEF detectado, escribiendo contenido mínimo...');
-              // Escribir un mensaje NDEF con contenido mínimo "0"
-              // (Android no permite mensajes completamente vacíos)
-              final minimalMessage = _createMinimalNdefMessage();
-              await ndef.write(message: minimalMessage);
-
-              // Detener sesión
-              await NfcManager.instance.stopSession();
-
-              debugPrint('✅ TAG limpiado exitosamente (contenido: "0")');
-              completer.complete(true);
-              return;
-            } catch (e) {
-              debugPrint('⚠️ No se pudo limpiar como NDEF: $e');
+            // Escribir "0" y VERIFICAR por relectura que el tag quedó limpio,
+            // con un reintento en sesión. Si tras los intentos no se confirma,
+            // se cae a los otros métodos (formatable) y, si todo falla, el
+            // desenlace final reporta ERROR:LIMPIEZA_FALLIDA.
+            final minimalMessage = _createMinimalNdefMessage();
+            for (int attempt = 1; attempt <= 2; attempt++) {
+              try {
+                debugPrint('🔄 TAG NDEF: escribiendo "0" (intento $attempt/2)...');
+                await ndef.write(message: minimalMessage);
+                if (await _verifyTagCleared(tag)) {
+                  await NfcManager.instance.stopSession();
+                  debugPrint('✅ TAG limpiado y verificado (contenido: "0")');
+                  completer.complete(true);
+                  return;
+                }
+                debugPrint('⚠️ Verificación de limpieza falló — reintentando...');
+                await Future.delayed(const Duration(milliseconds: 300));
+              } catch (e) {
+                debugPrint('⚠️ No se pudo limpiar como NDEF (intento $attempt): $e');
+                break; // pasar a otros métodos
+              }
             }
           } else {
             debugPrint('⚠️ TAG NDEF detectado pero es de solo lectura');
@@ -132,10 +138,16 @@ Future<bool> clearNFCTag(BuildContext context) async {
         // en accesos posteriores. El único camino seguro es NDEF o NdefFormatable.
         debugPrint('❌ No se pudo limpiar el TAG: el tipo de TAG no tiene soporte NDEF accesible.');
         debugPrint('   Si el TAG está corrompido, use NXP TagWriter para reformatearlo.');
+        FFAppState().update(() {
+          FFAppState().nfcRead = 'ERROR:LIMPIEZA_FALLIDA';
+        });
         completer.complete(false);
         await NfcManager.instance.stopSession();
       } catch (e) {
         debugPrint('❌ Error general limpiando TAG: $e');
+        FFAppState().update(() {
+          FFAppState().nfcRead = 'ERROR:LIMPIEZA_FALLIDA';
+        });
         completer.complete(false);
         await NfcManager.instance.stopSession();
       }
@@ -170,4 +182,26 @@ NdefMessage _createMinimalNdefMessage() {
   );
 
   return NdefMessage(records: [record]);
+}
+
+/// Re-lee el tag por NDEF y confirma que quedó limpio (vacío o contenido "0").
+/// Se ejecuta en la misma sesión, con el tag aún presente. Retorna false si
+/// no se pudo releer o si todavía hay contenido distinto de "0".
+Future<bool> _verifyTagCleared(NfcTag tag) async {
+  try {
+    final ndef = Ndef.from(tag);
+    if (ndef == null) return false;
+    final msg = await ndef.read();
+    if (msg == null || msg.records.isEmpty) return true; // sin records = limpio
+    final payload = msg.records.first.payload;
+    if (payload.isEmpty) return true;
+    final langLen = payload[0] & 0x3F;
+    if (payload.length <= langLen + 1) return true;
+    final content =
+        utf8.decode(payload.sublist(1 + langLen), allowMalformed: true).trim();
+    return content.isEmpty || content == '0';
+  } catch (e) {
+    debugPrint('⚠️ _verifyTagCleared error: $e');
+    return false;
+  }
 }

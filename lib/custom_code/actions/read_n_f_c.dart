@@ -467,6 +467,27 @@ String _enrichReadContent(String tagData, String tagId, int userId) {
   return records.length == 1 ? jsonEncode(records.first) : jsonEncode(records);
 }
 
+/// Re-lee el tag por NDEF y confirma que quedó limpio (vacío o "0"), dentro de
+/// la sesión activa. Retorna false si no se pudo releer o aún hay contenido.
+Future<bool> _verifyClearedInSession(NfcTag tag) async {
+  try {
+    final ndef = Ndef.from(tag);
+    if (ndef == null) return false;
+    final msg = await ndef.read();
+    if (msg == null || msg.records.isEmpty) return true;
+    final payload = msg.records.first.payload;
+    if (payload.isEmpty) return true;
+    final langLen = payload[0] & 0x3F;
+    if (payload.length <= langLen + 1) return true;
+    final content =
+        utf8.decode(payload.sublist(1 + langLen), allowMalformed: true).trim();
+    return content.isEmpty || content == '0';
+  } catch (e) {
+    debugPrint('⚠️ _verifyClearedInSession error: $e');
+    return false;
+  }
+}
+
 /// Borra un tag NFC dentro de una sesión ya activa.
 /// El objeto [tag] DEBE provenir de un callback onDiscovered activo.
 /// NO llama startSession ni stopSession — el caller maneja la sesión.
@@ -481,11 +502,14 @@ Future<bool> _eraseTagInSession(NfcTag tag) async {
 
   if (ndef != null) {
     if (ndef.isWritable) {
-      // Intento 1
+      // Intento 1: escribir "0" y VERIFICAR por relectura que quedó limpio.
       try {
         await ndef.write(message: minimalMsg);
-        debugPrint('✅ TAG borrado como NDEF intento 1 ("0")');
-        return true;
+        if (await _verifyClearedInSession(tag)) {
+          debugPrint('✅ TAG borrado y verificado como NDEF intento 1 ("0")');
+          return true;
+        }
+        debugPrint('⚠️ Borrado intento 1 no verificado — reintentando en 300ms...');
       } catch (e) {
         debugPrint('⚠️ Error NDEF intento 1: $e — reintentando en 300ms...');
       }
@@ -493,8 +517,11 @@ Future<bool> _eraseTagInSession(NfcTag tag) async {
       await Future.delayed(const Duration(milliseconds: 300));
       try {
         await ndef.write(message: minimalMsg);
-        debugPrint('✅ TAG borrado como NDEF intento 2 ("0")');
-        return true;
+        if (await _verifyClearedInSession(tag)) {
+          debugPrint('✅ TAG borrado y verificado como NDEF intento 2 ("0")');
+          return true;
+        }
+        debugPrint('❌ Borrado intento 2 no verificado');
       } catch (e) {
         debugPrint('⚠️ Error NDEF intento 2: $e');
       }
