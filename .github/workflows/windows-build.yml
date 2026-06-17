@@ -24,7 +24,11 @@ concurrency:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    # Fijado a windows-2022: trae Visual Studio 2022, que Flutter 3.35.7 detecta
+    # correctamente. Con windows-latest (imagen más nueva) Flutter no reconocía
+    # el VS instalado y caía en el generador por defecto "Visual Studio 16 2019",
+    # que no existe en el runner → CMake fallaba al generar.
+    runs-on: windows-2022
 
     steps:
       - name: Checkout
@@ -39,6 +43,9 @@ jobs:
 
       - name: Habilitar Windows desktop
         run: flutter config --enable-windows-desktop
+
+      - name: Diagnóstico (Flutter doctor)
+        run: flutter doctor -v
 
       - name: Instalar dependencias
         run: flutter pub get
