@@ -149,6 +149,8 @@ dev_dependencies:
   lints: 4.0.0
   flutter_test:
     sdk: flutter
+  # SQLite en el VM/CI (sin dispositivo) para probar journal, dedup y migraciones.
+  sqflite_common_ffi: ^2.3.3
 
 
 flutter_launcher_icons:
