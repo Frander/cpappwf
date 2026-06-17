@@ -42,7 +42,7 @@ Future<String?> validateDbSqlite(BuildContext context) async {
     final Database database = await openDatabase(
       dbPath,
       version:
-          29, // v29: tabla Users_permissions
+          30, // v30: Visit_uid (idempotencia de visitas NFC)
       onCreate: (Database db, int version) async {
         await createClickPalmTables(db);
       },
@@ -420,6 +420,7 @@ Future<void> createClickPalmTables(Database db) async {
         Id_virtual_point INTEGER,
         Status INTEGER NOT NULL DEFAULT 0,
         Rfid TEXT,
+        Visit_uid TEXT,
         FOREIGN KEY (Id_company) REFERENCES Companies(Id_company),
         FOREIGN KEY (Id_activity) REFERENCES Activities(Id_activity),
         FOREIGN KEY (Id_product) REFERENCES Products(Id_product),
@@ -456,6 +457,11 @@ Future<void> createClickPalmTables(Database db) async {
       'CREATE INDEX IF NOT EXISTS IX_Visits_Status ON Visits(Status);');
   await db.execute(
       'CREATE INDEX IF NOT EXISTS IX_Visits_Rfid ON Visits(Rfid);');
+  // Índice único parcial para idempotencia: dos visitas con el mismo Visit_uid
+  // (mismo contenido de tag re-importado) no pueden coexistir. Parcial para que
+  // las filas con Visit_uid NULL (origen distinto a NFC) no colisionen entre sí.
+  await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS IX_Visits_uid ON Visits(Visit_uid) WHERE Visit_uid IS NOT NULL;');
 
   // Tabla Visits_details
   await db.execute('''
@@ -2358,6 +2364,27 @@ Future<void> upgradeClickPalmDatabase(
         debugPrint('✅ Migración a versión 29 completada');
       } catch (e) {
         debugPrint('❌ Error en migración a versión 29: $e');
+      }
+    }
+
+    // Migración v29 a v30: Visit_uid (idempotencia de visitas NFC)
+    if (oldVersion < 30) {
+      debugPrint('📦 Aplicando migración a versión 30...');
+      try {
+        final visitCols = (await db.rawQuery('PRAGMA table_info(Visits);'))
+            .map((c) => c['name'] as String)
+            .toSet();
+        if (!visitCols.contains('Visit_uid')) {
+          await db.execute('ALTER TABLE Visits ADD COLUMN Visit_uid TEXT;');
+          debugPrint('   ✅ Columna Visit_uid agregada a Visits');
+        }
+        // Índice único parcial (las filas existentes con Visit_uid NULL no
+        // colisionan entre sí; las nuevas visitas NFC quedan deduplicadas).
+        await db.execute(
+            'CREATE UNIQUE INDEX IF NOT EXISTS IX_Visits_uid ON Visits(Visit_uid) WHERE Visit_uid IS NOT NULL;');
+        debugPrint('✅ Migración a versión 30 completada');
+      } catch (e) {
+        debugPrint('❌ Error en migración a versión 30: $e');
       }
     }
   } catch (e) {

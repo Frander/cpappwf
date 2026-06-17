@@ -623,3 +623,63 @@ bool isJsonArrayFormat(String nfcContent) {
     return false;
   }
 }
+
+// ─── Idempotencia de visitas ──────────────────────────────────────────────────
+
+/// Calcula un identificador estable y único para UN registro de producto del tag
+/// (RFID de origen + sus visitas de campo). Sirve como clave de idempotencia:
+/// re-leer el mismo tag (p.ej. uno que no se borró) produce el MISMO uid, de modo
+/// que el guardado en BD puede deduplicar y no crear visitas repetidas.
+///
+/// - Acepta cualquier formato de entrada (canónico / N1 / C1 / multi-chunk).
+/// - Solo usa campos INMUTABLES: el RFID del producto y, por cada visita,
+///   (DH, OP, VISITS, RESULTS, HE). Excluye a propósito los campos volátiles que
+///   se inyectan al leer/transferir (tag_to, US, Name_product, Id_product), que
+///   cambian entre lecturas del mismo contenido.
+/// - Si el registro trae varios productos, calcula el uid del PRIMERO; en el
+///   flujo de báscula cada elemento se guarda por separado, así que se llama una
+///   vez por registro de producto.
+///
+/// Retorna '' si el contenido no es un registro reconocible (en ese caso el
+/// llamador debe insertar sin deduplicar, para nunca DESCARTAR información).
+String computeVisitUid(String recordContent) {
+  final records = decodeNfcRecords(recordContent);
+  if (records.isEmpty) return '';
+  return _uidForRecord(records.first);
+}
+
+String _uidForRecord(Map<String, dynamic> rec) {
+  final ri = rec['Read_info'] as Map<String, dynamic>?;
+  // RFID inmutable del producto; fallback a tag_from (RFID físico del origen).
+  final rfidRaw = (ri?['RFID'] as String?)?.trim() ?? '';
+  final rfid = rfidRaw.isNotEmpty
+      ? rfidRaw
+      : ((ri?['tag_from'] as String?)?.trim() ?? '');
+  final visits = (rec['Visits'] as List?) ?? const [];
+  final sb = StringBuffer('R:$rfid');
+  for (final v in visits) {
+    if (v is! Map) continue;
+    sb.write(
+        '|${v['DH']};${v['OP']};${v['VISITS']};${v['RESULTS']};${v['HE']}');
+  }
+  return _stableHashHex(sb.toString());
+}
+
+/// Hash determinístico y estable (FNV-1a 32-bit con 4 semillas → 128-bit hex).
+/// Sin dependencias externas y con idéntica semántica en Android y Windows.
+/// Todas las operaciones se enmascaran a 32 bits (siempre positivas en Dart),
+/// evitando el problema de signo de los enteros de 64 bits al formatear a hex.
+String _stableHashHex(String input) {
+  final bytes = utf8.encode(input);
+  const seeds = [0, 0x9e3779b9, 0x7f4a7c15, 0x2545f491];
+  final buf = StringBuffer();
+  for (final seed in seeds) {
+    int h = (2166136261 ^ seed) & 0xFFFFFFFF;
+    for (final b in bytes) {
+      h = (h ^ b) & 0xFFFFFFFF;
+      h = (h * 16777619) & 0xFFFFFFFF;
+    }
+    buf.write(h.toRadixString(16).padLeft(8, '0'));
+  }
+  return buf.toString();
+}

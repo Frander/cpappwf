@@ -6383,6 +6383,24 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
       {int? tagIndex}) async {
     try {
       debugPrint('💾 ===== AUTO-GUARDANDO VISITA DESDE ADB TAG (statusId=$adbStatusId) =====');
+
+      // ── Idempotencia: si este registro de producto ya se importó (mismo
+      // contenido de tag, p.ej. un tag que no se borró y se volvió a leer),
+      // NO crear una visita duplicada. Se devuelve éxito para que el ACK
+      // borre el tag (el dato ya está a salvo en BD).
+      final visitUid = actions.computeVisitUid(rawTagJson);
+      if (visitUid.isNotEmpty) {
+        final dup = await globalDb.executeOperation((db) => db.rawQuery(
+            'SELECT Id_visit FROM Visits WHERE Visit_uid = ? LIMIT 1',
+            [visitUid]));
+        if (dup.isNotEmpty) {
+          debugPrint(
+              '♻️ ADB-TAG: visita ya importada (uid=$visitUid, Id_visit=${dup.first['Id_visit']}) — se omite para no duplicar');
+          if (mounted) setState(() => _processingTag = false);
+          return true; // ya está en BD → ACK success → el tag se borra
+        }
+      }
+
       final currentActivity = FFAppState().currentActivity;
       final idActivity = getJsonField(currentActivity, r'$.id_activity');
       final userSelected = FFAppState().userSelected;
@@ -6494,8 +6512,8 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             INSERT INTO Visits (
               Id_company, Id_activity, Id_headquarter, Id_product, Id_bulk,
               Id_user, Id_device, Id_status, Created_at, Battery,
-              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+              Latitude, Longitude, Altitude, Error_horizontal, Id_virtual_point, Status, Rfid, Visit_uid
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
           ''', [
             userSelected.idCompany,
             idActivity,
@@ -6514,6 +6532,7 @@ class _FormularioExtractorPageWidgetState extends State<FormularioExtractorPageW
             idVirtualPoint > 0 ? idVirtualPoint : null,
             0,
             tagFromRfid.isNotEmpty ? tagFromRfid : null,
+            visitUid.isNotEmpty ? visitUid : null,
           ]);
 
           debugPrint('✅ Visita ADB creada con ID: $visitId');
