@@ -1,0 +1,81 @@
+name: Build Windows (ClickPalm Desktop)
+
+# Cómo dispararlo:
+#   1) Automático: al hacer push de un tag que empiece por "v" (p.ej. v1.0.4).
+#         git tag v1.0.4
+#         git push origin v1.0.4
+#   2) Manual: pestaña "Actions" → "Build Windows (ClickPalm Desktop)" →
+#         "Run workflow" (puedes elegir la rama y si generar el instalador).
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      build_installer:
+        description: 'Generar instalador .exe con Inno Setup'
+        type: boolean
+        default: true
+
+# Cancela un build anterior del mismo ref si llega uno nuevo.
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Flutter (3.35.7 stable)
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.7'
+          channel: stable
+          cache: true
+
+      - name: Habilitar Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Instalar dependencias
+        run: flutter pub get
+
+      - name: Compilar release de Windows
+        run: flutter build windows --release
+
+      # Sube la carpeta Release tal cual (se comprime sola como .zip).
+      # Útil para copiar a la báscula y ejecutar click_palm_a_p_p.exe directo.
+      - name: Subir build crudo (carpeta Release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickpalm-windows-release
+          path: build/windows/x64/runner/Release/
+          retention-days: 14
+          if-no-files-found: error
+
+      # ── Instalador .exe (opcional) ────────────────────────────────────────
+      - name: Descargar VC++ Redistributable (para el instalador)
+        if: ${{ github.event_name == 'push' || inputs.build_installer }}
+        run: |
+          New-Item -ItemType Directory -Force -Path windows\redist | Out-Null
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "windows\redist\vc_redist.x64.exe"
+
+      - name: Instalar Inno Setup
+        if: ${{ github.event_name == 'push' || inputs.build_installer }}
+        run: choco install innosetup -y --no-progress
+
+      - name: Construir instalador
+        if: ${{ github.event_name == 'push' || inputs.build_installer }}
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss'
+
+      - name: Subir instalador
+        if: ${{ github.event_name == 'push' || inputs.build_installer }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clickpalm-windows-installer
+          path: Output/*.exe
+          retention-days: 14
+          if-no-files-found: error
