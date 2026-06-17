@@ -15,6 +15,7 @@ import 'package:nfc_manager/nfc_manager_android.dart';
 import 'package:ndef_record/ndef_record.dart';
 import 'package:sqflite/sqflite.dart';
 import '/backend/sqlite/global_db_singleton.dart';
+import 'nfc_gateway.dart';
 
 /// Consulta la memoria libre de un tag DeSFire mediante APDU GET_FREE_MEMORY.
 /// Retorna null si el comando falla (requiere auth o tag no lo soporta).
@@ -44,6 +45,44 @@ Future<int?> _getDeSFireFreeMemory(IsoDepAndroid isoDep) async {
 // fresco (reintentar con el handle viejo siempre falla con "Tag is out of date").
 String? _pendingRewriteContent;
 String? _pendingRewriteRfid;
+
+/// Adaptador que expone un tag NDEF real como [NfcTagOps], para reutilizar el
+/// núcleo PURO y probado [writeTextVerified] (escribir + verificar por
+/// relectura + reintentar) en producción sin duplicar esa lógica.
+class _RealNfcTagOps implements NfcTagOps {
+  final NfcTag _tag;
+  final Ndef _ndef;
+  _RealNfcTagOps(this._tag, this._ndef);
+
+  @override
+  String get tagId {
+    final a = NfcTagAndroid.from(_tag);
+    if (a == null || a.id.isEmpty) return '';
+    return a.id
+        .map((b) => b.toRadixString(16).toUpperCase().padLeft(2, '0'))
+        .join('');
+  }
+
+  @override
+  bool get isWritable => _ndef.isWritable;
+
+  @override
+  Future<String?> readText() async {
+    final msg = await _ndef.read();
+    if (msg == null || msg.records.isEmpty) return null;
+    final payload = msg.records.first.payload;
+    if (payload.isEmpty) return null;
+    final langLen = payload[0] & 0x3F;
+    if (payload.length <= langLen + 1) return null;
+    return utf8.decode(payload.sublist(1 + langLen), allowMalformed: true);
+  }
+
+  @override
+  Future<void> writeText(String content) async {
+    final err = await _writeNdefWithRetry(_ndef, _buildNdefTextMessage(content));
+    if (err != null) throw err; // writeTextVerified captura y decide reintentar
+  }
+}
 
 /// Construye el mensaje NDEF Text Record estándar para [content].
 NdefMessage _buildNdefTextMessage(String content) {
@@ -1175,19 +1214,11 @@ Future<bool> rewriteVerifiedExact(
           return;
         }
 
-        final message = _buildNdefTextMessage(content);
-        Object? writeError;
-        bool verified = false;
-        for (int attempt = 1; attempt <= 2; attempt++) {
-          writeError = await _writeNdefWithRetry(ndef, message);
-          if (writeError != null) break;
-          verified = await _verifyTagContent(tag, content);
-          if (verified) break;
-          debugPrint(
-              '⚠️ rewriteVerifiedExact: verificación falló (intento $attempt/2) — reescribiendo...');
-        }
+        // Núcleo puro probado: escribir + verificar por relectura + reintentar.
+        final outcome =
+            await writeTextVerified(_RealNfcTagOps(tag, ndef), content);
 
-        if (writeError == null && verified) {
+        if (outcome == NfcWriteOutcome.ok) {
           debugPrint('✅ rewriteVerifiedExact: escrito y verificado');
           FFAppState().update(() {
             FFAppState().nfcRead = content;
@@ -1195,7 +1226,7 @@ Future<bool> rewriteVerifiedExact(
           completer.complete(true);
         } else {
           FFAppState().update(() {
-            FFAppState().nfcRead = (writeError == null && !verified)
+            FFAppState().nfcRead = outcome == NfcWriteOutcome.notVerified
                 ? 'ERROR:VERIFICACION_FALLIDA'
                 : 'ERROR:ESCRITURA_FALLIDA';
           });
