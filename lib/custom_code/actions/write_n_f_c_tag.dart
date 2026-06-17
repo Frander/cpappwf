@@ -158,6 +158,10 @@ Future<bool> writeNFCTag(
       NfcPollingOption.iso15693,
     },
     onDiscovered: (NfcTag tag) async {
+      // onDiscovered puede dispararse varias veces (recovery / SOLICITAR_OTRO_TAG
+      // dejan la sesión abierta a propósito). Solo se ignora si YA completamos,
+      // así no se llama completer.complete() dos veces ("Future already completed").
+      if (completer.isCompleted) return;
       try {
         // === VALIDACIÓN DE TIPO DE PRODUCTO PARA TAG-WRITER ===
         // Obtener el RFID del tag ANTES de cualquier escritura

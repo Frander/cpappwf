@@ -42,6 +42,9 @@ Future<bool> writeNFCTagDirect(
       NfcPollingOption.iso15693,
     },
     onDiscovered: (NfcTag tag) async {
+      // onDiscovered puede dispararse varias veces en una sesión; si ya
+      // completamos, ignorar para no provocar "Future already completed".
+      if (completer.isCompleted) return;
       try {
         // NO LEER EL CONTENIDO EXISTENTE - Escribir directamente
         debugPrint('🚀 ESCRITURA DIRECTA: ${dataToWrite.length} bytes (sin lectura previa)');

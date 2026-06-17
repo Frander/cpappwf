@@ -52,6 +52,9 @@ Future<String> readNFC(
       NfcPollingOption.iso18092,
     },
     onDiscovered: (NfcTag tag) async {
+      // onDiscovered puede dispararse varias veces en una sesión; si ya
+      // completamos, ignorar para no provocar "Future already completed".
+      if (completer.isCompleted) return;
       try {
         String tagData = '';
 

@@ -39,6 +39,11 @@ Future<String> readNFCBasic(BuildContext context,
       NfcPollingOption.iso18092,
     },
     onDiscovered: (NfcTag tag) async {
+      // onDiscovered puede dispararse más de una vez en la misma sesión (otro tag
+      // o el mismo re-detectado), sobre todo con autoClose:false donde la sesión
+      // sigue activa. Sin esta guarda, el segundo disparo vuelve a llamar
+      // completer.complete() → "Bad state: Future already completed".
+      if (completer.isCompleted) return;
       try {
         String tagData = '';
 
@@ -177,13 +182,13 @@ Future<String> readNFCBasic(BuildContext context,
         }
 
         debugPrint('✅ readNFCBasic: Lectura completada');
-        completer.complete(tagData);
+        if (!completer.isCompleted) completer.complete(tagData);
       } catch (e) {
         debugPrint('❌ readNFCBasic: Error general: $e');
         if (autoClose) {
           await NfcManager.instance.stopSession();
         }
-        completer.complete('');
+        if (!completer.isCompleted) completer.complete('');
       }
     },
   );

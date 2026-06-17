@@ -34,6 +34,9 @@ Future<bool> clearNFCTag(BuildContext context) async {
       NfcPollingOption.iso15693,
     },
     onDiscovered: (NfcTag tag) async {
+      // onDiscovered puede dispararse varias veces en una sesión; si ya
+      // completamos, ignorar para no provocar "Future already completed".
+      if (completer.isCompleted) return;
       try {
         debugPrint('🏷️ TAG detectado, iniciando limpieza...');
 
